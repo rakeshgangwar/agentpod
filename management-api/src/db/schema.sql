@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS projects (
   coolify_app_uuid TEXT NOT NULL,
   coolify_server_uuid TEXT NOT NULL,
   container_port INTEGER DEFAULT 4096,
+  fqdn_url TEXT,  -- Public URL for the OpenCode container (e.g., https://opencode-myproject.superchotu.com)
   
   -- GitHub sync (optional)
   github_repo_url TEXT,

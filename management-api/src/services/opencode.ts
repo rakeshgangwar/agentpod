@@ -2,21 +2,18 @@
  * OpenCode Proxy Service
  * 
  * Proxies requests from the Management API to OpenCode containers.
- * Each project has its own OpenCode container running on a specific port.
+ * Each project has its own OpenCode container accessible via its FQDN URL.
  * 
  * Architecture:
- * Mobile App → Management API → OpenCode Container (on Coolify server)
+ * Mobile App → Management API → OpenCode Container (via FQDN/Traefik)
  */
 
 import { config } from '../config.ts';
 import { coolify } from './coolify.ts';
-import { getProjectById, type Project } from '../models/project.ts';
+import { getProjectById, updateProject, type Project } from '../models/project.ts';
 import { createLogger } from '../utils/logger.ts';
 
 const log = createLogger('opencode');
-
-// Cache server IP to avoid repeated lookups
-let cachedServerIp: string | null = null;
 
 // =============================================================================
 // Types
@@ -69,34 +66,47 @@ export interface OpenCodeFileContent {
 }
 
 // =============================================================================
-// Server IP Resolution
+// URL Resolution
 // =============================================================================
 
 /**
- * Get the IP address of the Coolify server where containers run
- */
-async function getServerIp(): Promise<string> {
-  if (cachedServerIp) {
-    return cachedServerIp;
-  }
-
-  try {
-    const server = await coolify.getServer(config.coolify.serverUuid);
-    cachedServerIp = server.ip;
-    log.info('Resolved Coolify server IP', { ip: cachedServerIp });
-    return cachedServerIp;
-  } catch (error) {
-    log.error('Failed to resolve Coolify server IP', { error });
-    throw new Error('Failed to resolve container server IP');
-  }
-}
-
-/**
  * Get the OpenCode API base URL for a project
+ * Uses the FQDN URL stored in the database, or fetches from Coolify if not set
  */
 async function getOpenCodeUrl(project: Project): Promise<string> {
-  const serverIp = await getServerIp();
-  return `http://${serverIp}:${project.containerPort}`;
+  // If we have a stored FQDN URL, use it
+  if (project.fqdnUrl) {
+    return project.fqdnUrl;
+  }
+  
+  // Fallback: Try to get FQDN from Coolify and cache it
+  try {
+    const coolifyApp = await coolify.getApplication(project.coolifyAppUuid);
+    if (coolifyApp.fqdn) {
+      // Update the project with the FQDN
+      log.info('Caching FQDN URL from Coolify', { 
+        projectId: project.id, 
+        fqdn: coolifyApp.fqdn 
+      });
+      updateProject(project.id, { fqdnUrl: coolifyApp.fqdn });
+      return coolifyApp.fqdn;
+    }
+  } catch (error) {
+    log.warn('Failed to get FQDN from Coolify', { error });
+  }
+  
+  // Last resort fallback: construct URL from wildcard domain
+  if (config.opencode.wildcardDomain) {
+    const fqdnUrl = `https://opencode-${project.slug}.${config.opencode.wildcardDomain}`;
+    log.info('Using constructed FQDN URL', { projectId: project.id, fqdnUrl });
+    updateProject(project.id, { fqdnUrl });
+    return fqdnUrl;
+  }
+  
+  throw new OpenCodeProxyError(
+    'No FQDN URL configured for this project. Please set OPENCODE_WILDCARD_DOMAIN or manually configure the container domain.',
+    500
+  );
 }
 
 // =============================================================================
@@ -416,17 +426,10 @@ export const opencode = {
    */
   async healthCheck(projectId: string): Promise<boolean> {
     try {
-      await this.getAppInfo(projectId);
+      await this.listSessions(projectId);
       return true;
     } catch {
       return false;
     }
-  },
-
-  /**
-   * Clear cached server IP (useful if server changes)
-   */
-  clearCache(): void {
-    cachedServerIp = null;
   },
 };

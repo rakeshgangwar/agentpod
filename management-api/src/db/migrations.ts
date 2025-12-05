@@ -109,18 +109,20 @@ export function rollbackMigration(migrations: Migration[]): void {
   }
 }
 
-// Example migrations (add as needed)
+// Migrations list - add new migrations at the end
 export const migrations: Migration[] = [
-  // Migration 1: Initial schema is in schema.sql, applied via initDatabase()
-  // Add future migrations here:
-  // {
-  //   version: 1,
-  //   name: 'add_project_tags',
-  //   up: () => {
-  //     db.exec('ALTER TABLE projects ADD COLUMN tags TEXT');
-  //   },
-  //   down: () => {
-  //     // SQLite doesn't support DROP COLUMN easily
-  //   },
-  // },
+  // Migration 1: Add fqdn_url column for public OpenCode container URLs
+  {
+    version: 1,
+    name: 'add_fqdn_url_to_projects',
+    up: () => {
+      db.exec('ALTER TABLE projects ADD COLUMN fqdn_url TEXT');
+    },
+    down: () => {
+      // SQLite doesn't support DROP COLUMN in older versions
+      // For rollback, we'd need to recreate the table without the column
+      // This is a one-way migration for simplicity
+      console.warn('Rollback not supported for this migration');
+    },
+  },
 ];

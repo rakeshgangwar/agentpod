@@ -55,6 +55,8 @@ export const config = {
   opencode: {
     image: getEnv('OPENCODE_IMAGE', 'opencode-server:latest'),
     basePort: getEnvInt('OPENCODE_BASE_PORT', 4001),
+    // Wildcard domain for OpenCode container URLs (e.g., superchotu.com -> opencode-{slug}.superchotu.com)
+    wildcardDomain: getEnv('OPENCODE_WILDCARD_DOMAIN', ''),
   },
 
   // Database

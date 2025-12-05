@@ -23,6 +23,7 @@ export interface Project {
   coolifyAppUuid: string;
   coolifyServerUuid: string;
   containerPort: number;
+  fqdnUrl: string | null;  // Public URL for the OpenCode container
   
   // GitHub sync
   githubRepoUrl: string | null;
@@ -51,6 +52,7 @@ export interface CreateProjectInput {
   coolifyAppUuid: string;
   coolifyServerUuid: string;
   containerPort: number;
+  fqdnUrl?: string;
   githubRepoUrl?: string;
   githubSyncEnabled?: boolean;
   githubSyncDirection?: SyncDirection;
@@ -62,6 +64,7 @@ export interface UpdateProjectInput {
   description?: string;
   status?: ProjectStatus;
   errorMessage?: string;
+  fqdnUrl?: string;
   githubSyncEnabled?: boolean;
   githubSyncDirection?: SyncDirection;
   lastSyncAt?: string;
@@ -83,6 +86,7 @@ interface ProjectRow {
   coolify_app_uuid: string;
   coolify_server_uuid: string;
   container_port: number;
+  fqdn_url: string | null;
   github_repo_url: string | null;
   github_sync_enabled: number;
   github_sync_direction: string;
@@ -106,6 +110,7 @@ function rowToProject(row: ProjectRow): Project {
     coolifyAppUuid: row.coolify_app_uuid,
     coolifyServerUuid: row.coolify_server_uuid,
     containerPort: row.container_port,
+    fqdnUrl: row.fqdn_url,
     githubRepoUrl: row.github_repo_url,
     githubSyncEnabled: row.github_sync_enabled === 1,
     githubSyncDirection: row.github_sync_direction as SyncDirection,
@@ -133,13 +138,13 @@ export function createProject(input: CreateProjectInput): Project {
     INSERT INTO projects (
       id, name, slug, description,
       forgejo_repo_url, forgejo_repo_id, forgejo_owner,
-      coolify_app_uuid, coolify_server_uuid, container_port,
+      coolify_app_uuid, coolify_server_uuid, container_port, fqdn_url,
       github_repo_url, github_sync_enabled, github_sync_direction,
       llm_provider, status
     ) VALUES (
       $id, $name, $slug, $description,
       $forgejoRepoUrl, $forgejoRepoId, $forgejoOwner,
-      $coolifyAppUuid, $coolifyServerUuid, $containerPort,
+      $coolifyAppUuid, $coolifyServerUuid, $containerPort, $fqdnUrl,
       $githubRepoUrl, $githubSyncEnabled, $githubSyncDirection,
       $llmProvider, $status
     )
@@ -156,6 +161,7 @@ export function createProject(input: CreateProjectInput): Project {
     $coolifyAppUuid: input.coolifyAppUuid,
     $coolifyServerUuid: input.coolifyServerUuid,
     $containerPort: input.containerPort,
+    $fqdnUrl: input.fqdnUrl ?? null,
     $githubRepoUrl: input.githubRepoUrl ?? null,
     $githubSyncEnabled: input.githubSyncEnabled ? 1 : 0,
     $githubSyncDirection: input.githubSyncDirection ?? 'push',
@@ -212,6 +218,10 @@ export function updateProject(id: string, input: UpdateProjectInput): Project | 
   if (input.errorMessage !== undefined) {
     updates.push('error_message = $errorMessage');
     params.$errorMessage = input.errorMessage;
+  }
+  if (input.fqdnUrl !== undefined) {
+    updates.push('fqdn_url = $fqdnUrl');
+    params.$fqdnUrl = input.fqdnUrl;
   }
   if (input.githubSyncEnabled !== undefined) {
     updates.push('github_sync_enabled = $githubSyncEnabled');

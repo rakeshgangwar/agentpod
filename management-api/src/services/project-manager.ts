@@ -86,9 +86,9 @@ RUN printf '%s\\n' \\
 # Expose OpenCode port
 EXPOSE 4096
 
-# Health check
+# Health check - use /session endpoint (returns JSON, unlike /app which returns HTML)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \\
-    CMD curl -f http://localhost:\${OPENCODE_PORT}/app || exit 1
+    CMD curl -f http://localhost:\${OPENCODE_PORT}/session || exit 1
 
 ENTRYPOINT ["/entrypoint.sh"]
 `;
@@ -162,9 +162,14 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
     // Use a simple incrementing port based on repo ID
     const containerPort = config.opencode.basePort + (forgejoRepo.id % 1000);
     
-    // Step 3: Create Coolify application using embedded Dockerfile
+    // Step 3: Generate FQDN for the container
+    const fqdnUrl = config.opencode.wildcardDomain 
+      ? `https://opencode-${slug}.${config.opencode.wildcardDomain}`
+      : null;
+    
+    // Step 4: Create Coolify application using embedded Dockerfile
     // This bypasses the git URL stripping issue that Coolify has with self-hosted Forgejo
-    log.info('Step 2: Creating Coolify application (embedded Dockerfile)', { slug });
+    log.info('Step 2: Creating Coolify application (embedded Dockerfile)', { slug, fqdnUrl });
     
     coolifyApp = await coolify.createDockerfileApp({
       projectUuid: config.coolify.projectUuid,
@@ -174,15 +179,16 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       portsExposes: String(containerPort),
       name: `opencode-${slug}`,
       description: `OpenCode container for ${name}`,
+      domains: fqdnUrl ?? undefined,  // Set the domain for Traefik routing
       instantDeploy: false, // We'll set env vars first, then deploy
       healthCheckEnabled: true,
-      healthCheckPath: '/app',
+      healthCheckPath: '/session',  // Use /session instead of /app (which returns HTML)
       healthCheckPort: String(containerPort),
     });
     
     log.info('Coolify application created', { uuid: coolifyApp.uuid });
     
-    // Step 4: Set environment variables
+    // Step 5: Set environment variables
     log.info('Step 3: Setting environment variables');
     
     // Transform the clone URL to use the public HTTPS URL (accessible from containers)
@@ -232,7 +238,7 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       vars: Object.keys(envVars) 
     });
     
-    // Step 5: Save to database
+    // Step 6: Save to database
     log.info('Step 4: Saving project to database');
     
     const projectInput: CreateProjectInput = {
@@ -244,6 +250,7 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       coolifyAppUuid: coolifyApp.uuid,
       coolifyServerUuid: config.coolify.serverUuid,
       containerPort,
+      fqdnUrl: fqdnUrl ?? undefined,
       githubRepoUrl: githubUrl,
       githubSyncEnabled: !!githubUrl,
       githubSyncDirection: 'push',

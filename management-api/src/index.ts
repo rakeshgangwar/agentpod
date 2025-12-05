@@ -4,6 +4,7 @@ import { logger } from 'hono/logger';
 import { bearerAuth } from 'hono/bearer-auth';
 import { config } from './config.ts';
 import { initDatabase } from './db/index.ts';
+import { runMigrations, migrations } from './db/migrations.ts';
 import { healthRoutes } from './routes/health.ts';
 import { projectRoutes } from './routes/projects.ts';
 import { providerRoutes } from './routes/providers.ts';
@@ -13,6 +14,10 @@ import { opencodeRoutes } from './routes/opencode.ts';
 // Initialize database
 console.log('Initializing database...');
 initDatabase();
+
+// Run migrations
+console.log('Running migrations...');
+runMigrations(migrations);
 
 // Create the Hono app
 const app = new Hono()
