@@ -326,12 +326,21 @@ export const opencodeRoutes = new Hono()
       
       log.info('SSE connection established, proxying stream', { projectId });
       
-      // Simply proxy the raw SSE stream - it's already in SSE format
-      return new Response(response.body, {
+      // Create a TransformStream to pass through the data
+      const { readable, writable } = new TransformStream();
+      
+      // Pipe the upstream response to our transform stream
+      response.body.pipeTo(writable).catch((err) => {
+        log.error('SSE pipe error', { projectId, error: err });
+      });
+      
+      // Return the readable side with proper SSE headers
+      return new Response(readable, {
         headers: {
           'Content-Type': 'text/event-stream',
           'Cache-Control': 'no-cache',
           'Connection': 'keep-alive',
+          'X-Accel-Buffering': 'no', // Disable nginx buffering
         },
       });
       
