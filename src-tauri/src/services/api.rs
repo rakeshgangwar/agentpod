@@ -99,17 +99,8 @@ impl ApiClient {
     /// Create a new project
     pub async fn create_project(&self, input: CreateProjectInput) -> Result<Project, AppError> {
         let url = format!("{}/api/projects", self.base_url);
-        
-        // Debug: log what we're sending
-        let json_body = serde_json::to_string(&input)
-            .map_err(|e| AppError::ApiError(format!("Failed to serialize input: {}", e)))?;
-        println!("[API] Creating project with body: {}", json_body);
-        
         let request = self.add_auth(self.client.post(&url)).json(&input);
         let response = request.send().await?;
-        
-        println!("[API] Create project response status: {}", response.status());
-        
         let result: ProjectResponse = self.handle_response(response).await?;
         Ok(result.project)
     }
