@@ -17,10 +17,14 @@ tailscale status
 tailscale ip -4
 ```
 
+### Actual Configuration
+- **VPS Tailscale IP:** `100.85.212.42`
+- **Device Name:** `coolify-ubuntu-16gb-nbg1-1`
+
 ### Useful Tailscale Commands
 ```bash
 # Check connection to another device
-tailscale ping <device-name>
+tailscale ping coolify-ubuntu-16gb-nbg1-1
 
 # List all devices in tailnet
 tailscale status
@@ -36,22 +40,23 @@ tailscale up
 
 ## Forgejo
 
+### Actual Deployment
+
+- **URL:** https://forgejo.superchotu.com
+- **User:** rakeshgangwar
+- **Deployed via:** Coolify One-Click Service
+
 ### Coolify Deployment Notes
 
 When deploying Forgejo via Coolify:
 
 1. **Storage**: Ensure persistent volume is configured for `/data`
 2. **Port**: Default is 3000 (HTTP) and 22 (SSH for git)
-3. **Environment Variables**:
-   ```
-   USER_UID=1000
-   USER_GID=1000
-   FORGEJO__server__ROOT_URL=http://100.x.x.x:3000/
-   ```
+3. **Domain**: Configure via Coolify's domain settings (SSL auto-provisioned)
 
 ### API Reference
 
-Base URL: `http://100.x.x.x:3000/api/v1`
+Base URL: `https://forgejo.superchotu.com/api/v1`
 
 **Authentication**: Bearer token in header
 ```
@@ -67,6 +72,20 @@ Authorization: token YOUR_TOKEN
 | DELETE | /repos/{owner}/{repo} | Delete repository |
 | GET | /repos/{owner}/{repo}/contents/{path} | Get file contents |
 
+**Example API Calls:**
+```bash
+# Get user info
+curl -H "Authorization: token YOUR_TOKEN" \
+  https://forgejo.superchotu.com/api/v1/user
+
+# Create repository
+curl -X POST \
+  -H "Authorization: token YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "my-repo", "private": false}' \
+  https://forgejo.superchotu.com/api/v1/user/repos
+```
+
 ### Creating API Token
 
 1. Log into Forgejo web UI
@@ -79,57 +98,32 @@ Authorization: token YOUR_TOKEN
 
 ## OpenCode Docker Image
 
-### Dockerfile
-```dockerfile
-FROM node:20-slim
+### Actual Deployment
 
-# Install OpenCode and git
-RUN npm install -g opencode-ai && \
-    apt-get update && \
-    apt-get install -y git && \
-    rm -rf /var/lib/apt/lists/*
+- **URL:** https://opencode.superchotu.com
+- **Deployed via:** Coolify Dockerfile build from Forgejo repo
+- **Source:** `docker/opencode/` directory in CodeOpen repo
 
-WORKDIR /workspace
+### Deployment Approach
 
-ENV OPENCODE_PORT=4096
-ENV OPENCODE_HOST=0.0.0.0
+Instead of publishing to an external registry, we used Coolify's Dockerfile build feature:
 
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+1. Push code to Forgejo repository
+2. Configure Coolify to build from Forgejo repo
+3. Set Base Directory to `docker/opencode`
+4. Coolify builds and deploys automatically
 
-EXPOSE 4096
+### Dockerfile Location
+`docker/opencode/Dockerfile` - See actual file in repository
 
-ENTRYPOINT ["/entrypoint.sh"]
-```
-
-### entrypoint.sh
+### Build and Test Commands (Local)
 ```bash
-#!/bin/bash
-set -e
-
-# Clone project if workspace is empty
-if [ ! -d "/workspace/.git" ] && [ -n "$FORGEJO_REPO_URL" ]; then
-    echo "Cloning repository from Forgejo..."
-    git clone "$FORGEJO_REPO_URL" /workspace
-fi
-
-# Configure git
-git config --global user.email "opencode@portable-command-center.local"
-git config --global user.name "OpenCode"
-git config --global --add safe.directory /workspace
-
-# Start OpenCode server
-cd /workspace
-exec opencode serve --port "$OPENCODE_PORT" --hostname "$OPENCODE_HOST"
-```
-
-### Build and Test Commands
-```bash
-# Build image
-docker build -t opencode-server ./docker/opencode
+# Build image locally
+cd docker/opencode
+docker build -t opencode-server .
 
 # Run locally for testing
-docker run -it --rm \
+docker run -d \
   -p 4096:4096 \
   -e ANTHROPIC_API_KEY="your-key" \
   -v $(pwd)/test-workspace:/workspace \
@@ -137,71 +131,88 @@ docker run -it --rm \
 
 # Test API
 curl http://localhost:4096/app
+curl http://localhost:4096/session
+curl -X POST http://localhost:4096/session
 ```
 
-### Publishing to Docker Hub
-```bash
-# Login
-docker login
+### Coolify Configuration
 
-# Tag
-docker tag opencode-server yourusername/opencode-server:latest
+When deploying via Coolify:
 
-# Push
-docker push yourusername/opencode-server:latest
+1. **Source:** Public Repository
+2. **Repository URL:** `https://forgejo.superchotu.com/rakeshgangwar/CodeOpen.git`
+3. **Branch:** `main`
+4. **Build Pack:** Dockerfile
+5. **Base Directory:** `docker/opencode`
+6. **Dockerfile Location:** `Dockerfile`
+7. **Port Exposes:** `4096`
+
+### Environment Variables
 ```
-
-### Publishing to Private Registry (Coolify)
-
-If using Coolify's built-in registry:
-```bash
-# Tag for Coolify registry
-docker tag opencode-server 100.x.x.x:5000/opencode-server:latest
-
-# Push (may need to configure insecure registry)
-docker push 100.x.x.x:5000/opencode-server:latest
+ANTHROPIC_API_KEY=your-api-key
+OPENCODE_PORT=4096
+OPENCODE_HOST=0.0.0.0
+GIT_USER_EMAIL=opencode@superchotu.com
+GIT_USER_NAME=OpenCode
 ```
 
 ---
 
-## Coolify API
+## Coolify
 
-### Authentication
+### Actual Configuration
+
+- **Dashboard URL:** https://admin.superchotu.com
+- **VPS Public IP:** 162.55.48.175
+
+### API Authentication
 ```bash
 # Get API token from Coolify UI: Keys & Tokens → API tokens
 # Use in requests:
 Authorization: Bearer YOUR_COOLIFY_TOKEN
 ```
 
-### Base URL
+### API Base URL
 ```
-http://100.x.x.x:8000/api/v1
+https://admin.superchotu.com/api/v1
 ```
 
-### Useful Endpoints
+### Useful API Endpoints
 ```bash
 # List servers
 curl -H "Authorization: Bearer $TOKEN" \
-  http://100.x.x.x:8000/api/v1/servers
+  https://admin.superchotu.com/api/v1/servers
 
 # List applications
 curl -H "Authorization: Bearer $TOKEN" \
-  http://100.x.x.x:8000/api/v1/applications
+  https://admin.superchotu.com/api/v1/applications
+```
 
-# Create Docker image application
+---
+
+## OpenCode API
+
+### Base URL
+```
+https://opencode.superchotu.com
+```
+
+### API Endpoints
+```bash
+# Get web UI
+curl https://opencode.superchotu.com/app
+
+# List sessions
+curl https://opencode.superchotu.com/session
+
+# Create session
+curl -X POST https://opencode.superchotu.com/session
+
+# Send message to session
 curl -X POST \
-  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{
-    "project_uuid": "xxx",
-    "server_uuid": "xxx",
-    "environment_name": "production",
-    "docker_registry_image_name": "yourusername/opencode-server",
-    "docker_registry_image_tag": "latest",
-    "ports_exposes": "4096",
-    "name": "opencode-test"
-  }' \
-  http://100.x.x.x:8000/api/v1/applications/dockerimage
+  -d '{"parts": [{"type": "text", "text": "Your prompt here"}]}' \
+  https://opencode.superchotu.com/session/SESSION_ID/message
 ```
 
 ---
@@ -214,14 +225,15 @@ curl -X POST \
 - Try `tailscale down && tailscale up` to reconnect
 
 ### Forgejo Won't Start
-- Check logs: `docker logs <container-id>`
-- Ensure port 3000 is not in use
-- Verify volume permissions
+- Check logs in Coolify dashboard
+- Verify domain DNS is configured
+- Check SSL certificate provisioning
 
 ### OpenCode Container Issues
-- Check if workspace has valid git repo
-- Verify environment variables are set
-- Check container logs for startup errors
+- **"no available server"**: Check port mapping in Coolify (should be 4096)
+- **SSL errors**: Wait for Let's Encrypt certificate provisioning
+- Check container logs in Coolify dashboard for startup errors
+- Verify ANTHROPIC_API_KEY environment variable is set
 
 ### Coolify API 401 Errors
 - Verify token has correct permissions (need `*` for full access)
@@ -230,16 +242,15 @@ curl -X POST \
 
 ---
 
-## Credentials to Save
+## Credentials Reference
 
-After completing Phase 1, save these securely:
-
-| Credential | Location | Notes |
-|------------|----------|-------|
-| Tailscale VPS IP | - | 100.x.x.x |
-| Forgejo URL | - | http://100.x.x.x:3000 |
-| Forgejo Admin User | - | Created during setup |
-| Forgejo API Token | - | For Management API |
-| Coolify URL | - | http://100.x.x.x:8000 |
-| Coolify API Token | - | For Management API |
-| Docker Registry | - | Where OpenCode image is stored |
+| Credential | Value | Notes |
+|------------|-------|-------|
+| Tailscale VPS IP | 100.85.212.42 | Internal Tailnet access |
+| VPS Public IP | 162.55.48.175 | External access |
+| Forgejo URL | https://forgejo.superchotu.com | Git hosting |
+| Forgejo User | rakeshgangwar | Admin account |
+| Forgejo API Token | Stored in `.env` | For API access |
+| Coolify URL | https://admin.superchotu.com | Dashboard |
+| OpenCode URL | https://opencode.superchotu.com | AI coding agent |
+| OpenCode Port | 4096 | Internal container port |

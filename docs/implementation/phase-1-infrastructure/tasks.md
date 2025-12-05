@@ -85,10 +85,9 @@ docker run -d \
 - [x] Test with actual API key and prompt (created hello.txt successfully)
 
 ### 3.3 Publish to Registry
-- [ ] Choose registry (Docker Hub or Coolify's built-in)
-- [ ] Tag image: `docker tag opencode-server your-registry/opencode-server:latest`
-- [ ] Push image: `docker push your-registry/opencode-server:latest`
-- [ ] Verify image is accessible from VPS
+- [x] Used Coolify's Dockerfile build from Forgejo repo (no external registry needed)
+- [x] Repository pushed to Forgejo: `https://forgejo.superchotu.com/rakeshgangwar/CodeOpen`
+- [x] Coolify builds image directly from source
 
 **Verification:**
 - [x] Image builds successfully
@@ -100,50 +99,55 @@ docker run -d \
 ## 4. Test Deployment via Coolify
 
 ### 4.1 Create Test Project in Coolify
-- [ ] Create new Project: "OpenCode Containers"
-- [ ] Create new Environment: "test"
+- [x] Create new Project: "OpenCode Containers"
+- [x] Create new Environment: "production"
 
 ### 4.2 Deploy Test Container
-- [ ] Create new Application → Docker Image
-- [ ] Configure:
-  - Image: `your-registry/opencode-server:latest`
+- [x] Create new Application → Dockerfile (from Forgejo repo)
+- [x] Configure:
+  - Repository: `https://forgejo.superchotu.com/rakeshgangwar/CodeOpen.git`
+  - Base Directory: `docker/opencode`
   - Port: 4096
-  - Environment variables:
-    - `FORGEJO_REPO_URL=http://forgejo:3000/admin/test-repo.git`
-    - `OPENCODE_PORT=4096`
-    - `OPENCODE_HOST=0.0.0.0`
-    - `ANTHROPIC_API_KEY=your-key` (or other provider)
-- [ ] Deploy
+  - Environment variables: ANTHROPIC_API_KEY, OPENCODE_PORT, OPENCODE_HOST
+- [x] Deploy to `https://opencode.superchotu.com`
 
 ### 4.3 Verify End-to-End
-- [ ] Container starts successfully
-- [ ] OpenCode API responds: `curl http://100.85.212.42:4096/app`
-- [ ] Create a session and send a test prompt
-- [ ] Verify changes are made to the workspace
+- [x] Container starts successfully
+- [x] OpenCode API responds: `curl https://opencode.superchotu.com/app`
+- [x] Create a session and send a test prompt
+- [x] Verify file created in workspace (test.txt with "Hello from Coolify!")
 
 **Verification:**
 ```bash
 # Check app info
-curl http://100.85.212.42:4096/app
+curl https://opencode.superchotu.com/app
 
 # Create session
-curl -X POST http://100.85.212.42:4096/session
+curl -X POST https://opencode.superchotu.com/session
 
 # Send prompt (replace SESSION_ID)
 curl -X POST \
   -H "Content-Type: application/json" \
   -d '{"parts": [{"type": "text", "text": "Create a hello.txt file with Hello World"}]}' \
-  http://100.85.212.42:4096/session/SESSION_ID/message
+  https://opencode.superchotu.com/session/SESSION_ID/message
 ```
 
 ---
 
 ## 5. Documentation & Cleanup
 
-- [ ] Document all IPs, ports, and URLs
-- [ ] Store credentials securely
-- [ ] Delete test resources (test-repo, test container)
+- [x] Document all IPs, ports, and URLs (see below)
+- [x] Store credentials securely (in local .env)
+- [ ] Delete test resources (test-repo) - optional, can keep for testing
 - [ ] Update phase status in implementation README
+
+### Infrastructure URLs
+| Service | URL |
+|---------|-----|
+| Coolify | https://admin.superchotu.com |
+| Forgejo | https://forgejo.superchotu.com |
+| OpenCode | https://opencode.superchotu.com |
+| VPS Tailscale IP | 100.85.212.42 |
 
 ---
 
