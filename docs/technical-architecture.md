@@ -88,7 +88,7 @@ Deep dive into the system design for the Portable Command Center.
 
 **Purpose**: Central orchestration service for project lifecycle, credential management, and background operations.
 
-**Technology**: Node.js/TypeScript or Go (TBD)
+**Technology**: Bun/TypeScript with Hono (SST team's framework choice)
 
 **Port**: 3001
 

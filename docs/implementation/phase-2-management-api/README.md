@@ -4,7 +4,7 @@ Build the backend service that orchestrates project lifecycle, container managem
 
 ## Objectives
 
-1. Set up Node.js/TypeScript project structure
+1. Set up Bun/TypeScript project structure with Hono
 2. Implement Coolify API client
 3. Implement Forgejo API client
 4. Create project lifecycle endpoints
@@ -16,7 +16,7 @@ Build the backend service that orchestrates project lifecycle, container managem
 - Phase 1 complete
 - Coolify API token
 - Forgejo API token
-- Node.js 20+ installed locally
+- Bun installed locally (or Node.js 20+)
 
 ## Duration
 
@@ -39,11 +39,21 @@ Build the backend service that orchestrates project lifecycle, container managem
 
 ## Tech Stack
 
-- **Runtime**: Node.js 20
+- **Runtime**: Bun (or Node.js 20)
 - **Language**: TypeScript
-- **Framework**: Fastify (lightweight, fast)
+- **Framework**: Hono (ultrafast, multi-runtime, SST team's choice)
+- **Validation**: Zod with @hono/zod-validator
 - **Database**: SQLite (simple, file-based) or PostgreSQL
 - **Deployment**: Docker via Coolify
+
+### Why Hono?
+
+Hono is the framework used by the SST team (creators of OpenCode). Key benefits:
+- **Ultrafast** - Uses `RegExpRouter` for high-performance routing
+- **Multi-runtime** - Same code runs on Bun, Node.js, Deno, Cloudflare Workers
+- **Lightweight** - ~14KB with no external dependencies
+- **Type-safe RPC** - Hono Client (`hc`) for type-safe API calls from mobile app
+- **Built-in middleware** - CORS, validation, auth, etc.
 
 ## Files in This Phase
 

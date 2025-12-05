@@ -1,18 +1,27 @@
 # Phase 2: Technical Notes
 
+## Framework: Hono
+
+Hono is the SST team's preferred framework, used in OpenCode itself. Key features:
+- Ultrafast routing with `RegExpRouter`
+- Multi-runtime support (Bun, Node.js, Deno, Cloudflare Workers)
+- Built-in middleware (CORS, validation, auth)
+- Type-safe RPC with Hono Client (`hc`)
+- ~14KB with no external dependencies
+
 ## Project Structure
 
 ```
 management-api/
 ├── src/
-│   ├── index.ts              # Entry point, server setup
+│   ├── index.ts              # Entry point, Hono app setup
 │   ├── config.ts             # Environment config
 │   ├── db/
 │   │   ├── index.ts          # Database connection
 │   │   ├── schema.sql        # Table definitions
 │   │   └── migrations.ts     # Migration runner
 │   ├── routes/
-│   │   ├── index.ts          # Route registration
+│   │   ├── index.ts          # Route aggregation & AppType export
 │   │   ├── health.ts         # Health endpoints
 │   │   ├── projects.ts       # Project CRUD
 │   │   ├── providers.ts      # LLM provider config
@@ -409,68 +418,168 @@ async function getLLMCredentials(providerId?: string): Promise<Record<string, st
 
 ---
 
+## Hono App Entry Point
+
+```typescript
+// src/index.ts
+import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import { logger } from 'hono/logger';
+import { bearerAuth } from 'hono/bearer-auth';
+import { config } from './config';
+import { projectRoutes } from './routes/projects';
+import { providerRoutes } from './routes/providers';
+import { healthRoutes } from './routes/health';
+
+const app = new Hono()
+  .use('*', logger())
+  .use('*', cors())
+  .use('/api/*', bearerAuth({ token: config.auth.token }))
+  .route('/', healthRoutes)
+  .route('/', projectRoutes)
+  .route('/', providerRoutes);
+
+// Export type for Hono Client (type-safe RPC from mobile app)
+export type AppType = typeof app;
+
+export default app;
+
+// Start server
+const port = config.port;
+console.log(`Management API running on port ${port}`);
+
+Bun.serve({
+  fetch: app.fetch,
+  port,
+});
+```
+
+---
+
 ## API Routes
 
 ```typescript
 // src/routes/projects.ts
-import { FastifyInstance } from 'fastify';
+import { Hono } from 'hono';
+import { zValidator } from '@hono/zod-validator';
+import { z } from 'zod';
 import { createProject, getProject, listProjects, deleteProject, startProject, stopProject } from '../services/project-manager';
 
-export async function projectRoutes(app: FastifyInstance) {
+// Request schemas
+const createProjectSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().optional(),
+  source: z.object({
+    type: z.enum(['empty', 'github']),
+    githubUrl: z.string().url().optional(),
+    syncEnabled: z.boolean().optional(),
+    syncDirection: z.enum(['push', 'pull', 'bidirectional']).optional(),
+  }),
+  llmProvider: z.string().optional(),
+});
+
+export const projectRoutes = new Hono()
   // List all projects
-  app.get('/api/projects', async () => {
-    return { projects: await listProjects() };
-  });
+  .get('/api/projects', async (c) => {
+    const projects = await listProjects();
+    return c.json({ projects });
+  })
   
   // Get single project
-  app.get('/api/projects/:id', async (request) => {
-    const { id } = request.params as { id: string };
+  .get('/api/projects/:id', async (c) => {
+    const id = c.req.param('id');
     const project = await getProject(id);
     if (!project) {
-      throw { statusCode: 404, message: 'Project not found' };
+      return c.json({ error: 'Project not found' }, 404);
     }
-    return project;
-  });
+    return c.json(project);
+  })
   
   // Create project
-  app.post('/api/projects', async (request) => {
-    const body = request.body as {
-      name: string;
-      description?: string;
-      source: {
-        type: 'empty' | 'github';
-        githubUrl?: string;
-        syncEnabled?: boolean;
-        syncDirection?: string;
-      };
-      llmProvider?: string;
-    };
-    
+  .post('/api/projects', zValidator('json', createProjectSchema), async (c) => {
+    const body = c.req.valid('json');
     const project = await createProject(body);
-    return project;
-  });
+    return c.json(project, 201);
+  })
   
   // Delete project
-  app.delete('/api/projects/:id', async (request) => {
-    const { id } = request.params as { id: string };
+  .delete('/api/projects/:id', async (c) => {
+    const id = c.req.param('id');
     await deleteProject(id);
-    return { success: true };
-  });
+    return c.json({ success: true });
+  })
   
   // Start project
-  app.post('/api/projects/:id/start', async (request) => {
-    const { id } = request.params as { id: string };
+  .post('/api/projects/:id/start', async (c) => {
+    const id = c.req.param('id');
     await startProject(id);
-    return { success: true };
-  });
+    return c.json({ success: true });
+  })
   
   // Stop project
-  app.post('/api/projects/:id/stop', async (request) => {
-    const { id } = request.params as { id: string };
+  .post('/api/projects/:id/stop', async (c) => {
+    const id = c.req.param('id');
     await stopProject(id);
-    return { success: true };
+    return c.json({ success: true });
   });
-}
+```
+
+---
+
+## Health Routes
+
+```typescript
+// src/routes/health.ts
+import { Hono } from 'hono';
+
+export const healthRoutes = new Hono()
+  .get('/health', (c) => c.json({ status: 'ok' }))
+  .get('/api/info', (c) => c.json({
+    name: 'Management API',
+    version: '1.0.0',
+    status: 'running',
+  }));
+```
+
+---
+
+## Provider Routes
+
+```typescript
+// src/routes/providers.ts
+import { Hono } from 'hono';
+import { zValidator } from '@hono/zod-validator';
+import { z } from 'zod';
+import { listProviders, configureProvider, setDefaultProvider, removeProvider } from '../services/provider-manager';
+
+const configureSchema = z.object({
+  apiKey: z.string().min(1),
+});
+
+export const providerRoutes = new Hono()
+  .get('/api/providers', async (c) => {
+    const providers = await listProviders();
+    return c.json({ providers });
+  })
+  
+  .post('/api/providers/:id/configure', zValidator('json', configureSchema), async (c) => {
+    const id = c.req.param('id');
+    const { apiKey } = c.req.valid('json');
+    await configureProvider(id, apiKey);
+    return c.json({ success: true });
+  })
+  
+  .post('/api/providers/:id/set-default', async (c) => {
+    const id = c.req.param('id');
+    await setDefaultProvider(id);
+    return c.json({ success: true });
+  })
+  
+  .delete('/api/providers/:id', async (c) => {
+    const id = c.req.param('id');
+    await removeProvider(id);
+    return c.json({ success: true });
+  });
 ```
 
 ---
@@ -479,6 +588,44 @@ export async function projectRoutes(app: FastifyInstance) {
 
 ```dockerfile
 # management-api/Dockerfile
+FROM oven/bun:1 AS builder
+
+WORKDIR /app
+
+COPY package.json bun.lockb ./
+RUN bun install --frozen-lockfile
+
+COPY . .
+
+# Production image
+FROM oven/bun:1-slim
+
+WORKDIR /app
+
+# Install SQLite (for better-sqlite3)
+RUN apt-get update && apt-get install -y sqlite3 && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/package.json ./
+
+# Create data directory for SQLite
+RUN mkdir -p /app/data
+
+ENV NODE_ENV=production
+ENV DATABASE_PATH=/app/data/database.sqlite
+
+EXPOSE 3001
+
+CMD ["bun", "run", "src/index.ts"]
+```
+
+### Alternative: Node.js Dockerfile
+
+If you prefer Node.js instead of Bun:
+
+```dockerfile
+# management-api/Dockerfile (Node.js version)
 FROM node:20-slim AS builder
 
 WORKDIR /app
@@ -489,19 +636,16 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-# Production image
 FROM node:20-slim
 
 WORKDIR /app
 
-# Install SQLite
 RUN apt-get update && apt-get install -y sqlite3 && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY package*.json ./
 
-# Create data directory for SQLite
 RUN mkdir -p /app/data
 
 ENV NODE_ENV=production
@@ -509,7 +653,20 @@ ENV DATABASE_PATH=/app/data/database.sqlite
 
 EXPOSE 3001
 
+# For Node.js, use the node adapter
 CMD ["node", "dist/index.js"]
+```
+
+For Node.js, update `src/index.ts`:
+
+```typescript
+import { serve } from '@hono/node-server';
+// ... rest of the app
+
+serve({
+  fetch: app.fetch,
+  port: config.port,
+});
 ```
 
 ---
@@ -590,3 +747,64 @@ curl -X POST http://localhost:3001/api/providers/openrouter/configure \
   -H "Authorization: Bearer your-token" \
   -d '{ "apiKey": "sk-or-xxx" }'
 ```
+
+---
+
+## Type-Safe API Client (Hono RPC)
+
+One of the key benefits of Hono is the type-safe RPC client. This allows the mobile app (Tauri + Svelte) to call the Management API with full type safety.
+
+### Server-side: Export AppType
+
+```typescript
+// src/index.ts (already shown above)
+export type AppType = typeof app;
+```
+
+### Client-side: Use Hono Client
+
+```typescript
+// In the mobile app (Svelte frontend)
+import { hc } from 'hono/client';
+import type { AppType } from 'management-api'; // Import the type
+
+// Create type-safe client
+const client = hc<AppType>('http://100.x.x.x:3001', {
+  headers: {
+    Authorization: 'Bearer your-token',
+  },
+});
+
+// Now you get full autocomplete and type checking!
+async function listProjects() {
+  const res = await client.api.projects.$get();
+  if (res.ok) {
+    const data = await res.json();
+    return data.projects; // Fully typed!
+  }
+}
+
+async function createProject(name: string) {
+  const res = await client.api.projects.$post({
+    json: {
+      name,
+      source: { type: 'empty' },
+    },
+  });
+  return res.json();
+}
+
+async function startProject(id: string) {
+  const res = await client.api.projects[':id'].start.$post({
+    param: { id },
+  });
+  return res.json();
+}
+```
+
+### Benefits of Hono RPC
+
+1. **End-to-end type safety** - No manual type definitions for API responses
+2. **Autocomplete** - IDE suggests available endpoints and parameters
+3. **Compile-time errors** - Catch API mismatches before runtime
+4. **No code generation** - Types are inferred from the server code

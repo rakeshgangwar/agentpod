@@ -4,22 +4,32 @@
 
 ### 1.1 Initialize Project
 - [ ] Create `management-api/` directory
-- [ ] Initialize npm project: `npm init -y`
+- [ ] Initialize Bun project: `bun init`
 - [ ] Install dependencies:
   ```bash
-  npm install fastify @fastify/cors @fastify/env
-  npm install better-sqlite3  # or pg for PostgreSQL
-  npm install -D typescript @types/node @types/better-sqlite3
-  npm install -D tsx  # for running TypeScript directly
+  # Core framework
+  bun add hono @hono/zod-validator zod
+
+  # Database
+  bun add better-sqlite3
+  bun add -D @types/better-sqlite3
+
+  # Utilities
+  bun add nanoid dotenv
   ```
 - [ ] Configure TypeScript (`tsconfig.json`)
 - [ ] Set up project structure:
   ```
   management-api/
   ├── src/
-  │   ├── index.ts
-  │   ├── config.ts
+  │   ├── index.ts           # Entry point with Hono app
+  │   ├── config.ts          # Environment config
   │   ├── routes/
+  │   │   ├── index.ts       # Route aggregation & type export
+  │   │   ├── health.ts
+  │   │   ├── projects.ts
+  │   │   ├── providers.ts
+  │   │   └── sync.ts
   │   ├── services/
   │   ├── models/
   │   └── utils/
