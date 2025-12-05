@@ -1,0 +1,57 @@
+# =============================================================================
+# Management API - Docker Compose for Local Development
+# =============================================================================
+# 
+# Usage:
+#   docker compose up -d          # Start in background
+#   docker compose logs -f        # Follow logs
+#   docker compose down           # Stop and remove
+#   docker compose down -v        # Stop and remove with volumes
+#
+# =============================================================================
+
+services:
+  management-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: management-api
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - API_TOKEN=${API_TOKEN:-dev-token-change-in-production}
+      - DATABASE_PATH=/app/data/database.sqlite
+      # Coolify configuration (use Tailscale IP in production)
+      - COOLIFY_URL=${COOLIFY_URL:-https://admin.superchotu.com}
+      - COOLIFY_TOKEN=${COOLIFY_TOKEN}
+      - COOLIFY_PROJECT_UUID=${COOLIFY_PROJECT_UUID}
+      - COOLIFY_SERVER_UUID=${COOLIFY_SERVER_UUID}
+      # Forgejo configuration
+      - FORGEJO_URL=${FORGEJO_URL:-https://forgejo.superchotu.com}
+      - FORGEJO_TOKEN=${FORGEJO_TOKEN}
+      - FORGEJO_OWNER=${FORGEJO_OWNER:-rakeshgangwar}
+      # OpenCode configuration
+      - OPENCODE_IMAGE=${OPENCODE_IMAGE:-opencode-server:latest}
+      - OPENCODE_BASE_PORT=${OPENCODE_BASE_PORT:-4001}
+    volumes:
+      # Persist SQLite database
+      - api-data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    networks:
+      - management-network
+
+volumes:
+  api-data:
+    driver: local
+
+networks:
+  management-network:
+    driver: bridge

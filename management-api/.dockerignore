@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+bun.lock
+
+# Data files
+data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# Test files
+tests/
+*.test.ts
+coverage/
+
+# Development files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+.cache/
+
+# Git
+.git/
+.gitignore
+
+# Documentation (not needed in container)
+*.md
+!README.md
+
+# Docker files (not needed inside container)
+Dockerfile
+docker-compose*.yml
+.dockerignore
