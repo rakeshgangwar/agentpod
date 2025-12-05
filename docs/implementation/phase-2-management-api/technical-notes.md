@@ -9,6 +9,156 @@ Hono is the SST team's preferred framework, used in OpenCode itself. Key feature
 - Type-safe RPC with Hono Client (`hc`)
 - ~14KB with no external dependencies
 
+---
+
+## Critical Fixes & Lessons Learned
+
+### Issue 1: Coolify Strips Git URL Domain (BLOCKING)
+
+**Problem**: Coolify's `/applications/public` endpoint strips the domain from git URLs and defaults to GitHub as the source.
+
+```
+Input:  git_repository: "https://forgejo.superchotu.com/rakeshgangwar/repo.git"
+Stored: git_repository: "rakeshgangwar/repo.git"  # Domain stripped!
+Result: Deployment fails - tries to clone from GitHub instead of Forgejo
+```
+
+**Root Cause**: Coolify's public git app endpoint sets `source_type: "GithubApp"` and reconstructs URLs assuming GitHub.
+
+**Solution**: Use the `/applications/dockerfile` endpoint instead, which:
+1. Accepts raw Dockerfile content (base64 encoded)
+2. No git cloning during build - bypasses the URL issue entirely
+3. Clone the Forgejo repo at container startup via entrypoint script
+
+```typescript
+// Dockerfile must be base64 encoded!
+const dockerfileBase64 = Buffer.from(dockerfile).toString('base64');
+
+await coolify.createDockerfileApp({
+  projectUuid: config.coolify.projectUuid,
+  serverUuid: config.coolify.serverUuid,
+  environmentName: 'production',
+  dockerfile: dockerfileBase64,  // Base64 encoded!
+  portsExposes: '4096',
+  name: 'opencode-myproject',
+  instantDeploy: false,
+});
+```
+
+### Issue 2: Forgejo URL Port Not Accessible from Containers
+
+**Problem**: Forgejo returns clone URLs with internal port (`:3000`), but containers can't reach that port externally.
+
+```
+Forgejo returns: https://forgejo.superchotu.com:3000/owner/repo.git
+Container error: Failed to connect to forgejo.superchotu.com port 3000
+```
+
+**Solution**: Transform URLs to use public HTTPS (through Traefik reverse proxy):
+
+```typescript
+// Fallback regex: strip port from HTTPS URLs
+const publicCloneUrl = cloneUrl.replace(
+  /^(https:\/\/[^/:]+):\d+(\/.*)/,
+  '$1$2'
+);
+// Result: https://forgejo.superchotu.com/owner/repo.git
+```
+
+### Issue 3: Coolify Deploy Endpoint
+
+**Problem**: Documentation suggested `/applications/{uuid}/deploy` but it returned 404.
+
+**Solution**: Use `/deploy?uuid={uuid}` (query parameter, not path parameter):
+
+```typescript
+async deployApplication(uuid: string, force: boolean = false) {
+  const forceParam = force ? '&force=true' : '';
+  return request('GET', `/deploy?uuid=${uuid}${forceParam}`);
+}
+```
+
+### Issue 4: Coolify Environment Variable "Duplicates"
+
+**Observation**: Coolify creates both `is_preview: true` and `is_preview: false` versions of each env var.
+
+**Explanation**: This is intentional behavior for preview deployment support. Use `filterPreview: true` when listing to get only production vars:
+
+```typescript
+async listEnvVars(appUuid: string, filterPreview: boolean = false) {
+  const envVars = await request('GET', `/applications/${appUuid}/envs`);
+  return filterPreview ? envVars.filter(e => !e.is_preview) : envVars;
+}
+```
+
+### Issue 5: Bulk Environment Variable Updates
+
+**Problem**: Setting env vars one-by-one is slow and error-prone.
+
+**Solution**: Use the bulk update endpoint:
+
+```typescript
+async setEnvVars(appUuid: string, vars: Record<string, string>) {
+  const data = Object.entries(vars).map(([key, value]) => ({
+    key,
+    value,
+    is_preview: false,
+    is_literal: true,
+  }));
+  await request('PATCH', `/applications/${appUuid}/envs/bulk`, { data });
+}
+```
+
+---
+
+## Final Working Architecture
+
+### Container Creation Flow
+
+```
+1. Create Forgejo repo (empty or mirror from GitHub)
+2. Create Coolify app with embedded Dockerfile (base64)
+3. Set env vars (FORGEJO_REPO_URL with public URL, LLM keys)
+4. Deploy triggers build
+5. Container starts, entrypoint clones Forgejo repo
+6. OpenCode server starts on configured port
+```
+
+### Embedded Dockerfile Approach
+
+The Dockerfile is embedded directly in the API code to avoid git cloning issues:
+
+```dockerfile
+FROM node:20-slim
+
+RUN apt-get update && apt-get install -y git curl && rm -rf /var/lib/apt/lists/*
+RUN npm install -g opencode-ai
+
+WORKDIR /workspace
+
+# Entrypoint created via printf (heredocs don't work in Dockerfile)
+RUN printf '%s\n' \
+    '#!/bin/bash' \
+    'set -e' \
+    'if [ -n "$FORGEJO_REPO_URL" ]; then git clone "$FORGEJO_REPO_URL" /workspace; fi' \
+    'exec opencode serve --port "${OPENCODE_PORT:-4096}"' \
+    > /entrypoint.sh && chmod +x /entrypoint.sh
+
+EXPOSE 4096
+HEALTHCHECK CMD curl -f http://localhost:${OPENCODE_PORT}/app || exit 1
+ENTRYPOINT ["/entrypoint.sh"]
+```
+
+### Configuration
+
+```bash
+# .env
+FORGEJO_URL=https://forgejo.superchotu.com:3000      # API access (internal)
+FORGEJO_PUBLIC_URL=https://forgejo.superchotu.com    # Clone URL (external)
+```
+
+---
+
 ## Project Structure
 
 ```

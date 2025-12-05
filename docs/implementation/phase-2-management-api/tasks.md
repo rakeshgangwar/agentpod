@@ -1,5 +1,13 @@
 # Phase 2: Tasks
 
+## Status: COMPLETE ✅
+
+**Deployed at**: https://api.superchotu.com
+
+**Key Achievement**: Full end-to-end project creation flow working - creates Forgejo repo, Coolify app with embedded Dockerfile, sets env vars, deploys container, and container successfully clones repo and starts OpenCode.
+
+---
+
 ## 1. Project Setup ✅
 
 ### 1.1 Initialize Project
@@ -45,7 +53,8 @@
   - `PORT` - API port (default: 3001)
   - `COOLIFY_URL` - Coolify API URL
   - `COOLIFY_TOKEN` - Coolify API token
-  - `FORGEJO_URL` - Forgejo URL
+  - `FORGEJO_URL` - Forgejo URL (internal, for API)
+  - `FORGEJO_PUBLIC_URL` - Forgejo URL (external, for git clone)
   - `FORGEJO_TOKEN` - Forgejo API token
   - `DATABASE_PATH` - SQLite database path
 
@@ -76,31 +85,33 @@
 - [x] Implement methods:
   - `listServers()` - Get available servers
   - `listApplications()` - Get all apps
-  - `createDockerImageApp(config)` - Create OpenCode container
+  - `createDockerImageApp(config)` - Create from Docker image
+  - `createDockerfileApp(config)` - Create from embedded Dockerfile (BASE64!)
   - `getApplication(uuid)` - Get app details
   - `startApplication(uuid)` - Start container
   - `stopApplication(uuid)` - Stop container
+  - `restartApplication(uuid)` - Restart container
+  - `deployApplication(uuid)` - Trigger build/deploy
   - `deleteApplication(uuid)` - Remove container
-  - `setEnvironmentVariables(uuid, vars)` - Set env vars
-- [x] Add error handling and retries
-- [x] Add request logging
+  - `setEnvVars(uuid, vars)` - Bulk set env vars
+  - `listEnvVars(uuid, filterPreview)` - List env vars
+- [x] Add error handling and logging
+- [x] **Fixed**: Deploy endpoint uses `/deploy?uuid=` not `/applications/{uuid}/deploy`
+- [x] **Fixed**: Dockerfile must be base64 encoded
 
 ### 3.2 Forgejo Client ✅
 - [x] Create `src/services/forgejo.ts`
 - [x] Implement methods:
   - `listRepos()` - List all repositories
   - `createRepo(name, description)` - Create new repo
+  - `createMirror(config)` - Import from GitHub
   - `deleteRepo(owner, name)` - Delete repo
   - `getRepo(owner, name)` - Get repo details
   - `getCloneUrl(owner, name)` - Get clone URL for container
 - [x] Add error handling
 
-### 3.3 GitHub Client (for imports) - Deferred
-- [ ] Create `src/services/github.ts` (deferred - using Forgejo mirror feature instead)
-- [ ] Implement methods:
-  - `getRepoInfo(url)` - Parse and validate GitHub URL
-  - `cloneRepo(url, destination)` - Clone to temp directory
-- [ ] Handle authentication for private repos
+### 3.3 GitHub Client (for imports) - Using Forgejo Mirror
+- [x] GitHub import via Forgejo's `createMirror()` instead of separate client
 
 ---
 
@@ -151,10 +162,11 @@
 - [x] Implement `createNewProject(options)`:
   1. Validate input
   2. Create Forgejo repo (or import from GitHub via mirror)
-  3. Create Coolify application
-  4. Set environment variables (LLM keys, Forgejo URL)
-  5. Save project to database
-  6. Return project details
+  3. Create Coolify application with **embedded Dockerfile**
+  4. Transform Forgejo URL to public HTTPS (remove port)
+  5. Set environment variables (LLM keys, Forgejo URL)
+  6. Save project to database
+  7. Return project details
 
 ### 5.2 Project Deletion Flow ✅
 - [x] Implement `deleteProjectFully(id)`:
@@ -178,7 +190,7 @@
 
 ---
 
-## 6. GitHub Import (Using Forgejo Mirror)
+## 6. GitHub Import (Using Forgejo Mirror) ✅
 
 ### 6.1 Import Flow ✅
 - [x] GitHub import integrated into `createNewProject` via Forgejo mirror
@@ -202,11 +214,12 @@
 ### 7.2 Integration Tests ✅
 - [x] Test API routes (16 tests)
 - [x] Test authentication flow
-- [ ] Test full project creation flow (requires mocks)
+- [x] Test full project creation flow (E2E test script)
 
 ### 7.3 Manual Testing ✅
 - [x] Test all endpoints with curl
 - [x] Verified health, providers, and projects endpoints
+- [x] E2E test: project creation → deploy → running:healthy
 
 ---
 
@@ -229,11 +242,22 @@
 - [x] `scripts/deploy.sh` - Deploy to Coolify
 - [x] `.dockerignore` for optimized builds
 
-### 8.4 Deploy to Coolify
-- [ ] Create application in Coolify
-- [ ] Set environment variables
-- [ ] Configure persistent storage for SQLite
-- [ ] Deploy and test
+### 8.4 Deploy to Coolify ✅
+- [x] Create application in Coolify
+- [x] Set environment variables
+- [x] Configure persistent storage for SQLite
+- [x] Deploy and test
+- [x] Verified at https://api.superchotu.com
+
+---
+
+## Critical Bugs Fixed
+
+1. **Coolify strips git URL domain** → Use `/applications/dockerfile` with embedded Dockerfile
+2. **Dockerfile must be base64 encoded** → Added encoding in `createDockerfileApp()`
+3. **Forgejo URL port not accessible** → Transform to public HTTPS URL (strip port)
+4. **Deploy endpoint 404** → Use `/deploy?uuid=` query parameter
+5. **Heredocs in Dockerfile fail** → Use `printf` with escaped strings
 
 ---
 
@@ -243,3 +267,4 @@
 - Consider adding rate limiting later
 - Log all external API calls for debugging
 - Sync flow deferred for post-MVP
+- Container health check confirms OpenCode is running

@@ -27,6 +27,73 @@ import { ProjectCreationError, ProjectNotFoundError } from '../utils/errors.ts';
 const log = createLogger('project-manager');
 
 // =============================================================================
+// OpenCode Dockerfile (embedded to avoid git URL issues with Coolify)
+// =============================================================================
+
+const OPENCODE_DOCKERFILE = `FROM node:20-slim
+
+# Install required packages
+RUN apt-get update && \\
+    apt-get install -y git curl && \\
+    rm -rf /var/lib/apt/lists/*
+
+# Install OpenCode globally
+RUN npm install -g opencode-ai
+
+# Create workspace directory
+WORKDIR /workspace
+
+# Environment variables (will be overridden by Coolify env vars)
+ENV OPENCODE_PORT=4096
+ENV OPENCODE_HOST=0.0.0.0
+
+# Create entrypoint script using printf (heredocs don't work well in Dockerfile)
+RUN printf '%s\\n' \\
+    '#!/bin/bash' \\
+    'set -e' \\
+    '' \\
+    'echo "=== OpenCode Container Starting ==="' \\
+    '' \\
+    'if [ ! -d "/workspace/.git" ] && [ -n "\$FORGEJO_REPO_URL" ]; then' \\
+    '    echo "Cloning repository from Forgejo..."' \\
+    '    if [ -n "\$FORGEJO_USER" ] && [ -n "\$FORGEJO_TOKEN" ]; then' \\
+    '        REPO_URL_WITH_AUTH=\$(echo "\$FORGEJO_REPO_URL" | sed "s|://|://\$FORGEJO_USER:\$FORGEJO_TOKEN@|")' \\
+    '        git clone "\$REPO_URL_WITH_AUTH" /workspace' \\
+    '    else' \\
+    '        git clone "\$FORGEJO_REPO_URL" /workspace' \\
+    '    fi' \\
+    '    echo "Repository cloned successfully."' \\
+    'elif [ -d "/workspace/.git" ]; then' \\
+    '    echo "Existing git repository found in workspace."' \\
+    'else' \\
+    '    echo "No repository URL provided. Starting with empty workspace."' \\
+    'fi' \\
+    '' \\
+    'git config --global user.email "\${GIT_USER_EMAIL:-opencode@local}"' \\
+    'git config --global user.name "\${GIT_USER_NAME:-OpenCode}"' \\
+    'git config --global --add safe.directory /workspace' \\
+    '' \\
+    'echo "=== Configuration ==="' \\
+    'echo "Workspace: /workspace"' \\
+    'echo "Port: \${OPENCODE_PORT:-4096}"' \\
+    'echo "===================="' \\
+    '' \\
+    'cd /workspace' \\
+    'echo "Starting OpenCode server..."' \\
+    'exec opencode serve --port "\${OPENCODE_PORT:-4096}" --hostname "\${OPENCODE_HOST:-0.0.0.0}"' \\
+    > /entrypoint.sh && chmod +x /entrypoint.sh
+
+# Expose OpenCode port
+EXPOSE 4096
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \\
+    CMD curl -f http://localhost:\${OPENCODE_PORT}/app || exit 1
+
+ENTRYPOINT ["/entrypoint.sh"]
+`;
+
+// =============================================================================
 // Types
 // =============================================================================
 
@@ -95,19 +162,22 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
     // Use a simple incrementing port based on repo ID
     const containerPort = config.opencode.basePort + (forgejoRepo.id % 1000);
     
-    // Step 3: Create Coolify application
-    log.info('Step 2: Creating Coolify application', { slug });
+    // Step 3: Create Coolify application using embedded Dockerfile
+    // This bypasses the git URL stripping issue that Coolify has with self-hosted Forgejo
+    log.info('Step 2: Creating Coolify application (embedded Dockerfile)', { slug });
     
-    coolifyApp = await coolify.createDockerImageApp({
+    coolifyApp = await coolify.createDockerfileApp({
       projectUuid: config.coolify.projectUuid,
       serverUuid: config.coolify.serverUuid,
       environmentName: 'production',
-      imageName: config.opencode.image,
-      imageTag: 'latest',
+      dockerfile: OPENCODE_DOCKERFILE,
       portsExposes: String(containerPort),
       name: `opencode-${slug}`,
       description: `OpenCode container for ${name}`,
-      instantDeploy: false, // We'll set env vars first
+      instantDeploy: false, // We'll set env vars first, then deploy
+      healthCheckEnabled: true,
+      healthCheckPath: '/app',
+      healthCheckPort: String(containerPort),
     });
     
     log.info('Coolify application created', { uuid: coolifyApp.uuid });
@@ -115,10 +185,37 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
     // Step 4: Set environment variables
     log.info('Step 3: Setting environment variables');
     
+    // Transform the clone URL to use the public HTTPS URL (accessible from containers)
+    // Forgejo returns URLs with internal port (e.g., :3000), but containers need the public HTTPS URL
+    let publicCloneUrl = forgejoRepo.clone_url;
+    
+    // If publicUrl is different from url, do a direct replacement
+    if (config.forgejo.publicUrl !== config.forgejo.url) {
+      publicCloneUrl = forgejoRepo.clone_url.replace(
+        new RegExp(`^${config.forgejo.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`),
+        config.forgejo.publicUrl
+      );
+    } else {
+      // Fallback: if no publicUrl configured, try to remove port from HTTPS URLs
+      // e.g., https://forgejo.superchotu.com:3000/... -> https://forgejo.superchotu.com/...
+      publicCloneUrl = forgejoRepo.clone_url.replace(
+        /^(https:\/\/[^/:]+):\d+(\/.*)/,
+        '$1$2'
+      );
+    }
+    
+    log.info('Clone URL transformation', {
+      original: forgejoRepo.clone_url,
+      public: publicCloneUrl,
+    });
+    
     const envVars: Record<string, string> = {
-      // Forgejo repo URL for OpenCode to clone
-      REPO_URL: forgejoRepo.clone_url,
-      REPO_BRANCH: forgejoRepo.default_branch,
+      // Forgejo repo URL for OpenCode to clone at startup (using public URL)
+      FORGEJO_REPO_URL: publicCloneUrl,
+      // Git config
+      GIT_USER_EMAIL: 'opencode@portable-command-center.local',
+      GIT_USER_NAME: 'OpenCode',
+      // Project info
       PROJECT_NAME: name,
     };
     

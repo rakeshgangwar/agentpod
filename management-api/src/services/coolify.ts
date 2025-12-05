@@ -80,6 +80,37 @@ export interface CreateDockerImageAppInput {
   instantDeploy?: boolean;
 }
 
+export interface CreatePublicGitAppInput {
+  projectUuid: string;
+  serverUuid: string;
+  environmentName: string;
+  gitRepository: string;
+  gitBranch: string;
+  buildPack: 'dockerfile' | 'nixpacks' | 'static';
+  portsExposes: string;
+  name: string;
+  description?: string;
+  baseDirectory?: string;
+  domains?: string;
+  instantDeploy?: boolean;
+}
+
+export interface CreateDockerfileAppInput {
+  projectUuid: string;
+  serverUuid: string;
+  environmentName: string;
+  dockerfile: string;  // Raw Dockerfile content - no git cloning needed!
+  portsExposes: string;
+  name: string;
+  description?: string;
+  domains?: string;
+  instantDeploy?: boolean;
+  // Health check options
+  healthCheckEnabled?: boolean;
+  healthCheckPath?: string;
+  healthCheckPort?: string;
+}
+
 export interface CreateEnvVarInput {
   key: string;
   value: string;
@@ -209,6 +240,56 @@ export const coolify = {
   },
   
   /**
+   * Create application from public Git repository (Dockerfile build)
+   * WARNING: Coolify strips the domain from git URLs and defaults to GitHub!
+   * For self-hosted Forgejo, use createDockerfileApp instead.
+   */
+  async createPublicGitApp(input: CreatePublicGitAppInput): Promise<{ uuid: string }> {
+    return request<{ uuid: string }>('POST', '/applications/public', {
+      project_uuid: input.projectUuid,
+      server_uuid: input.serverUuid,
+      environment_name: input.environmentName,
+      git_repository: input.gitRepository,
+      git_branch: input.gitBranch,
+      build_pack: input.buildPack,
+      ports_exposes: input.portsExposes,
+      name: input.name,
+      description: input.description,
+      base_directory: input.baseDirectory,
+      domains: input.domains,
+      instant_deploy: input.instantDeploy ?? false,
+    });
+  },
+  
+  /**
+   * Create application from raw Dockerfile content
+   * This is the preferred method for OpenCode containers as it:
+   * 1. Doesn't require git cloning (avoids Forgejo URL stripping issue)
+   * 2. Embeds the Dockerfile directly
+   * 3. Works reliably with self-hosted infrastructure
+   * Note: Coolify requires the dockerfile to be base64 encoded
+   */
+  async createDockerfileApp(input: CreateDockerfileAppInput): Promise<{ uuid: string }> {
+    // Base64 encode the Dockerfile content as required by Coolify API
+    const dockerfileBase64 = Buffer.from(input.dockerfile).toString('base64');
+    
+    return request<{ uuid: string }>('POST', '/applications/dockerfile', {
+      project_uuid: input.projectUuid,
+      server_uuid: input.serverUuid,
+      environment_name: input.environmentName,
+      dockerfile: dockerfileBase64,
+      ports_exposes: input.portsExposes,
+      name: input.name,
+      description: input.description,
+      domains: input.domains,
+      instant_deploy: input.instantDeploy ?? false,
+      health_check_enabled: input.healthCheckEnabled ?? true,
+      health_check_path: input.healthCheckPath ?? '/app',
+      health_check_port: input.healthCheckPort ?? input.portsExposes,
+    });
+  },
+  
+  /**
    * Delete application
    */
   async deleteApplication(uuid: string): Promise<void> {
@@ -237,29 +318,44 @@ export const coolify = {
     await request<unknown>('GET', `/applications/${uuid}/restart`);
   },
   
+  /**
+   * Deploy/rebuild application (triggers a new build for Dockerfile apps)
+   * Uses the /deploy endpoint with uuid query parameter
+   * See: https://coolify.io/docs/api-reference/api/operations/deploy-by-tag-or-uuid
+   */
+  async deployApplication(uuid: string, force: boolean = false): Promise<{ deployments: Array<{ message: string; resource_uuid: string; deployment_uuid: string }> }> {
+    const forceParam = force ? '&force=true' : '';
+    return request<{ deployments: Array<{ message: string; resource_uuid: string; deployment_uuid: string }> }>('GET', `/deploy?uuid=${uuid}${forceParam}`);
+  },
+  
   // ---------------------------------------------------------------------------
   // Environment Variables
   // ---------------------------------------------------------------------------
   
   /**
    * List environment variables for an application
+   * Note: Coolify creates both preview and non-preview versions of each env var.
+   * By default, this returns all. Use filterPreview to get only production vars.
    */
-  async listEnvVars(appUuid: string): Promise<CoolifyEnvVar[]> {
-    return request<CoolifyEnvVar[]>('GET', `/applications/${appUuid}/envs`);
+  async listEnvVars(appUuid: string, filterPreview: boolean = false): Promise<CoolifyEnvVar[]> {
+    const envVars = await request<CoolifyEnvVar[]>('GET', `/applications/${appUuid}/envs`);
+    if (filterPreview) {
+      return envVars.filter(e => !e.is_preview);
+    }
+    return envVars;
   },
   
   /**
    * Create environment variable
    */
   async createEnvVar(appUuid: string, input: CreateEnvVarInput): Promise<{ uuid: string }> {
+    // Note: is_build_time is not valid for Docker Image apps (no build step)
+    // Only include fields that are universally supported
     return request<{ uuid: string }>('POST', `/applications/${appUuid}/envs`, {
       key: input.key,
       value: input.value,
       is_preview: input.isPreview ?? false,
-      is_build_time: input.isBuildTime ?? false,
       is_literal: input.isLiteral ?? true,
-      is_multiline: input.isMultiline ?? false,
-      is_shown_once: input.isShownOnce ?? false,
     });
   },
   
@@ -271,28 +367,22 @@ export const coolify = {
   },
   
   /**
-   * Set multiple environment variables (creates or updates)
+   * Set multiple environment variables using bulk update
+   * Note: Coolify automatically creates both preview and non-preview versions.
+   * This is normal behavior for supporting preview deployments.
+   * See: https://coolify.io/docs/api-reference/api/operations/update-envs-by-application-uuid
    */
   async setEnvVars(appUuid: string, vars: Record<string, string>): Promise<void> {
-    // Get existing env vars
-    const existing = await this.listEnvVars(appUuid);
-    const existingMap = new Map(existing.map(e => [e.key, e]));
+    const data = Object.entries(vars).map(([key, value]) => ({
+      key,
+      value,
+      is_preview: false,
+      is_literal: true,
+      is_multiline: false,
+      is_shown_once: false,
+    }));
     
-    for (const [key, value] of Object.entries(vars)) {
-      const existingVar = existingMap.get(key);
-      
-      if (existingVar) {
-        // Update existing var
-        await request('PATCH', `/applications/${appUuid}/envs/${existingVar.uuid}`, {
-          key,
-          value,
-          is_literal: true,
-        });
-      } else {
-        // Create new var
-        await this.createEnvVar(appUuid, { key, value, isLiteral: true });
-      }
-    }
+    await request('PATCH', `/applications/${appUuid}/envs/bulk`, { data });
   },
   
   // ---------------------------------------------------------------------------

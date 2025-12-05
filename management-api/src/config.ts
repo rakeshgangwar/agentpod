@@ -44,6 +44,9 @@ export const config = {
   // Forgejo
   forgejo: {
     url: getEnv('FORGEJO_URL', 'http://localhost:3000'),
+    // Public URL for clone operations (accessible from containers)
+    // This should be the HTTPS URL through Traefik, without port
+    publicUrl: getEnv('FORGEJO_PUBLIC_URL', getEnv('FORGEJO_URL', 'http://localhost:3000')),
     token: getEnv('FORGEJO_TOKEN', ''),
     owner: getEnv('FORGEJO_OWNER', 'admin'),
   },
