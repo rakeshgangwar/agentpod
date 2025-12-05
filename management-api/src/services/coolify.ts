@@ -1,0 +1,332 @@
+/**
+ * Coolify API Client
+ * Handles container orchestration via Coolify's REST API
+ * 
+ * API Docs: https://coolify.io/docs/api-reference/authorization
+ * Base URL: http://<ip>:8000/api/v1
+ * Auth: Bearer token
+ */
+
+import { config } from '../config.ts';
+import { CoolifyApiError } from '../utils/errors.ts';
+import { createLogger } from '../utils/logger.ts';
+
+const log = createLogger('coolify');
+
+// =============================================================================
+// Types
+// =============================================================================
+
+export interface CoolifyServer {
+  id: number;
+  uuid: string;
+  name: string;
+  description: string | null;
+  ip: string;
+  user: string;
+  port: number;
+  settings?: {
+    is_reachable: boolean;
+    is_usable: boolean;
+  };
+}
+
+export interface CoolifyApplication {
+  id: number;
+  uuid: string;
+  name: string;
+  description: string | null;
+  fqdn: string | null;
+  status: string;
+  repository_project_id?: number;
+  git_repository?: string;
+  git_branch?: string;
+  docker_registry_image_name?: string;
+  docker_registry_image_tag?: string;
+  ports_exposes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CoolifyEnvVar {
+  id: number;
+  uuid: string;
+  key: string;
+  value: string;
+  is_preview: boolean;
+  is_build_time: boolean;
+  is_literal: boolean;
+  is_multiline: boolean;
+  is_shown_once: boolean;
+}
+
+export interface CoolifyProject {
+  id: number;
+  uuid: string;
+  name: string;
+  description: string | null;
+}
+
+export interface CreateDockerImageAppInput {
+  projectUuid: string;
+  serverUuid: string;
+  environmentName: string;
+  imageName: string;
+  imageTag: string;
+  portsExposes: string;
+  name: string;
+  description?: string;
+  domains?: string;
+  instantDeploy?: boolean;
+}
+
+export interface CreateEnvVarInput {
+  key: string;
+  value: string;
+  isPreview?: boolean;
+  isBuildTime?: boolean;
+  isLiteral?: boolean;
+  isMultiline?: boolean;
+  isShownOnce?: boolean;
+}
+
+// =============================================================================
+// HTTP Client
+// =============================================================================
+
+const BASE_URL = `${config.coolify.url}/api/v1`;
+
+async function request<T>(
+  method: string,
+  path: string,
+  body?: unknown
+): Promise<T> {
+  const url = `${BASE_URL}${path}`;
+  
+  log.debug(`${method} ${path}`, body ? { body } : undefined);
+  
+  try {
+    const response = await fetch(url, {
+      method,
+      headers: {
+        'Authorization': `Bearer ${config.coolify.token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    
+    const text = await response.text();
+    let data: unknown;
+    
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = text;
+    }
+    
+    if (!response.ok) {
+      log.error(`Coolify API error: ${response.status}`, { path, data });
+      throw new CoolifyApiError(
+        `Coolify API error: ${response.status} ${response.statusText}`,
+        response.status,
+        data
+      );
+    }
+    
+    log.debug(`Response ${response.status}`, { path });
+    return data as T;
+  } catch (error) {
+    if (error instanceof CoolifyApiError) {
+      throw error;
+    }
+    log.error('Coolify API request failed', { path, error });
+    throw new CoolifyApiError(
+      `Failed to connect to Coolify: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      500,
+      error
+    );
+  }
+}
+
+// =============================================================================
+// API Methods
+// =============================================================================
+
+export const coolify = {
+  // ---------------------------------------------------------------------------
+  // Servers
+  // ---------------------------------------------------------------------------
+  
+  /**
+   * List all servers
+   */
+  async listServers(): Promise<CoolifyServer[]> {
+    return request<CoolifyServer[]>('GET', '/servers');
+  },
+  
+  /**
+   * Get server by UUID
+   */
+  async getServer(uuid: string): Promise<CoolifyServer> {
+    return request<CoolifyServer>('GET', `/servers/${uuid}`);
+  },
+  
+  // ---------------------------------------------------------------------------
+  // Applications
+  // ---------------------------------------------------------------------------
+  
+  /**
+   * List all applications
+   */
+  async listApplications(): Promise<CoolifyApplication[]> {
+    return request<CoolifyApplication[]>('GET', '/applications');
+  },
+  
+  /**
+   * Get application by UUID
+   */
+  async getApplication(uuid: string): Promise<CoolifyApplication> {
+    return request<CoolifyApplication>('GET', `/applications/${uuid}`);
+  },
+  
+  /**
+   * Create application from Docker image
+   */
+  async createDockerImageApp(input: CreateDockerImageAppInput): Promise<{ uuid: string }> {
+    return request<{ uuid: string }>('POST', '/applications/dockerimage', {
+      project_uuid: input.projectUuid,
+      server_uuid: input.serverUuid,
+      environment_name: input.environmentName,
+      docker_registry_image_name: input.imageName,
+      docker_registry_image_tag: input.imageTag,
+      ports_exposes: input.portsExposes,
+      name: input.name,
+      description: input.description,
+      domains: input.domains,
+      instant_deploy: input.instantDeploy ?? false,
+    });
+  },
+  
+  /**
+   * Delete application
+   */
+  async deleteApplication(uuid: string): Promise<void> {
+    await request<unknown>('DELETE', `/applications/${uuid}`);
+  },
+  
+  /**
+   * Start application
+   * Note: Coolify uses GET for start/stop/restart
+   */
+  async startApplication(uuid: string): Promise<void> {
+    await request<unknown>('GET', `/applications/${uuid}/start`);
+  },
+  
+  /**
+   * Stop application
+   */
+  async stopApplication(uuid: string): Promise<void> {
+    await request<unknown>('GET', `/applications/${uuid}/stop`);
+  },
+  
+  /**
+   * Restart application
+   */
+  async restartApplication(uuid: string): Promise<void> {
+    await request<unknown>('GET', `/applications/${uuid}/restart`);
+  },
+  
+  // ---------------------------------------------------------------------------
+  // Environment Variables
+  // ---------------------------------------------------------------------------
+  
+  /**
+   * List environment variables for an application
+   */
+  async listEnvVars(appUuid: string): Promise<CoolifyEnvVar[]> {
+    return request<CoolifyEnvVar[]>('GET', `/applications/${appUuid}/envs`);
+  },
+  
+  /**
+   * Create environment variable
+   */
+  async createEnvVar(appUuid: string, input: CreateEnvVarInput): Promise<{ uuid: string }> {
+    return request<{ uuid: string }>('POST', `/applications/${appUuid}/envs`, {
+      key: input.key,
+      value: input.value,
+      is_preview: input.isPreview ?? false,
+      is_build_time: input.isBuildTime ?? false,
+      is_literal: input.isLiteral ?? true,
+      is_multiline: input.isMultiline ?? false,
+      is_shown_once: input.isShownOnce ?? false,
+    });
+  },
+  
+  /**
+   * Delete environment variable
+   */
+  async deleteEnvVar(appUuid: string, envUuid: string): Promise<void> {
+    await request<unknown>('DELETE', `/applications/${appUuid}/envs/${envUuid}`);
+  },
+  
+  /**
+   * Set multiple environment variables (creates or updates)
+   */
+  async setEnvVars(appUuid: string, vars: Record<string, string>): Promise<void> {
+    // Get existing env vars
+    const existing = await this.listEnvVars(appUuid);
+    const existingMap = new Map(existing.map(e => [e.key, e]));
+    
+    for (const [key, value] of Object.entries(vars)) {
+      const existingVar = existingMap.get(key);
+      
+      if (existingVar) {
+        // Update existing var
+        await request('PATCH', `/applications/${appUuid}/envs/${existingVar.uuid}`, {
+          key,
+          value,
+          is_literal: true,
+        });
+      } else {
+        // Create new var
+        await this.createEnvVar(appUuid, { key, value, isLiteral: true });
+      }
+    }
+  },
+  
+  // ---------------------------------------------------------------------------
+  // Projects (Coolify's project concept, not our projects)
+  // ---------------------------------------------------------------------------
+  
+  /**
+   * List Coolify projects
+   */
+  async listProjects(): Promise<CoolifyProject[]> {
+    return request<CoolifyProject[]>('GET', '/projects');
+  },
+  
+  /**
+   * Get Coolify project by UUID
+   */
+  async getProject(uuid: string): Promise<CoolifyProject> {
+    return request<CoolifyProject>('GET', `/projects/${uuid}`);
+  },
+  
+  // ---------------------------------------------------------------------------
+  // Health
+  // ---------------------------------------------------------------------------
+  
+  /**
+   * Check Coolify API health by listing servers
+   */
+  async healthCheck(): Promise<boolean> {
+    try {
+      // Use /servers endpoint as health check since /healthcheck doesn't exist
+      await this.listServers();
+      return true;
+    } catch {
+      return false;
+    }
+  },
+};

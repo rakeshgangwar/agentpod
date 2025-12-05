@@ -5,6 +5,9 @@ import { bearerAuth } from 'hono/bearer-auth';
 import { config } from './config.ts';
 import { initDatabase } from './db/index.ts';
 import { healthRoutes } from './routes/health.ts';
+import { projectRoutes } from './routes/projects.ts';
+import { providerRoutes } from './routes/providers.ts';
+import { syncRoutes } from './routes/sync.ts';
 
 // Initialize database
 console.log('Initializing database...');
@@ -18,7 +21,11 @@ const app = new Hono()
   // Health routes are public (no auth required)
   .route('/', healthRoutes)
   // Protected API routes require authentication
-  .use('/api/*', bearerAuth({ token: config.auth.token }));
+  .use('/api/*', bearerAuth({ token: config.auth.token }))
+  // API routes
+  .route('/api/projects', projectRoutes)
+  .route('/api/providers', providerRoutes)
+  .route('/api/projects', syncRoutes); // Sync routes are under /api/projects/:id/sync
 
 // Export type for Hono Client (type-safe RPC from mobile app)
 export type AppType = typeof app;
@@ -33,8 +40,17 @@ console.log(`
 ║  Port:        ${String(port).padEnd(42)}║
 ║  Environment: ${config.nodeEnv.padEnd(42)}║
 ║  Database:    ${config.database.path.padEnd(42)}║
-║  Health:      http://localhost:${port}/health${' '.repeat(20)}║
-║  API Info:    http://localhost:${port}/api/info${' '.repeat(18)}║
+╠═══════════════════════════════════════════════════════════╣
+║  Endpoints:                                               ║
+║  - GET  /health              Health check                 ║
+║  - GET  /api/info            API info                     ║
+║  - GET  /api/projects        List projects                ║
+║  - POST /api/projects        Create project               ║
+║  - GET  /api/projects/:id    Get project                  ║
+║  - POST /api/projects/:id/start   Start container         ║
+║  - POST /api/projects/:id/stop    Stop container          ║
+║  - GET  /api/providers       List providers               ║
+║  - POST /api/providers/:id/configure  Set credentials     ║
 ╚═══════════════════════════════════════════════════════════╝
 `);
 

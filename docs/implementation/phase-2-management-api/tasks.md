@@ -69,11 +69,11 @@
 
 ---
 
-## 3. External Service Clients
+## 3. External Service Clients ✅
 
-### 3.1 Coolify Client
-- [ ] Create `src/services/coolify.ts`
-- [ ] Implement methods:
+### 3.1 Coolify Client ✅
+- [x] Create `src/services/coolify.ts`
+- [x] Implement methods:
   - `listServers()` - Get available servers
   - `listApplications()` - Get all apps
   - `createDockerImageApp(config)` - Create OpenCode container
@@ -82,21 +82,21 @@
   - `stopApplication(uuid)` - Stop container
   - `deleteApplication(uuid)` - Remove container
   - `setEnvironmentVariables(uuid, vars)` - Set env vars
-- [ ] Add error handling and retries
-- [ ] Add request logging
+- [x] Add error handling and retries
+- [x] Add request logging
 
-### 3.2 Forgejo Client
-- [ ] Create `src/services/forgejo.ts`
-- [ ] Implement methods:
+### 3.2 Forgejo Client ✅
+- [x] Create `src/services/forgejo.ts`
+- [x] Implement methods:
   - `listRepos()` - List all repositories
   - `createRepo(name, description)` - Create new repo
   - `deleteRepo(owner, name)` - Delete repo
   - `getRepo(owner, name)` - Get repo details
   - `getCloneUrl(owner, name)` - Get clone URL for container
-- [ ] Add error handling
+- [x] Add error handling
 
-### 3.3 GitHub Client (for imports)
-- [ ] Create `src/services/github.ts`
+### 3.3 GitHub Client (for imports) - Deferred
+- [ ] Create `src/services/github.ts` (deferred - using Forgejo mirror feature instead)
 - [ ] Implement methods:
   - `getRepoInfo(url)` - Parse and validate GitHub URL
   - `cloneRepo(url, destination)` - Clone to temp directory
@@ -104,68 +104,73 @@
 
 ---
 
-## 4. API Routes
+## 4. API Routes ✅
 
-### 4.1 Health & Info Routes
-- [ ] Create `src/routes/health.ts`
-- [ ] Endpoints:
+### 4.1 Health & Info Routes ✅
+- [x] Create `src/routes/health.ts`
+- [x] Endpoints:
   - `GET /health` - Health check
   - `GET /api/info` - API version, status
 
-### 4.2 Project Routes
-- [ ] Create `src/routes/projects.ts`
-- [ ] Endpoints:
+### 4.2 Project Routes ✅
+- [x] Create `src/routes/projects.ts`
+- [x] Endpoints:
   - `GET /api/projects` - List all projects
-  - `GET /api/projects/:id` - Get project details
+  - `GET /api/projects/:id` - Get project details (with live container status)
   - `POST /api/projects` - Create new project
+  - `PATCH /api/projects/:id` - Update project metadata
   - `DELETE /api/projects/:id` - Delete project
   - `POST /api/projects/:id/start` - Start container
   - `POST /api/projects/:id/stop` - Stop container
-  - `GET /api/projects/:id/status` - Get container status
+  - `POST /api/projects/:id/restart` - Restart container
+  - `POST /api/projects/:id/credentials` - Update LLM credentials
 
-### 4.3 Provider Routes
-- [ ] Create `src/routes/providers.ts`
-- [ ] Endpoints:
+### 4.3 Provider Routes ✅
+- [x] Create `src/routes/providers.ts`
+- [x] Endpoints:
   - `GET /api/providers` - List configured providers
+  - `GET /api/providers/default` - Get default provider
+  - `GET /api/providers/:id` - Get provider details
   - `POST /api/providers/:id/configure` - Set API key
   - `POST /api/providers/:id/set-default` - Set as default
   - `DELETE /api/providers/:id` - Remove provider config
 
-### 4.4 Sync Routes
-- [ ] Create `src/routes/sync.ts`
-- [ ] Endpoints:
+### 4.4 Sync Routes ✅
+- [x] Create `src/routes/sync.ts`
+- [x] Endpoints:
   - `POST /api/projects/:id/sync` - Sync with GitHub
   - `GET /api/projects/:id/sync/status` - Get sync status
+  - `POST /api/projects/:id/sync/config` - Configure sync settings
 
 ---
 
-## 5. Core Business Logic
+## 5. Core Business Logic ✅
 
-### 5.1 Project Creation Flow
-- [ ] Create `src/services/project-manager.ts`
-- [ ] Implement `createProject(options)`:
+### 5.1 Project Creation Flow ✅
+- [x] Create `src/services/project-manager.ts`
+- [x] Implement `createNewProject(options)`:
   1. Validate input
-  2. Create Forgejo repo (or import from GitHub)
+  2. Create Forgejo repo (or import from GitHub via mirror)
   3. Create Coolify application
   4. Set environment variables (LLM keys, Forgejo URL)
-  5. Start container
-  6. Save project to database
-  7. Return project details
+  5. Save project to database
+  6. Return project details
 
-### 5.2 Project Deletion Flow
-- [ ] Implement `deleteProject(id)`:
+### 5.2 Project Deletion Flow ✅
+- [x] Implement `deleteProjectFully(id)`:
   1. Stop container
   2. Delete Coolify application
   3. Delete Forgejo repo (optional, configurable)
   4. Remove from database
 
-### 5.3 Container Management
-- [ ] Implement `startProject(id)`
-- [ ] Implement `stopProject(id)`
-- [ ] Implement `getProjectStatus(id)` - Get live status from Coolify
+### 5.3 Container Management ✅
+- [x] Implement `startProject(id)`
+- [x] Implement `stopProject(id)`
+- [x] Implement `restartProject(id)`
+- [x] Implement `getProjectWithStatus(id)` - Get live status from Coolify
 
-### 5.4 Credential Injection
-- [ ] Implement `injectCredentials(projectId)`:
+### 5.4 Credential Injection ✅
+- [x] Implement `updateProjectCredentials(projectId, providerId)`:
   1. Get default provider or project-specific override
   2. Get credentials from database
   3. Update Coolify env vars
@@ -173,11 +178,14 @@
 
 ---
 
-## 6. GitHub Import
+## 6. GitHub Import (Using Forgejo Mirror)
 
-### 6.1 Import Flow
-- [ ] Create `src/services/github-import.ts`
-- [ ] Implement `importFromGitHub(url, options)`:
+### 6.1 Import Flow ✅
+- [x] GitHub import integrated into `createNewProject` via Forgejo mirror
+- [x] Implement via `forgejo.createMirror()`:
+  1. Parse GitHub URL
+  2. Create Forgejo repo as one-time import
+  3. Continue with normal project creation
   1. Parse GitHub URL
   2. Clone repo to temp directory
   3. Create Forgejo repo
