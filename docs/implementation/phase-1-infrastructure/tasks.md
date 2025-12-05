@@ -3,22 +3,22 @@
 ## 1. Tailscale Setup
 
 ### 1.1 Install Tailscale on VPS
-- [ ] SSH into Hetzner VPS
-- [ ] Install Tailscale: `curl -fsSL https://tailscale.com/install.sh | sh`
-- [ ] Authenticate: `tailscale up`
-- [ ] Note the Tailscale IP (100.x.x.x)
-- [ ] Verify connectivity from local machine
+- [x] SSH into Hetzner VPS
+- [x] Install Tailscale: `curl -fsSL https://tailscale.com/install.sh | sh`
+- [x] Authenticate: `tailscale up`
+- [x] Note the Tailscale IP: **100.85.212.42** (coolify-ubuntu-16gb-nbg1-1)
+- [x] Verify connectivity from local machine
 
 ### 1.2 Configure Tailscale
-- [ ] Enable MagicDNS (optional but recommended)
+- [x] Enable MagicDNS (optional but recommended)
 - [ ] Set up ACLs if needed for security
 - [ ] Test connection from mobile device (if Tailscale app installed)
 
 **Verification:**
 ```bash
 # From local machine (with Tailscale)
-ping 100.x.x.x
-ssh user@100.x.x.x
+ping 100.85.212.42
+ssh user@100.85.212.42
 ```
 
 ---
@@ -26,41 +26,41 @@ ssh user@100.x.x.x
 ## 2. Forgejo Deployment
 
 ### 2.1 Deploy via Coolify
-- [ ] Log into Coolify dashboard
-- [ ] Go to Services → One-Click Services
-- [ ] Select "Forgejo" (or Gitea if Forgejo not available)
-- [ ] Configure:
+- [x] Log into Coolify dashboard
+- [x] Go to Services → One-Click Services
+- [x] Select "Forgejo" (or Gitea if Forgejo not available)
+- [x] Configure:
   - Port: 3000
   - Domain: (optional, can use IP)
   - Storage: Persistent volume for repos
-- [ ] Deploy and wait for startup
+- [x] Deploy and wait for startup
 
 ### 2.2 Initial Forgejo Configuration
-- [ ] Access Forgejo at `http://100.x.x.x:3000`
-- [ ] Complete initial setup wizard
-- [ ] Create admin account
-- [ ] Generate API token: Settings → Applications → Generate Token
-- [ ] Store token securely (will be used by Management API)
+- [x] Access Forgejo at `https://forgejo.superchotu.com`
+- [x] Complete initial setup wizard
+- [x] Create admin account
+- [x] Generate API token: Settings → Applications → Generate Token
+- [x] Store token securely in `docker/opencode/.env`
 
 ### 2.3 Test Forgejo API
-- [ ] Test API connectivity:
+- [x] Test API connectivity:
 ```bash
 curl -H "Authorization: token YOUR_TOKEN" \
-  http://100.x.x.x:3000/api/v1/user
+  https://forgejo.superchotu.com/api/v1/user
 ```
-- [ ] Create test repository via API:
+- [x] Create test repository via API:
 ```bash
 curl -X POST \
   -H "Authorization: token YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name": "test-repo", "private": false}' \
-  http://100.x.x.x:3000/api/v1/user/repos
+  https://forgejo.superchotu.com/api/v1/user/repos
 ```
 
 **Verification:**
-- Forgejo UI accessible
-- Can create/delete repos via API
-- Can clone repos via git
+- [x] Forgejo UI accessible
+- [x] Can create/delete repos via API
+- [ ] Can clone repos via git
 
 ---
 
@@ -69,19 +69,20 @@ curl -X POST \
 ### 3.1 Create Dockerfile
 - [x] Create `docker/opencode/Dockerfile`
 - [x] Create `docker/opencode/entrypoint.sh`
-- [ ] Test build locally: `docker build -t opencode-server .`
+- [x] Test build locally: `docker build -t opencode-server .`
 
 ### 3.2 Test Image Locally
-- [ ] Run container:
+- [x] Run container:
 ```bash
 docker run -d \
   -p 4096:4096 \
-  -e ANTHROPIC_API_KEY=test \
-  -v $(pwd)/test-project:/workspace \
+  -v $(pwd)/test-workspace:/workspace \
   opencode-server
 ```
-- [ ] Verify OpenCode responds: `curl http://localhost:4096/app`
-- [ ] Test with actual API key and prompt
+- [x] Verify OpenCode responds: `curl http://localhost:4096/app`
+- [x] Verify session API: `curl http://localhost:4096/session`
+- [x] Create session: `curl -X POST http://localhost:4096/session`
+- [x] Test with actual API key and prompt (created hello.txt successfully)
 
 ### 3.3 Publish to Registry
 - [ ] Choose registry (Docker Hub or Coolify's built-in)
@@ -90,9 +91,9 @@ docker run -d \
 - [ ] Verify image is accessible from VPS
 
 **Verification:**
-- Image builds successfully
-- Container starts and OpenCode server runs
-- API endpoints respond correctly
+- [x] Image builds successfully
+- [x] Container starts and OpenCode server runs
+- [x] API endpoints respond correctly
 
 ---
 
@@ -116,23 +117,23 @@ docker run -d \
 
 ### 4.3 Verify End-to-End
 - [ ] Container starts successfully
-- [ ] OpenCode API responds: `curl http://100.x.x.x:4096/app`
+- [ ] OpenCode API responds: `curl http://100.85.212.42:4096/app`
 - [ ] Create a session and send a test prompt
 - [ ] Verify changes are made to the workspace
 
 **Verification:**
 ```bash
 # Check app info
-curl http://100.x.x.x:4096/app
+curl http://100.85.212.42:4096/app
 
 # Create session
-curl -X POST http://100.x.x.x:4096/session
+curl -X POST http://100.85.212.42:4096/session
 
 # Send prompt (replace SESSION_ID)
 curl -X POST \
   -H "Content-Type: application/json" \
   -d '{"parts": [{"type": "text", "text": "Create a hello.txt file with Hello World"}]}' \
-  http://100.x.x.x:4096/session/SESSION_ID/message
+  http://100.85.212.42:4096/session/SESSION_ID/message
 ```
 
 ---
