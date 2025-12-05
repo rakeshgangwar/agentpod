@@ -305,35 +305,52 @@ export const opencodeRoutes = new Hono()
       const eventIterator = await opencode.subscribeToEvents(projectId);
       const encoder = new TextEncoder();
       
+      // Track if stream is still open
+      let isOpen = true;
+      
       // Create a ReadableStream that forwards SDK events as SSE
       const stream = new ReadableStream({
-        start(controller) {
+        async start(controller) {
           // Send initial connection comment immediately
           controller.enqueue(encoder.encode(': connected\n\n'));
           
-          // Spawn async loop to process events (don't await - this runs in background)
-          (async () => {
-            try {
-              // Iterate over SDK events and forward them
-              for await (const event of eventIterator) {
-                const eventType = event.type || 'message';
-                const eventData = JSON.stringify(event);
-                const sseMessage = `event: ${eventType}\ndata: ${eventData}\n\n`;
-                controller.enqueue(encoder.encode(sseMessage));
-              }
-            } catch (err) {
-              log.error('SSE stream error', { projectId, error: err });
-              // Send error event before closing
-              const errorEvent = `event: error\ndata: ${JSON.stringify({ message: 'Stream error' })}\n\n`;
-              controller.enqueue(encoder.encode(errorEvent));
-            } finally {
-              controller.close();
+          try {
+            // Iterate over SDK events and forward them
+            for await (const event of eventIterator) {
+              if (!isOpen) break;
+              
+              const eventType = event.type || 'message';
+              const eventData = JSON.stringify(event);
+              const sseMessage = `event: ${eventType}\ndata: ${eventData}\n\n`;
+              controller.enqueue(encoder.encode(sseMessage));
             }
-          })();
+          } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : String(err);
+            log.error('SSE stream error', { projectId, error: errorMessage });
+            
+            if (isOpen) {
+              try {
+                // Send error event before closing
+                const errorEvent = `event: error\ndata: ${JSON.stringify({ message: 'Stream error: ' + errorMessage })}\n\n`;
+                controller.enqueue(encoder.encode(errorEvent));
+              } catch {
+                // Ignore enqueue errors if stream is already closed
+              }
+            }
+          } finally {
+            if (isOpen) {
+              isOpen = false;
+              try {
+                controller.close();
+              } catch {
+                // Ignore close errors if stream is already closed
+              }
+            }
+          }
         },
         cancel() {
           log.info('SSE client disconnected', { projectId });
-          // The async iterator will be garbage collected
+          isOpen = false;
         }
       });
       
@@ -352,7 +369,8 @@ export const opencodeRoutes = new Hono()
       if (error instanceof OpenCodeProxyError) {
         return c.json({ error: error.message, details: error.details }, error.statusCode as 400);
       }
-      log.error('Failed to start SSE proxy', { projectId, error });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log.error('Failed to start SSE proxy', { projectId, error: errorMessage });
       return c.json({ error: 'Internal server error' }, 500);
     }
   })

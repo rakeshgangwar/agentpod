@@ -3,6 +3,12 @@
  * 
  * This adapter connects assistant-ui to the OpenCode API via Tauri commands.
  * It handles session management, message sending, and real-time streaming.
+ * 
+ * SSE Event Flow:
+ * 1. message.updated (role: "user") - User message registered
+ * 2. message.updated (role: "assistant") - Assistant message created (initially empty)
+ * 3. message.part.updated (type: "text") - Text streaming updates with delta
+ * 4. session.idle - Processing complete
  */
 
 import type { ChatModelAdapter, ChatModelRunOptions, ChatModelRunResult } from "@assistant-ui/react";
@@ -73,34 +79,89 @@ export function createOpenCodeAdapter(projectId: string): ChatModelAdapter {
           throw new Error("No text content in user message");
         }
 
-        // Set up streaming if not already connected
+        // Set up streaming state
         let accumulatedText = "";
+        let assistantMessageId: string | null = null;
         let streamingResolve: ((value: void) => void) | null = null;
         let streamError: Error | null = null;
 
         // Create a promise that resolves when streaming is done
-        const streamingComplete = new Promise<void>((resolve, reject) => {
+        const streamingComplete = new Promise<void>((resolve) => {
           streamingResolve = resolve;
         });
 
         // Connect to SSE stream
+        console.log('[OpenCode Adapter] Connecting to SSE stream for project:', state.projectId);
         stream = new OpenCodeStream(state.projectId);
         await stream.connect(
           (event: OpenCodeEvent) => {
-            // Handle different event types
-            if (event.eventType === "message.part.updated") {
-              const data = event.data as { text?: string; content?: string };
-              const newText = data.text || data.content || "";
-              if (newText) {
-                accumulatedText = newText;
+            console.log('[OpenCode Adapter] SSE Event:', event.eventType);
+            // SSE event structure from OpenCode:
+            // { eventType: "message.part.updated", data: { type: "...", properties: { ... } } }
+            const eventData = event.data as { 
+              type?: string; 
+              properties?: {
+                part?: { 
+                  type?: string; 
+                  text?: string;
+                  messageID?: string;
+                };
+                info?: { 
+                  id?: string;
+                  role?: string;
+                  parentID?: string;
+                };
+                delta?: string;
+                status?: { type?: string };
+                sessionID?: string;
+              };
+            };
+            
+            // Track assistant message IDs from message.updated events
+            if (event.eventType === "message.updated") {
+              const info = eventData.properties?.info;
+              if (info?.role === "assistant" && info.id) {
+                assistantMessageId = info.id;
               }
-            } else if (event.eventType === "session.updated") {
-              const data = event.data as { status?: string };
-              if (data.status === "idle") {
-                // Session finished processing
+            }
+            
+            // Handle text part updates - only for assistant messages
+            if (event.eventType === "message.part.updated") {
+              const part = eventData.properties?.part;
+              const delta = eventData.properties?.delta;
+              
+              // Only process text parts that belong to assistant messages
+              if (part?.type === "text") {
+                const isAssistantPart = assistantMessageId && part.messageID === assistantMessageId;
+                
+                // If we can't determine message ownership, still use the text (fallback)
+                if (isAssistantPart || !part.messageID) {
+                  // Prefer using the full text, which is always up-to-date
+                  if (part.text) {
+                    accumulatedText = part.text;
+                  } else if (delta) {
+                    // Fallback to delta if no full text
+                    accumulatedText += delta;
+                  }
+                }
+              }
+            }
+            
+            // Session idle = processing complete
+            if (event.eventType === "session.idle") {
+              streamingResolve?.();
+            }
+            
+            // Also check session.status for idle state
+            if (event.eventType === "session.status") {
+              const status = eventData.properties?.status;
+              if (status?.type === "idle") {
                 streamingResolve?.();
               }
-            } else if (event.eventType === "error") {
+            }
+            
+            // Handle errors
+            if (event.eventType === "error") {
               streamError = new Error(String(event.data));
               streamingResolve?.();
             }
@@ -126,16 +187,16 @@ export function createOpenCodeAdapter(projectId: string): ChatModelAdapter {
         abortSignal?.addEventListener("abort", abortHandler);
 
         // Send the message (this triggers the AI response)
-        await opencodeSendMessage(state.projectId, state.sessionId, textContent.text);
+        console.log('[OpenCode Adapter] Sending message to session:', state.sessionId);
+        try {
+          await opencodeSendMessage(state.projectId, state.sessionId, textContent.text);
+          console.log('[OpenCode Adapter] Message sent successfully');
+        } catch (sendError) {
+          console.error('[OpenCode Adapter] Failed to send message:', sendError);
+          throw sendError;
+        }
 
-        // Stream updates as they come in
-        const pollInterval = setInterval(() => {
-          if (accumulatedText) {
-            // We'll yield in the loop below
-          }
-        }, 100);
-
-        // Poll for updates and yield
+        // Poll for updates and yield streaming results
         let lastYieldedText = "";
         while (true) {
           // Check if streaming is complete
@@ -157,8 +218,6 @@ export function createOpenCodeAdapter(projectId: string): ChatModelAdapter {
           }
         }
 
-        clearInterval(pollInterval);
-
         // Clean up
         abortSignal?.removeEventListener("abort", abortHandler);
         await stream?.disconnect();
@@ -168,8 +227,8 @@ export function createOpenCodeAdapter(projectId: string): ChatModelAdapter {
           throw streamError;
         }
 
-        // Final yield with complete response
-        if (accumulatedText) {
+        // Final yield with complete response (ensure we yield at least once)
+        if (accumulatedText && accumulatedText !== lastYieldedText) {
           yield {
             content: [{ type: "text", text: accumulatedText }],
           };

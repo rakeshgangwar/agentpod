@@ -10,7 +10,15 @@ const config = {
   // preprocessReact must be last in the array
   preprocess: [vitePreprocess(), preprocessReact()],
   kit: {
-    adapter: adapter(),
+    adapter: adapter({
+      // Fallback page for dynamic routes in SPA mode
+      fallback: "index.html",
+    }),
+    prerender: {
+      // Dynamic routes like /projects/[id] cannot be prerendered
+      // They will use client-side routing via the fallback page
+      handleUnseenRoutes: "ignore",
+    },
   },
 };
 
