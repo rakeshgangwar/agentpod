@@ -215,12 +215,14 @@ export const opencodeRoutes = new Hono()
   /**
    * GET /api/projects/:id/opencode/file
    * List files in the project
+   * Query param: path (optional, defaults to "/")
    */
   .get('/:id/opencode/file', async (c) => {
     const projectId = c.req.param('id');
+    const path = c.req.query('path') || '/';
     
     try {
-      const files = await opencode.listFiles(projectId);
+      const files = await opencode.listFiles(projectId, path);
       return c.json(files);
     } catch (error) {
       if (error instanceof OpenCodeProxyError) {
@@ -258,25 +260,25 @@ export const opencodeRoutes = new Hono()
 
   /**
    * GET /api/projects/:id/opencode/find/file
-   * Find files by pattern
-   * Query param: pattern (required)
+   * Find files by query
+   * Query param: query (required)
    */
   .get('/:id/opencode/find/file', async (c) => {
     const projectId = c.req.param('id');
-    const pattern = c.req.query('pattern');
+    const query = c.req.query('query');
     
-    if (!pattern) {
-      return c.json({ error: 'Missing required query parameter: pattern' }, 400);
+    if (!query) {
+      return c.json({ error: 'Missing required query parameter: query' }, 400);
     }
     
     try {
-      const files = await opencode.findFiles(projectId, pattern);
+      const files = await opencode.findFiles(projectId, query);
       return c.json(files);
     } catch (error) {
       if (error instanceof OpenCodeProxyError) {
         return c.json({ error: error.message, details: error.details }, error.statusCode as 400);
       }
-      log.error('Failed to find files', { projectId, pattern, error });
+      log.error('Failed to find files', { projectId, query, error });
       return c.json({ error: 'Internal server error' }, 500);
     }
   })

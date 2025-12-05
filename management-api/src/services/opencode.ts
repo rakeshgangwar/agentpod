@@ -333,7 +333,7 @@ export const opencode = {
   /**
    * List files in the project
    */
-  async listFiles(projectId: string): Promise<OpenCodeFile[]> {
+  async listFiles(projectId: string, path: string = '/'): Promise<OpenCodeFile[]> {
     const project = getProjectById(projectId);
     if (!project) {
       throw new OpenCodeProxyError('Project not found', 404);
@@ -342,7 +342,8 @@ export const opencode = {
       throw new OpenCodeProxyError('Project container is not running', 503);
     }
 
-    return proxyRequest<OpenCodeFile[]>(project, 'GET', '/file');
+    const encodedPath = encodeURIComponent(path);
+    return proxyRequest<OpenCodeFile[]>(project, 'GET', `/file?path=${encodedPath}`);
   },
 
   /**
@@ -362,9 +363,9 @@ export const opencode = {
   },
 
   /**
-   * Find files by pattern
+   * Find files by query
    */
-  async findFiles(projectId: string, pattern: string): Promise<string[]> {
+  async findFiles(projectId: string, query: string): Promise<string[]> {
     const project = getProjectById(projectId);
     if (!project) {
       throw new OpenCodeProxyError('Project not found', 404);
@@ -373,8 +374,8 @@ export const opencode = {
       throw new OpenCodeProxyError('Project container is not running', 503);
     }
 
-    const encodedPattern = encodeURIComponent(pattern);
-    return proxyRequest<string[]>(project, 'GET', `/find/file?pattern=${encodedPattern}`);
+    const encodedQuery = encodeURIComponent(query);
+    return proxyRequest<string[]>(project, 'GET', `/find/file?query=${encodedQuery}`);
   },
 
   // ---------------------------------------------------------------------------
