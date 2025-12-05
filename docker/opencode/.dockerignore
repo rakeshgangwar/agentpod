@@ -1,0 +1,10 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+README*
+
+# Local test files
+test-*

@@ -1,0 +1,41 @@
+# Docker Compose for local testing
+# Usage: docker-compose up --build
+#
+# Before running:
+# 1. Copy .env.example to .env
+# 2. Fill in your API key(s)
+
+version: '3.8'
+
+services:
+  opencode:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: opencode-server
+    ports:
+      - "${OPENCODE_PORT:-4096}:${OPENCODE_PORT:-4096}"
+    environment:
+      - OPENCODE_PORT=${OPENCODE_PORT:-4096}
+      - OPENCODE_HOST=0.0.0.0
+      # LLM Provider - uncomment and set the one you use
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      # Git configuration
+      - GIT_USER_EMAIL=${GIT_USER_EMAIL:-opencode@local}
+      - GIT_USER_NAME=${GIT_USER_NAME:-OpenCode}
+      # Optional: Forgejo repo to clone
+      - FORGEJO_REPO_URL=${FORGEJO_REPO_URL:-}
+      - FORGEJO_USER=${FORGEJO_USER:-}
+      - FORGEJO_TOKEN=${FORGEJO_TOKEN:-}
+    volumes:
+      # Mount a local directory as workspace for testing
+      - ./test-workspace:/workspace
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${OPENCODE_PORT:-4096}/app"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
