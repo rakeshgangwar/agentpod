@@ -303,31 +303,33 @@ export const opencodeRoutes = new Hono()
       
       // Get the async iterator of events from the SDK
       const eventIterator = await opencode.subscribeToEvents(projectId);
+      const encoder = new TextEncoder();
       
       // Create a ReadableStream that forwards SDK events as SSE
       const stream = new ReadableStream({
-        async start(controller) {
-          const encoder = new TextEncoder();
+        start(controller) {
+          // Send initial connection comment immediately
+          controller.enqueue(encoder.encode(': connected\n\n'));
           
-          try {
-            // Send initial connection event
-            controller.enqueue(encoder.encode(': connected\n\n'));
-            
-            // Iterate over SDK events and forward them
-            for await (const event of eventIterator) {
-              const eventType = event.type || 'message';
-              const eventData = JSON.stringify(event);
-              const sseMessage = `event: ${eventType}\ndata: ${eventData}\n\n`;
-              controller.enqueue(encoder.encode(sseMessage));
+          // Spawn async loop to process events (don't await - this runs in background)
+          (async () => {
+            try {
+              // Iterate over SDK events and forward them
+              for await (const event of eventIterator) {
+                const eventType = event.type || 'message';
+                const eventData = JSON.stringify(event);
+                const sseMessage = `event: ${eventType}\ndata: ${eventData}\n\n`;
+                controller.enqueue(encoder.encode(sseMessage));
+              }
+            } catch (err) {
+              log.error('SSE stream error', { projectId, error: err });
+              // Send error event before closing
+              const errorEvent = `event: error\ndata: ${JSON.stringify({ message: 'Stream error' })}\n\n`;
+              controller.enqueue(encoder.encode(errorEvent));
+            } finally {
+              controller.close();
             }
-          } catch (err) {
-            log.error('SSE stream error', { projectId, error: err });
-            // Send error event before closing
-            const errorEvent = `event: error\ndata: ${JSON.stringify({ message: 'Stream error' })}\n\n`;
-            controller.enqueue(encoder.encode(errorEvent));
-          } finally {
-            controller.close();
-          }
+          })();
         },
         cancel() {
           log.info('SSE client disconnected', { projectId });
