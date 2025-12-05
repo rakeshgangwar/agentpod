@@ -8,13 +8,11 @@ use serde::{Deserialize, Serialize};
 // Session Models
 // =============================================================================
 
-/// Session status
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
-pub enum SessionStatus {
-    Idle,
-    Running,
-    Error,
+/// Session time info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionTime {
+    pub created: u64,
+    pub updated: u64,
 }
 
 /// OpenCode session
@@ -22,13 +20,21 @@ pub enum SessionStatus {
 #[serde(rename_all = "camelCase")]
 pub struct Session {
     pub id: String,
-    pub status: SessionStatus,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    #[serde(rename = "projectID", skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub directory: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub time: Option<SessionTime>,
+    // Legacy fields for compatibility
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cost: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub created_at: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub updated_at: Option<String>,
 }
 
 // =============================================================================
@@ -43,39 +49,140 @@ pub enum MessageRole {
     Assistant,
 }
 
-/// Message part type
+/// Message part type - matches OpenCode API types
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 pub enum MessagePartType {
     Text,
-    #[serde(rename = "tool_call")]
-    ToolCall,
-    #[serde(rename = "tool_result")]
+    #[serde(rename = "tool-invocation")]
+    ToolInvocation,
+    #[serde(rename = "tool-result")]
     ToolResult,
+    #[serde(rename = "step-start")]
+    StepStart,
+    #[serde(rename = "step-finish")]
+    StepFinish,
     File,
+    #[serde(other)]
+    Unknown,
 }
 
-/// Message info (metadata)
+/// Message time info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MessageTime {
+    pub created: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub completed: Option<u64>,
+}
+
+/// Message part time info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PartTime {
+    pub start: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end: Option<u64>,
+}
+
+/// Token cache info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TokenCache {
+    pub read: u64,
+    pub write: u64,
+}
+
+/// Token usage info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TokenUsage {
+    pub input: u64,
+    pub output: u64,
+    #[serde(default)]
+    pub reasoning: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache: Option<TokenCache>,
+}
+
+/// Message path info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MessagePath {
+    pub cwd: String,
+    pub root: String,
+}
+
+/// Message info (metadata) - matches actual OpenCode API response
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MessageInfo {
     pub id: String,
+    #[serde(rename = "sessionID")]
+    pub session_id: String,
     pub role: MessageRole,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub content: Option<String>,
+    pub time: Option<MessageTime>,
+    #[serde(rename = "parentID", skip_serializing_if = "Option::is_none")]
+    pub parent_id: Option<String>,
+    #[serde(rename = "modelID", skip_serializing_if = "Option::is_none")]
+    pub model_id: Option<String>,
+    #[serde(rename = "providerID", skip_serializing_if = "Option::is_none")]
+    pub provider_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<MessagePath>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cost: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tokens: Option<TokenUsage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub finish: Option<String>,
 }
 
-/// A part of a message (text, tool call, file, etc.)
+/// Tool invocation state
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ToolInvocation {
+    #[serde(rename = "toolCallId")]
+    pub tool_call_id: String,
+    #[serde(rename = "toolName")]
+    pub tool_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub args: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub state: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result: Option<serde_json::Value>,
+}
+
+/// A part of a message (text, tool call, file, etc.) - matches actual OpenCode API
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MessagePart {
     pub id: String,
+    #[serde(rename = "sessionID")]
+    pub session_id: String,
+    #[serde(rename = "messageID")]
+    pub message_id: String,
     #[serde(rename = "type")]
     pub part_type: MessagePartType,
+    // Text content
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
+    // Step tracking
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub content: Option<String>,
+    pub snapshot: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    // Timing
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub time: Option<PartTime>,
+    // Cost/tokens for step-finish
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cost: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tokens: Option<TokenUsage>,
+    // Tool invocation
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_invocation: Option<ToolInvocation>,
+    // File info
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -91,12 +198,12 @@ pub struct Message {
     pub parts: Vec<MessagePart>,
 }
 
-/// Input for creating a message part
+/// Input for creating a message part (for sending messages)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MessagePartInput {
     #[serde(rename = "type")]
-    pub part_type: MessagePartType,
+    pub part_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -125,7 +232,7 @@ pub enum FileNodeType {
     Directory,
 }
 
-/// File system node (file or directory)
+/// File system node (file or directory) - matches actual OpenCode API
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileNode {
     pub name: String,
@@ -133,15 +240,19 @@ pub struct FileNode {
     pub node_type: FileNodeType,
     pub path: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub absolute: Option<String>,
+    #[serde(default)]
+    pub ignored: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub children: Option<Vec<FileNode>>,
 }
 
-/// File content response
+/// File content response - matches actual OpenCode API
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileContent {
     pub content: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub language: Option<String>,
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub content_type: Option<String>,
 }
 
 // =============================================================================

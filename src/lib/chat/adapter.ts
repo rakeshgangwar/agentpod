@@ -215,7 +215,7 @@ export function convertToAssistantMessages(messages: Message[]): Array<{
 }> {
   return messages.map((msg) => {
     const textParts = msg.parts
-      .filter((part) => part.partType === "text" && part.text)
+      .filter((part) => part.type === "text" && part.text)
       .map((part) => ({ type: "text" as const, text: part.text! }));
 
     return {

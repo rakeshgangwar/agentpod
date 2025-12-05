@@ -157,30 +157,105 @@ export async function restartProject(id: string): Promise<Project> {
 // OpenCode Types
 // =============================================================================
 
-export type SessionStatus = "idle" | "running" | "error";
 export type MessageRole = "user" | "assistant";
-export type MessagePartType = "text" | "tool_call" | "tool_result" | "file";
+export type MessagePartType = "text" | "tool-invocation" | "tool-result" | "step-start" | "step-finish" | "file";
 export type FileNodeType = "file" | "directory";
 
+/** Session time info */
+export interface SessionTime {
+  created: number;
+  updated: number;
+}
+
+/** OpenCode session - matches actual API response */
 export interface Session {
   id: string;
-  status: SessionStatus;
+  version?: string;
+  projectID?: string;
+  directory?: string;
+  title?: string;
+  time?: SessionTime;
+  // Legacy fields for compatibility
+  status?: string;
   cost?: number;
-  createdAt?: string;
-  updatedAt?: string;
 }
 
+/** Message time info */
+export interface MessageTime {
+  created: number;
+  completed?: number;
+}
+
+/** Part time info */
+export interface PartTime {
+  start: number;
+  end?: number;
+}
+
+/** Token cache info */
+export interface TokenCache {
+  read: number;
+  write: number;
+}
+
+/** Token usage info */
+export interface TokenUsage {
+  input: number;
+  output: number;
+  reasoning: number;
+  cache?: TokenCache;
+}
+
+/** Message path info */
+export interface MessagePath {
+  cwd: string;
+  root: string;
+}
+
+/** Message info (metadata) - matches actual OpenCode API response */
 export interface MessageInfo {
   id: string;
+  sessionID: string;
   role: MessageRole;
-  content?: string;
+  time?: MessageTime;
+  parentID?: string;
+  modelID?: string;
+  providerID?: string;
+  mode?: string;
+  path?: MessagePath;
+  cost?: number;
+  tokens?: TokenUsage;
+  finish?: string;
 }
 
+/** Tool invocation state */
+export interface ToolInvocation {
+  toolCallId: string;
+  toolName: string;
+  args?: unknown;
+  state?: string;
+  result?: unknown;
+}
+
+/** A part of a message - matches actual OpenCode API */
 export interface MessagePart {
   id: string;
-  partType: MessagePartType;
+  sessionID: string;
+  messageID: string;
+  type: MessagePartType;
+  // Text content
   text?: string;
-  content?: string;
+  // Step tracking
+  snapshot?: string;
+  reason?: string;
+  // Timing
+  time?: PartTime;
+  // Cost/tokens for step-finish
+  cost?: number;
+  tokens?: TokenUsage;
+  // Tool invocation
+  toolInvocation?: ToolInvocation;
+  // File info
   url?: string;
   filename?: string;
   mime?: string;
@@ -191,16 +266,20 @@ export interface Message {
   parts: MessagePart[];
 }
 
+/** File system node - matches actual OpenCode API */
 export interface FileNode {
   name: string;
-  nodeType: FileNodeType;
+  type: FileNodeType;
   path: string;
+  absolute?: string;
+  ignored: boolean;
   children?: FileNode[];
 }
 
+/** File content response - matches actual OpenCode API */
 export interface FileContent {
   content: string;
-  language?: string;
+  type?: string;
 }
 
 export interface AppInfo {

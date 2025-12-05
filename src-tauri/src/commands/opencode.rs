@@ -4,7 +4,7 @@
 //! All communication goes through the Management API proxy.
 
 use crate::models::{
-    AppError, AppInfo, FileContent, FileNode, Message, MessagePartInput, MessagePartType,
+    AppError, AppInfo, FileContent, FileNode, Message, MessagePartInput,
     OpenCodeEvent, OpenCodeHealth, SendMessageInput, Session, StreamConnection,
     StreamEventPayload, StreamStatus, StreamStatusPayload,
 };
@@ -112,7 +112,7 @@ pub async fn opencode_send_message(
 
     let input = SendMessageInput {
         parts: vec![MessagePartInput {
-            part_type: MessagePartType::Text,
+            part_type: "text".to_string(),
             text: Some(text),
             url: None,
             filename: None,
@@ -136,7 +136,7 @@ pub async fn opencode_send_message_with_files(
     let client = get_client()?;
 
     let mut parts = vec![MessagePartInput {
-        part_type: MessagePartType::Text,
+        part_type: "text".to_string(),
         text: Some(text),
         url: None,
         filename: None,
@@ -152,7 +152,7 @@ pub async fn opencode_send_message_with_files(
             .to_string();
 
         parts.push(MessagePartInput {
-            part_type: MessagePartType::File,
+            part_type: "file".to_string(),
             text: None,
             url: Some(format!("file://{}", file_path)),
             filename: Some(filename),
