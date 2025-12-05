@@ -6,7 +6,6 @@
  */
 
 import { Hono } from 'hono';
-import { streamSSE } from 'hono/streaming';
 import { opencode, OpenCodeProxyError } from '../services/opencode.ts';
 import { getProjectById } from '../models/project.ts';
 import { coolify } from '../services/coolify.ts';
@@ -302,83 +301,38 @@ export const opencodeRoutes = new Hono()
       
       log.info('Starting SSE proxy', { projectId, eventUrl });
       
-      // Proxy the SSE stream using streamSSE
-      return streamSSE(c, async (stream) => {
-        let running = true;
-        
-        // Handle client disconnection
-        stream.onAbort(() => {
-          log.info('SSE client disconnected', { projectId });
-          running = false;
+      // Fetch the upstream SSE stream
+      const response = await fetch(eventUrl, {
+        headers: {
+          'Accept': 'text/event-stream',
+        },
+      });
+      
+      if (!response.ok) {
+        log.error('Failed to connect to OpenCode SSE', { 
+          projectId, 
+          status: response.status,
+          statusText: response.statusText 
         });
-        
-        try {
-          const response = await fetch(eventUrl, {
-            headers: {
-              'Accept': 'text/event-stream',
-            },
-          });
-          
-          if (!response.ok) {
-            await stream.writeSSE({
-              data: JSON.stringify({ type: 'error', message: 'Failed to connect to OpenCode' }),
-              event: 'error',
-            });
-            return;
-          }
-          
-          const reader = response.body?.getReader();
-          if (!reader) {
-            await stream.writeSSE({
-              data: JSON.stringify({ type: 'error', message: 'No response body' }),
-              event: 'error',
-            });
-            return;
-          }
-          
-          const decoder = new TextDecoder();
-          let buffer = '';
-          
-          while (running) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            
-            // Decode and add to buffer
-            buffer += decoder.decode(value, { stream: true });
-            
-            // Process complete SSE events from buffer
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || ''; // Keep incomplete line in buffer
-            
-            let currentEvent = '';
-            let currentData = '';
-            
-            for (const line of lines) {
-              if (line.startsWith('event:')) {
-                currentEvent = line.substring(6).trim();
-              } else if (line.startsWith('data:')) {
-                currentData = line.substring(5).trim();
-              } else if (line === '' && currentData) {
-                // Empty line marks end of event
-                await stream.writeSSE({
-                  data: currentData,
-                  event: currentEvent || 'message',
-                });
-                currentEvent = '';
-                currentData = '';
-              }
-            }
-          }
-          
-          reader.cancel();
-          
-        } catch (error) {
-          log.error('SSE proxy error', { projectId, error });
-          await stream.writeSSE({
-            data: JSON.stringify({ type: 'error', message: error instanceof Error ? error.message : 'Unknown error' }),
-            event: 'error',
-          });
-        }
+        return c.json({ 
+          error: 'Failed to connect to OpenCode event stream',
+          status: response.status 
+        }, 502);
+      }
+      
+      if (!response.body) {
+        return c.json({ error: 'No response body from OpenCode' }, 502);
+      }
+      
+      log.info('SSE connection established, proxying stream', { projectId });
+      
+      // Simply proxy the raw SSE stream - it's already in SSE format
+      return new Response(response.body, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+        },
       });
       
     } catch (error) {
