@@ -292,50 +292,52 @@ export const opencodeRoutes = new Hono()
    * 
    * This endpoint streams Server-Sent Events from the OpenCode container.
    * Events include: session.updated, message.part.updated, tool.execute, etc.
+   * 
+   * Uses the OpenCode SDK to subscribe to events and forwards them to the client.
    */
   .get('/:id/opencode/event', async (c) => {
     const projectId = c.req.param('id');
     
     try {
-      const eventUrl = await opencode.getEventStreamUrl(projectId);
+      log.info('Starting SSE proxy via SDK', { projectId });
       
-      log.info('Starting SSE proxy', { projectId, eventUrl });
+      // Get the async iterator of events from the SDK
+      const eventIterator = await opencode.subscribeToEvents(projectId);
       
-      // Fetch the upstream SSE stream
-      const response = await fetch(eventUrl, {
-        headers: {
-          'Accept': 'text/event-stream',
+      // Create a ReadableStream that forwards SDK events as SSE
+      const stream = new ReadableStream({
+        async start(controller) {
+          const encoder = new TextEncoder();
+          
+          try {
+            // Send initial connection event
+            controller.enqueue(encoder.encode(': connected\n\n'));
+            
+            // Iterate over SDK events and forward them
+            for await (const event of eventIterator) {
+              const eventType = event.type || 'message';
+              const eventData = JSON.stringify(event);
+              const sseMessage = `event: ${eventType}\ndata: ${eventData}\n\n`;
+              controller.enqueue(encoder.encode(sseMessage));
+            }
+          } catch (err) {
+            log.error('SSE stream error', { projectId, error: err });
+            // Send error event before closing
+            const errorEvent = `event: error\ndata: ${JSON.stringify({ message: 'Stream error' })}\n\n`;
+            controller.enqueue(encoder.encode(errorEvent));
+          } finally {
+            controller.close();
+          }
         },
+        cancel() {
+          log.info('SSE client disconnected', { projectId });
+          // The async iterator will be garbage collected
+        }
       });
       
-      if (!response.ok) {
-        log.error('Failed to connect to OpenCode SSE', { 
-          projectId, 
-          status: response.status,
-          statusText: response.statusText 
-        });
-        return c.json({ 
-          error: 'Failed to connect to OpenCode event stream',
-          status: response.status 
-        }, 502);
-      }
+      log.info('SSE connection established via SDK', { projectId });
       
-      if (!response.body) {
-        return c.json({ error: 'No response body from OpenCode' }, 502);
-      }
-      
-      log.info('SSE connection established, proxying stream', { projectId });
-      
-      // Create a TransformStream to pass through the data
-      const { readable, writable } = new TransformStream();
-      
-      // Pipe the upstream response to our transform stream
-      response.body.pipeTo(writable).catch((err) => {
-        log.error('SSE pipe error', { projectId, error: err });
-      });
-      
-      // Return the readable side with proper SSE headers
-      return new Response(readable, {
+      return new Response(stream, {
         headers: {
           'Content-Type': 'text/event-stream',
           'Cache-Control': 'no-cache',
