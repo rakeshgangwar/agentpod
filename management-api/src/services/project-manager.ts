@@ -188,6 +188,21 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
     
     log.info('Coolify application created', { uuid: coolifyApp.uuid });
     
+    // Step 4a: Update application settings (Coolify's create endpoint doesn't reliably set these)
+    log.info('Step 2b: Updating Coolify application settings');
+    await coolify.updateApplication(coolifyApp.uuid, {
+      ports_exposes: String(containerPort),
+      domains: fqdnUrl ?? undefined,
+      health_check_enabled: true,
+      health_check_path: '/session',
+      health_check_port: String(containerPort),
+    });
+    
+    log.info('Coolify application settings updated', { 
+      ports: containerPort, 
+      domain: fqdnUrl 
+    });
+    
     // Step 5: Set environment variables
     log.info('Step 3: Setting environment variables');
     
@@ -221,6 +236,9 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       OPENCODE_HOST: '0.0.0.0',
       // Forgejo repo URL for OpenCode to clone at startup (using public URL)
       FORGEJO_REPO_URL: publicCloneUrl,
+      // Forgejo credentials for git push (so OpenCode can commit changes back)
+      FORGEJO_USER: config.forgejo.owner,
+      FORGEJO_TOKEN: config.forgejo.token,
       // Git config
       GIT_USER_EMAIL: 'opencode@portable-command-center.local',
       GIT_USER_NAME: 'OpenCode',

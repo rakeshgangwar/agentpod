@@ -290,6 +290,21 @@ export const coolify = {
   },
   
   /**
+   * Update application settings
+   * Use this after creation to set ports, domains, health checks, etc.
+   * The Coolify dockerfile creation endpoint doesn't reliably accept all parameters.
+   */
+  async updateApplication(uuid: string, settings: {
+    ports_exposes?: string;
+    domains?: string;
+    health_check_enabled?: boolean;
+    health_check_path?: string;
+    health_check_port?: string;
+  }): Promise<void> {
+    await request<unknown>('PATCH', `/applications/${uuid}`, settings);
+  },
+
+  /**
    * Delete application
    */
   async deleteApplication(uuid: string): Promise<void> {
