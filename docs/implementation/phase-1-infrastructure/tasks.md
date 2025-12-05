@@ -67,8 +67,8 @@ curl -X POST \
 ## 3. OpenCode Docker Image
 
 ### 3.1 Create Dockerfile
-- [ ] Create `docker/opencode/Dockerfile`
-- [ ] Create `docker/opencode/entrypoint.sh`
+- [x] Create `docker/opencode/Dockerfile`
+- [x] Create `docker/opencode/entrypoint.sh`
 - [ ] Test build locally: `docker build -t opencode-server .`
 
 ### 3.2 Test Image Locally
