@@ -1,11 +1,11 @@
 # Phase 2: Tasks
 
-## 1. Project Setup
+## 1. Project Setup ✅
 
 ### 1.1 Initialize Project
-- [ ] Create `management-api/` directory
-- [ ] Initialize Bun project: `bun init`
-- [ ] Install dependencies:
+- [x] Create `management-api/` directory
+- [x] Initialize Bun project: `bun init`
+- [x] Install dependencies:
   ```bash
   # Core framework
   bun add hono @hono/zod-validator zod
@@ -17,8 +17,8 @@
   # Utilities
   bun add nanoid dotenv
   ```
-- [ ] Configure TypeScript (`tsconfig.json`)
-- [ ] Set up project structure:
+- [x] Configure TypeScript (`tsconfig.json`)
+- [x] Set up project structure:
   ```
   management-api/
   ├── src/
@@ -39,9 +39,9 @@
   ```
 
 ### 1.2 Configure Environment
-- [ ] Create `.env.example` with required variables
-- [ ] Set up config loader (`src/config.ts`)
-- [ ] Variables needed:
+- [x] Create `.env.example` with required variables
+- [x] Set up config loader (`src/config.ts`)
+- [x] Variables needed:
   - `PORT` - API port (default: 3001)
   - `COOLIFY_URL` - Coolify API URL
   - `COOLIFY_TOKEN` - Coolify API token
@@ -51,20 +51,21 @@
 
 ---
 
-## 2. Database Setup
+## 2. Database Setup ✅
 
 ### 2.1 Design Schema
-- [ ] Create `src/db/schema.sql`
-- [ ] Tables:
+- [x] Create `src/db/schema.sql`
+- [x] Tables:
   - `projects` - Project metadata
   - `providers` - LLM provider configurations
   - `settings` - Global settings
 
 ### 2.2 Implement Database Layer
-- [ ] Create `src/db/index.ts` - Database connection
-- [ ] Create `src/db/migrations.ts` - Run migrations on startup
-- [ ] Create `src/models/project.ts` - Project CRUD operations
-- [ ] Create `src/models/provider.ts` - Provider CRUD operations
+- [x] Create `src/db/index.ts` - Database connection (using Bun's native `bun:sqlite`)
+- [x] Create `src/db/migrations.ts` - Migration framework (ready for future use)
+- [x] Create `src/models/project.ts` - Project CRUD operations
+- [x] Create `src/models/provider.ts` - Provider CRUD operations
+- [x] Create `src/db/test-db.ts` - Database test script
 
 ---
 

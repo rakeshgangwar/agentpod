@@ -1,0 +1,23 @@
+{
+  "name": "management-api",
+  "version": "0.1.0",
+  "description": "Management API for Portable Command Center - orchestrates projects, containers, and credentials",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --hot src/index.ts",
+    "start": "bun run src/index.ts",
+    "test:db": "bun run src/db/test-db.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "hono": "^4.6.0",
+    "@hono/zod-validator": "^0.4.0",
+    "zod": "^3.23.0",
+    "nanoid": "^5.0.0"
+  }
+}
