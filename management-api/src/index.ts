@@ -8,6 +8,7 @@ import { healthRoutes } from './routes/health.ts';
 import { projectRoutes } from './routes/projects.ts';
 import { providerRoutes } from './routes/providers.ts';
 import { syncRoutes } from './routes/sync.ts';
+import { opencodeRoutes } from './routes/opencode.ts';
 
 // Initialize database
 console.log('Initializing database...');
@@ -25,7 +26,8 @@ const app = new Hono()
   // API routes
   .route('/api/projects', projectRoutes)
   .route('/api/providers', providerRoutes)
-  .route('/api/projects', syncRoutes); // Sync routes are under /api/projects/:id/sync
+  .route('/api/projects', syncRoutes) // Sync routes are under /api/projects/:id/sync
+  .route('/api/projects', opencodeRoutes); // OpenCode proxy routes are under /api/projects/:id/opencode/*
 
 // Export type for Hono Client (type-safe RPC from mobile app)
 export type AppType = typeof app;
@@ -34,24 +36,31 @@ export type AppType = typeof app;
 const port = config.port;
 
 console.log(`
-╔═══════════════════════════════════════════════════════════╗
-║            Management API - Portable Command Center       ║
-╠═══════════════════════════════════════════════════════════╣
-║  Port:        ${String(port).padEnd(42)}║
-║  Environment: ${config.nodeEnv.padEnd(42)}║
-║  Database:    ${config.database.path.padEnd(42)}║
-╠═══════════════════════════════════════════════════════════╣
-║  Endpoints:                                               ║
-║  - GET  /health              Health check                 ║
-║  - GET  /api/info            API info                     ║
-║  - GET  /api/projects        List projects                ║
-║  - POST /api/projects        Create project               ║
-║  - GET  /api/projects/:id    Get project                  ║
-║  - POST /api/projects/:id/start   Start container         ║
-║  - POST /api/projects/:id/stop    Stop container          ║
-║  - GET  /api/providers       List providers               ║
-║  - POST /api/providers/:id/configure  Set credentials     ║
-╚═══════════════════════════════════════════════════════════╝
+╔═══════════════════════════════════════════════════════════════╗
+║              Management API - Portable Command Center         ║
+╠═══════════════════════════════════════════════════════════════╣
+║  Port:        ${String(port).padEnd(46)}║
+║  Environment: ${config.nodeEnv.padEnd(46)}║
+║  Database:    ${config.database.path.padEnd(46)}║
+╠═══════════════════════════════════════════════════════════════╣
+║  Project Endpoints:                                           ║
+║  - GET  /api/projects              List projects              ║
+║  - POST /api/projects              Create project             ║
+║  - GET  /api/projects/:id          Get project                ║
+║  - POST /api/projects/:id/start    Start container            ║
+║  - POST /api/projects/:id/stop     Stop container             ║
+╠═══════════════════════════════════════════════════════════════╣
+║  OpenCode Proxy Endpoints (per project):                      ║
+║  - GET  /api/projects/:id/opencode/session     List sessions  ║
+║  - POST /api/projects/:id/opencode/session     Create session ║
+║  - POST .../session/:sid/message               Send message   ║
+║  - GET  /api/projects/:id/opencode/event       SSE stream     ║
+║  - GET  /api/projects/:id/opencode/file        List files     ║
+╠═══════════════════════════════════════════════════════════════╣
+║  Provider Endpoints:                                          ║
+║  - GET  /api/providers             List providers             ║
+║  - POST /api/providers/:id/configure  Set credentials         ║
+╚═══════════════════════════════════════════════════════════════╝
 `);
 
 export default {
