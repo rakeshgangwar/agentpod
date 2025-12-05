@@ -181,6 +181,13 @@ export function selectProject(project: Project | null): void {
 }
 
 /**
+ * Get a project by ID from the current list (synchronous)
+ */
+export function getProject(id: string): Project | undefined {
+  return projectsList.find(p => p.id === id);
+}
+
+/**
  * Clear error
  */
 export function clearError(): void {
