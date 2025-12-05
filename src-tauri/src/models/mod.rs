@@ -2,8 +2,10 @@
 //! These models mirror the Management API types
 
 pub mod error;
+pub mod opencode;
 
 pub use error::AppError;
+pub use opencode::*;
 use serde::{Deserialize, Serialize};
 
 /// Project status enum

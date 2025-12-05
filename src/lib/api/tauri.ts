@@ -151,3 +151,191 @@ export async function stopProject(id: string): Promise<Project> {
 export async function restartProject(id: string): Promise<Project> {
   return invoke<Project>("restart_project", { id });
 }
+
+// =============================================================================
+// OpenCode Types
+// =============================================================================
+
+export type SessionStatus = "idle" | "running" | "error";
+export type MessageRole = "user" | "assistant";
+export type MessagePartType = "text" | "tool_call" | "tool_result" | "file";
+export type FileNodeType = "file" | "directory";
+
+export interface Session {
+  id: string;
+  status: SessionStatus;
+  cost?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface MessageInfo {
+  id: string;
+  role: MessageRole;
+  content?: string;
+}
+
+export interface MessagePart {
+  id: string;
+  partType: MessagePartType;
+  text?: string;
+  content?: string;
+  url?: string;
+  filename?: string;
+  mime?: string;
+}
+
+export interface Message {
+  info: MessageInfo;
+  parts: MessagePart[];
+}
+
+export interface FileNode {
+  name: string;
+  nodeType: FileNodeType;
+  path: string;
+  children?: FileNode[];
+}
+
+export interface FileContent {
+  content: string;
+  language?: string;
+}
+
+export interface AppInfo {
+  name: string;
+  version: string;
+}
+
+export interface OpenCodeHealth {
+  healthy: boolean;
+  projectId: string;
+  error?: string;
+}
+
+// =============================================================================
+// OpenCode - App Info & Health Commands
+// =============================================================================
+
+/**
+ * Get OpenCode app info for a project
+ */
+export async function opencodeGetAppInfo(projectId: string): Promise<AppInfo> {
+  return invoke<AppInfo>("opencode_get_app_info", { projectId });
+}
+
+/**
+ * Check if OpenCode container is healthy
+ */
+export async function opencodeHealthCheck(projectId: string): Promise<OpenCodeHealth> {
+  return invoke<OpenCodeHealth>("opencode_health_check", { projectId });
+}
+
+// =============================================================================
+// OpenCode - Session Commands
+// =============================================================================
+
+/**
+ * List all sessions for a project
+ */
+export async function opencodeListSessions(projectId: string): Promise<Session[]> {
+  return invoke<Session[]>("opencode_list_sessions", { projectId });
+}
+
+/**
+ * Create a new session for a project
+ */
+export async function opencodeCreateSession(projectId: string): Promise<Session> {
+  return invoke<Session>("opencode_create_session", { projectId });
+}
+
+/**
+ * Get a session by ID
+ */
+export async function opencodeGetSession(projectId: string, sessionId: string): Promise<Session> {
+  return invoke<Session>("opencode_get_session", { projectId, sessionId });
+}
+
+/**
+ * Delete a session
+ */
+export async function opencodeDeleteSession(projectId: string, sessionId: string): Promise<void> {
+  return invoke("opencode_delete_session", { projectId, sessionId });
+}
+
+/**
+ * Abort a running session
+ */
+export async function opencodeAbortSession(projectId: string, sessionId: string): Promise<void> {
+  return invoke("opencode_abort_session", { projectId, sessionId });
+}
+
+// =============================================================================
+// OpenCode - Message Commands
+// =============================================================================
+
+/**
+ * List messages in a session
+ */
+export async function opencodeListMessages(projectId: string, sessionId: string): Promise<Message[]> {
+  return invoke<Message[]>("opencode_list_messages", { projectId, sessionId });
+}
+
+/**
+ * Send a text message to a session
+ */
+export async function opencodeSendMessage(
+  projectId: string,
+  sessionId: string,
+  text: string
+): Promise<Message> {
+  return invoke<Message>("opencode_send_message", { projectId, sessionId, text });
+}
+
+/**
+ * Send a message with file attachments
+ */
+export async function opencodeSendMessageWithFiles(
+  projectId: string,
+  sessionId: string,
+  text: string,
+  files: string[]
+): Promise<Message> {
+  return invoke<Message>("opencode_send_message_with_files", { projectId, sessionId, text, files });
+}
+
+/**
+ * Get a specific message
+ */
+export async function opencodeGetMessage(
+  projectId: string,
+  sessionId: string,
+  messageId: string
+): Promise<Message> {
+  return invoke<Message>("opencode_get_message", { projectId, sessionId, messageId });
+}
+
+// =============================================================================
+// OpenCode - File Commands
+// =============================================================================
+
+/**
+ * List files in a project
+ */
+export async function opencodeListFiles(projectId: string): Promise<FileNode[]> {
+  return invoke<FileNode[]>("opencode_list_files", { projectId });
+}
+
+/**
+ * Get file content
+ */
+export async function opencodeGetFileContent(projectId: string, path: string): Promise<FileContent> {
+  return invoke<FileContent>("opencode_get_file_content", { projectId, path });
+}
+
+/**
+ * Find files by pattern
+ */
+export async function opencodeFindFiles(projectId: string, pattern: string): Promise<string[]> {
+  return invoke<string[]>("opencode_find_files", { projectId, pattern });
+}

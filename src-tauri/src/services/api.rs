@@ -3,8 +3,9 @@
 //! This module provides a typed HTTP client for all Management API operations.
 
 use crate::models::{
-    AppError, ConnectionConfig, CreateProjectInput, ErrorResponse, HealthResponse, Project,
-    ProjectResponse, ProjectsResponse, SuccessResponse,
+    AppError, AppInfo, ConnectionConfig, CreateProjectInput, ErrorResponse, FileContent, FileNode,
+    HealthResponse, Message, OpenCodeHealth, Project, ProjectResponse, ProjectsResponse,
+    SendMessageInput, Session, SuccessResponse,
 };
 use reqwest::Client;
 use std::time::Duration;
@@ -140,5 +141,189 @@ impl ApiClient {
         let response = request.send().await?;
         let result: ProjectResponse = self.handle_response(response).await?;
         Ok(result.project)
+    }
+
+    // =========================================================================
+    // OpenCode - App Info & Health
+    // =========================================================================
+
+    /// Get OpenCode app info for a project
+    pub async fn opencode_get_app_info(&self, project_id: &str) -> Result<AppInfo, AppError> {
+        let url = format!("{}/api/projects/{}/opencode/app", self.base_url, project_id);
+        let request = self.add_auth(self.client.get(&url));
+        let response = request.send().await?;
+        self.handle_response(response).await
+    }
+
+    /// Check if OpenCode container is healthy
+    pub async fn opencode_health_check(&self, project_id: &str) -> Result<OpenCodeHealth, AppError> {
+        let url = format!("{}/api/projects/{}/opencode/health", self.base_url, project_id);
+        let request = self.add_auth(self.client.get(&url));
+        let response = request.send().await?;
+        self.handle_response(response).await
+    }
+
+    // =========================================================================
+    // OpenCode - Sessions
+    // =========================================================================
+
+    /// List all sessions for a project
+    pub async fn opencode_list_sessions(&self, project_id: &str) -> Result<Vec<Session>, AppError> {
+        let url = format!("{}/api/projects/{}/opencode/session", self.base_url, project_id);
+        let request = self.add_auth(self.client.get(&url));
+        let response = request.send().await?;
+        self.handle_response(response).await
+    }
+
+    /// Create a new session for a project
+    pub async fn opencode_create_session(&self, project_id: &str) -> Result<Session, AppError> {
+        let url = format!("{}/api/projects/{}/opencode/session", self.base_url, project_id);
+        let request = self.add_auth(self.client.post(&url));
+        let response = request.send().await?;
+        self.handle_response(response).await
+    }
+
+    /// Get a session by ID
+    pub async fn opencode_get_session(
+        &self,
+        project_id: &str,
+        session_id: &str,
+    ) -> Result<Session, AppError> {
+        let url = format!(
+            "{}/api/projects/{}/opencode/session/{}",
+            self.base_url, project_id, session_id
+        );
+        let request = self.add_auth(self.client.get(&url));
+        let response = request.send().await?;
+        self.handle_response(response).await
+    }
+
+    /// Delete a session
+    pub async fn opencode_delete_session(
+        &self,
+        project_id: &str,
+        session_id: &str,
+    ) -> Result<(), AppError> {
+        let url = format!(
+            "{}/api/projects/{}/opencode/session/{}",
+            self.base_url, project_id, session_id
+        );
+        let request = self.add_auth(self.client.delete(&url));
+        let response = request.send().await?;
+        let _: SuccessResponse = self.handle_response(response).await?;
+        Ok(())
+    }
+
+    /// Abort a running session
+    pub async fn opencode_abort_session(
+        &self,
+        project_id: &str,
+        session_id: &str,
+    ) -> Result<(), AppError> {
+        let url = format!(
+            "{}/api/projects/{}/opencode/session/{}/abort",
+            self.base_url, project_id, session_id
+        );
+        let request = self.add_auth(self.client.post(&url));
+        let response = request.send().await?;
+        let _: SuccessResponse = self.handle_response(response).await?;
+        Ok(())
+    }
+
+    // =========================================================================
+    // OpenCode - Messages
+    // =========================================================================
+
+    /// List messages in a session
+    pub async fn opencode_list_messages(
+        &self,
+        project_id: &str,
+        session_id: &str,
+    ) -> Result<Vec<Message>, AppError> {
+        let url = format!(
+            "{}/api/projects/{}/opencode/session/{}/message",
+            self.base_url, project_id, session_id
+        );
+        let request = self.add_auth(self.client.get(&url));
+        let response = request.send().await?;
+        self.handle_response(response).await
+    }
+
+    /// Send a message to a session
+    pub async fn opencode_send_message(
+        &self,
+        project_id: &str,
+        session_id: &str,
+        input: SendMessageInput,
+    ) -> Result<Message, AppError> {
+        let url = format!(
+            "{}/api/projects/{}/opencode/session/{}/message",
+            self.base_url, project_id, session_id
+        );
+        let request = self.add_auth(self.client.post(&url)).json(&input);
+        let response = request.send().await?;
+        self.handle_response(response).await
+    }
+
+    /// Get a specific message
+    pub async fn opencode_get_message(
+        &self,
+        project_id: &str,
+        session_id: &str,
+        message_id: &str,
+    ) -> Result<Message, AppError> {
+        let url = format!(
+            "{}/api/projects/{}/opencode/session/{}/message/{}",
+            self.base_url, project_id, session_id, message_id
+        );
+        let request = self.add_auth(self.client.get(&url));
+        let response = request.send().await?;
+        self.handle_response(response).await
+    }
+
+    // =========================================================================
+    // OpenCode - Files
+    // =========================================================================
+
+    /// List files in a project
+    pub async fn opencode_list_files(&self, project_id: &str) -> Result<Vec<FileNode>, AppError> {
+        let url = format!("{}/api/projects/{}/opencode/file", self.base_url, project_id);
+        let request = self.add_auth(self.client.get(&url));
+        let response = request.send().await?;
+        self.handle_response(response).await
+    }
+
+    /// Get file content
+    pub async fn opencode_get_file_content(
+        &self,
+        project_id: &str,
+        path: &str,
+    ) -> Result<FileContent, AppError> {
+        let url = format!(
+            "{}/api/projects/{}/opencode/file/content?path={}",
+            self.base_url,
+            project_id,
+            urlencoding::encode(path)
+        );
+        let request = self.add_auth(self.client.get(&url));
+        let response = request.send().await?;
+        self.handle_response(response).await
+    }
+
+    /// Find files by pattern
+    pub async fn opencode_find_files(
+        &self,
+        project_id: &str,
+        pattern: &str,
+    ) -> Result<Vec<String>, AppError> {
+        let url = format!(
+            "{}/api/projects/{}/opencode/find/file?pattern={}",
+            self.base_url,
+            project_id,
+            urlencoding::encode(pattern)
+        );
+        let request = self.add_auth(self.client.get(&url));
+        let response = request.send().await?;
+        self.handle_response(response).await
     }
 }
