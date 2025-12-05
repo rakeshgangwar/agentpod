@@ -1,6 +1,68 @@
 # Phase 4: Tasks
 
-## 1. Project List UI
+## Priority Order
+
+1. **Routing Structure Refactor** - Proper SvelteKit routing
+2. **Project Detail View** - Tabs and navigation
+3. **Chat Interface** - Core feature with OpenCode integration
+4. **File Browser** - Browse and view project files
+5. **SSE Streaming** - Real-time updates
+6. **Settings & Deferred Items** - From Phase 3
+
+---
+
+## 0. Prerequisites & Setup
+
+### 0.1 Install Additional Dependencies
+- [ ] Install Shiki for syntax highlighting: `pnpm add shiki`
+- [ ] Install marked for markdown: `pnpm add marked`
+- [ ] Install additional shadcn components:
+  ```bash
+  pnpm dlx shadcn-svelte@next add dialog tabs scroll-area separator avatar dropdown-menu
+  ```
+- [ ] Install sonner for toast notifications: `pnpm add sonner`
+
+### 0.2 Management API Updates
+- [ ] Add OpenCode proxy endpoints to Management API:
+  - `GET /api/projects/:id/opencode/session` - List sessions
+  - `POST /api/projects/:id/opencode/session` - Create session
+  - `GET /api/projects/:id/opencode/session/:sid` - Get session
+  - `POST /api/projects/:id/opencode/session/:sid/message` - Send message
+  - `GET /api/projects/:id/opencode/session/:sid/message` - List messages
+  - `POST /api/projects/:id/opencode/session/:sid/abort` - Abort session
+  - `GET /api/projects/:id/opencode/event` - SSE stream (proxy)
+  - `GET /api/projects/:id/opencode/file` - List files
+  - `GET /api/projects/:id/opencode/file/content` - Read file
+
+---
+
+## 1. Routing Structure Refactor
+
+### 1.1 Base Layout Updates
+- [ ] Update `src/routes/+layout.svelte` for connection guard
+- [ ] Create root redirect logic in `src/routes/+page.svelte`
+
+### 1.2 Setup Route
+- [ ] Create `src/routes/setup/+page.svelte`
+- [ ] Move connection form from current +page.svelte
+- [ ] Redirect to /projects after successful connection
+
+### 1.3 Projects Routes
+- [ ] Create `src/routes/projects/+page.svelte` (project list)
+- [ ] Create `src/routes/projects/new/+page.svelte` (create project)
+- [ ] Create `src/routes/projects/[id]/+layout.svelte` (project shell)
+- [ ] Create `src/routes/projects/[id]/+page.svelte` (redirect to chat)
+- [ ] Create `src/routes/projects/[id]/chat/+page.svelte`
+- [ ] Create `src/routes/projects/[id]/files/+page.svelte`
+- [ ] Create `src/routes/projects/[id]/sync/+page.svelte`
+
+### 1.4 Settings Route
+- [ ] Create `src/routes/settings/+page.svelte`
+- [ ] Move settings content from current +page.svelte
+
+---
+
+## 2. Project List UI
 
 ### 1.1 Project List Screen
 - [ ] Create `src/routes/projects/+page.svelte`
@@ -102,17 +164,19 @@
 ## 5. Real-time Streaming (SSE)
 
 ### 5.1 SSE Client in Rust
-- [ ] Add `eventsource-client` crate
-- [ ] Create `src/services/sse.rs`
-- [ ] Implement event stream subscription
+- [ ] Use `reqwest` with `stream` feature (no external crate needed)
+- [ ] Create `src-tauri/src/services/sse.rs`
+- [ ] Implement SSE parsing with manual `data:` line parsing
+- [ ] Handle reconnection logic
 
 ### 5.2 Tauri Event Bridge
-- [ ] Emit events from Rust to frontend
-- [ ] Event types:
-  - `message:update` - New message content
-  - `message:part` - Streaming chunk
-  - `session:status` - Session state change
-  - `session:idle` - Task complete
+- [ ] Emit events from Rust to frontend via `app.emit()`
+- [ ] Event types (from OpenCode):
+  - `session.updated` - Session status/cost changed
+  - `message.part.updated` - Streaming text chunk
+  - `tool.execute` - Tool being executed
+  - `tool.result` - Tool execution completed
+  - `file.edited` - File was modified
 
 ### 5.3 Frontend Event Handling
 - [ ] Create `src/lib/stores/chat.ts`
@@ -130,20 +194,21 @@
 
 ## 6. OpenCode API Integration
 
-### 6.1 Rust Commands for OpenCode
-- [ ] Create `src/commands/opencode.rs`
-- [ ] Commands:
+### 6.1 Rust Commands for OpenCode (via Management API)
+- [ ] Create `src-tauri/src/commands/opencode.rs`
+- [ ] Commands (all proxy through Management API):
   - `opencode_list_sessions(project_id)`
   - `opencode_get_session(project_id, session_id)`
   - `opencode_create_session(project_id)`
   - `opencode_send_prompt(project_id, session_id, prompt)`
   - `opencode_abort_session(project_id, session_id)`
   - `opencode_subscribe_events(project_id)`
+  - `opencode_list_files(project_id)`
+  - `opencode_get_file(project_id, path)`
 
-### 6.2 Direct OpenCode Connection
-- [ ] Get container endpoint from project
-- [ ] Connect directly to OpenCode API
-- [ ] Handle authentication if needed
+### 6.2 Frontend API Wrapper
+- [ ] Update `src/lib/api/tauri.ts` with OpenCode commands
+- [ ] Type definitions for Session, Message, FileNode
 
 ---
 
@@ -158,8 +223,8 @@
 
 ### 7.2 File Viewer
 - [ ] Create `src/lib/components/FileViewer.svelte`
-- [ ] Fetch file contents from OpenCode API
-- [ ] Syntax highlighting (use Shiki or Prism)
+- [ ] Fetch file contents via Management API → OpenCode
+- [ ] Syntax highlighting with Shiki
 - [ ] Line numbers
 - [ ] Copy path button
 - [ ] "Use in Chat" button
@@ -210,18 +275,74 @@
 
 ---
 
-## 10. Testing
+## 10. Deferred Items from Phase 3
+
+### 10.1 Settings Store & Commands
+- [ ] Create `src/lib/stores/settings.svelte.ts`
+- [ ] Create `src-tauri/src/commands/settings.rs`
+- [ ] Implement commands:
+  - `get_settings()` - Get app settings
+  - `save_settings(settings)` - Save settings
+  - `get_providers()` - List LLM providers from API
+
+### 10.2 OAuth Integration Skeleton
+- [ ] Add `tauri-plugin-oauth` to Tauri builder
+- [ ] Configure permissions: `oauth:allow-start`, `oauth:allow-cancel`
+- [ ] Create `src-tauri/src/services/oauth.rs`
+- [ ] Implement OAuth commands:
+  - `initiate_oauth(provider)` - Start OAuth server, return port
+  - `complete_oauth(provider, auth_url)` - Handle callback
+- [ ] Enable GitHub Connect button in settings
+- [ ] Enable LLM Provider Configure button in settings
+
+### 10.3 Additional shadcn Components
+- [ ] Dialog - for modals and confirmations
+- [ ] Tabs - for project detail view
+- [ ] ScrollArea - for chat scrolling
+- [ ] Separator - UI dividers
+- [ ] Avatar - user/AI indicators
+- [ ] DropdownMenu - session selection, actions
+- [ ] Toast/Sonner - notifications
+
+---
+
+## 11. Testing
 
 - [ ] Test project creation flow end-to-end
 - [ ] Test chat with real OpenCode container
 - [ ] Test file browser navigation
 - [ ] Test SSE streaming
-- [ ] Test on iOS/Android device
+- [ ] Test routing and navigation
+- [ ] Test settings persistence
 
 ---
 
 ## Notes
 
-- Consider offline caching for project list
-- Implement optimistic UI updates where possible
-- Add error boundaries for graceful failures
+### Architecture Decisions
+- All OpenCode communication goes through Management API (proxy pattern)
+- Management API stores session metadata for future features
+- SSE implemented with reqwest + manual parsing (no external crate)
+- Shiki for syntax highlighting (VS Code quality)
+- marked for markdown rendering
+
+### Dependencies to Add
+```bash
+# Frontend
+pnpm add shiki marked sonner
+
+# shadcn components
+pnpm dlx shadcn-svelte@next add dialog tabs scroll-area separator avatar dropdown-menu
+```
+
+### Rust Dependencies
+```toml
+# Cargo.toml additions (if needed)
+futures-util = "0.3"  # For stream handling
+```
+
+### Future Considerations
+- Offline caching for project list
+- Optimistic UI updates
+- Error boundaries for graceful failures
+- Session history persistence in Management API database

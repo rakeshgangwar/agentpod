@@ -1,5 +1,164 @@
 # Phase 4: Technical Notes
 
+## Architecture Decisions
+
+### Connection Flow
+```
+Desktop App (Tauri) → Management API → OpenCode Container
+```
+
+- **Desktop App**: Only connects to Management API
+- **Management API**: Proxies requests to OpenCode containers, stores session metadata
+- **OpenCode Container**: One per project, isolated workspace
+
+### API Routing Decision
+- Use **global OpenCode APIs** (`/session`, `/file`, etc.)
+- Each container is already project-scoped by nature
+- Management API adds project context via routing
+
+### Authentication
+- Management API handles all auth (API key)
+- OpenCode containers are on private Docker network
+- No auth needed between Management API and OpenCode
+
+---
+
+## Technology Choices
+
+### Syntax Highlighting: Shiki
+**Why Shiki over Prism:**
+- More accurate (uses VS Code's TextMate grammars)
+- Better theme support (native VS Code themes)
+- First-class markdown integration packages
+- Easy light/dark mode switching
+
+**Packages:**
+```bash
+pnpm add shiki marked
+```
+
+**Usage for Markdown with code highlighting:**
+```typescript
+import { marked } from 'marked';
+import { codeToHtml, createHighlighter } from 'shiki';
+
+// Create highlighter once
+const highlighter = await createHighlighter({
+  themes: ['github-dark', 'github-light'],
+  langs: ['typescript', 'javascript', 'python', 'rust', 'bash', 'json', 'markdown']
+});
+
+// Custom renderer for code blocks
+marked.use({
+  async: true,
+  renderer: {
+    code(code: string, lang: string) {
+      return highlighter.codeToHtml(code, { 
+        lang: lang || 'text', 
+        theme: 'github-dark' 
+      });
+    }
+  }
+});
+
+// Render markdown with highlighted code
+const html = await marked.parse(markdownContent);
+```
+
+### SSE Implementation: reqwest with manual parsing
+**Approach:** Use reqwest's `bytes_stream()` with manual SSE parsing
+
+**Why not external crates:**
+- SSE format is simple (`data: {...}\n\n`)
+- Reduces dependencies
+- Full control over reconnection logic
+
+```rust
+use futures_util::StreamExt;
+use reqwest::Client;
+use tauri::{AppHandle, Emitter};
+
+pub async fn subscribe_to_events(
+    app: AppHandle,
+    base_url: &str,
+    project_id: &str,
+) -> Result<(), String> {
+    let client = Client::new();
+    let response = client
+        .get(format!("{}/event", base_url))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    
+    let mut stream = response.bytes_stream();
+    let mut buffer = String::new();
+    
+    while let Some(chunk) = stream.next().await {
+        let bytes = chunk.map_err(|e| e.to_string())?;
+        buffer.push_str(&String::from_utf8_lossy(&bytes));
+        
+        // Parse complete SSE messages
+        while let Some(pos) = buffer.find("\n\n") {
+            let message = buffer[..pos].to_string();
+            buffer = buffer[pos + 2..].to_string();
+            
+            for line in message.lines() {
+                if let Some(data) = line.strip_prefix("data: ") {
+                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
+                        app.emit(&format!("opencode:{}", project_id), json)
+                            .map_err(|e| e.to_string())?;
+                    }
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
+```
+
+---
+
+## Routing Structure
+
+```
+src/routes/
+├── +layout.svelte           # App shell, connection guard
+├── +layout.ts               # SSR disabled
+├── +page.svelte             # Root redirect
+├── setup/
+│   └── +page.svelte         # Connection setup
+├── projects/
+│   ├── +page.svelte         # Project list
+│   ├── new/
+│   │   └── +page.svelte     # Create project
+│   └── [id]/
+│       ├── +layout.svelte   # Project header + tabs
+│       ├── +page.svelte     # Redirect to chat
+│       ├── chat/
+│       │   └── +page.svelte # Chat interface
+│       ├── files/
+│       │   └── +page.svelte # File browser
+│       └── sync/
+│           └── +page.svelte # Sync settings
+├── settings/
+│   └── +page.svelte         # Settings
+└── activity/
+    └── +page.svelte         # Activity feed (optional)
+```
+
+---
+
+## Additional shadcn Components Needed
+
+```bash
+# Install additional components
+pnpm dlx shadcn-svelte@next add dialog tabs scroll-area separator avatar dropdown-menu
+pnpm add sonner  # For toast notifications
+```
+
+---
+
 ## SSE Event Streaming
 
 ### Rust SSE Client
