@@ -1,150 +1,61 @@
 # Phase 3: Tasks
 
-## 1. Tauri Mobile Setup
+## Development Approach
 
-### 1.1 Prerequisites
-- [ ] Install Rust: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
-- [ ] Install Tauri CLI: `cargo install tauri-cli`
-- [ ] For iOS: Install Xcode, Xcode Command Line Tools
-- [ ] For Android: Install Android Studio, NDK, SDK
-
-### 1.2 Configure Mobile Targets
-- [ ] Add iOS target: `rustup target add aarch64-apple-ios`
-- [ ] Add Android targets:
-  ```bash
-  rustup target add aarch64-linux-android
-  rustup target add armv7-linux-androideabi
-  rustup target add i686-linux-android
-  rustup target add x86_64-linux-android
-  ```
-- [ ] Initialize Tauri mobile: `cargo tauri android init` / `cargo tauri ios init`
-
-### 1.3 Test Build
-- [ ] Build for iOS simulator: `cargo tauri ios dev`
-- [ ] Build for Android emulator: `cargo tauri android dev`
-- [ ] Verify app launches with default template
+**Desktop-first, responsive design** - We develop on Linux desktop for fast iteration, building a responsive UI that works on all screen sizes. Mobile builds (iOS/Android) are deferred to a later phase.
 
 ---
 
-## 2. Rust Backend Foundation
+## 1. Project Setup
 
-### 2.1 Project Structure
-- [ ] Organize `src-tauri/src/`:
+### 1.1 Rust Dependencies
+- [ ] Update `Cargo.toml` with required dependencies:
+  ```toml
+  [dependencies]
+  tauri = { version = "2", features = [] }
+  tauri-plugin-opener = "2"
+  tauri-plugin-oauth = "2"
+  serde = { version = "1", features = ["derive"] }
+  serde_json = "1"
+  tokio = { version = "1", features = ["full"] }
+  reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+  keyring = "3"
+  thiserror = "2"
+  ```
+
+### 1.2 Frontend Dependencies
+- [ ] Install Tailwind CSS v4: `pnpm add -D @tailwindcss/vite tailwindcss`
+- [ ] Initialize shadcn-svelte: `pnpm dlx shadcn-svelte@next init`
+- [ ] Install core shadcn components: button, card, input, dialog, drawer, sidebar, toast
+
+### 1.3 Project Structure (Rust)
+- [ ] Create directory structure:
   ```
   src-tauri/src/
-  ├── lib.rs          # Main library, command exports
-  ├── main.rs         # Entry point
-  ├── commands/       # Tauri commands
+  ├── lib.rs              # Main library, command exports
+  ├── main.rs             # Entry point
+  ├── commands/           # Tauri commands
   │   ├── mod.rs
-  │   ├── projects.rs
-  │   ├── auth.rs
-  │   └── settings.rs
-  ├── services/       # Business logic
+  │   ├── auth.rs         # Connection/auth commands
+  │   ├── projects.rs     # Project CRUD commands
+  │   └── settings.rs     # Settings commands
+  ├── services/           # Business logic
   │   ├── mod.rs
-  │   ├── api.rs      # HTTP client
-  │   ├── oauth.rs    # OAuth proxy
-  │   └── storage.rs  # Secure storage
-  └── models/         # Data types
+  │   ├── api.rs          # HTTP client for Management API
+  │   ├── storage.rs      # Secure credential storage
+  │   └── oauth.rs        # OAuth flow handling
+  └── models/             # Data types
       └── mod.rs
   ```
 
-### 2.2 Dependencies
-- [ ] Update `Cargo.toml`:
-  ```toml
-  [dependencies]
-  tauri = { version = "2", features = ["macos-private-api"] }
-  serde = { version = "1", features = ["derive"] }
-  serde_json = "1"
-  reqwest = { version = "0.11", features = ["json"] }
-  tokio = { version = "1", features = ["full"] }
-  keyring = "2"  # For secure credential storage
-  ```
-
-### 2.3 API Client
-- [ ] Create `src/services/api.rs`
-- [ ] Implement base HTTP client with:
-  - Base URL configuration
-  - Bearer token authentication
-  - Error handling
-  - Request/response logging (debug)
-
-### 2.4 Secure Storage
-- [ ] Create `src/services/storage.rs`
-- [ ] Implement functions:
-  - `store_credential(key, value)` - Save to Keychain/Keystore
-  - `get_credential(key)` - Retrieve from Keychain/Keystore
-  - `delete_credential(key)` - Remove credential
-- [ ] Keys to store:
-  - `api_endpoint` - Management API URL
-  - `api_token` - Authentication token
-
----
-
-## 3. Tauri Commands
-
-### 3.1 Connection Commands
-- [ ] Create `src/commands/auth.rs`
-- [ ] Commands:
-  - `connect(endpoint, token)` - Store and validate connection
-  - `disconnect()` - Clear stored credentials
-  - `get_connection_status()` - Check if connected
-  - `test_connection()` - Ping Management API
-
-### 3.2 Project Commands (Skeleton)
-- [ ] Create `src/commands/projects.rs`
-- [ ] Commands (call Management API):
-  - `list_projects()` - Get all projects
-  - `get_project(id)` - Get project details
-  - `create_project(options)` - Create new project
-  - `delete_project(id)` - Delete project
-  - `start_project(id)` - Start container
-  - `stop_project(id)` - Stop container
-
-### 3.3 Settings Commands
-- [ ] Create `src/commands/settings.rs`
-- [ ] Commands:
-  - `get_settings()` - Get app settings
-  - `save_settings(settings)` - Save settings
-  - `get_providers()` - List LLM providers
-  - `configure_provider(id, config)` - Set provider credentials
-
-### 3.4 Register Commands
-- [ ] Update `lib.rs` to export all commands
-- [ ] Register in Tauri builder
-
----
-
-## 4. OAuth Proxy (Skeleton)
-
-### 4.1 GitHub Copilot OAuth
-- [ ] Create `src/services/oauth.rs`
-- [ ] Implement device flow:
-  - `github_copilot_initiate()` - Get device code
-  - `github_copilot_poll(device_code)` - Poll for token
-- [ ] Store token via secure storage
-
-### 4.2 Anthropic OAuth
-- [ ] Implement redirect flow:
-  - `anthropic_initiate()` - Get auth URL
-  - `anthropic_exchange(code)` - Exchange code for token
-- [ ] Handle deep link callback
-
-### 4.3 Tauri Commands for OAuth
-- [ ] `initiate_oauth(provider)` - Start OAuth flow
-- [ ] `poll_oauth(provider, device_code)` - Poll for token (device flow)
-- [ ] `complete_oauth(provider, code)` - Complete OAuth (redirect flow)
-
----
-
-## 5. Svelte Frontend Foundation
-
-### 5.1 Project Structure
-- [ ] Organize `src/`:
+### 1.4 Project Structure (Svelte)
+- [ ] Create directory structure:
   ```
   src/
   ├── routes/
-  │   ├── +layout.svelte      # App shell
-  │   ├── +page.svelte        # Home (redirects)
+  │   ├── +layout.svelte      # App shell with responsive sidebar
+  │   ├── +layout.ts          # SSR disabled
+  │   ├── +page.svelte        # Home (redirects based on connection)
   │   ├── setup/
   │   │   └── +page.svelte    # First-time setup
   │   ├── projects/
@@ -154,121 +65,259 @@
   │   └── settings/
   │       └── +page.svelte    # Settings
   ├── lib/
-  │   ├── components/         # Reusable components
-  │   ├── stores/             # Svelte stores
-  │   ├── api/                # API client wrappers
-  │   └── utils/              # Utilities
-  └── app.html
+  │   ├── components/         # App-specific components
+  │   │   └── ui/             # shadcn-svelte components
+  │   ├── stores/             # Svelte stores (runes)
+  │   │   ├── connection.svelte.ts
+  │   │   ├── projects.svelte.ts
+  │   │   └── settings.svelte.ts
+  │   ├── api/                # Tauri API wrappers
+  │   │   └── tauri.ts
+  │   └── utils/              # Utilities (cn, etc.)
+  └── app.css                 # Global styles + Tailwind
   ```
 
-### 5.2 Tauri API Integration
+---
+
+## 2. Rust Backend Core
+
+### 2.1 API Client Service
+- [ ] Create `src/services/api.rs`
+- [ ] Implement `ApiClient` struct with:
+  - Base URL configuration
+  - Bearer token authentication
+  - GET, POST, DELETE methods
+  - Error handling with `thiserror`
+  - Request timeout configuration
+
+### 2.2 Secure Storage Service
+- [ ] Create `src/services/storage.rs`
+- [ ] Implement primary storage using `keyring` crate:
+  - `store_credential(key, value)` - Save to system keychain
+  - `get_credential(key)` - Retrieve from keychain
+  - `delete_credential(key)` - Remove credential
+- [ ] Implement fallback for systems without keychain:
+  - Encrypt credentials using app-derived key
+  - Store in Tauri app data directory
+- [ ] Keys to store:
+  - `api_endpoint` - Management API URL
+  - `api_token` - Authentication token
+
+### 2.3 App State Management
+- [ ] Create `AppState` struct with:
+  - `api_client: Mutex<Option<ApiClient>>`
+- [ ] Register state in Tauri builder
+- [ ] Handle state restoration on app startup
+
+---
+
+## 3. Tauri Commands
+
+### 3.1 Auth Commands
+- [ ] Create `src/commands/auth.rs`
+- [ ] Implement commands:
+  - `connect(endpoint, token)` - Store credentials and validate connection
+  - `disconnect()` - Clear stored credentials
+  - `get_connection_status()` - Return connected state and endpoint
+  - `test_connection()` - Ping Management API health endpoint
+  - `restore_connection()` - Called on startup to restore saved credentials
+
+### 3.2 Project Commands
+- [ ] Create `src/commands/projects.rs`
+- [ ] Implement commands (call Management API):
+  - `list_projects()` - GET /api/projects
+  - `get_project(id)` - GET /api/projects/:id
+  - `create_project(name, description)` - POST /api/projects (empty project only)
+  - `delete_project(id)` - DELETE /api/projects/:id
+  - `start_project(id)` - POST /api/projects/:id/start
+  - `stop_project(id)` - POST /api/projects/:id/stop
+
+### 3.3 Settings Commands
+- [ ] Create `src/commands/settings.rs`
+- [ ] Implement commands:
+  - `get_settings()` - Get app settings
+  - `save_settings(settings)` - Save settings
+  - `get_providers()` - List LLM providers from API
+
+### 3.4 Register Commands
+- [ ] Update `lib.rs` to export all command modules
+- [ ] Register all commands in Tauri builder
+- [ ] Configure permissions in `capabilities/default.json`
+
+---
+
+## 4. OAuth Integration (Skeleton)
+
+### 4.1 Setup tauri-plugin-oauth
+- [ ] Add plugin to Tauri builder
+- [ ] Configure permissions for oauth:allow-start, oauth:allow-cancel
+- [ ] Create `src/services/oauth.rs`
+
+### 4.2 OAuth Commands
+- [ ] `initiate_oauth(provider)` - Start OAuth server, return port
+- [ ] `complete_oauth(provider, auth_url)` - Handle callback URL, extract token
+- [ ] Store tokens via secure storage service
+
+### 4.3 Provider Skeletons
+- [ ] GitHub Copilot (device flow) - skeleton only
+- [ ] Anthropic (redirect flow) - skeleton only
+
+---
+
+## 5. Svelte Frontend Foundation
+
+### 5.1 Tailwind + shadcn-svelte Setup
+- [ ] Configure Tailwind CSS v4 in vite.config.js
+- [ ] Set up app.css with theme variables (light/dark)
+- [ ] Configure shadcn-svelte with default theme
+- [ ] Install required components via CLI
+
+### 5.2 Tauri API Wrapper
 - [ ] Create `src/lib/api/tauri.ts`
-- [ ] Wrap Tauri invoke calls:
+- [ ] Type-safe wrappers for all Tauri commands:
   ```typescript
-  import { invoke } from '@tauri-apps/api/core';
-  
   export const api = {
-    async connect(endpoint: string, token: string) {
-      return invoke('connect', { endpoint, token });
-    },
-    async listProjects() {
-      return invoke('list_projects');
-    },
-    // ... more methods
+    // Auth
+    connect(endpoint: string, token: string): Promise<void>,
+    disconnect(): Promise<void>,
+    getConnectionStatus(): Promise<ConnectionStatus>,
+    testConnection(): Promise<boolean>,
+    
+    // Projects
+    listProjects(): Promise<Project[]>,
+    getProject(id: string): Promise<Project>,
+    createProject(name: string, description?: string): Promise<Project>,
+    deleteProject(id: string): Promise<void>,
+    startProject(id: string): Promise<void>,
+    stopProject(id: string): Promise<void>,
   };
   ```
 
-### 5.3 State Management
-- [ ] Create `src/lib/stores/connection.ts`:
-  ```typescript
-  import { writable } from 'svelte/store';
+### 5.3 State Management (Svelte 5 Runes)
+- [ ] Create `src/lib/stores/connection.svelte.ts`:
+  - `connectionState` - reactive state using $state
+  - `isConnected` - derived from connectionState
+  - `connect()`, `disconnect()`, `checkConnection()` functions
   
-  export const connectionStatus = writable<'disconnected' | 'connecting' | 'connected'>('disconnected');
-  export const endpoint = writable<string | null>(null);
-  ```
-- [ ] Create `src/lib/stores/projects.ts`
-- [ ] Create `src/lib/stores/settings.ts`
+- [ ] Create `src/lib/stores/projects.svelte.ts`:
+  - `projects` - list of projects
+  - `loading`, `error` states
+  - `loadProjects()`, `createProject()`, `deleteProject()` functions
 
-### 5.4 Routing Setup
-- [ ] Configure SvelteKit for SPA mode (static adapter)
-- [ ] Implement route guards for authenticated routes
-- [ ] Set up navigation helpers
+- [ ] Create `src/lib/stores/settings.svelte.ts`:
+  - App settings state
+  - Provider configurations
 
----
-
-## 6. UI Components (Basic)
-
-### 6.1 Layout Components
-- [ ] `AppShell.svelte` - Main layout with navigation
-- [ ] `Header.svelte` - Top bar with title, back button
-- [ ] `BottomNav.svelte` - Bottom navigation tabs
-
-### 6.2 Common Components
-- [ ] `Button.svelte` - Primary, secondary, danger variants
-- [ ] `Input.svelte` - Text input with label, error state
-- [ ] `Card.svelte` - Content card
-- [ ] `Loading.svelte` - Loading spinner/skeleton
-- [ ] `Toast.svelte` - Notification toasts
-
-### 6.3 Styling
-- [ ] Set up CSS variables for theming
-- [ ] Create base styles (typography, colors, spacing)
-- [ ] Mobile-first responsive design
+### 5.4 Routing & Guards
+- [ ] Configure SvelteKit for SPA mode (already done)
+- [ ] Implement route guard in `+layout.svelte`:
+  - On mount, check connection status
+  - If not connected, redirect to /setup
+  - Show loading state while checking
 
 ---
 
-## 7. First-Time Setup Flow
+## 6. UI Components & Layout
 
-### 7.1 Setup Screen
-- [ ] Create `src/routes/setup/+page.svelte`
-- [ ] Steps:
-  1. Welcome message
-  2. Enter Management API URL
-  3. Enter API token
-  4. Test connection
-  5. Success → redirect to projects
+### 6.1 App Shell (Responsive)
+- [ ] Create `+layout.svelte` with:
+  - Sidebar for desktop (≥768px) using shadcn Sidebar
+  - Drawer/hamburger menu for mobile (<768px)
+  - Header with connection status indicator
+  - Main content area
 
-### 7.2 Connection Logic
-- [ ] On app start, check for stored credentials
-- [ ] If none → redirect to setup
-- [ ] If found → test connection → show projects or setup
+### 6.2 Required shadcn Components
+- [ ] Button (primary, secondary, destructive, ghost)
+- [ ] Card (for project cards)
+- [ ] Input (text inputs)
+- [ ] Label (form labels)
+- [ ] Dialog (desktop modals)
+- [ ] Drawer (mobile modals, bottom sheets)
+- [ ] Sidebar (navigation)
+- [ ] Sonner/Toast (notifications)
+- [ ] Badge (status indicators)
+- [ ] Skeleton (loading states)
+
+### 6.3 App-Specific Components
+- [ ] `ConnectionStatus.svelte` - Shows connected/disconnected state
+- [ ] `ProjectCard.svelte` - Project summary card
+- [ ] `StatusBadge.svelte` - Running/stopped/error badges
+- [ ] `EmptyState.svelte` - No projects placeholder
+
+---
+
+## 7. Screens
+
+### 7.1 Setup Screen (`/setup`)
+- [ ] Welcome message
+- [ ] Form fields:
+  - Management API URL (e.g., http://100.x.x.x:3001)
+  - API Token
+- [ ] "Test Connection" button
+- [ ] "Connect" button
+- [ ] Error display
+- [ ] Redirect to /projects on success
+
+### 7.2 Projects List (`/projects`)
+- [ ] Header with "New Project" button
+- [ ] Responsive grid of ProjectCards:
+  - 1 column on mobile
+  - 2 columns on tablet
+  - 3 columns on desktop
+- [ ] Each card shows: name, status, description
+- [ ] Click card → navigate to detail
+- [ ] Empty state when no projects
+
+### 7.3 Project Detail (`/projects/[id]`)
+- [ ] Project name and description
+- [ ] Status badge (running/stopped)
+- [ ] Action buttons:
+  - Start (if stopped)
+  - Stop (if running)
+  - Delete (with confirmation)
+- [ ] OpenCode URL (when running)
+- [ ] Back navigation
+
+### 7.4 Settings (`/settings`)
+- [ ] Connection info (endpoint, connected status)
+- [ ] "Disconnect" button
+- [ ] LLM Provider configuration (list from API)
+- [ ] App version info
 
 ---
 
 ## 8. Testing
 
 ### 8.1 Rust Tests
-- [ ] Unit tests for API client
-- [ ] Unit tests for secure storage (mock)
-- [ ] Integration test for commands
+- [ ] Unit tests for API client (mock responses)
+- [ ] Unit tests for storage service (mock keyring)
+- [ ] Integration tests for commands
 
-### 8.2 Frontend Tests
-- [ ] Test Tauri API wrappers
-- [ ] Test stores
-
-### 8.3 Manual Testing
-- [ ] Test on iOS simulator
-- [ ] Test on Android emulator
-- [ ] Test connection to real Management API
+### 8.2 Manual Testing
+- [ ] Test on Linux desktop
+- [ ] Test responsive breakpoints (resize window)
+- [ ] Test connection to live Management API
+- [ ] Test project CRUD operations
+- [ ] Test dark mode toggle
 
 ---
 
-## 9. Build & Package
+## 9. Mobile Builds (Deferred)
 
-### 9.1 iOS
-- [ ] Configure signing (development)
-- [ ] Build debug IPA
-- [ ] Test on physical device (optional)
+These tasks are deferred to a later phase:
 
-### 9.2 Android
-- [ ] Configure signing (debug keystore)
-- [ ] Build debug APK
-- [ ] Test on physical device (optional)
+- [ ] Install Xcode / Android Studio
+- [ ] Add iOS/Android targets: `cargo tauri ios init` / `cargo tauri android init`
+- [ ] Configure signing
+- [ ] Build and test on simulators/devices
+- [ ] Handle Tailscale connectivity on mobile
 
 ---
 
 ## Notes
 
-- Focus on iOS or Android first, then add the other
-- Tailscale must be running on mobile device for testing
-- Keep UI minimal in this phase - focus on foundation
+- Focus on desktop-first development for fast iteration
+- Use responsive design patterns from shadcn-svelte
+- Keep OAuth as skeleton - full implementation in Phase 4
+- Empty project creation only - GitHub sync in Phase 4
+- Test with live Management API throughout development

@@ -1,66 +1,47 @@
 # Phase 3: Technical Notes
 
-## Tauri v2 Mobile Setup
+## Development Approach
 
-### Prerequisites Installation
-
-```bash
-# macOS
-xcode-select --install
-brew install cocoapods
-
-# Rust targets for iOS
-rustup target add aarch64-apple-ios
-rustup target add aarch64-apple-ios-sim  # For Apple Silicon simulators
-rustup target add x86_64-apple-ios       # For Intel simulators
-
-# Rust targets for Android
-rustup target add aarch64-linux-android
-rustup target add armv7-linux-androideabi
-rustup target add i686-linux-android
-rustup target add x86_64-linux-android
-```
-
-### Initialize Mobile
-
-```bash
-# From project root
-cd src-tauri
-
-# Initialize iOS
-cargo tauri ios init
-
-# Initialize Android
-cargo tauri android init
-```
-
-### Development Commands
-
-```bash
-# iOS development
-cargo tauri ios dev
-
-# Android development
-cargo tauri android dev
-
-# Build for release
-cargo tauri ios build
-cargo tauri android build
-```
+We use a **desktop-first, responsive design** approach:
+- Develop and test on Linux desktop for fast iteration
+- Build responsive UI using Tailwind CSS breakpoints
+- Use shadcn-svelte's responsive patterns (Dialog on desktop, Drawer on mobile)
+- Defer mobile builds (iOS/Android) to later phase
 
 ---
 
-## Rust Project Structure
+## Project Setup Commands
 
-### Cargo.toml
+### Install Frontend Dependencies
+
+```bash
+# From project root
+pnpm install
+
+# Add Tailwind CSS v4
+pnpm add -D @tailwindcss/vite tailwindcss
+
+# Initialize shadcn-svelte (choose: Default style, slate color, src/lib/components/ui)
+pnpm dlx shadcn-svelte@next init
+
+# Add required components
+pnpm dlx shadcn-svelte@next add button card input label dialog drawer sidebar sonner badge skeleton
+```
+
+### Rust Dependencies
+
+Update `src-tauri/Cargo.toml`:
 
 ```toml
 [package]
-name = "portable-command-center"
+name = "codeopen"
 version = "0.1.0"
+description = "Portable Command Center for OpenCode"
+authors = ["you"]
 edition = "2021"
 
 [lib]
+name = "codeopen_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
@@ -68,14 +49,19 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
-tauri-plugin-shell = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-oauth = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
-reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-features = false }
-keyring = "2"
-thiserror = "1"
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+keyring = "3"
+thiserror = "2"
 ```
+
+---
+
+## Rust Project Structure
 
 ### lib.rs
 
@@ -86,36 +72,36 @@ mod commands;
 mod services;
 mod models;
 
-use commands::{auth, projects, settings};
+use commands::auth::AppState;
+use std::sync::Mutex;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_oauth::init())
+        .manage(AppState {
+            api_client: Mutex::new(None),
+        })
         .invoke_handler(tauri::generate_handler![
             // Auth commands
-            auth::connect,
-            auth::disconnect,
-            auth::get_connection_status,
-            auth::test_connection,
+            commands::auth::connect,
+            commands::auth::disconnect,
+            commands::auth::get_connection_status,
+            commands::auth::test_connection,
+            commands::auth::restore_connection,
             
             // Project commands
-            projects::list_projects,
-            projects::get_project,
-            projects::create_project,
-            projects::delete_project,
-            projects::start_project,
-            projects::stop_project,
+            commands::projects::list_projects,
+            commands::projects::get_project,
+            commands::projects::create_project,
+            commands::projects::delete_project,
+            commands::projects::start_project,
+            commands::projects::stop_project,
             
             // Settings commands
-            settings::get_settings,
-            settings::save_settings,
-            settings::get_providers,
-            settings::configure_provider,
-            
-            // OAuth commands
-            auth::initiate_oauth,
-            auth::poll_oauth,
+            commands::settings::get_settings,
+            commands::settings::save_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -131,6 +117,7 @@ pub fn run() {
 
 use reqwest::Client;
 use serde::{de::DeserializeOwned, Serialize};
+use std::time::Duration;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -143,6 +130,17 @@ pub enum ApiError {
     NotConnected,
 }
 
+// Make ApiError serializable for Tauri
+impl serde::Serialize for ApiError {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+#[derive(Clone)]
 pub struct ApiClient {
     client: Client,
     base_url: String,
@@ -150,12 +148,20 @@ pub struct ApiClient {
 }
 
 impl ApiClient {
-    pub fn new(base_url: String, token: String) -> Self {
-        Self {
-            client: Client::new(),
-            base_url,
+    pub fn new(base_url: String, token: String) -> Result<Self, ApiError> {
+        let client = Client::builder()
+            .timeout(Duration::from_secs(30))
+            .build()?;
+            
+        Ok(Self {
+            client,
+            base_url: base_url.trim_end_matches('/').to_string(),
             token,
-        }
+        })
+    }
+    
+    pub fn base_url(&self) -> &str {
+        &self.base_url
     }
     
     pub async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T, ApiError> {
@@ -195,6 +201,22 @@ impl ApiClient {
         Ok(response.json().await?)
     }
     
+    pub async fn post_empty(&self, path: &str) -> Result<(), ApiError> {
+        let response = self.client
+            .post(format!("{}{}", self.base_url, path))
+            .header("Authorization", format!("Bearer {}", self.token))
+            .send()
+            .await?;
+        
+        if !response.status().is_success() {
+            let status = response.status().as_u16();
+            let message = response.text().await.unwrap_or_default();
+            return Err(ApiError::Api { status, message });
+        }
+        
+        Ok(())
+    }
+    
     pub async fn delete(&self, path: &str) -> Result<(), ApiError> {
         let response = self.client
             .delete(format!("{}{}", self.base_url, path))
@@ -223,12 +245,23 @@ impl ApiClient {
 use keyring::Entry;
 use thiserror::Error;
 
-const SERVICE_NAME: &str = "portable-command-center";
+const SERVICE_NAME: &str = "codeopen";
 
 #[derive(Error, Debug)]
 pub enum StorageError {
     #[error("Keyring error: {0}")]
     Keyring(#[from] keyring::Error),
+    #[error("Credential not found")]
+    NotFound,
+}
+
+impl serde::Serialize for StorageError {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
 }
 
 pub fn store_credential(key: &str, value: &str) -> Result<(), StorageError> {
@@ -276,10 +309,15 @@ pub struct AppState {
     pub api_client: Mutex<Option<ApiClient>>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct ConnectionStatus {
     pub connected: bool,
     pub endpoint: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct HealthResponse {
+    status: String,
 }
 
 #[tauri::command]
@@ -288,9 +326,12 @@ pub async fn connect(
     endpoint: String,
     token: String,
 ) -> Result<(), String> {
-    // Test connection first
-    let client = ApiClient::new(endpoint.clone(), token.clone());
-    client.get::<serde_json::Value>("/health")
+    // Create client and test connection
+    let client = ApiClient::new(endpoint.clone(), token.clone())
+        .map_err(|e| format!("Failed to create client: {}", e))?;
+    
+    // Test connection by hitting health endpoint
+    client.get::<HealthResponse>("/health")
         .await
         .map_err(|e| format!("Connection failed: {}", e))?;
     
@@ -323,8 +364,7 @@ pub async fn get_connection_status(
     state: State<'_, AppState>,
 ) -> Result<ConnectionStatus, String> {
     let client = state.api_client.lock().unwrap();
-    let endpoint = storage::get_credential(storage::KEY_API_ENDPOINT)
-        .map_err(|e| format!("Failed to get endpoint: {}", e))?;
+    let endpoint = client.as_ref().map(|c| c.base_url().to_string());
     
     Ok(ConnectionStatus {
         connected: client.is_some(),
@@ -337,12 +377,43 @@ pub async fn test_connection(state: State<'_, AppState>) -> Result<bool, String>
     let client = state.api_client.lock().unwrap();
     match &*client {
         Some(api) => {
-            api.get::<serde_json::Value>("/health")
-                .await
-                .map(|_| true)
-                .map_err(|e| format!("Connection test failed: {}", e))
+            match api.get::<HealthResponse>("/health").await {
+                Ok(_) => Ok(true),
+                Err(e) => Err(format!("Connection test failed: {}", e)),
+            }
         }
         None => Ok(false),
+    }
+}
+
+#[tauri::command]
+pub async fn restore_connection(state: State<'_, AppState>) -> Result<bool, String> {
+    // Try to restore connection from stored credentials
+    let endpoint = storage::get_credential(storage::KEY_API_ENDPOINT)
+        .map_err(|e| format!("Failed to get endpoint: {}", e))?;
+    let token = storage::get_credential(storage::KEY_API_TOKEN)
+        .map_err(|e| format!("Failed to get token: {}", e))?;
+    
+    match (endpoint, token) {
+        (Some(endpoint), Some(token)) => {
+            let client = ApiClient::new(endpoint, token)
+                .map_err(|e| format!("Failed to create client: {}", e))?;
+            
+            // Test if connection still works
+            match client.get::<HealthResponse>("/health").await {
+                Ok(_) => {
+                    *state.api_client.lock().unwrap() = Some(client);
+                    Ok(true)
+                }
+                Err(_) => {
+                    // Connection failed, clear stored credentials
+                    let _ = storage::delete_credential(storage::KEY_API_ENDPOINT);
+                    let _ = storage::delete_credential(storage::KEY_API_TOKEN);
+                    Ok(false)
+                }
+            }
+        }
+        _ => Ok(false),
     }
 }
 ```
@@ -354,53 +425,50 @@ pub async fn test_connection(state: State<'_, AppState>) -> Result<bool, String>
 ```rust
 // src-tauri/src/commands/projects.rs
 
-use crate::services::api::ApiClient;
 use crate::commands::auth::AppState;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Project {
     pub id: String,
     pub name: String,
     pub slug: String,
     pub description: Option<String>,
     pub status: String,
-    pub container_port: i32,
+    pub container_port: Option<i32>,
+    pub opencode_url: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct ProjectList {
+pub struct ProjectListResponse {
     pub projects: Vec<Project>,
 }
 
-#[derive(Deserialize)]
-pub struct CreateProjectOptions {
-    pub name: String,
-    pub description: Option<String>,
-    pub source: ProjectSource,
-    pub llm_provider: Option<String>,
+#[derive(Serialize)]
+struct CreateProjectRequest {
+    name: String,
+    description: Option<String>,
+    source: ProjectSource,
 }
 
-#[derive(Deserialize)]
-pub struct ProjectSource {
-    pub r#type: String,  // "empty" or "github"
-    pub github_url: Option<String>,
-    pub sync_enabled: Option<bool>,
-    pub sync_direction: Option<String>,
+#[derive(Serialize)]
+struct ProjectSource {
+    r#type: String,
 }
 
-fn get_client(state: &State<'_, AppState>) -> Result<ApiClient, String> {
+fn get_client(state: &State<'_, AppState>) -> Result<crate::services::api::ApiClient, String> {
     let guard = state.api_client.lock().unwrap();
     guard.clone().ok_or_else(|| "Not connected".to_string())
 }
 
 #[tauri::command]
-pub async fn list_projects(state: State<'_, AppState>) -> Result<ProjectList, String> {
+pub async fn list_projects(state: State<'_, AppState>) -> Result<Vec<Project>, String> {
     let client = get_client(&state)?;
-    client.get("/api/projects")
+    let response: ProjectListResponse = client.get("/api/projects")
         .await
-        .map_err(|e| format!("Failed to list projects: {}", e))
+        .map_err(|e| format!("Failed to list projects: {}", e))?;
+    Ok(response.projects)
 }
 
 #[tauri::command]
@@ -414,10 +482,18 @@ pub async fn get_project(state: State<'_, AppState>, id: String) -> Result<Proje
 #[tauri::command]
 pub async fn create_project(
     state: State<'_, AppState>,
-    options: CreateProjectOptions,
+    name: String,
+    description: Option<String>,
 ) -> Result<Project, String> {
     let client = get_client(&state)?;
-    client.post("/api/projects", &options)
+    let request = CreateProjectRequest {
+        name,
+        description,
+        source: ProjectSource {
+            r#type: "empty".to_string(),
+        },
+    };
+    client.post("/api/projects", &request)
         .await
         .map_err(|e| format!("Failed to create project: {}", e))
 }
@@ -433,18 +509,16 @@ pub async fn delete_project(state: State<'_, AppState>, id: String) -> Result<()
 #[tauri::command]
 pub async fn start_project(state: State<'_, AppState>, id: String) -> Result<(), String> {
     let client = get_client(&state)?;
-    client.post::<serde_json::Value, _>(&format!("/api/projects/{}/start", id), &())
+    client.post_empty(&format!("/api/projects/{}/start", id))
         .await
-        .map(|_| ())
         .map_err(|e| format!("Failed to start project: {}", e))
 }
 
 #[tauri::command]
 pub async fn stop_project(state: State<'_, AppState>, id: String) -> Result<(), String> {
     let client = get_client(&state)?;
-    client.post::<serde_json::Value, _>(&format!("/api/projects/{}/stop", id), &())
+    client.post_empty(&format!("/api/projects/{}/stop", id))
         .await
-        .map(|_| ())
         .map_err(|e| format!("Failed to stop project: {}", e))
 }
 ```
@@ -464,24 +538,13 @@ export interface Project {
   slug: string;
   description?: string;
   status: string;
-  container_port: number;
+  container_port?: number;
+  opencode_url?: string;
 }
 
 export interface ConnectionStatus {
   connected: boolean;
   endpoint?: string;
-}
-
-export interface CreateProjectOptions {
-  name: string;
-  description?: string;
-  source: {
-    type: 'empty' | 'github';
-    github_url?: string;
-    sync_enabled?: boolean;
-    sync_direction?: string;
-  };
-  llm_provider?: string;
 }
 
 export const api = {
@@ -502,8 +565,12 @@ export const api = {
     return invoke('test_connection');
   },
   
+  async restoreConnection(): Promise<boolean> {
+    return invoke('restore_connection');
+  },
+  
   // Projects
-  async listProjects(): Promise<{ projects: Project[] }> {
+  async listProjects(): Promise<Project[]> {
     return invoke('list_projects');
   },
   
@@ -511,8 +578,8 @@ export const api = {
     return invoke('get_project', { id });
   },
   
-  async createProject(options: CreateProjectOptions): Promise<Project> {
-    return invoke('create_project', { options });
+  async createProject(name: string, description?: string): Promise<Project> {
+    return invoke('create_project', { name, description });
   },
   
   async deleteProject(id: string): Promise<void> {
@@ -531,198 +598,158 @@ export const api = {
 
 ---
 
-## Svelte Stores
+## Svelte Stores (Svelte 5 Runes)
 
 ```typescript
-// src/lib/stores/connection.ts
+// src/lib/stores/connection.svelte.ts
 
-import { writable, derived } from 'svelte/store';
 import { api, type ConnectionStatus } from '$lib/api/tauri';
 
-export const connectionStatus = writable<ConnectionStatus>({
-  connected: false,
-  endpoint: undefined,
-});
-
-export const isConnected = derived(
-  connectionStatus,
-  ($status) => $status.connected
-);
-
-export async function checkConnection() {
-  try {
-    const status = await api.getConnectionStatus();
-    connectionStatus.set(status);
-    return status.connected;
-  } catch (e) {
-    connectionStatus.set({ connected: false });
-    return false;
+class ConnectionStore {
+  status = $state<ConnectionStatus>({ connected: false });
+  loading = $state(false);
+  error = $state<string | null>(null);
+  
+  get isConnected() {
+    return this.status.connected;
+  }
+  
+  get endpoint() {
+    return this.status.endpoint;
+  }
+  
+  async checkConnection() {
+    this.loading = true;
+    this.error = null;
+    
+    try {
+      // Try to restore from stored credentials
+      const restored = await api.restoreConnection();
+      if (restored) {
+        this.status = await api.getConnectionStatus();
+      } else {
+        this.status = { connected: false };
+      }
+      return this.status.connected;
+    } catch (e) {
+      this.error = e instanceof Error ? e.message : String(e);
+      this.status = { connected: false };
+      return false;
+    } finally {
+      this.loading = false;
+    }
+  }
+  
+  async connect(endpoint: string, token: string) {
+    this.loading = true;
+    this.error = null;
+    
+    try {
+      await api.connect(endpoint, token);
+      this.status = { connected: true, endpoint };
+    } catch (e) {
+      this.error = e instanceof Error ? e.message : String(e);
+      throw e;
+    } finally {
+      this.loading = false;
+    }
+  }
+  
+  async disconnect() {
+    this.loading = true;
+    this.error = null;
+    
+    try {
+      await api.disconnect();
+      this.status = { connected: false };
+    } catch (e) {
+      this.error = e instanceof Error ? e.message : String(e);
+      throw e;
+    } finally {
+      this.loading = false;
+    }
   }
 }
 
-export async function connect(endpoint: string, token: string) {
-  await api.connect(endpoint, token);
-  connectionStatus.set({ connected: true, endpoint });
-}
-
-export async function disconnect() {
-  await api.disconnect();
-  connectionStatus.set({ connected: false, endpoint: undefined });
-}
+export const connectionStore = new ConnectionStore();
 ```
 
 ```typescript
-// src/lib/stores/projects.ts
+// src/lib/stores/projects.svelte.ts
 
-import { writable } from 'svelte/store';
-import { api, type Project, type CreateProjectOptions } from '$lib/api/tauri';
+import { api, type Project } from '$lib/api/tauri';
 
-export const projects = writable<Project[]>([]);
-export const loading = writable(false);
-export const error = writable<string | null>(null);
-
-export async function loadProjects() {
-  loading.set(true);
-  error.set(null);
+class ProjectsStore {
+  projects = $state<Project[]>([]);
+  loading = $state(false);
+  error = $state<string | null>(null);
   
-  try {
-    const result = await api.listProjects();
-    projects.set(result.projects);
-  } catch (e) {
-    error.set(e instanceof Error ? e.message : 'Failed to load projects');
-  } finally {
-    loading.set(false);
-  }
-}
-
-export async function createProject(options: CreateProjectOptions) {
-  const project = await api.createProject(options);
-  projects.update((p) => [...p, project]);
-  return project;
-}
-
-export async function deleteProject(id: string) {
-  await api.deleteProject(id);
-  projects.update((p) => p.filter((proj) => proj.id !== id));
-}
-```
-
----
-
-## Setup Page
-
-```svelte
-<!-- src/routes/setup/+page.svelte -->
-<script lang="ts">
-  import { goto } from '$app/navigation';
-  import { connect } from '$lib/stores/connection';
-  
-  let endpoint = '';
-  let token = '';
-  let error = '';
-  let loading = false;
-  
-  async function handleConnect() {
-    if (!endpoint || !token) {
-      error = 'Please enter both endpoint and token';
-      return;
-    }
-    
-    loading = true;
-    error = '';
+  async loadProjects() {
+    this.loading = true;
+    this.error = null;
     
     try {
-      await connect(endpoint, token);
-      goto('/projects');
+      this.projects = await api.listProjects();
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Connection failed';
+      this.error = e instanceof Error ? e.message : String(e);
     } finally {
-      loading = false;
+      this.loading = false;
     }
   }
-</script>
+  
+  async createProject(name: string, description?: string) {
+    this.loading = true;
+    this.error = null;
+    
+    try {
+      const project = await api.createProject(name, description);
+      this.projects = [...this.projects, project];
+      return project;
+    } catch (e) {
+      this.error = e instanceof Error ? e.message : String(e);
+      throw e;
+    } finally {
+      this.loading = false;
+    }
+  }
+  
+  async deleteProject(id: string) {
+    try {
+      await api.deleteProject(id);
+      this.projects = this.projects.filter(p => p.id !== id);
+    } catch (e) {
+      this.error = e instanceof Error ? e.message : String(e);
+      throw e;
+    }
+  }
+  
+  async startProject(id: string) {
+    try {
+      await api.startProject(id);
+      await this.loadProjects(); // Refresh to get updated status
+    } catch (e) {
+      this.error = e instanceof Error ? e.message : String(e);
+      throw e;
+    }
+  }
+  
+  async stopProject(id: string) {
+    try {
+      await api.stopProject(id);
+      await this.loadProjects(); // Refresh to get updated status
+    } catch (e) {
+      this.error = e instanceof Error ? e.message : String(e);
+      throw e;
+    }
+  }
+}
 
-<div class="setup">
-  <h1>Connect to Server</h1>
-  
-  <form on:submit|preventDefault={handleConnect}>
-    <label>
-      Management API URL
-      <input
-        type="url"
-        bind:value={endpoint}
-        placeholder="http://100.x.x.x:3001"
-      />
-    </label>
-    
-    <label>
-      API Token
-      <input
-        type="password"
-        bind:value={token}
-        placeholder="your-api-token"
-      />
-    </label>
-    
-    {#if error}
-      <p class="error">{error}</p>
-    {/if}
-    
-    <button type="submit" disabled={loading}>
-      {loading ? 'Connecting...' : 'Connect'}
-    </button>
-  </form>
-</div>
-
-<style>
-  .setup {
-    padding: 2rem;
-    max-width: 400px;
-    margin: 0 auto;
-  }
-  
-  form {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-  
-  label {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-  
-  input {
-    padding: 0.75rem;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    font-size: 1rem;
-  }
-  
-  button {
-    padding: 0.75rem;
-    background: #007aff;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 1rem;
-    cursor: pointer;
-  }
-  
-  button:disabled {
-    opacity: 0.5;
-  }
-  
-  .error {
-    color: red;
-  }
-</style>
+export const projectsStore = new ProjectsStore();
 ```
 
 ---
 
-## App Layout
+## Responsive Layout Pattern
 
 ```svelte
 <!-- src/routes/+layout.svelte -->
@@ -730,10 +757,20 @@ export async function deleteProject(id: string) {
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
-  import { checkConnection, isConnected } from '$lib/stores/connection';
+  import { connectionStore } from '$lib/stores/connection.svelte';
+  import { MediaQuery } from 'svelte/reactivity';
+  import * as Sidebar from '$lib/components/ui/sidebar';
+  import * as Drawer from '$lib/components/ui/drawer';
+  
+  let { children } = $props();
+  
+  const isDesktop = new MediaQuery('(min-width: 768px)');
+  let drawerOpen = $state(false);
+  let initialized = $state(false);
   
   onMount(async () => {
-    const connected = await checkConnection();
+    const connected = await connectionStore.checkConnection();
+    initialized = true;
     
     // Redirect to setup if not connected (except if already on setup page)
     if (!connected && !$page.url.pathname.startsWith('/setup')) {
@@ -742,5 +779,190 @@ export async function deleteProject(id: string) {
   });
 </script>
 
-<slot />
+{#if !initialized}
+  <div class="flex h-screen items-center justify-center">
+    <p>Loading...</p>
+  </div>
+{:else if isDesktop.current}
+  <!-- Desktop: Sidebar layout -->
+  <Sidebar.Provider>
+    <Sidebar.Root>
+      <Sidebar.Content>
+        <!-- Navigation items -->
+      </Sidebar.Content>
+    </Sidebar.Root>
+    <main class="flex-1">
+      {@render children()}
+    </main>
+  </Sidebar.Provider>
+{:else}
+  <!-- Mobile: Drawer layout -->
+  <div class="flex flex-col h-screen">
+    <header class="flex items-center p-4 border-b">
+      <button onclick={() => drawerOpen = true}>
+        Menu
+      </button>
+    </header>
+    <main class="flex-1 overflow-auto">
+      {@render children()}
+    </main>
+    <Drawer.Root bind:open={drawerOpen}>
+      <Drawer.Content>
+        <!-- Navigation items -->
+      </Drawer.Content>
+    </Drawer.Root>
+  </div>
+{/if}
+```
+
+---
+
+## Tailwind CSS v4 Configuration
+
+```css
+/* src/app.css */
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.269 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.371 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.439 0 0);
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+```
+
+---
+
+## Permissions Configuration
+
+Update `src-tauri/capabilities/default.json`:
+
+```json
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default capability for the app",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "opener:default",
+    "oauth:allow-start",
+    "oauth:allow-cancel"
+  ]
+}
+```
+
+---
+
+## Development Commands
+
+```bash
+# Start development (desktop)
+pnpm tauri dev
+
+# Build for production
+pnpm tauri build
+
+# Run Rust tests
+cd src-tauri && cargo test
+
+# Type check frontend
+pnpm check
 ```
