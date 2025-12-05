@@ -198,6 +198,7 @@ The "Portable Command Center" itself.
 **Svelte Frontend:**
 - Project list and management
 - Chat interface for OpenCode sessions
+- File browser with syntax-highlighted viewer
 - Server/container status
 - LLM provider configuration
 - OAuth flow UI

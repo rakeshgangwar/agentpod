@@ -12,6 +12,7 @@ Detailed user flows and interactions for the Portable Command Center mobile appl
   - [Create New Project (From Scratch)](#create-new-project-from-scratch)
   - [Import Project from GitHub](#import-project-from-github)
   - [Work on Existing Project](#work-on-existing-project)
+  - [Browse and View Files](#browse-and-view-files)
   - [Configure LLM Provider](#configure-llm-provider)
   - [Sync Changes to GitHub](#sync-changes-to-github)
   - [Monitor Background Tasks](#monitor-background-tasks)
@@ -262,6 +263,82 @@ flowchart TD
 
 ---
 
+### Browse and View Files
+
+**Goal**: Browse project structure and view file contents.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    BROWSE AND VIEW FILES                        │
+└─────────────────────────────────────────────────────────────────┘
+
+1. OPEN PROJECT → TAP "FILES" TAB
+   └─► File browser shows project structure:
+       📁 src/
+       📁 docs/
+       📁 tests/
+       📄 package.json
+       📄 README.md
+       📄 .gitignore
+
+2. NAVIGATE FOLDERS
+   ├─► Tap folder to expand/collapse
+   ├─► Breadcrumb navigation at top: project / src / components
+   └─► Back button or swipe to go up
+
+3. TAP FILE TO VIEW
+   └─► File viewer opens with:
+       ├─► Syntax highlighting (based on file type)
+       ├─► Line numbers
+       ├─► File path in header
+       └─► File size and last modified info
+
+4. FILE VIEWER ACTIONS
+   ├─► 🔍 Search within file (Cmd+F / Ctrl+F)
+   ├─► 📋 Copy file path
+   ├─► 📤 Share file content
+   ├─► 💬 "Ask about this file" → Opens chat with file context
+   └─► ✏️ "Edit with AI" → Opens chat with edit prompt
+
+5. REFERENCE FILE IN CHAT
+   ├─► From file viewer: Tap "Use in Chat"
+   ├─► From chat: Type @ to open file picker
+   │   └─► Search or browse to select file
+   └─► File reference appears as: @src/components/Button.svelte
+
+6. VIEW RECENT CHANGES
+   ├─► Tap "History" icon on file
+   └─► Shows recent commits affecting this file:
+       • "Add hover state" - 2 hours ago
+       • "Initial component" - yesterday
+       └─► Tap commit to see diff
+
+   DATA SOURCE (OpenCode API):
+   ├─► GET /file - Read file contents
+   ├─► GET /find - Search/list files
+   └─► GET /file/status - Git status for files
+```
+
+**Screens:**
+1. Project View → Files Tab
+2. File Browser (tree view)
+3. File Viewer (with syntax highlighting)
+4. File Search
+5. File History / Git Log
+6. File Reference Picker (in chat)
+
+**Supported File Types:**
+| Type | Extensions | Features |
+|------|------------|----------|
+| Code | .js, .ts, .py, .go, .rs, .svelte | Syntax highlighting, line numbers |
+| Markup | .html, .md, .mdx | Rendered preview option |
+| Config | .json, .yaml, .toml | Syntax highlighting |
+| Text | .txt, .log | Plain text view |
+| Images | .png, .jpg, .svg | Image preview |
+| Binary | Others | "Cannot preview" message, download option |
+
+---
+
 ### Configure LLM Provider
 
 **Goal**: Add or change LLM provider credentials.
@@ -463,14 +540,41 @@ flowchart TD
 │       ▼             ▼             ▼             ▼               │
 │  ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐         │
 │  │ Project │   │ Server  │   │ Session │   │  LLM    │         │
-│  │  Chat   │   │ Detail  │   │ Detail  │   │Providers│         │
+│  │  View   │   │ Detail  │   │ Detail  │   │Providers│         │
 │  └────┬────┘   └─────────┘   └─────────┘   └─────────┘         │
 │       │                                                         │
-│       ▼                                                         │
-│  ┌─────────┐                                                    │
-│  │ Session │                                                    │
-│  │Messages │                                                    │
-│  └─────────┘                                                    │
+│  ┌────┴─────────────────────────────┐                           │
+│  │                                  │                           │
+│  ▼                                  ▼                           │
+│  ┌─────────┐                   ┌─────────┐                      │
+│  │  Chat   │                   │  Files  │                      │
+│  │Sessions │                   │ Browser │                      │
+│  └────┬────┘                   └────┬────┘                      │
+│       │                             │                           │
+│       ▼                             ▼                           │
+│  ┌─────────┐                   ┌─────────┐                      │
+│  │ Session │                   │  File   │                      │
+│  │Messages │                   │ Viewer  │                      │
+│  └─────────┘                   └─────────┘                      │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Project View Tabs
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         PROJECT VIEW                            │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │ < Back    my-awesome-app                    ⚙️ ↗️ 🔄    │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │  [ 💬 Chat ]    [ 📁 Files ]    [ 🔄 Sync ]             │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                                                                 │
+│                    (Tab content below)                          │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```

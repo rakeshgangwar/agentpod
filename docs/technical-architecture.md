@@ -228,6 +228,10 @@ src/
 │   │   │   └── +page.svelte     # Create project
 │   │   └── [id]/
 │   │       ├── +page.svelte     # Project detail / chat
+│   │       ├── files/
+│   │       │   ├── +page.svelte     # File browser
+│   │       │   └── [...path]/
+│   │       │       └── +page.svelte # File viewer (dynamic route)
 │   │       ├── settings/
 │   │       │   └── +page.svelte # Project settings
 │   │       └── sync/
@@ -243,7 +247,10 @@ src/
 │   │   ├── Chat.svelte          # Chat interface
 │   │   ├── Message.svelte       # Single message
 │   │   ├── ProjectCard.svelte   # Project list item
-│   │   └── ServerStatus.svelte  # Server indicator
+│   │   ├── ServerStatus.svelte  # Server indicator
+│   │   ├── FileBrowser.svelte   # File tree navigation
+│   │   ├── FileViewer.svelte    # Syntax-highlighted file view
+│   │   └── FileReference.svelte # @ file picker for chat
 │   ├── stores/
 │   │   ├── projects.ts          # Projects state
 │   │   ├── auth.ts              # Auth state
@@ -611,6 +618,90 @@ Response: 409 Conflict
   "conflicts": [...]
 }
 ```
+
+### OpenCode File APIs
+
+The mobile app communicates directly with OpenCode containers for file operations.
+
+```yaml
+# List/Search Files
+GET /find?pattern=*.ts&path=src
+
+Response: 200 OK
+{
+  "files": [
+    {
+      "path": "src/index.ts",
+      "type": "file",
+      "size": 1234,
+      "modified": "2024-12-05T10:30:00Z"
+    },
+    {
+      "path": "src/utils.ts",
+      "type": "file",
+      "size": 567,
+      "modified": "2024-12-04T15:20:00Z"
+    }
+  ]
+}
+
+# Get File Contents
+GET /file?path=src/index.ts
+
+Response: 200 OK
+{
+  "path": "src/index.ts",
+  "content": "import { app } from './app';\n\napp.listen(3000);",
+  "size": 1234,
+  "modified": "2024-12-05T10:30:00Z",
+  "language": "typescript"
+}
+
+# Get File/Directory Status (Git)
+GET /file/status
+
+Response: 200 OK
+{
+  "status": {
+    "staged": ["src/new-file.ts"],
+    "modified": ["src/index.ts"],
+    "untracked": ["temp.log"]
+  }
+}
+
+# Get Directory Tree
+GET /find?path=.&depth=2
+
+Response: 200 OK
+{
+  "tree": {
+    "name": ".",
+    "type": "directory",
+    "children": [
+      {
+        "name": "src",
+        "type": "directory",
+        "children": [
+          { "name": "index.ts", "type": "file" },
+          { "name": "utils.ts", "type": "file" }
+        ]
+      },
+      { "name": "package.json", "type": "file" },
+      { "name": "README.md", "type": "file" }
+    ]
+  }
+}
+```
+
+**File Viewer Features:**
+
+| Feature | Implementation |
+|---------|----------------|
+| Syntax Highlighting | Client-side using Shiki or Prism.js |
+| Line Numbers | Rendered in FileViewer component |
+| Search in File | Client-side text search |
+| Copy Path | Native clipboard API |
+| File Reference (@) | Insert path into chat input |
 
 ---
 
