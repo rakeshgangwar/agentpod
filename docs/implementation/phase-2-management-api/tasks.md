@@ -135,9 +135,9 @@
   - `POST /api/providers/:id/set-default` - Set as default
   - `DELETE /api/providers/:id` - Remove provider config
 
-### 4.4 Sync Routes ✅
-- [x] Create `src/routes/sync.ts`
-- [x] Endpoints:
+### 4.4 Sync Routes (Deferred)
+- [x] Create `src/routes/sync.ts` (basic implementation, full sync deferred)
+- [ ] Endpoints (deferred for post-MVP):
   - `POST /api/projects/:id/sync` - Sync with GitHub
   - `GET /api/projects/:id/sync/status` - Get sync status
   - `POST /api/projects/:id/sync/config` - Configure sync settings

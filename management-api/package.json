@@ -7,7 +7,13 @@
   "scripts": {
     "dev": "bun run --hot src/index.ts",
     "start": "bun run src/index.ts",
+    "test": "bun test tests/unit && bun test tests/integration",
+    "test:unit": "bun test tests/unit",
+    "test:integration": "bun test tests/integration",
+    "test:watch": "bun test --watch",
+    "test:coverage": "bun test --coverage",
     "test:db": "bun run src/db/test-db.ts",
+    "test:clients": "bun run src/services/test-clients.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
