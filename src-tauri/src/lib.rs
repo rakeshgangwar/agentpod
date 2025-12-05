@@ -21,6 +21,8 @@ use commands::{
     opencode_list_messages, opencode_send_message, opencode_send_message_with_files,
     opencode_get_message,
     opencode_list_files, opencode_get_file_content, opencode_find_files,
+    // OpenCode streaming commands
+    opencode_connect_stream, opencode_disconnect_stream,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -59,6 +61,9 @@ pub fn run() {
             opencode_list_files,
             opencode_get_file_content,
             opencode_find_files,
+            // OpenCode commands - Streaming
+            opencode_connect_stream,
+            opencode_disconnect_stream,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

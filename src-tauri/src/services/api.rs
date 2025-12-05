@@ -326,4 +326,35 @@ impl ApiClient {
         let response = request.send().await?;
         self.handle_response(response).await
     }
+
+    // =========================================================================
+    // OpenCode - SSE Event Stream
+    // =========================================================================
+
+    /// Get the SSE event stream URL for a project
+    pub fn opencode_event_stream_url(&self, project_id: &str) -> String {
+        format!("{}/api/projects/{}/opencode/event", self.base_url, project_id)
+    }
+
+    /// Connect to the SSE event stream and return a response for streaming
+    pub async fn opencode_connect_event_stream(
+        &self,
+        project_id: &str,
+    ) -> Result<reqwest::Response, AppError> {
+        let url = self.opencode_event_stream_url(project_id);
+        let request = self
+            .add_auth(self.client.get(&url))
+            .header("Accept", "text/event-stream");
+        
+        let response = request.send().await?;
+        
+        if !response.status().is_success() {
+            return Err(AppError::ApiError(format!(
+                "Failed to connect to event stream: {}",
+                response.status()
+            )));
+        }
+        
+        Ok(response)
+    }
 }

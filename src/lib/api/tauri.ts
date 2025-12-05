@@ -6,6 +6,7 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 // =============================================================================
 // Types
@@ -338,4 +339,158 @@ export async function opencodeGetFileContent(projectId: string, path: string): P
  */
 export async function opencodeFindFiles(projectId: string, pattern: string): Promise<string[]> {
   return invoke<string[]>("opencode_find_files", { projectId, pattern });
+}
+
+// =============================================================================
+// OpenCode - SSE Streaming Types
+// =============================================================================
+
+export type StreamStatus = "connected" | "disconnected" | "error";
+
+export interface StreamConnection {
+  streamId: string;
+  projectId: string;
+}
+
+export interface OpenCodeEvent {
+  eventType: string;
+  data: unknown;
+}
+
+export interface StreamEventPayload {
+  streamId: string;
+  projectId: string;
+  event: OpenCodeEvent;
+}
+
+export interface StreamStatusPayload {
+  streamId: string;
+  projectId: string;
+  status: StreamStatus;
+  error?: string;
+}
+
+// =============================================================================
+// OpenCode - SSE Streaming Commands
+// =============================================================================
+
+/**
+ * Connect to the OpenCode SSE event stream for a project.
+ * 
+ * This establishes a persistent connection that emits events through Tauri's
+ * event system. Use `onStreamEvent` and `onStreamStatus` to listen for events.
+ * 
+ * @returns StreamConnection with a unique streamId for managing the connection
+ */
+export async function opencodeConnectStream(projectId: string): Promise<StreamConnection> {
+  return invoke<StreamConnection>("opencode_connect_stream", { projectId });
+}
+
+/**
+ * Disconnect from an OpenCode SSE event stream
+ */
+export async function opcodeDisconnectStream(streamId: string): Promise<void> {
+  return invoke("opencode_disconnect_stream", { streamId });
+}
+
+/**
+ * Listen for OpenCode stream events
+ * 
+ * @param callback Function called for each event received
+ * @returns Unlisten function to stop listening
+ */
+export async function onStreamEvent(
+  callback: (payload: StreamEventPayload) => void
+): Promise<UnlistenFn> {
+  return listen<StreamEventPayload>("opencode:event", (event) => {
+    callback(event.payload);
+  });
+}
+
+/**
+ * Listen for OpenCode stream status changes
+ * 
+ * @param callback Function called for each status change
+ * @returns Unlisten function to stop listening
+ */
+export async function onStreamStatus(
+  callback: (payload: StreamStatusPayload) => void
+): Promise<UnlistenFn> {
+  return listen<StreamStatusPayload>("opencode:stream-status", (event) => {
+    callback(event.payload);
+  });
+}
+
+/**
+ * Helper class for managing a stream connection with automatic cleanup
+ */
+export class OpenCodeStream {
+  private streamId: string | null = null;
+  private projectId: string;
+  private eventUnlisten: UnlistenFn | null = null;
+  private statusUnlisten: UnlistenFn | null = null;
+  private onEvent: ((event: OpenCodeEvent) => void) | null = null;
+  private onStatus: ((status: StreamStatus, error?: string) => void) | null = null;
+
+  constructor(projectId: string) {
+    this.projectId = projectId;
+  }
+
+  /**
+   * Connect to the stream
+   */
+  async connect(
+    onEvent: (event: OpenCodeEvent) => void,
+    onStatus?: (status: StreamStatus, error?: string) => void
+  ): Promise<void> {
+    this.onEvent = onEvent;
+    this.onStatus = onStatus ?? null;
+
+    // Set up event listeners before connecting
+    this.eventUnlisten = await onStreamEvent((payload) => {
+      if (payload.streamId === this.streamId && this.onEvent) {
+        this.onEvent(payload.event);
+      }
+    });
+
+    this.statusUnlisten = await onStreamStatus((payload) => {
+      if (payload.streamId === this.streamId && this.onStatus) {
+        this.onStatus(payload.status, payload.error);
+      }
+    });
+
+    // Connect to the stream
+    const connection = await opencodeConnectStream(this.projectId);
+    this.streamId = connection.streamId;
+  }
+
+  /**
+   * Disconnect from the stream and clean up listeners
+   */
+  async disconnect(): Promise<void> {
+    if (this.streamId) {
+      await opcodeDisconnectStream(this.streamId);
+      this.streamId = null;
+    }
+
+    if (this.eventUnlisten) {
+      this.eventUnlisten();
+      this.eventUnlisten = null;
+    }
+
+    if (this.statusUnlisten) {
+      this.statusUnlisten();
+      this.statusUnlisten = null;
+    }
+
+    this.onEvent = null;
+    this.onStatus = null;
+  }
+
+  /**
+   * Check if the stream is connected
+   */
+  get isConnected(): boolean {
+    return this.streamId !== null;
+  }
 }

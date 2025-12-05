@@ -210,6 +210,9 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
     });
     
     const envVars: Record<string, string> = {
+      // OpenCode server configuration - MUST match ports_exposes
+      OPENCODE_PORT: String(containerPort),
+      OPENCODE_HOST: '0.0.0.0',
       // Forgejo repo URL for OpenCode to clone at startup (using public URL)
       FORGEJO_REPO_URL: publicCloneUrl,
       // Git config

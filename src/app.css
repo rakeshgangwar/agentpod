@@ -2,6 +2,10 @@
 
 @import "tw-animate-css";
 
+/* assistant-ui styles */
+@import "@assistant-ui/styles/index.css";
+@import "@assistant-ui/styles/markdown.css";
+
 @custom-variant dark (&:is(.dark *));
 
 :root {
@@ -117,5 +121,101 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* assistant-ui custom styles */
+@layer components {
+  /* Thread container */
+  .aui-thread-root {
+    --aui-thread-background: var(--background);
+    --aui-thread-foreground: var(--foreground);
+    height: 100%;
+  }
+
+  /* Messages */
+  .aui-assistant-message {
+    background: var(--muted);
+    border-radius: var(--radius);
+  }
+
+  .aui-user-message {
+    background: var(--primary);
+    color: var(--primary-foreground);
+    border-radius: var(--radius);
+  }
+
+  /* Composer (input area) */
+  .aui-composer-root {
+    border-top: 1px solid var(--border);
+    background: var(--background);
+  }
+
+  .aui-composer-input {
+    background: var(--input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .aui-composer-input:focus {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* Send button */
+  .aui-composer-send {
+    background: var(--primary);
+    color: var(--primary-foreground);
+    border-radius: var(--radius);
+  }
+
+  .aui-composer-send:hover {
+    opacity: 0.9;
+  }
+
+  .aui-composer-send:disabled {
+    opacity: 0.5;
+  }
+
+  /* Markdown content */
+  .aui-md {
+    color: var(--foreground);
+  }
+
+  .aui-md pre {
+    background: var(--muted);
+    border-radius: var(--radius);
+    overflow-x: auto;
+  }
+
+  .aui-md code {
+    background: var(--muted);
+    padding: 0.2em 0.4em;
+    border-radius: calc(var(--radius) - 2px);
+    font-size: 0.875em;
+  }
+
+  .aui-md pre code {
+    background: transparent;
+    padding: 0;
+  }
+
+  /* Scroll area */
+  .aui-thread-viewport {
+    scrollbar-width: thin;
+    scrollbar-color: var(--muted-foreground) transparent;
+  }
+
+  .aui-thread-viewport::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .aui-thread-viewport::-webkit-scrollbar-thumb {
+    background: var(--muted-foreground);
+    border-radius: 4px;
+  }
+
+  .aui-thread-viewport::-webkit-scrollbar-track {
+    background: transparent;
   }
 }

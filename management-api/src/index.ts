@@ -23,11 +23,12 @@ const app = new Hono()
   .route('/', healthRoutes)
   // Protected API routes require authentication
   .use('/api/*', bearerAuth({ token: config.auth.token }))
-  // API routes
-  .route('/api/projects', projectRoutes)
-  .route('/api/providers', providerRoutes)
+  // API routes - Note: Order matters! More specific routes should come first
+  // OpenCode proxy routes must come before generic project routes to avoid /:id catching everything
+  .route('/api/projects', opencodeRoutes) // OpenCode proxy routes are under /api/projects/:id/opencode/*
   .route('/api/projects', syncRoutes) // Sync routes are under /api/projects/:id/sync
-  .route('/api/projects', opencodeRoutes); // OpenCode proxy routes are under /api/projects/:id/opencode/*
+  .route('/api/projects', projectRoutes)
+  .route('/api/providers', providerRoutes);
 
 // Export type for Hono Client (type-safe RPC from mobile app)
 export type AppType = typeof app;
