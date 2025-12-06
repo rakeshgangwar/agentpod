@@ -1,5 +1,22 @@
 # Phase 6: Tasks
 
+## 0. Deferred UI/UX Items from Phase 4
+
+### 0.1 Navigation & Layout
+- [ ] Create `src/lib/components/BottomNav.svelte`
+- [ ] Tabs: Projects | Activity | Settings
+- [ ] Active state indicator
+- [ ] Responsive layout adjustments
+
+### 0.2 Loading States
+- [ ] Skeleton loaders for project list
+- [ ] Skeleton loaders for chat messages
+- [ ] Skeleton loaders for file tree
+- [ ] Spinner for actions
+- [ ] Progress indicators for long operations
+
+---
+
 ## 1. UI Animations
 
 ### 1.1 Page Transitions

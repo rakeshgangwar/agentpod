@@ -1,14 +1,15 @@
 # Phase 6: Polish & Optimization
 
-Final polish, performance optimization, and preparation for release.
+Final polish, performance optimization, and preparation for release. Includes deferred UI/UX items from Phase 4.
 
 ## Objectives
 
-1. UI animations and transitions
-2. Performance optimization
-3. Comprehensive error handling
-4. Accessibility improvements
-5. Documentation and onboarding
+1. **Deferred from Phase 4**: Bottom navigation, skeleton loaders, loading states
+2. UI animations and transitions
+3. Performance optimization
+4. Comprehensive error handling
+5. Accessibility improvements
+6. Documentation and onboarding
 
 ## Prerequisites
 
@@ -20,6 +21,12 @@ Final polish, performance optimization, and preparation for release.
 
 ## Deliverables
 
+### Deferred from Phase 4
+- [ ] Bottom navigation component (Projects | Activity | Settings)
+- [ ] Skeleton loaders for lists and content
+- [ ] Loading spinners and progress indicators
+
+### Original Phase 6 Scope
 - [ ] Smooth animations throughout app
 - [ ] Fast load times and responsive UI
 - [ ] Graceful error handling everywhere
@@ -33,6 +40,7 @@ Final polish, performance optimization, and preparation for release.
 3. All errors show user-friendly messages
 4. VoiceOver/TalkBack works correctly
 5. New users understand how to use the app
+6. Consistent loading states across the app
 
 ## Files in This Phase
 

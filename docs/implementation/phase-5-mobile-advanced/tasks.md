@@ -1,5 +1,50 @@
 # Phase 5: Tasks
 
+## 0. Deferred from Phase 4 (Settings & Project Enhancements)
+
+### 0.1 Settings Store & Commands
+- [ ] Create `src/lib/stores/settings.svelte.ts`
+- [ ] Create `src-tauri/src/commands/settings.rs`
+- [ ] Implement commands:
+  - `get_settings()` - Get app settings
+  - `save_settings(settings)` - Save settings
+  - `get_providers()` - List LLM providers from API
+- [ ] Persist settings to local storage
+
+### 0.2 Settings UI Enhancements
+- [ ] Update `src/routes/settings/+page.svelte`
+- [ ] Sections:
+  - Connection (endpoint, reconnect)
+  - LLM Providers (list, configure)
+  - Theme preference (light/dark/system)
+  - About (version, links)
+- [ ] Disconnect button
+- [ ] Test connection button
+
+### 0.3 Project Creation Enhancements
+- [ ] LLM provider selector in project creation form
+- [ ] Sync options in GitHub import:
+  - Enable sync toggle
+  - Sync direction selector (push/pull/bidirectional)
+
+### 0.4 Project List Enhancements
+- [ ] Pull-to-refresh functionality
+- [ ] Quick start/stop toggle on project cards
+- [ ] Auto-refresh container status periodically
+
+### 0.5 File Browser Enhancements
+- [ ] Copy path button in file viewer
+- [ ] "Use in Chat" button to reference file
+
+### 0.6 Chat Enhancements
+- [ ] File reference picker (@mentions)
+- [ ] Create `src/lib/components/FileReferencePicker.svelte`
+- [ ] Trigger on @ in chat input
+- [ ] Search/filter files
+- [ ] Insert reference on select
+
+---
+
 ## 1. OAuth Implementation
 
 ### 1.1 GitHub Copilot (Device Flow)
@@ -134,25 +179,17 @@
 
 ---
 
-## 6. Settings Enhancements
+## 6. Settings Enhancements (Extended)
 
-### 6.1 Settings Screen
-- [ ] Create `src/routes/settings/+page.svelte`
-- [ ] Sections:
-  - Connection (endpoint, reconnect)
-  - LLM Providers
-  - Notifications
-  - About
-
-### 6.2 Connection Settings
-- [ ] Show current endpoint
-- [ ] Disconnect button
-- [ ] Reconnect to different server
-
-### 6.3 Notification Settings
+### 6.1 Notification Settings
 - [ ] Enable/disable push notifications
 - [ ] Notification sound toggle
 - [ ] Quiet hours (future)
+
+### 6.2 Connection Settings
+- [ ] Show current endpoint
+- [ ] Connection status indicator
+- [ ] Reconnect to different server
 
 ---
 
@@ -197,6 +234,24 @@
 - [ ] Test offline mode
 - [ ] Test GitHub sync
 - [ ] Test error scenarios
+- [ ] Test settings persistence
+
+---
+
+## 10. Additional Components (Deferred from Phase 4)
+
+### 10.1 Install Remaining shadcn Components
+- [ ] Dialog - for modals and confirmations
+- [ ] DropdownMenu - session selection, actions
+- [ ] Toast/Sonner - notifications (`pnpm add sonner`)
+
+### 10.2 Container Management UI
+- [ ] Start button (when stopped)
+- [ ] Stop button (when running)
+- [ ] Confirmation dialog for stop
+- [ ] Loading state during operation
+- [ ] Show error state if container crashed
+- [ ] "Restart" option
 
 ---
 
