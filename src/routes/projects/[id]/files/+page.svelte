@@ -1,17 +1,35 @@
 <script lang="ts">
   import { page } from "$app/stores";
+  import { goto } from "$app/navigation";
   import * as Card from "$lib/components/ui/card";
   import { Button } from "$lib/components/ui/button";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { ScrollArea } from "$lib/components/ui/scroll-area";
   import { CodeBlock } from "$lib/components/ui/code-block";
   import { MarkdownViewer } from "$lib/components/ui/markdown";
+  import { toast } from "svelte-sonner";
   import {
     opencodeListFiles,
     opencodeGetFileContent,
     type FileNode,
     type FileContent,
   } from "$lib/api/tauri";
+
+  // Copy path to clipboard
+  function copyPath() {
+    if (selectedFile) {
+      navigator.clipboard.writeText(selectedFile.path);
+      toast.success("Path copied to clipboard");
+    }
+  }
+
+  // Navigate to chat with file reference
+  function useInChat() {
+    if (selectedFile && projectId) {
+      // Navigate to chat page with file path as search param
+      goto(`/projects/${projectId}/chat?file=${encodeURIComponent(selectedFile.path)}`);
+    }
+  }
 
   let projectId = $derived($page.params.id ?? "");
 
@@ -318,14 +336,32 @@
             <Button
               size="sm"
               variant="outline"
+              onclick={copyPath}
+              title="Copy file path to clipboard"
+            >
+              Copy Path
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onclick={useInChat}
+              title="Reference this file in chat"
+            >
+              Use in Chat
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
               onclick={() => {
                 if (fileContent?.content) {
                   navigator.clipboard.writeText(fileContent.content);
+                  toast.success("Content copied to clipboard");
                 }
               }}
               disabled={!fileContent?.content}
+              title="Copy file content to clipboard"
             >
-              Copy
+              Copy Content
             </Button>
           </div>
         </div>

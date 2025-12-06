@@ -5,6 +5,7 @@
   import { ChatThread } from "$lib/chat/ChatThread";
   import { Button } from "$lib/components/ui/button";
   import { Skeleton } from "$lib/components/ui/skeleton";
+  import FilePickerModal from "$lib/components/file-picker-modal.svelte";
   import {
     opencodeListSessions,
     opencodeCreateSession,
@@ -24,11 +25,38 @@
     }
   }
 
+  // File picker modal state
+  let filePickerOpen = $state(false);
+  let pendingFilePath = $state<string | null>(null);
+
+  function handleFilePickerRequest() {
+    filePickerOpen = true;
+  }
+
+  function handleFileSelect(filePath: string) {
+    pendingFilePath = filePath;
+  }
+
+  function clearPendingFilePath() {
+    pendingFilePath = null;
+  }
+
   // Wrap React components for use in Svelte
   const react = sveltify({ RuntimeProvider, ChatThread });
 
   // Get project ID from route params
   let projectId = $derived($page.params.id ?? "");
+
+  // Check for file param in URL (from "Use in Chat" button in file browser)
+  $effect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const fileParam = urlParams.get("file");
+    if (fileParam && !pendingFilePath) {
+      pendingFilePath = fileParam;
+      // Clean up the URL
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  });
 
   // Session state
   let sessions = $state<Session[]>([]);
@@ -217,7 +245,13 @@
       {#if selectedSessionId}
         {#key selectedSessionId}
           <react.RuntimeProvider {projectId} sessionId={selectedSessionId}>
-            <react.ChatThread {projectId} {findFiles} />
+            <react.ChatThread 
+              {projectId} 
+              {findFiles} 
+              onFilePickerRequest={handleFilePickerRequest}
+              {pendingFilePath}
+              onPendingFilePathClear={clearPendingFilePath}
+            />
           </react.RuntimeProvider>
         {/key}
       {:else}
@@ -238,3 +272,11 @@
     <p class="text-muted-foreground">Loading...</p>
   </div>
 {/if}
+
+<!-- File Picker Modal -->
+<FilePickerModal
+  {projectId}
+  open={filePickerOpen}
+  onOpenChange={(open) => (filePickerOpen = open)}
+  onSelect={handleFileSelect}
+/>

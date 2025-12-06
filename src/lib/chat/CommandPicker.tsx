@@ -15,6 +15,7 @@ export interface Command {
 
 // Built-in OpenCode commands
 const BUILTIN_COMMANDS: Command[] = [
+  { name: "file", description: "Browse and select a file to reference" },
   { name: "init", description: "Analyze app and create AGENTS.md" },
   { name: "undo", description: "Undo the last action" },
   { name: "redo", description: "Redo the last undone action" },

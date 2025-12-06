@@ -156,9 +156,12 @@ function AssistantMessage() {
 interface ComposerProps {
   projectId?: string;
   findFiles?: (projectId: string, pattern: string) => Promise<string[]>;
+  onFilePickerRequest?: () => void;
+  pendingFilePath?: string | null;
+  onPendingFilePathClear?: () => void;
 }
 
-function Composer({ projectId, findFiles }: ComposerProps) {
+function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, onPendingFilePathClear }: ComposerProps) {
   const composerRuntime = useComposerRuntime();
   const [inputValue, setInputValue] = useState("");
   const [showCommandPicker, setShowCommandPicker] = useState(false);
@@ -170,6 +173,17 @@ function Composer({ projectId, findFiles }: ComposerProps) {
   
   // Track cursor position for @ detection
   const [cursorPosition, setCursorPosition] = useState(0);
+  
+  // Handle pending file path from external file picker modal
+  useEffect(() => {
+    if (pendingFilePath && onPendingFilePathClear) {
+      // Insert the file path at the current position or append
+      const newValue = inputValue ? `${inputValue} @${pendingFilePath}` : `@${pendingFilePath} `;
+      setInputValue(newValue);
+      onPendingFilePathClear();
+      inputRef.current?.focus();
+    }
+  }, [pendingFilePath, onPendingFilePathClear]);
   
   // Handle input changes
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -208,11 +222,19 @@ function Composer({ projectId, findFiles }: ComposerProps) {
   
   // Handle command selection
   const handleCommandSelect = useCallback((command: Command) => {
+    // Special handling for /file command - open file picker modal
+    if (command.name === "file" && onFilePickerRequest) {
+      setInputValue("");
+      setShowCommandPicker(false);
+      onFilePickerRequest();
+      return;
+    }
+    
     const newValue = `/${command.name} `;
     setInputValue(newValue);
     setShowCommandPicker(false);
     inputRef.current?.focus();
-  }, []);
+  }, [onFilePickerRequest]);
   
   // Handle file selection
   const handleFileSelect = useCallback((filePath: string) => {
@@ -387,12 +409,24 @@ export interface ChatThreadProps {
   projectId?: string;
   /** Function to find files in the project */
   findFiles?: (projectId: string, pattern: string) => Promise<string[]>;
+  /** Callback when /file command is selected to open file picker modal */
+  onFilePickerRequest?: () => void;
+  /** File path selected from external file picker modal */
+  pendingFilePath?: string | null;
+  /** Callback to clear pending file path after it's been processed */
+  onPendingFilePathClear?: () => void;
 }
 
 /**
  * ChatThread component renders the full chat interface
  */
-export function ChatThread({ projectId, findFiles }: ChatThreadProps) {
+export function ChatThread({ 
+  projectId, 
+  findFiles, 
+  onFilePickerRequest, 
+  pendingFilePath, 
+  onPendingFilePathClear 
+}: ChatThreadProps) {
   return (
     <ThreadPrimitive.Root className="flex flex-col h-full">
       <ThreadPrimitive.Viewport className="flex-1 overflow-y-auto">
@@ -415,7 +449,13 @@ export function ChatThread({ projectId, findFiles }: ChatThreadProps) {
         <ThreadPrimitive.ViewportFooter />
       </ThreadPrimitive.Viewport>
       
-      <Composer projectId={projectId} findFiles={findFiles} />
+      <Composer 
+        projectId={projectId} 
+        findFiles={findFiles} 
+        onFilePickerRequest={onFilePickerRequest}
+        pendingFilePath={pendingFilePath}
+        onPendingFilePathClear={onPendingFilePathClear}
+      />
     </ThreadPrimitive.Root>
   );
 }
