@@ -41,6 +41,14 @@ pub async fn list_providers_with_models(popular_only: Option<bool>) -> Result<Ve
     Ok(response.providers)
 }
 
+/// List only configured LLM providers (those with credentials)
+#[tauri::command]
+pub async fn list_configured_providers() -> Result<Vec<ProviderWithModels>, AppError> {
+    let client = ApiClient::new()?;
+    let response: ProvidersWithModelsResponse = client.get("/api/providers/configured").await?;
+    Ok(response.providers)
+}
+
 /// Get the default LLM provider from Management API
 #[tauri::command]
 pub async fn get_default_provider() -> Result<Option<Provider>, AppError> {

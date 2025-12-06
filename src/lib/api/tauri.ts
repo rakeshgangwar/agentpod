@@ -685,6 +685,13 @@ export async function listProvidersWithModels(popularOnly = true): Promise<Provi
 }
 
 /**
+ * List only configured LLM providers (those with credentials set up)
+ */
+export async function listConfiguredProviders(): Promise<ProviderWithModels[]> {
+  return invoke<ProviderWithModels[]>("list_configured_providers");
+}
+
+/**
  * Configure a provider with an API key
  */
 export async function configureProviderApiKey(providerId: string, apiKey: string): Promise<void> {

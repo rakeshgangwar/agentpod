@@ -22,6 +22,7 @@ use commands::{
     list_providers_with_models, configure_provider_api_key,
     init_oauth_flow, poll_oauth_flow, cancel_oauth_flow,
     remove_provider_credentials, set_default_provider,
+    list_configured_providers,
     // OpenCode commands
     opencode_get_app_info, opencode_health_check,
     opencode_list_sessions, opencode_create_session, opencode_get_session,
@@ -74,6 +75,7 @@ pub fn run() {
             import_settings,
             // Provider commands (new)
             list_providers_with_models,
+            list_configured_providers,
             configure_provider_api_key,
             init_oauth_flow,
             poll_oauth_flow,
