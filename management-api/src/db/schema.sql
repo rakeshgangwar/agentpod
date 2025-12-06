@@ -41,7 +41,52 @@ CREATE TABLE IF NOT EXISTS projects (
 );
 
 -- =============================================================================
--- Providers Table
+-- Provider Credentials Table
+-- =============================================================================
+-- Stores encrypted LLM provider credentials (global, shared across all projects)
+-- Credentials are encrypted using AES-256-GCM before storage
+CREATE TABLE IF NOT EXISTS provider_credentials (
+  id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  provider_id TEXT NOT NULL UNIQUE,  -- 'anthropic', 'openai', 'github-copilot', etc.
+  auth_type TEXT NOT NULL CHECK(auth_type IN ('api_key', 'oauth', 'device_flow')),
+  
+  -- All credential fields are encrypted before storage
+  -- API Key authentication
+  api_key_encrypted TEXT,
+  
+  -- OAuth/Device Flow authentication
+  access_token_encrypted TEXT,
+  refresh_token_encrypted TEXT,
+  token_expires_at TEXT,
+  
+  -- OAuth metadata
+  oauth_provider TEXT,  -- 'github', 'opencode-zen', etc.
+  oauth_scopes TEXT,    -- JSON array of granted scopes
+  
+  -- Timestamps
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+-- =============================================================================
+-- OAuth State Table
+-- =============================================================================
+-- Temporary storage for OAuth device flow state (pending authorizations)
+CREATE TABLE IF NOT EXISTS oauth_state (
+  id TEXT PRIMARY KEY,
+  provider_id TEXT NOT NULL,
+  device_code TEXT NOT NULL,
+  user_code TEXT NOT NULL,
+  verification_uri TEXT NOT NULL,
+  interval_seconds INTEGER DEFAULT 5,
+  expires_at TEXT NOT NULL,
+  status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'completed', 'expired', 'error')),
+  error_message TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- =============================================================================
+-- Providers Table (Legacy - kept for backwards compatibility, will be deprecated)
 -- =============================================================================
 -- Stores LLM provider configurations
 CREATE TABLE IF NOT EXISTS providers (
@@ -81,6 +126,9 @@ CREATE INDEX IF NOT EXISTS idx_projects_slug ON projects(slug);
 CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
 CREATE INDEX IF NOT EXISTS idx_projects_created_at ON projects(created_at);
 CREATE INDEX IF NOT EXISTS idx_providers_is_default ON providers(is_default);
+CREATE INDEX IF NOT EXISTS idx_provider_credentials_provider_id ON provider_credentials(provider_id);
+CREATE INDEX IF NOT EXISTS idx_oauth_state_provider_id ON oauth_state(provider_id);
+CREATE INDEX IF NOT EXISTS idx_oauth_state_status ON oauth_state(status);
 
 -- =============================================================================
 -- Seed Data: Default Providers

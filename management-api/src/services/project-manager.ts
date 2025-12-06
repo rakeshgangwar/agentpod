@@ -20,7 +20,7 @@ import {
   type Project,
   type CreateProjectInput,
 } from '../models/project.ts';
-import { getProviderEnvVars, getDefaultProvider } from '../models/provider.ts';
+import { getProviderEnvVars, getSetting } from '../models/provider.ts';
 import { createLogger } from '../utils/logger.ts';
 import { ProjectCreationError, ProjectNotFoundError } from '../utils/errors.ts';
 
@@ -247,7 +247,7 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
     };
     
     // Add LLM credentials
-    const llmEnvVars = getProviderEnvVars(llmProviderId);
+    const llmEnvVars = await getProviderEnvVars(llmProviderId);
     Object.assign(envVars, llmEnvVars);
     
     await coolify.setEnvVars(coolifyApp.uuid, envVars);
@@ -272,7 +272,7 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       githubRepoUrl: githubUrl,
       githubSyncEnabled: !!githubUrl,
       githubSyncDirection: 'push',
-      llmProvider: llmProviderId ?? getDefaultProvider()?.id,
+      llmProvider: llmProviderId ?? getSetting('default_provider') ?? undefined,
     };
     
     const project = dbCreateProject(projectInput);
@@ -487,7 +487,7 @@ export async function updateProjectCredentials(
   log.info('Updating project credentials', { projectId, providerId });
   
   // Get credentials from provider
-  const envVars = getProviderEnvVars(providerId);
+  const envVars = await getProviderEnvVars(providerId);
   
   if (Object.keys(envVars).length === 0) {
     log.warn('No credentials found for provider', { providerId });

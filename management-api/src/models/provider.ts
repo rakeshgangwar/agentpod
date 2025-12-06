@@ -1,4 +1,6 @@
 import { db } from '../db/index.ts';
+import { getCredential } from './provider-credentials.ts';
+import { modelsDev } from '../services/models-dev.ts';
 
 // =============================================================================
 // Types
@@ -194,38 +196,56 @@ export function removeProviderConfig(id: string): Provider | null {
 
 /**
  * Get environment variables for a provider (to inject into containers)
+ * Uses encrypted credentials from provider_credentials table
+ * and env var names from Models.dev API
  */
-export function getProviderEnvVars(providerId?: string): Record<string, string> {
-  const provider = providerId 
-    ? getProviderById(providerId) 
-    : getDefaultProvider();
+export async function getProviderEnvVars(providerId?: string): Promise<Record<string, string>> {
+  // If no providerId specified, try to get from settings
+  const targetProviderId = providerId ?? getSetting('default_provider');
   
-  if (!provider || !provider.isConfigured) {
+  if (!targetProviderId) {
     return {};
   }
   
-  const envVarMap: Record<string, string> = {
+  // Get decrypted credentials
+  const credential = await getCredential(targetProviderId);
+  if (!credential) {
+    return {};
+  }
+  
+  // Get env var name from Models.dev
+  const provider = await modelsDev.getProvider(targetProviderId);
+  
+  // Fallback env var map for providers not in Models.dev or without apiKeyEnvVar
+  const fallbackEnvVarMap: Record<string, string> = {
     'anthropic': 'ANTHROPIC_API_KEY',
     'openai': 'OPENAI_API_KEY',
     'openrouter': 'OPENROUTER_API_KEY',
     'google': 'GOOGLE_GENERATIVE_AI_API_KEY',
-    'amazon-bedrock': 'AWS_ACCESS_KEY_ID', // Bedrock needs multiple vars
+    'amazon-bedrock': 'AWS_ACCESS_KEY_ID',
     'github-copilot': 'GITHUB_TOKEN',
+    'azure': 'AZURE_API_KEY',
+    'groq': 'GROQ_API_KEY',
+    'mistral': 'MISTRAL_API_KEY',
+    'xai': 'XAI_API_KEY',
+    'together': 'TOGETHER_API_KEY',
+    'perplexity': 'PERPLEXITY_API_KEY',
+    'cohere': 'COHERE_API_KEY',
+    'deepseek': 'DEEPSEEK_API_KEY',
   };
   
-  const envVar = envVarMap[provider.id];
+  const envVar = provider?.apiKeyEnvVar ?? fallbackEnvVarMap[targetProviderId];
   if (!envVar) {
     return {};
   }
   
-  // For API key providers
-  if (provider.type === 'api_key' && provider.apiKey) {
-    return { [envVar]: provider.apiKey };
+  // Return the appropriate credential
+  if (credential.authType === 'api_key' && credential.apiKey) {
+    return { [envVar]: credential.apiKey };
   }
   
-  // For OAuth providers
-  if (provider.type === 'oauth' && provider.accessToken) {
-    return { [envVar]: provider.accessToken };
+  if ((credential.authType === 'oauth' || credential.authType === 'device_flow') && credential.accessToken) {
+    return { [envVar]: credential.accessToken };
   }
   
   return {};
@@ -237,4 +257,29 @@ export function getProviderEnvVars(providerId?: string): Record<string, string> 
 export function hasConfiguredProvider(): boolean {
   const row = db.query('SELECT 1 FROM providers WHERE is_configured = 1 LIMIT 1').get();
   return !!row;
+}
+
+// =============================================================================
+// Settings Operations
+// =============================================================================
+
+/**
+ * Get a setting value
+ */
+export function getSetting(key: string): string | null {
+  const row = db.query(
+    'SELECT value FROM settings WHERE key = $key'
+  ).get({ $key: key }) as { value: string } | null;
+  return row?.value || null;
+}
+
+/**
+ * Set a setting value
+ */
+export function setSetting(key: string, value: string): void {
+  db.query(`
+    INSERT INTO settings (key, value, updated_at) 
+    VALUES ($key, $value, datetime('now'))
+    ON CONFLICT(key) DO UPDATE SET value = $value, updated_at = datetime('now')
+  `).run({ $key: key, $value: value });
 }

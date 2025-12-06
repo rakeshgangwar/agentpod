@@ -49,6 +49,16 @@ impl ApiClient {
         })
     }
     
+    /// Get the base URL
+    pub fn base_url(&self) -> &str {
+        &self.base_url
+    }
+    
+    /// Get a reference to the HTTP client
+    pub fn client(&self) -> &Client {
+        &self.client
+    }
+    
     /// Make a GET request to the API
     pub async fn get<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<T, AppError> {
         let url = format!("{}{}", self.base_url, path);
@@ -70,6 +80,11 @@ impl ApiClient {
     }
 
     /// Add authorization header if API key is configured
+    pub fn add_auth_header(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+        self.add_auth(request)
+    }
+
+    /// Add authorization header if API key is configured (internal)
     fn add_auth(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
         match &self.api_key {
             Some(key) => request.header("Authorization", format!("Bearer {}", key)),

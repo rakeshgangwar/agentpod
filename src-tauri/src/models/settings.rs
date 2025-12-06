@@ -64,6 +64,84 @@ pub struct Provider {
     pub is_default: bool,
 }
 
+/// Model capabilities
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelCapabilities {
+    pub image: bool,
+    pub video: bool,
+    pub tools: bool,
+    pub streaming: bool,
+}
+
+/// Model pricing info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelPricing {
+    pub input: f64,
+    pub output: f64,
+}
+
+/// Model info from providers list
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelInfo {
+    pub id: String,
+    pub name: String,
+    pub context: u32,
+    pub max_output: u32,
+    pub pricing: ModelPricing,
+    pub capabilities: ModelCapabilities,
+}
+
+/// Enhanced provider with models from Models.dev
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderWithModels {
+    pub id: String,
+    pub name: String,
+    pub auth_type: String,  // "api_key", "oauth", or "device_flow"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api_key_env_var: Option<String>,
+    pub is_configured: bool,
+    pub is_default: bool,
+    pub logo_url: String,
+    pub models: Vec<ModelInfo>,
+}
+
+/// Providers list response from Management API (enhanced)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProvidersWithModelsResponse {
+    pub providers: Vec<ProviderWithModels>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_count: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub popular_count: Option<usize>,
+}
+
+/// OAuth device flow initialization response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OAuthFlowInit {
+    pub state_id: String,
+    pub user_code: String,
+    pub verification_uri: String,
+    pub expires_at: String,
+    pub interval: u32,
+}
+
+/// OAuth flow status
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OAuthFlowStatus {
+    pub status: String,  // "pending", "completed", "expired", "error"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(default)]
+    pub is_configured: bool,
+}
+
 /// Providers list response from Management API
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProvidersResponse {

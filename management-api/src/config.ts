@@ -33,6 +33,13 @@ export const config = {
     token: getEnv('API_TOKEN', 'dev-token-change-in-production'),
   },
 
+  // Encryption for provider credentials
+  encryption: {
+    // 32-byte (256-bit) key for AES-256-GCM
+    // In production, this should be a secure random value stored securely
+    key: getEnv('ENCRYPTION_KEY', 'dev-encryption-key-32-bytes-long!'),
+  },
+
   // Coolify
   coolify: {
     url: getEnv('COOLIFY_URL', 'http://localhost:8000'),

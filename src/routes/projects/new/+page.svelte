@@ -7,6 +7,7 @@
   import { Label } from "$lib/components/ui/label";
   import * as Card from "$lib/components/ui/card";
   import * as Tabs from "$lib/components/ui/tabs";
+  import LlmProviderSelector from "$lib/components/llm-provider-selector.svelte";
 
   // Redirect if not connected
   $effect(() => {
@@ -25,6 +26,10 @@
   // GitHub Import form
   let githubUrl = $state("");
   let syncEnabled = $state(true);
+  
+  // LLM Provider selection
+  let selectedModel = $state("");
+  let showAllProviders = $state(false);
   
   // Submission state
   let isSubmitting = $state(false);
@@ -70,9 +75,13 @@
         // From Scratch
         creationProgress = [...creationProgress, "Creating repository..."];
         
+        // Extract provider ID from selected model (format: "provider/model")
+        const llmProviderId = selectedModel ? selectedModel.split("/")[0] : undefined;
+        
         const project = await createProject({
           name: projectName.trim(),
           description: projectDescription.trim() || undefined,
+          llmProviderId,
         });
         
         if (project) {
@@ -92,9 +101,13 @@
         // Extract name from URL if not provided
         const repoName = extractRepoName(githubUrl);
         
+        // Extract provider ID from selected model (format: "provider/model")
+        const llmProviderId = selectedModel ? selectedModel.split("/")[0] : undefined;
+        
         const project = await createProject({
           name: repoName || "imported-project",
           githubUrl: githubUrl.trim(),
+          llmProviderId,
         });
         
         if (project) {
@@ -207,12 +220,13 @@
                   />
                 </div>
                 
-                <!-- Future: LLM Provider selector -->
-                <div class="space-y-2 opacity-50">
-                  <Label>LLM Provider</Label>
-                  <div class="text-sm text-muted-foreground bg-muted p-3 rounded-md">
-                    Uses default provider (Anthropic Claude)
-                  </div>
+                <!-- LLM Provider selector -->
+                <div class="space-y-2 border-t pt-4">
+                  <LlmProviderSelector
+                    bind:selectedModel
+                    bind:showAllProviders
+                    disabled={isSubmitting}
+                  />
                 </div>
               </Tabs.Content>
               
@@ -253,6 +267,15 @@
                   <p class="text-xs text-muted-foreground ml-6">
                     Keep your project in sync with the GitHub repository. Changes can be pushed back to GitHub.
                   </p>
+                </div>
+                
+                <!-- LLM Provider selector -->
+                <div class="space-y-2 border-t pt-4">
+                  <LlmProviderSelector
+                    bind:selectedModel
+                    bind:showAllProviders
+                    disabled={isSubmitting}
+                  />
                 </div>
               </Tabs.Content>
               

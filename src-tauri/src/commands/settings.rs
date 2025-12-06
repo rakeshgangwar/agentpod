@@ -2,7 +2,10 @@
 //! 
 //! Handles local settings storage and Management API provider operations.
 
-use crate::models::{AppError, AppSettings, ExportData, Provider, ProvidersResponse};
+use crate::models::{
+    AppError, AppSettings, ExportData, Provider, ProvidersResponse,
+    ProviderWithModels, ProvidersWithModelsResponse, OAuthFlowInit, OAuthFlowStatus,
+};
 use crate::services::{ApiClient, SettingsService};
 use chrono::Utc;
 
@@ -18,11 +21,23 @@ pub async fn save_settings(settings: AppSettings) -> Result<(), AppError> {
     SettingsService::save_settings(&settings)
 }
 
-/// List LLM providers from Management API
+/// List LLM providers from Management API (legacy endpoint)
 #[tauri::command]
 pub async fn list_providers() -> Result<Vec<Provider>, AppError> {
     let client = ApiClient::new()?;
     let response: ProvidersResponse = client.get("/api/providers").await?;
+    Ok(response.providers)
+}
+
+/// List LLM providers with models from Models.dev (new endpoint)
+#[tauri::command]
+pub async fn list_providers_with_models(popular_only: Option<bool>) -> Result<Vec<ProviderWithModels>, AppError> {
+    let client = ApiClient::new()?;
+    
+    let popular = popular_only.unwrap_or(true);
+    let path = format!("/api/providers?popularOnly={}", popular);
+    
+    let response: ProvidersWithModelsResponse = client.get(&path).await?;
     Ok(response.providers)
 }
 
@@ -39,6 +54,130 @@ pub async fn get_default_provider() -> Result<Option<Provider>, AppError> {
     
     let response: Response = client.get("/api/providers/default").await?;
     Ok(response.provider)
+}
+
+/// Configure a provider with an API key
+#[tauri::command]
+pub async fn configure_provider_api_key(provider_id: String, api_key: String) -> Result<(), AppError> {
+    let client = ApiClient::new()?;
+    
+    #[derive(serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Body {
+        api_key: String,
+    }
+    
+    #[derive(serde::Deserialize)]
+    struct Response {
+        success: bool,
+    }
+    
+    let path = format!("/api/providers/{}/configure", provider_id);
+    let _response: Response = client.post(&path, &Body { api_key }).await?;
+    
+    Ok(())
+}
+
+/// Initialize OAuth device flow for a provider
+#[tauri::command]
+pub async fn init_oauth_flow(provider_id: String) -> Result<OAuthFlowInit, AppError> {
+    let client = ApiClient::new()?;
+    
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Response {
+        state_id: String,
+        user_code: String,
+        verification_uri: String,
+        expires_at: String,
+        interval: u32,
+    }
+    
+    let path = format!("/api/providers/{}/oauth/init", provider_id);
+    let response: Response = client.post(&path, &serde_json::json!({})).await?;
+    
+    Ok(OAuthFlowInit {
+        state_id: response.state_id,
+        user_code: response.user_code,
+        verification_uri: response.verification_uri,
+        expires_at: response.expires_at,
+        interval: response.interval,
+    })
+}
+
+/// Poll OAuth device flow status
+#[tauri::command]
+pub async fn poll_oauth_flow(provider_id: String, state_id: String) -> Result<OAuthFlowStatus, AppError> {
+    let client = ApiClient::new()?;
+    
+    #[derive(serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Body {
+        state_id: String,
+    }
+    
+    let path = format!("/api/providers/{}/oauth/poll", provider_id);
+    let response: OAuthFlowStatus = client.post(&path, &Body { state_id }).await?;
+    
+    Ok(response)
+}
+
+/// Cancel an OAuth flow
+#[tauri::command]
+pub async fn cancel_oauth_flow(provider_id: String, state_id: String) -> Result<(), AppError> {
+    let client = ApiClient::new()?;
+    
+    let path = format!("/api/providers/{}/oauth/{}", provider_id, state_id);
+    
+    // DELETE request - we'll need to add a delete method to ApiClient
+    let url = format!("{}{}", client.base_url(), path);
+    let request = client.client().delete(&url);
+    let request = client.add_auth_header(request);
+    let response = request.send().await
+        .map_err(|e| AppError::NetworkError(e.to_string()))?;
+    
+    if !response.status().is_success() {
+        return Err(AppError::ApiError(format!("Failed to cancel OAuth flow: {}", response.status())));
+    }
+    
+    Ok(())
+}
+
+/// Remove provider credentials
+#[tauri::command]
+pub async fn remove_provider_credentials(provider_id: String) -> Result<(), AppError> {
+    let client = ApiClient::new()?;
+    
+    let path = format!("/api/providers/{}", provider_id);
+    
+    // DELETE request
+    let url = format!("{}{}", client.base_url(), path);
+    let request = client.client().delete(&url);
+    let request = client.add_auth_header(request);
+    let response = request.send().await
+        .map_err(|e| AppError::NetworkError(e.to_string()))?;
+    
+    if !response.status().is_success() {
+        return Err(AppError::ApiError(format!("Failed to remove credentials: {}", response.status())));
+    }
+    
+    Ok(())
+}
+
+/// Set a provider as the default
+#[tauri::command]
+pub async fn set_default_provider(provider_id: String) -> Result<(), AppError> {
+    let client = ApiClient::new()?;
+    
+    #[derive(serde::Deserialize)]
+    struct Response {
+        success: bool,
+    }
+    
+    let path = format!("/api/providers/{}/set-default", provider_id);
+    let _response: Response = client.post(&path, &serde_json::json!({})).await?;
+    
+    Ok(())
 }
 
 /// Export settings to a JSON string for backup/transfer

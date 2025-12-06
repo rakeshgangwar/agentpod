@@ -18,6 +18,10 @@ use commands::{
     // Settings commands
     get_settings, save_settings, list_providers, get_default_provider,
     export_settings, import_settings,
+    // Provider commands (new)
+    list_providers_with_models, configure_provider_api_key,
+    init_oauth_flow, poll_oauth_flow, cancel_oauth_flow,
+    remove_provider_credentials, set_default_provider,
     // OpenCode commands
     opencode_get_app_info, opencode_health_check,
     opencode_list_sessions, opencode_create_session, opencode_get_session,
@@ -68,6 +72,14 @@ pub fn run() {
             get_default_provider,
             export_settings,
             import_settings,
+            // Provider commands (new)
+            list_providers_with_models,
+            configure_provider_api_key,
+            init_oauth_flow,
+            poll_oauth_flow,
+            cancel_oauth_flow,
+            remove_provider_credentials,
+            set_default_provider,
             // OpenCode commands - App Info & Health
             opencode_get_app_info,
             opencode_health_check,

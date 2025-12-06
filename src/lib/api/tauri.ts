@@ -565,6 +565,60 @@ export interface Provider {
   isDefault: boolean;
 }
 
+// =============================================================================
+// Enhanced Provider Types (with Models.dev data)
+// =============================================================================
+
+export type AuthType = "api_key" | "oauth" | "device_flow";
+
+export interface ModelCapabilities {
+  image: boolean;
+  video: boolean;
+  tools: boolean;
+  streaming: boolean;
+}
+
+export interface ModelPricing {
+  input: number;
+  output: number;
+}
+
+export interface ModelInfo {
+  id: string;
+  name: string;
+  context: number;
+  maxOutput: number;
+  pricing: ModelPricing;
+  capabilities: ModelCapabilities;
+}
+
+export interface ProviderWithModels {
+  id: string;
+  name: string;
+  authType: AuthType;
+  apiKeyEnvVar?: string;
+  isConfigured: boolean;
+  isDefault: boolean;
+  logoUrl: string;
+  models: ModelInfo[];
+}
+
+export interface OAuthFlowInit {
+  stateId: string;
+  userCode: string;
+  verificationUri: string;
+  expiresAt: string;
+  interval: number;
+}
+
+export type OAuthFlowStatusType = "pending" | "completed" | "expired" | "error";
+
+export interface OAuthFlowStatus {
+  status: OAuthFlowStatusType;
+  error?: string;
+  isConfigured: boolean;
+}
+
 export interface ExportData {
   version: string;
   exportedAt: string;
@@ -616,6 +670,60 @@ export async function exportSettings(): Promise<string> {
  */
 export async function importSettings(json: string): Promise<AppSettings> {
   return invoke<AppSettings>("import_settings", { json });
+}
+
+// =============================================================================
+// Provider Commands (Enhanced with Models.dev)
+// =============================================================================
+
+/**
+ * List LLM providers with their models from Models.dev
+ * @param popularOnly - Only return popular/curated providers (default: true)
+ */
+export async function listProvidersWithModels(popularOnly = true): Promise<ProviderWithModels[]> {
+  return invoke<ProviderWithModels[]>("list_providers_with_models", { popularOnly });
+}
+
+/**
+ * Configure a provider with an API key
+ */
+export async function configureProviderApiKey(providerId: string, apiKey: string): Promise<void> {
+  return invoke("configure_provider_api_key", { providerId, apiKey });
+}
+
+/**
+ * Initialize OAuth device flow for a provider (e.g., GitHub Copilot)
+ */
+export async function initOAuthFlow(providerId: string): Promise<OAuthFlowInit> {
+  return invoke<OAuthFlowInit>("init_oauth_flow", { providerId });
+}
+
+/**
+ * Poll OAuth device flow status
+ */
+export async function pollOAuthFlow(providerId: string, stateId: string): Promise<OAuthFlowStatus> {
+  return invoke<OAuthFlowStatus>("poll_oauth_flow", { providerId, stateId });
+}
+
+/**
+ * Cancel an OAuth flow
+ */
+export async function cancelOAuthFlow(providerId: string, stateId: string): Promise<void> {
+  return invoke("cancel_oauth_flow", { providerId, stateId });
+}
+
+/**
+ * Remove provider credentials
+ */
+export async function removeProviderCredentials(providerId: string): Promise<void> {
+  return invoke("remove_provider_credentials", { providerId });
+}
+
+/**
+ * Set a provider as the default
+ */
+export async function setDefaultProvider(providerId: string): Promise<void> {
+  return invoke("set_default_provider", { providerId });
 }
 
 // =============================================================================
