@@ -2,10 +2,8 @@
   import { goto } from "$app/navigation";
   import { confirm } from "@tauri-apps/plugin-dialog";
   import { connection } from "$lib/stores/connection.svelte";
-  import { projects, fetchProjects, startProject, stopProject, deleteProject, createProject } from "$lib/stores/projects.svelte";
+  import { projects, fetchProjects, startProject, stopProject, deleteProject } from "$lib/stores/projects.svelte";
   import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { Label } from "$lib/components/ui/label";
   import * as Card from "$lib/components/ui/card";
   import { Badge } from "$lib/components/ui/badge";
   import { Skeleton } from "$lib/components/ui/skeleton";
@@ -23,30 +21,6 @@
       fetchProjects();
     }
   });
-
-  // Create project form state
-  let showCreateForm = $state(false);
-  let newProjectName = $state("");
-  let newProjectDescription = $state("");
-  let isCreating = $state(false);
-
-  async function handleCreateProject(e: Event) {
-    e.preventDefault();
-    if (!newProjectName.trim()) return;
-    
-    isCreating = true;
-    const project = await createProject({
-      name: newProjectName,
-      description: newProjectDescription || undefined,
-    });
-    
-    if (project) {
-      showCreateForm = false;
-      newProjectName = "";
-      newProjectDescription = "";
-    }
-    isCreating = false;
-  }
 
   function getStatusColor(status: string): "default" | "secondary" | "destructive" | "outline" {
     switch (status) {
@@ -79,49 +53,14 @@
         </p>
       </div>
       <div class="flex gap-2">
-        <Button variant="outline" onclick={() => showCreateForm = !showCreateForm}>
-          {showCreateForm ? "Cancel" : "New Project"}
+        <Button onclick={() => goto("/projects/new")}>
+          New Project
         </Button>
         <Button variant="ghost" onclick={() => goto("/settings")}>
           Settings
         </Button>
       </div>
     </div>
-
-    <!-- Create Project Form -->
-    {#if showCreateForm}
-      <Card.Root>
-        <Card.Header>
-          <Card.Title>Create New Project</Card.Title>
-        </Card.Header>
-        <Card.Content>
-          <form onsubmit={handleCreateProject} class="space-y-4">
-            <div class="grid gap-4 sm:grid-cols-2">
-              <div class="space-y-2">
-                <Label for="project-name">Project Name</Label>
-                <Input
-                  id="project-name"
-                  placeholder="My Project"
-                  bind:value={newProjectName}
-                  required
-                />
-              </div>
-              <div class="space-y-2">
-                <Label for="project-desc">Description (optional)</Label>
-                <Input
-                  id="project-desc"
-                  placeholder="Project description..."
-                  bind:value={newProjectDescription}
-                />
-              </div>
-            </div>
-            <Button type="submit" disabled={isCreating || !newProjectName.trim()}>
-              {isCreating ? "Creating..." : "Create Project"}
-            </Button>
-          </form>
-        </Card.Content>
-      </Card.Root>
-    {/if}
 
     <!-- Error Display -->
     {#if projects.error}

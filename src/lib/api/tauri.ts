@@ -117,12 +117,15 @@ export async function getProject(id: string): Promise<Project> {
  * Create a new project
  */
 export async function createProject(input: CreateProjectInput): Promise<Project> {
-  return invoke<Project>("create_project", {
+  // Tauri expects camelCase parameter names (converts to snake_case for Rust)
+  const params = {
     name: input.name,
     description: input.description ?? null,
-    github_url: input.githubUrl ?? null,
-    llm_provider_id: input.llmProviderId ?? null,
-  });
+    githubUrl: input.githubUrl ?? null,
+    llmProviderId: input.llmProviderId ?? null,
+  };
+  
+  return invoke<Project>("create_project", params);
 }
 
 /**
