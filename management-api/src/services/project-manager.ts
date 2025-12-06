@@ -151,9 +151,9 @@ const ENTRYPOINT_BASE64 = Buffer.from(ENTRYPOINT_SCRIPT).toString('base64');
 
 const OPENCODE_DOCKERFILE = `FROM node:20-slim
 
-# Install required packages (including jq for JSON parsing)
+# Install required packages (including jq for JSON parsing, wget for Coolify healthcheck)
 RUN apt-get update && \\
-    apt-get install -y git curl jq && \\
+    apt-get install -y git curl wget jq && \\
     rm -rf /var/lib/apt/lists/*
 
 # Install OpenCode globally

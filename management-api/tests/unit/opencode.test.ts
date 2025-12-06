@@ -5,7 +5,8 @@
  * These tests don't require actual OpenCode containers.
  */
 
-import '../setup';
+import { ensureDbInitialized } from '../setup';
+ensureDbInitialized();
 
 import { describe, test, expect, beforeEach, mock, spyOn } from 'bun:test';
 import { db } from '../../src/db/index';

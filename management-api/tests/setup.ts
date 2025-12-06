@@ -88,3 +88,26 @@ export function createMockFetch(responses: Map<string, { status: number; body: u
 // Set up environment immediately when this file is imported
 setupTestEnv();
 ensureTestDbDir();
+
+// Initialize database schema for unit tests
+// This is done lazily to avoid circular imports
+let dbInitialized = false;
+export function ensureDbInitialized(): void {
+  if (dbInitialized) return;
+  
+  // Import dynamically to avoid circular imports
+  const { initDatabase } = require('../src/db/index');
+  const { runMigrations } = require('../src/db/migrations');
+  
+  try {
+    initDatabase();
+    runMigrations();
+    dbInitialized = true;
+  } catch (e) {
+    // Ignore if already initialized
+    if (!(e instanceof Error) || !e.message.includes('already exists')) {
+      console.warn('Database init warning:', e);
+    }
+    dbInitialized = true;
+  }
+}
