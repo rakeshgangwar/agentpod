@@ -293,20 +293,20 @@
             {#if isMarkdownFile(selectedFile.name)}
               <div class="flex border rounded-md overflow-hidden">
                 <button
-                  class="px-2 py-1 text-xs transition-colors {markdownViewMode === 'preview' 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'bg-muted hover:bg-muted/80'}"
-                  onclick={() => markdownViewMode = "preview"}
-                >
-                  Preview
-                </button>
-                <button
                   class="px-2 py-1 text-xs transition-colors {markdownViewMode === 'raw' 
                     ? 'bg-primary text-primary-foreground' 
                     : 'bg-muted hover:bg-muted/80'}"
                   onclick={() => markdownViewMode = "raw"}
                 >
                   Raw
+                </button>
+                <button
+                  class="px-2 py-1 text-xs transition-colors {markdownViewMode === 'preview' 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'bg-muted hover:bg-muted/80'}"
+                  onclick={() => markdownViewMode = "preview"}
+                >
+                  Preview
                 </button>
               </div>
             {/if}
