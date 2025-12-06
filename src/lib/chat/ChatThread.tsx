@@ -10,6 +10,8 @@ import {
   ThreadPrimitive,
   ComposerPrimitive,
   MessagePrimitive,
+  useThread,
+  useMessage,
   type ToolCallMessagePartProps,
 } from "@assistant-ui/react";
 import { MarkdownTextPrimitive } from "@assistant-ui/react-markdown";
@@ -33,6 +35,15 @@ function TextPart() {
 function ToolCallPart({ toolName, args, result }: ToolCallMessagePartProps) {
   const isComplete = result !== undefined;
   
+  // Stringify the result for display
+  const resultDisplay = result === undefined 
+    ? "(pending...)" 
+    : result === "" || result === null
+      ? "(success - no output)"
+      : typeof result === 'string' 
+        ? result 
+        : JSON.stringify(result, null, 2);
+  
   return (
     <div className="my-2 rounded-lg border border-border bg-muted/50 overflow-hidden">
       <div className="flex items-center gap-2 px-3 py-2 bg-muted border-b border-border">
@@ -53,14 +64,12 @@ function ToolCallPart({ toolName, args, result }: ToolCallMessagePartProps) {
               {JSON.stringify(args, null, 2)}
             </pre>
           </div>
-          {isComplete && (
-            <div>
-              <span className="text-xs font-medium text-muted-foreground">Result:</span>
-              <pre className="mt-1 text-xs bg-background rounded p-2 overflow-auto max-h-32">
-                {typeof result === 'string' ? result : JSON.stringify(result, null, 2)}
-              </pre>
-            </div>
-          )}
+          <div>
+            <span className="text-xs font-medium text-muted-foreground">Result:</span>
+            <pre className="mt-1 text-xs bg-background rounded p-2 overflow-auto max-h-32">
+              {resultDisplay}
+            </pre>
+          </div>
         </div>
       </details>
     </div>
@@ -106,8 +115,21 @@ function UserMessage() {
 
 /**
  * AssistantMessage component renders assistant messages
+ * Hides empty messages (e.g., auto-created placeholder when isRunning)
  */
 function AssistantMessage() {
+  const message = useMessage();
+  
+  // Don't render if message has no actual content
+  // (assistant-ui auto-creates empty assistant message when isRunning)
+  const hasContent = message.content.some((part) => {
+    if (part.type === "text" && part.text && part.text.length > 0) return true;
+    if (part.type === "tool-call") return true;
+    return false;
+  });
+  
+  if (!hasContent) return null;
+  
   return (
     <MessagePrimitive.Root className="flex justify-start mb-4">
       <div className="max-w-[80%] rounded-lg px-4 py-2 bg-muted">
@@ -164,6 +186,57 @@ function EmptyState() {
 }
 
 /**
+ * Loading indicator shown while waiting for assistant response
+ * Shows when thread is running AND the assistant hasn't started producing content yet
+ */
+function LoadingIndicator() {
+  const isRunning = useThread((t) => t.isRunning);
+  const messages = useThread((t) => t.messages);
+  
+  // Only show loading when:
+  // 1. Thread is running (assistant is processing)
+  // 2. Either:
+  //    - No messages yet
+  //    - Last message is from user
+  //    - Last message is an empty assistant message (auto-created by runtime)
+  const lastMessage = messages[messages.length - 1];
+  
+  let showLoading = false;
+  if (isRunning) {
+    if (!lastMessage) {
+      showLoading = true;
+    } else if (lastMessage.role === "user") {
+      showLoading = true;
+    } else if (lastMessage.role === "assistant") {
+      // Check if assistant message has any actual content
+      const hasContent = lastMessage.content.some((part) => {
+        if (part.type === "text" && part.text && part.text.length > 0) return true;
+        if (part.type === "tool-call") return true;
+        return false;
+      });
+      showLoading = !hasContent;
+    }
+  }
+  
+  if (!showLoading) return null;
+  
+  return (
+    <div className="flex justify-start mb-4">
+      <div className="max-w-[80%] rounded-lg px-4 py-3 bg-muted">
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1">
+            <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+            <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+            <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+          </div>
+          <span className="text-sm text-muted-foreground">Thinking...</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * ChatThread component renders the full chat interface
  */
 export function ChatThread() {
@@ -181,6 +254,9 @@ export function ChatThread() {
               AssistantMessage,
             }}
           />
+          
+          {/* Show loading indicator when waiting for assistant response */}
+          <LoadingIndicator />
         </div>
         
         <ThreadPrimitive.ViewportFooter />

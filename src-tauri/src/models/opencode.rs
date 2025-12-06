@@ -54,6 +54,7 @@ pub enum MessageRole {
 #[serde(rename_all = "kebab-case")]
 pub enum MessagePartType {
     Text,
+    Tool,
     #[serde(rename = "tool-invocation")]
     ToolInvocation,
     #[serde(rename = "tool-result")]
@@ -63,6 +64,7 @@ pub enum MessagePartType {
     #[serde(rename = "step-finish")]
     StepFinish,
     File,
+    Patch,
     #[serde(other)]
     Unknown,
 }
@@ -152,6 +154,24 @@ pub struct ToolInvocation {
     pub result: Option<serde_json::Value>,
 }
 
+/// Tool state - used in "tool" type parts (current OpenCode format)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ToolState {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub time: Option<PartTime>,
+}
+
 /// A part of a message (text, tool call, file, etc.) - matches actual OpenCode API
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -179,9 +199,16 @@ pub struct MessagePart {
     pub cost: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tokens: Option<TokenUsage>,
-    // Tool invocation
+    // Tool invocation (legacy format)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_invocation: Option<ToolInvocation>,
+    // Tool (current OpenCode format) - type: "tool"
+    #[serde(rename = "callID", skip_serializing_if = "Option::is_none")]
+    pub call_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub state: Option<ToolState>,
     // File info
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,

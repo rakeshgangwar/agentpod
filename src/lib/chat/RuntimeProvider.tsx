@@ -62,13 +62,36 @@ function convertOpenCodeMessage(msg: Message): InternalMessage {
   for (const part of msg.parts) {
     if (part.type === "text" && part.text) {
       internal.text += part.text;
-    } else if (part.type === "tool-invocation" && part.toolInvocation) {
+    } 
+    // Handle tool-invocation format (legacy)
+    else if (part.type === "tool-invocation" && part.toolInvocation) {
       internal.toolCalls.set(part.toolInvocation.toolCallId, {
         toolCallId: part.toolInvocation.toolCallId,
         toolName: part.toolInvocation.toolName,
         args: (part.toolInvocation.args ?? {}) as Record<string, unknown>,
         result: part.toolInvocation.result,
       });
+    }
+    // Handle "tool" format (current OpenCode format)
+    // Structure: { type: "tool", callID, tool, state: { status, input, output, ... } }
+    else if (part.type === "tool" && part.callID && part.state) {
+      const callID = part.callID;
+      const toolName = part.tool || "unknown";
+      const state = part.state;
+      const status = state.status;
+      const input = state.input ?? {};
+      const output = state.output;
+      
+      internal.toolCalls.set(callID, {
+        toolCallId: callID,
+        toolName,
+        args: input,
+        result: status === "completed" || status === "error" ? output : undefined,
+      });
+    }
+    // Warn about unhandled tool parts
+    else if (part.type === "tool") {
+      console.warn("[ToolCall] Unhandled tool part - missing callID or state:", JSON.stringify(part).slice(0, 300));
     }
   }
 
@@ -153,13 +176,11 @@ export function RuntimeProvider({ projectId, sessionId: initialSessionId, childr
       setError(null);
 
       try {
-        console.log("[RuntimeProvider] Loading messages for session:", sessionId);
         const opencodeMessages = await opencodeListMessages(projectId, sessionId);
 
         if (cancelled) return;
 
         const converted = opencodeMessages.map(convertOpenCodeMessage);
-        console.log("[RuntimeProvider] Loaded messages:", converted.length);
         setInternalMessages(converted);
       } catch (err) {
         if (cancelled) return;
@@ -192,12 +213,26 @@ export function RuntimeProvider({ projectId, sessionId: initialSessionId, childr
         const role = info.role as "user" | "assistant";
 
         setInternalMessages((prev) => {
-          // Check if message already exists
-          const exists = prev.some((m) => m.id === messageId);
-          if (exists) return prev;
+          // Check if message already exists by ID
+          const existsById = prev.some((m) => m.id === messageId);
+          if (existsById) return prev;
 
-          // Add new message
-          console.log("[RuntimeProvider] Adding new message:", messageId, role);
+          // For user messages, check if there's an optimistic message we should replace
+          if (role === "user") {
+            const optimisticIndex = prev.findIndex(
+              (m) => m.role === "user" && m.id.startsWith("user-")
+            );
+            if (optimisticIndex !== -1) {
+              // Replace the optimistic message with the real one
+              const newMessages = [...prev];
+              newMessages[optimisticIndex] = {
+                ...newMessages[optimisticIndex],
+                id: messageId, // Update to real ID
+              };
+              return newMessages;
+            }
+          }
+
           return [
             ...prev,
             {
@@ -217,10 +252,14 @@ export function RuntimeProvider({ projectId, sessionId: initialSessionId, childr
       const part = properties?.part as Record<string, unknown> | undefined;
       const messageId = (properties?.messageID || (part as Record<string, unknown>)?.messageID) as string | undefined;
 
-      if (!messageId || !part) return;
+      if (!messageId) {
+        return;
+      }
+      
+      if (!part) return;
 
-      setInternalMessages((prev) =>
-        prev.map((m) => {
+      setInternalMessages((prev) => {
+        return prev.map((m) => {
           if (m.id !== messageId) return m;
 
           // Clone the message to update
@@ -238,26 +277,48 @@ export function RuntimeProvider({ projectId, sessionId: initialSessionId, childr
             }
           }
 
+          // Handle tool-invocation format (legacy)
           if (part.type === "tool-invocation") {
             const toolInvocation = part.toolInvocation as Record<string, unknown> | undefined;
             if (toolInvocation?.toolCallId) {
+              const toolName = (toolInvocation.toolName as string) || "unknown";
               updated.toolCalls.set(toolInvocation.toolCallId as string, {
                 toolCallId: toolInvocation.toolCallId as string,
-                toolName: (toolInvocation.toolName as string) || "unknown",
+                toolName,
                 args: (toolInvocation.args as Record<string, unknown>) ?? {},
                 result: toolInvocation.result,
               });
             }
           }
 
+          // Handle "tool" format (from SSE stream)
+          // Format: { type: "tool", callID, tool, state: { input, status, output, ... } }
+          if (part.type === "tool") {
+            const callID = part.callID as string | undefined;
+            const toolName = (part.tool as string | undefined) || "unknown";
+            const state = part.state as Record<string, unknown> | undefined;
+            
+            if (callID) {
+              const status = state?.status as string | undefined;
+              const input = (state?.input as Record<string, unknown>) ?? {};
+              const output = state?.output;
+              
+              updated.toolCalls.set(callID, {
+                toolCallId: callID,
+                toolName,
+                args: input,
+                result: status === "completed" || status === "error" ? output : undefined,
+              });
+            }
+          }
+
           return updated;
-        })
-      );
+        });
+      });
     }
 
     // Handle session.idle - processing complete
     if (event.eventType === "session.idle") {
-      console.log("[RuntimeProvider] Session idle - streaming complete");
       setIsRunning(false);
     }
 
@@ -266,7 +327,6 @@ export function RuntimeProvider({ projectId, sessionId: initialSessionId, childr
       const info = properties?.info as Record<string, unknown> | undefined;
       const status = info?.status as Record<string, unknown> | undefined;
       if (status?.type === "idle") {
-        console.log("[RuntimeProvider] Session status idle");
         setIsRunning(false);
       }
     }
@@ -285,19 +345,14 @@ export function RuntimeProvider({ projectId, sessionId: initialSessionId, childr
       const stream = new OpenCodeStream(projectId);
       streamRef.current = stream;
 
-      console.log("[RuntimeProvider] Connecting to SSE stream");
       stream.connect(
         handleSSEEvent,
         (status, err) => {
-          console.log("[RuntimeProvider] Stream status:", status, err);
-          // Don't set error state for stream errors - just log them
-          // Stream errors are transient and shouldn't break the UI
           if (status === "error") {
-            console.warn("[RuntimeProvider] Stream error (non-fatal):", err);
+            console.warn("[RuntimeProvider] Stream error:", err);
           }
           // Try to reconnect after disconnection (unless we're cleaning up)
           if (status === "disconnected" && !isCleaningUp) {
-            console.log("[RuntimeProvider] Stream disconnected, will reconnect in 2s");
             reconnectTimeout = setTimeout(connectStream, 2000);
           }
         }
@@ -313,7 +368,6 @@ export function RuntimeProvider({ projectId, sessionId: initialSessionId, childr
     connectStream();
 
     return () => {
-      console.log("[RuntimeProvider] Disconnecting SSE stream");
       isCleaningUp = true;
       if (reconnectTimeout) {
         clearTimeout(reconnectTimeout);
@@ -339,7 +393,6 @@ export function RuntimeProvider({ projectId, sessionId: initialSessionId, childr
       return;
     }
 
-    console.log("[RuntimeProvider] Sending message:", textPart.text.slice(0, 50));
     setIsRunning(true);
 
     // Add user message to state immediately (optimistic update)
@@ -358,7 +411,6 @@ export function RuntimeProvider({ projectId, sessionId: initialSessionId, childr
     try {
       // Send message to OpenCode - response comes via SSE
       await opencodeSendMessage(projectId, sessionId, textPart.text);
-      console.log("[RuntimeProvider] Message sent successfully");
     } catch (err) {
       console.error("[RuntimeProvider] Failed to send message:", err);
       setError(err instanceof Error ? err.message : "Failed to send message");
@@ -369,7 +421,6 @@ export function RuntimeProvider({ projectId, sessionId: initialSessionId, childr
   // Handle cancellation
   const onCancel = useCallback(async () => {
     if (!sessionId) return;
-    console.log("[RuntimeProvider] Cancelling...");
     try {
       await opencodeAbortSession(projectId, sessionId);
     } catch (err) {
