@@ -222,9 +222,9 @@
   }
 </script>
 
-<div class="flex h-[calc(100vh-200px)] min-h-[400px] gap-4">
+<div class="flex h-[calc(100vh-200px)] min-h-[400px] gap-4 overflow-hidden">
   <!-- File Tree Panel -->
-  <Card.Root class="w-72 flex flex-col">
+  <Card.Root class="w-72 flex-shrink-0 flex flex-col">
     <Card.Header class="py-3 px-4 border-b flex-row items-center justify-between">
       <Card.Title class="text-sm">Files</Card.Title>
       <Button size="sm" variant="ghost" onclick={loadFileTree} disabled={isLoadingTree}>
@@ -284,7 +284,7 @@
   </Card.Root>
 
   <!-- File Content Panel -->
-  <Card.Root class="flex-1 flex flex-col">
+  <Card.Root class="flex-1 min-w-0 flex flex-col overflow-hidden">
     {#if selectedFile}
       <Card.Header class="py-3 px-4 border-b">
         <div class="flex items-center justify-between">
