@@ -219,16 +219,44 @@
         return "svelte";
       case "rs":
         return "rust";
+      case "py":
+        return "python";
+      case "go":
+        return "go";
+      case "java":
+        return "java";
+      case "kt":
+        return "kotlin";
+      case "rb":
+        return "ruby";
+      case "php":
+        return "php";
+      case "c":
+      case "h":
+        return "c";
+      case "cpp":
+      case "cc":
+      case "cxx":
+      case "hpp":
+        return "cpp";
+      case "cs":
+        return "csharp";
+      case "swift":
+        return "swift";
       case "json":
         return "json";
       case "md":
+      case "mdx":
         return "markdown";
       case "css":
         return "css";
       case "scss":
         return "scss";
       case "html":
+      case "htm":
         return "html";
+      case "xml":
+        return "xml";
       case "toml":
         return "toml";
       case "yaml":
@@ -236,9 +264,17 @@
         return "yaml";
       case "sh":
       case "bash":
+      case "zsh":
         return "bash";
       case "sql":
         return "sql";
+      case "dockerfile":
+        return "dockerfile";
+      case "graphql":
+      case "gql":
+        return "graphql";
+      case "vue":
+        return "vue";
       default:
         return "plaintext";
     }
