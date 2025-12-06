@@ -151,9 +151,9 @@ const ENTRYPOINT_BASE64 = Buffer.from(ENTRYPOINT_SCRIPT).toString('base64');
 
 const OPENCODE_DOCKERFILE = `FROM node:20-slim
 
-# Install required packages (including jq for JSON parsing, wget for Coolify healthcheck)
+# Install required packages (including jq for JSON parsing)
 RUN apt-get update && \\
-    apt-get install -y git curl wget jq && \\
+    apt-get install -y git curl jq && \\
     rm -rf /var/lib/apt/lists/*
 
 # Install OpenCode globally
@@ -177,10 +177,8 @@ RUN echo "${ENTRYPOINT_BASE64}" | base64 -d > /entrypoint.sh && chmod +x /entryp
 # Expose OpenCode port
 EXPOSE 4096
 
-# Health check - use /app endpoint which is simpler and always available
-# Increased start-period to give OpenCode time to fully initialize
-HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=5 \\
-    CMD curl -sf http://localhost:\${OPENCODE_PORT}/app || exit 1
+# No HEALTHCHECK - Coolify's healthcheck doesn't work well with dynamic ports
+# The container is healthy when OpenCode logs "opencode server listening on..."
 
 ENTRYPOINT ["/entrypoint.sh"]
 `;
@@ -275,7 +273,9 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       description: `OpenCode container for ${name}`,
       domains: fqdnUrl ?? undefined,  // Set the domain for Traefik routing
       instantDeploy: false, // We'll set env vars first, then deploy
-      healthCheckEnabled: false,  // Disable Coolify healthcheck - container has its own HEALTHCHECK
+      healthCheckEnabled: true,
+      healthCheckPath: '/session',  // /session returns JSON [], /app returns HTML
+      healthCheckPort: String(containerPort),
     });
     
     log.info('Coolify application created', { uuid: coolifyApp.uuid });
@@ -285,7 +285,9 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
     await coolify.updateApplication(coolifyApp.uuid, {
       ports_exposes: String(containerPort),
       domains: fqdnUrl ?? undefined,
-      health_check_enabled: false,  // Disable Coolify healthcheck - container has its own HEALTHCHECK
+      health_check_enabled: true,
+      health_check_path: '/session',
+      health_check_port: String(containerPort),
     });
     
     log.info('Coolify application settings updated', { 
