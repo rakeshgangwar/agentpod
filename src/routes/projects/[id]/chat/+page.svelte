@@ -6,12 +6,14 @@
   import { Button } from "$lib/components/ui/button";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import FilePickerModal from "$lib/components/file-picker-modal.svelte";
+  import ModelSelector from "$lib/components/model-selector.svelte";
   import {
     opencodeListSessions,
     opencodeCreateSession,
     opencodeDeleteSession,
     opencodeFindFiles,
     type Session,
+    type ModelSelection,
   } from "$lib/api/tauri";
   import { confirm } from "@tauri-apps/plugin-dialog";
 
@@ -64,6 +66,9 @@
   let isLoading = $state(true);
   let isCreating = $state(false);
   let error = $state<string | null>(null);
+
+  // Model selection state
+  let selectedModel = $state<ModelSelection | undefined>(undefined);
 
   // Load sessions when project changes
   $effect(() => {
@@ -243,8 +248,20 @@
     <!-- Chat Area -->
     <div class="flex-1 flex flex-col">
       {#if selectedSessionId}
+        <!-- Model Selector Header -->
+        <div class="border-b px-4 py-2 flex items-center justify-between bg-muted/30">
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-muted-foreground">Model:</span>
+            <ModelSelector 
+              {projectId}
+              bind:selectedModel
+              compact={true}
+            />
+          </div>
+        </div>
+        
         {#key selectedSessionId}
-          <react.RuntimeProvider {projectId} sessionId={selectedSessionId}>
+          <react.RuntimeProvider {projectId} sessionId={selectedSessionId} {selectedModel}>
             <react.ChatThread 
               {projectId} 
               {findFiles} 

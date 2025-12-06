@@ -31,6 +31,11 @@ export interface SendMessageInput {
     filename?: string;
     mime?: string;
   }>;
+  /** Optional model selection - if not provided, uses the default model */
+  model?: {
+    providerID: string;
+    modelID: string;
+  };
 }
 
 // =============================================================================
@@ -224,11 +229,24 @@ export const opencode = {
       }
     });
     
+    // Build the body with optional model selection
+    const body: { parts: typeof sdkParts; model?: { providerID: string; modelID: string } } = {
+      parts: sdkParts,
+    };
+    
+    if (input.model) {
+      body.model = input.model;
+      log.info('Sending message with model selection', { 
+        projectId, 
+        sessionId, 
+        provider: input.model.providerID, 
+        model: input.model.modelID 
+      });
+    }
+    
     const result = await client.session.prompt({
       path: { id: sessionId },
-      body: {
-        parts: sdkParts,
-      },
+      body,
     });
     return result.data!;
   },
@@ -336,6 +354,31 @@ export const opencode = {
       config: configResult.data,
       project: projectResult.data,
     };
+  },
+
+  /**
+   * Get configured providers and their models from OpenCode
+   */
+  async getProviders(projectId: string): Promise<unknown> {
+    const { project } = await getClient(projectId);
+    const baseUrl = await getOpenCodeUrl(project);
+    
+    // Make direct HTTP call to the /config/providers endpoint
+    const url = new URL('/config/providers', baseUrl);
+    
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+    });
+    
+    if (!response.ok) {
+      throw new OpenCodeProxyError(
+        `Failed to get providers: ${response.statusText}`,
+        response.status
+      );
+    }
+    
+    return response.json();
   },
 
   // ---------------------------------------------------------------------------

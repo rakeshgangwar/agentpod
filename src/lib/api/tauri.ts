@@ -338,6 +338,29 @@ export interface OpenCodeHealth {
 }
 
 // =============================================================================
+// OpenCode - Provider/Model Types (from OpenCode API)
+// =============================================================================
+
+/** Model info as returned from OpenCode's /config/providers endpoint */
+export interface OpenCodeModel {
+  id: string;
+  name: string;
+}
+
+/** Provider info as returned from OpenCode's /config/providers endpoint */
+export interface OpenCodeProvider {
+  id: string;
+  name: string;
+  models: OpenCodeModel[];
+}
+
+/** Model selection for sending messages */
+export interface ModelSelection {
+  providerId: string;
+  modelId: string;
+}
+
+// =============================================================================
 // OpenCode - App Info & Health Commands
 // =============================================================================
 
@@ -353,6 +376,13 @@ export async function opencodeGetAppInfo(projectId: string): Promise<AppInfo> {
  */
 export async function opencodeHealthCheck(projectId: string): Promise<OpenCodeHealth> {
   return invoke<OpenCodeHealth>("opencode_health_check", { projectId });
+}
+
+/**
+ * Get configured LLM providers and their models for a project
+ */
+export async function opencodeGetProviders(projectId: string): Promise<OpenCodeProvider[]> {
+  return invoke<OpenCodeProvider[]>("opencode_get_providers", { projectId });
 }
 
 // =============================================================================
@@ -407,25 +437,49 @@ export async function opencodeListMessages(projectId: string, sessionId: string)
 
 /**
  * Send a text message to a session
+ * @param projectId - Project ID
+ * @param sessionId - Session ID
+ * @param text - Message text
+ * @param model - Optional model selection (providerId and modelId)
  */
 export async function opencodeSendMessage(
   projectId: string,
   sessionId: string,
-  text: string
+  text: string,
+  model?: ModelSelection
 ): Promise<Message> {
-  return invoke<Message>("opencode_send_message", { projectId, sessionId, text });
+  return invoke<Message>("opencode_send_message", { 
+    projectId, 
+    sessionId, 
+    text,
+    providerId: model?.providerId,
+    modelId: model?.modelId,
+  });
 }
 
 /**
  * Send a message with file attachments
+ * @param projectId - Project ID
+ * @param sessionId - Session ID
+ * @param text - Message text
+ * @param files - Array of file paths
+ * @param model - Optional model selection (providerId and modelId)
  */
 export async function opencodeSendMessageWithFiles(
   projectId: string,
   sessionId: string,
   text: string,
-  files: string[]
+  files: string[],
+  model?: ModelSelection
 ): Promise<Message> {
-  return invoke<Message>("opencode_send_message_with_files", { projectId, sessionId, text, files });
+  return invoke<Message>("opencode_send_message_with_files", { 
+    projectId, 
+    sessionId, 
+    text, 
+    files,
+    providerId: model?.providerId,
+    modelId: model?.modelId,
+  });
 }
 
 /**

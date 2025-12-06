@@ -4,7 +4,7 @@
 //! All communication goes through the Management API proxy.
 
 use crate::models::{
-    AppError, AppInfo, FileContent, FileNode, Message, MessagePartInput,
+    AppError, AppInfo, FileContent, FileNode, Message, MessagePartInput, ModelSelection,
     OpenCodeEvent, OpenCodeHealth, SendMessageInput, Session, StreamConnection,
     StreamEventPayload, StreamStatus, StreamStatusPayload,
 };
@@ -36,6 +36,13 @@ pub async fn opencode_get_app_info(project_id: String) -> Result<AppInfo, AppErr
 pub async fn opencode_health_check(project_id: String) -> Result<OpenCodeHealth, AppError> {
     let client = get_client()?;
     client.opencode_health_check(&project_id).await
+}
+
+/// Get configured LLM providers and their models for a project
+#[tauri::command]
+pub async fn opencode_get_providers(project_id: String) -> Result<serde_json::Value, AppError> {
+    let client = get_client()?;
+    client.opencode_get_providers(&project_id).await
 }
 
 // =============================================================================
@@ -106,8 +113,18 @@ pub async fn opencode_send_message(
     project_id: String,
     session_id: String,
     text: String,
+    provider_id: Option<String>,
+    model_id: Option<String>,
 ) -> Result<Message, AppError> {
     let client = get_client()?;
+
+    let model = match (provider_id, model_id) {
+        (Some(pid), Some(mid)) => Some(ModelSelection {
+            provider_id: pid,
+            model_id: mid,
+        }),
+        _ => None,
+    };
 
     let input = SendMessageInput {
         parts: vec![MessagePartInput {
@@ -117,6 +134,7 @@ pub async fn opencode_send_message(
             filename: None,
             mime: None,
         }],
+        model,
     };
 
     client
@@ -131,6 +149,8 @@ pub async fn opencode_send_message_with_files(
     session_id: String,
     text: String,
     files: Vec<String>, // File paths
+    provider_id: Option<String>,
+    model_id: Option<String>,
 ) -> Result<Message, AppError> {
     let client = get_client()?;
 
@@ -159,7 +179,15 @@ pub async fn opencode_send_message_with_files(
         });
     }
 
-    let input = SendMessageInput { parts };
+    let model = match (provider_id, model_id) {
+        (Some(pid), Some(mid)) => Some(ModelSelection {
+            provider_id: pid,
+            model_id: mid,
+        }),
+        _ => None,
+    };
+
+    let input = SendMessageInput { parts, model };
 
     client
         .opencode_send_message(&project_id, &session_id, input)

@@ -25,11 +25,13 @@ import {
   OpenCodeStream,
   type Message,
   type OpenCodeEvent,
+  type ModelSelection,
 } from "../api/tauri";
 
 interface RuntimeProviderProps {
   projectId: string;
   sessionId?: string;
+  selectedModel?: ModelSelection;
   children: ReactNode;
 }
 
@@ -136,7 +138,7 @@ function convertToThreadMessage(msg: InternalMessage): ThreadMessageLike {
  * RuntimeProvider wraps children with the assistant-ui runtime
  * configured for OpenCode using External Store Runtime.
  */
-export function RuntimeProvider({ projectId, sessionId: initialSessionId, children }: RuntimeProviderProps) {
+export function RuntimeProvider({ projectId, sessionId: initialSessionId, selectedModel, children }: RuntimeProviderProps) {
   // Internal message state (mutable, managed by us)
   const [internalMessages, setInternalMessages] = useState<InternalMessage[]>([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -410,13 +412,13 @@ export function RuntimeProvider({ projectId, sessionId: initialSessionId, childr
 
     try {
       // Send message to OpenCode - response comes via SSE
-      await opencodeSendMessage(projectId, sessionId, textPart.text);
+      await opencodeSendMessage(projectId, sessionId, textPart.text, selectedModel);
     } catch (err) {
       console.error("[RuntimeProvider] Failed to send message:", err);
       setError(err instanceof Error ? err.message : "Failed to send message");
       setIsRunning(false);
     }
-  }, [projectId, sessionId]);
+  }, [projectId, sessionId, selectedModel]);
 
   // Handle cancellation
   const onCancel = useCallback(async () => {

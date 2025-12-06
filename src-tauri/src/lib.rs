@@ -24,7 +24,7 @@ use commands::{
     remove_provider_credentials, set_default_provider,
     list_configured_providers,
     // OpenCode commands
-    opencode_get_app_info, opencode_health_check,
+    opencode_get_app_info, opencode_health_check, opencode_get_providers,
     opencode_list_sessions, opencode_create_session, opencode_get_session,
     opencode_delete_session, opencode_abort_session,
     opencode_list_messages, opencode_send_message, opencode_send_message_with_files,
@@ -85,6 +85,7 @@ pub fn run() {
             // OpenCode commands - App Info & Health
             opencode_get_app_info,
             opencode_health_check,
+            opencode_get_providers,
             // OpenCode commands - Sessions
             opencode_list_sessions,
             opencode_create_session,

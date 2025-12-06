@@ -39,6 +39,25 @@ export const opencodeRoutes = new Hono()
     }
   })
 
+  /**
+   * GET /api/projects/:id/opencode/providers
+   * Get configured LLM providers and their models
+   */
+  .get('/:id/opencode/providers', async (c) => {
+    const projectId = c.req.param('id');
+    
+    try {
+      const providers = await opencode.getProviders(projectId);
+      return c.json(providers);
+    } catch (error) {
+      if (error instanceof OpenCodeProxyError) {
+        return c.json({ error: error.message, details: error.details }, error.statusCode as 400);
+      }
+      log.error('Failed to get OpenCode providers', { projectId, error });
+      return c.json({ error: 'Internal server error' }, 500);
+    }
+  })
+
   // ===========================================================================
   // Sessions
   // ===========================================================================

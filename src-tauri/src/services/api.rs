@@ -240,6 +240,14 @@ impl ApiClient {
         self.handle_response(response).await
     }
 
+    /// Get configured LLM providers and their models for a project
+    pub async fn opencode_get_providers(&self, project_id: &str) -> Result<serde_json::Value, AppError> {
+        let url = format!("{}/api/projects/{}/opencode/providers", self.base_url, project_id);
+        let request = self.add_auth(self.client.get(&url));
+        let response = request.send().await?;
+        self.handle_response(response).await
+    }
+
     // =========================================================================
     // OpenCode - Sessions
     // =========================================================================

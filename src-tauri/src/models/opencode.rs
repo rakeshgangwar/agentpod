@@ -241,10 +241,24 @@ pub struct MessagePartInput {
     pub mime: Option<String>,
 }
 
+/// Model selection for a message
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelSelection {
+    #[serde(rename = "providerID")]
+    pub provider_id: String,
+    #[serde(rename = "modelID")]
+    pub model_id: String,
+}
+
 /// Input for sending a message
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SendMessageInput {
     pub parts: Vec<MessagePartInput>,
+    /// Optional model selection - if not provided, uses the default model
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<ModelSelection>,
 }
 
 // =============================================================================
