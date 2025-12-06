@@ -14,7 +14,58 @@ import { createLogger } from '../utils/logger.ts';
 const log = createLogger('models-dev');
 
 // =============================================================================
-// Types - Models.dev API Response
+// Types - Models.dev API Response (Raw)
+// =============================================================================
+
+/**
+ * Raw API response format from models.dev/api.json
+ * The API returns an object keyed by provider ID, not an array
+ */
+interface ModelsDevApiResponse {
+  [providerId: string]: ModelsDevProviderRaw;
+}
+
+interface ModelsDevProviderRaw {
+  id: string;
+  name: string;
+  env?: string[];
+  npm?: string;
+  doc?: string;
+  api?: string;
+  models: {
+    [modelId: string]: ModelsDevModelRaw;
+  };
+}
+
+interface ModelsDevModelRaw {
+  id: string;
+  name: string;
+  attachment?: boolean;
+  reasoning?: boolean;
+  tool_call?: boolean;
+  temperature?: boolean;
+  knowledge?: string;
+  release_date?: string;
+  last_updated?: string;
+  modalities?: {
+    input?: string[];
+    output?: string[];
+  };
+  open_weights?: boolean;
+  cost?: {
+    input: number;
+    output: number;
+    cache_read?: number;
+    cache_write?: number;
+  };
+  limit?: {
+    context: number;
+    output: number;
+  };
+}
+
+// =============================================================================
+// Types - Normalized (for internal use)
 // =============================================================================
 
 export interface ModelsDevProvider {
@@ -34,12 +85,9 @@ export interface ModelsDevModel {
   pricing: {
     input: number;
     output: number;
-    request?: number;
   };
-  trainingData?: string;
   image?: boolean;
   video?: boolean;
-  object?: boolean;
   tools?: boolean;
   streaming?: boolean;
 }
@@ -157,7 +205,37 @@ export const modelsDev = {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const providers = await response.json() as ModelsDevProvider[];
+      // API returns an object keyed by provider ID, not an array
+      const rawData = await response.json() as ModelsDevApiResponse;
+      
+      // Transform to normalized array format
+      const providers = Object.entries(rawData).map(([providerId, rawProvider]) => {
+        // Transform models from object to array
+        const models: ModelsDevModel[] = Object.entries(rawProvider.models || {}).map(([modelId, rawModel]) => ({
+          id: modelId,
+          name: rawModel.name || modelId,
+          provider: providerId,
+          context: rawModel.limit?.context || 0,
+          maxOutput: rawModel.limit?.output || 0,
+          pricing: {
+            input: rawModel.cost?.input || 0,
+            output: rawModel.cost?.output || 0,
+          },
+          // Derive capabilities from modalities and fields
+          image: rawModel.modalities?.input?.includes('image') || rawModel.attachment || false,
+          video: rawModel.modalities?.input?.includes('video') || false,
+          tools: rawModel.tool_call || false,
+          streaming: true, // Most models support streaming
+        }));
+
+        return {
+          id: providerId,
+          name: rawProvider.name || providerId,
+          apiKeyEnvVar: rawProvider.env?.[0], // Use first env var as the primary one
+          npm: rawProvider.npm,
+          models,
+        } as ModelsDevProvider;
+      });
       
       // Cache the result
       cache = {
