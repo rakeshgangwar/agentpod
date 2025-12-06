@@ -85,19 +85,9 @@
       .replace(/'/g, "&#039;");
   }
 
-  // Normalize language for Shiki
+  // Shiki handles language detection - just pass directly
   function normalizeLanguage(lang: string): string {
-    const langMap: Record<string, string> = {
-      js: "javascript",
-      ts: "typescript",
-      py: "python",
-      rb: "ruby",
-      sh: "bash",
-      yml: "yaml",
-      md: "markdown",
-      rs: "rust",
-    };
-    return langMap[lang.toLowerCase()] || lang.toLowerCase() || "plaintext";
+    return lang.toLowerCase() || "plaintext";
   }
 
   // Re-render when content changes

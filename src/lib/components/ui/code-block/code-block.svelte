@@ -23,106 +23,20 @@
   let isLoading = $state(true);
   let error = $state<string | null>(null);
 
-  // Languages supported by Shiki
-  const supportedLanguages = new Set<string>([
-    "javascript", "typescript", "jsx", "tsx", "json", "jsonc", "json5",
-    "html", "css", "scss", "sass", "less", "xml",
-    "markdown", "mdx", "yaml", "toml",
-    "python", "rust", "go", "java", "kotlin", "swift", "c", "cpp", "csharp", "ruby", "php",
-    "bash", "fish", "powershell", "sql",
-    "dockerfile", "makefile", "nginx",
-    "svelte", "vue", "graphql", "prisma"
-  ]);
-
-  // Map common file extensions to shiki language names
-  function normalizeLanguage(lang: string): string {
-    const langMap: Record<string, string> = {
-      // JavaScript/TypeScript
-      js: "javascript",
-      jsx: "jsx",
-      ts: "typescript",
-      tsx: "tsx",
-      mjs: "javascript",
-      cjs: "javascript",
-      // Web
-      html: "html",
-      htm: "html",
-      css: "css",
-      scss: "scss",
-      sass: "sass",
-      less: "less",
-      // Data formats
-      json: "json",
-      jsonc: "jsonc",
-      json5: "json5",
-      yaml: "yaml",
-      yml: "yaml",
-      toml: "toml",
-      xml: "xml",
-      // Markdown
-      md: "markdown",
-      mdx: "mdx",
-      // Programming languages
-      py: "python",
-      python: "python",
-      rs: "rust",
-      rust: "rust",
-      go: "go",
-      java: "java",
-      kt: "kotlin",
-      kotlin: "kotlin",
-      swift: "swift",
-      c: "c",
-      cpp: "cpp",
-      "c++": "cpp",
-      h: "c",
-      hpp: "cpp",
-      cs: "csharp",
-      csharp: "csharp",
-      rb: "ruby",
-      ruby: "ruby",
-      php: "php",
-      // Shell
-      sh: "bash",
-      bash: "bash",
-      zsh: "bash",
-      fish: "fish",
-      ps1: "powershell",
-      powershell: "powershell",
-      // Database
-      sql: "sql",
-      // Config
-      dockerfile: "dockerfile",
-      docker: "dockerfile",
-      makefile: "makefile",
-      make: "makefile",
-      nginx: "nginx",
-      // Svelte/Vue/React
-      svelte: "svelte",
-      vue: "vue",
-      // Other
-      graphql: "graphql",
-      gql: "graphql",
-      prisma: "prisma",
-    };
-
-    const normalized = lang.toLowerCase();
-    const mapped = langMap[normalized] || normalized;
-    
-    // Return the language if supported, otherwise fallback to plaintext
-    return supportedLanguages.has(mapped) ? mapped : "plaintext";
-  }
+  // Shiki supports 200+ languages - just pass the language/extension directly
+  // It will handle detection and fallback to plaintext for unknown languages
 
   async function highlightCode() {
     isLoading = true;
     error = null;
 
     try {
-      const normalizedLang = normalizeLanguage(language);
-      
       // Use dual themes for automatic light/dark mode support
+      // Shiki handles language detection - pass extension directly
+      const lang = language.toLowerCase() || "plaintext";
+      
       const html = await codeToHtml(code, {
-        lang: normalizedLang,
+        lang,
         themes: {
           light: lightTheme,
           dark: darkTheme,
@@ -132,10 +46,23 @@
 
       highlightedHtml = html;
     } catch (err) {
-      console.error("Shiki highlighting error:", err);
-      error = err instanceof Error ? err.message : "Failed to highlight code";
-      // Fallback to plain text
-      highlightedHtml = `<pre class="shiki"><code>${escapeHtml(code)}</code></pre>`;
+      // If language is not supported, try plaintext
+      console.warn(`Shiki: language "${language}" not supported, falling back to plaintext`);
+      try {
+        const html = await codeToHtml(code, {
+          lang: "plaintext",
+          themes: {
+            light: lightTheme,
+            dark: darkTheme,
+          },
+          defaultColor: false,
+        });
+        highlightedHtml = html;
+      } catch {
+        // Final fallback to raw HTML
+        error = err instanceof Error ? err.message : "Failed to highlight code";
+        highlightedHtml = `<pre class="shiki"><code>${escapeHtml(code)}</code></pre>`;
+      }
     } finally {
       isLoading = false;
     }

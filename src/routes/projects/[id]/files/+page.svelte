@@ -207,77 +207,9 @@
   }
 
   function getLanguage(filename: string): string {
-    const ext = filename.split(".").pop()?.toLowerCase();
-    switch (ext) {
-      case "ts":
-      case "tsx":
-        return "typescript";
-      case "js":
-      case "jsx":
-        return "javascript";
-      case "svelte":
-        return "svelte";
-      case "rs":
-        return "rust";
-      case "py":
-        return "python";
-      case "go":
-        return "go";
-      case "java":
-        return "java";
-      case "kt":
-        return "kotlin";
-      case "rb":
-        return "ruby";
-      case "php":
-        return "php";
-      case "c":
-      case "h":
-        return "c";
-      case "cpp":
-      case "cc":
-      case "cxx":
-      case "hpp":
-        return "cpp";
-      case "cs":
-        return "csharp";
-      case "swift":
-        return "swift";
-      case "json":
-        return "json";
-      case "md":
-      case "mdx":
-        return "markdown";
-      case "css":
-        return "css";
-      case "scss":
-        return "scss";
-      case "html":
-      case "htm":
-        return "html";
-      case "xml":
-        return "xml";
-      case "toml":
-        return "toml";
-      case "yaml":
-      case "yml":
-        return "yaml";
-      case "sh":
-      case "bash":
-      case "zsh":
-        return "bash";
-      case "sql":
-        return "sql";
-      case "dockerfile":
-        return "dockerfile";
-      case "graphql":
-      case "gql":
-        return "graphql";
-      case "vue":
-        return "vue";
-      default:
-        return "plaintext";
-    }
+    // Just return the file extension - let Shiki handle language detection
+    // Shiki supports 200+ languages and knows their extensions
+    return filename.split(".").pop()?.toLowerCase() || "plaintext";
   }
 
   // Sort nodes: directories first, then alphabetically
