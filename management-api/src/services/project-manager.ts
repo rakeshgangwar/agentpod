@@ -33,9 +33,9 @@ const log = createLogger('project-manager');
 
 const OPENCODE_DOCKERFILE = `FROM node:20-slim
 
-# Install required packages
+# Install required packages (including jq for JSON parsing)
 RUN apt-get update && \\
-    apt-get install -y git curl && \\
+    apt-get install -y git curl jq && \\
     rm -rf /var/lib/apt/lists/*
 
 # Install OpenCode globally
@@ -55,6 +55,22 @@ RUN printf '%s\\n' \\
     '' \\
     'echo "=== OpenCode Container Starting ==="' \\
     '' \\
+    '# Create auth.json for OpenCode authentication' \\
+    'OPENCODE_DATA_DIR="\${HOME}/.local/share/opencode"' \\
+    'AUTH_FILE="\${OPENCODE_DATA_DIR}/auth.json"' \\
+    'mkdir -p "\$OPENCODE_DATA_DIR"' \\
+    '' \\
+    '# If OPENCODE_AUTH_JSON is provided, write it directly to auth.json' \\
+    'if [ -n "\$OPENCODE_AUTH_JSON" ]; then' \\
+    '    echo "Writing auth.json from OPENCODE_AUTH_JSON..."' \\
+    '    echo "\$OPENCODE_AUTH_JSON" > "\$AUTH_FILE"' \\
+    '    echo "Providers configured: \$(cat \$AUTH_FILE | jq -c keys 2>/dev/null || echo unknown)"' \\
+    'else' \\
+    '    echo "No OPENCODE_AUTH_JSON provided. Starting with empty auth."' \\
+    '    echo "{}" > "\$AUTH_FILE"' \\
+    'fi' \\
+    '' \\
+    '# Clone repository' \\
     'if [ ! -d "/workspace/.git" ] && [ -n "\$FORGEJO_REPO_URL" ]; then' \\
     '    echo "Cloning repository from Forgejo..."' \\
     '    if [ -n "\$FORGEJO_USER" ] && [ -n "\$FORGEJO_TOKEN" ]; then' \\
