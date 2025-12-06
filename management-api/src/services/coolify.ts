@@ -308,11 +308,11 @@ export const coolify = {
   /**
    * Update application Dockerfile
    * Use this to update the Dockerfile content for an existing application
+   * Note: For PATCH, Coolify expects the raw Dockerfile content, not base64 encoded
    */
   async updateDockerfile(uuid: string, dockerfile: string): Promise<void> {
-    const dockerfileBase64 = Buffer.from(dockerfile).toString('base64');
     await request<unknown>('PATCH', `/applications/${uuid}`, {
-      dockerfile: dockerfileBase64,
+      dockerfile: dockerfile,
     });
   },
 
