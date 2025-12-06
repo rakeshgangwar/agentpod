@@ -177,9 +177,10 @@ RUN echo "${ENTRYPOINT_BASE64}" | base64 -d > /entrypoint.sh && chmod +x /entryp
 # Expose OpenCode port
 EXPOSE 4096
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \\
-    CMD curl -f http://localhost:\${OPENCODE_PORT}/session || exit 1
+# Health check - use /app endpoint which is simpler and always available
+# Increased start-period to give OpenCode time to fully initialize
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=5 \\
+    CMD curl -sf http://localhost:\${OPENCODE_PORT}/app || exit 1
 
 ENTRYPOINT ["/entrypoint.sh"]
 `;
