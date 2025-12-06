@@ -405,6 +405,69 @@ export async function getProjectWithStatus(projectId: string): Promise<ProjectWi
   }
 }
 
+/**
+ * Get container logs for a project
+ * @param projectId - Project ID
+ * @param lines - Number of lines to return (default 100)
+ * @returns Log output as a string
+ */
+export async function getProjectLogs(projectId: string, lines: number = 100): Promise<string> {
+  const project = getProjectById(projectId);
+  if (!project) {
+    throw new ProjectNotFoundError(projectId);
+  }
+  
+  log.info('Getting project logs', { projectId, lines });
+  
+  try {
+    const logs = await coolify.getApplicationLogs(project.coolifyAppUuid, lines);
+    return logs;
+  } catch (error) {
+    log.error('Failed to get project logs', { projectId, error });
+    throw error;
+  }
+}
+
+/**
+ * Deploy/rebuild a project's container
+ * Triggers a new build for Dockerfile-based containers
+ * @param projectId - Project ID
+ * @param force - Force deployment even if no changes (default false)
+ * @returns Deployment info
+ */
+export async function deployProject(
+  projectId: string,
+  force: boolean = false
+): Promise<{ message: string; deploymentId?: string }> {
+  const project = getProjectById(projectId);
+  if (!project) {
+    throw new ProjectNotFoundError(projectId);
+  }
+  
+  log.info('Deploying project', { projectId, name: project.name, force });
+  
+  try {
+    const result = await coolify.deployApplication(project.coolifyAppUuid, force);
+    
+    // Extract deployment info from the response
+    const deployment = result.deployments?.[0];
+    
+    log.info('Project deployment triggered', { 
+      projectId, 
+      deploymentId: deployment?.deployment_uuid,
+      message: deployment?.message 
+    });
+    
+    return {
+      message: deployment?.message ?? 'Deployment triggered',
+      deploymentId: deployment?.deployment_uuid,
+    };
+  } catch (error) {
+    log.error('Failed to deploy project', { projectId, error });
+    throw error;
+  }
+}
+
 // =============================================================================
 // Credential Injection
 // =============================================================================

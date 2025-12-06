@@ -4,6 +4,7 @@
  */
 
 import { Hono } from 'hono';
+import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import {
@@ -19,6 +20,8 @@ import {
   getProjectWithStatus,
   deleteProjectFully,
   updateProjectCredentials,
+  getProjectLogs,
+  deployProject,
 } from '../services/project-manager.ts';
 import { ApiError, ProjectNotFoundError } from '../utils/errors.ts';
 
@@ -58,6 +61,32 @@ export const projectRoutes = new Hono()
   })
 
   /**
+   * GET /api/projects/:id/logs
+   * Get container logs for project
+   * Query params:
+   *   - lines: Number of log lines to return (default 100, max 1000)
+   * NOTE: This must come BEFORE /:id to avoid being caught by the catch-all
+   */
+  .get('/:id/logs', async (c) => {
+    const id = c.req.param('id');
+    const linesParam = c.req.query('lines');
+    const lines = Math.min(Math.max(parseInt(linesParam || '100', 10) || 100, 1), 1000);
+    
+    try {
+      const logs = await getProjectLogs(id, lines);
+      return c.json({ logs, lines });
+    } catch (error) {
+      if (error instanceof ProjectNotFoundError) {
+        return c.json({ error: error.message }, 404);
+      }
+      if (error instanceof ApiError) {
+        return c.json({ error: error.message }, error.statusCode as ContentfulStatusCode);
+      }
+      throw error;
+    }
+  })
+
+  /**
    * GET /api/projects/:id
    * Get project by ID with live container status
    */
@@ -93,7 +122,7 @@ export const projectRoutes = new Hono()
       return c.json({ project }, 201);
     } catch (error) {
       if (error instanceof ApiError) {
-        return c.json({ error: error.message, details: error.details }, error.statusCode);
+        return c.json({ error: error.message, details: error.details }, error.statusCode as ContentfulStatusCode);
       }
       throw error;
     }
@@ -160,7 +189,7 @@ export const projectRoutes = new Hono()
         return c.json({ error: error.message }, 404);
       }
       if (error instanceof ApiError) {
-        return c.json({ error: error.message }, error.statusCode);
+        return c.json({ error: error.message }, error.statusCode as ContentfulStatusCode);
       }
       throw error;
     }
@@ -181,7 +210,7 @@ export const projectRoutes = new Hono()
         return c.json({ error: error.message }, 404);
       }
       if (error instanceof ApiError) {
-        return c.json({ error: error.message }, error.statusCode);
+        return c.json({ error: error.message }, error.statusCode as ContentfulStatusCode);
       }
       throw error;
     }
@@ -202,7 +231,7 @@ export const projectRoutes = new Hono()
         return c.json({ error: error.message }, 404);
       }
       if (error instanceof ApiError) {
-        return c.json({ error: error.message }, error.statusCode);
+        return c.json({ error: error.message }, error.statusCode as ContentfulStatusCode);
       }
       throw error;
     }
@@ -226,7 +255,47 @@ export const projectRoutes = new Hono()
         return c.json({ error: error.message }, 404);
       }
       if (error instanceof ApiError) {
-        return c.json({ error: error.message }, error.statusCode);
+        return c.json({ error: error.message }, error.statusCode as ContentfulStatusCode);
+      }
+      throw error;
+    }
+  })
+
+  /**
+   * POST /api/projects/:id/deploy
+   * Trigger a deployment/rebuild of the project container
+   * Body (optional):
+   *   - force: Force deployment even if no changes (default false)
+   */
+  .post('/:id/deploy', zValidator('json', z.object({
+    force: z.boolean().optional().default(false),
+  }).optional()), async (c) => {
+    const id = c.req.param('id');
+    
+    // Handle optional body
+    let force = false;
+    try {
+      const body = await c.req.json();
+      if (body && typeof body.force === 'boolean') {
+        force = body.force;
+      }
+    } catch {
+      // No body provided, use default
+    }
+    
+    try {
+      const result = await deployProject(id, force);
+      return c.json({ 
+        success: true, 
+        message: result.message,
+        deploymentId: result.deploymentId,
+      });
+    } catch (error) {
+      if (error instanceof ProjectNotFoundError) {
+        return c.json({ error: error.message }, 404);
+      }
+      if (error instanceof ApiError) {
+        return c.json({ error: error.message }, error.statusCode as ContentfulStatusCode);
       }
       throw error;
     }

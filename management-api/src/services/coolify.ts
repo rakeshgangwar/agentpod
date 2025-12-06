@@ -343,6 +343,40 @@ export const coolify = {
     return request<{ deployments: Array<{ message: string; resource_uuid: string; deployment_uuid: string }> }>('GET', `/deploy?uuid=${uuid}${forceParam}`);
   },
   
+  /**
+   * Get container logs for an application
+   * Returns stdout/stderr logs from the running container
+   * See: https://coolify.io/docs/api-reference/api/operations/get-logs-by-application-uuid
+   * 
+   * @param uuid - Application UUID
+   * @param lines - Number of lines to return (default 100)
+   * @returns Log output as a string
+   */
+  async getApplicationLogs(uuid: string, lines: number = 100): Promise<string> {
+    const response = await request<{ logs?: string | string[]; stdout?: string; stderr?: string } | string>(
+      'GET', 
+      `/applications/${uuid}/logs?lines=${lines}`
+    );
+    
+    // The Coolify API can return logs in different formats:
+    // 1. Direct string
+    // 2. { logs: string | string[] }
+    // 3. { stdout: string, stderr: string }
+    if (typeof response === 'string') {
+      return response;
+    }
+    
+    if (response.logs) {
+      return Array.isArray(response.logs) ? response.logs.join('\n') : response.logs;
+    }
+    
+    if (response.stdout || response.stderr) {
+      return [response.stdout, response.stderr].filter(Boolean).join('\n');
+    }
+    
+    return '';
+  },
+  
   // ---------------------------------------------------------------------------
   // Environment Variables
   // ---------------------------------------------------------------------------
