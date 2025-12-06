@@ -147,7 +147,7 @@ export function createOpenCodeAdapter(projectId: string, initialSessionId?: stri
                 }
               }
               
-              // Handle tool invocations
+              // Handle tool invocations (legacy format: tool-invocation)
               if (part?.type === "tool-invocation") {
                 const toolInvocation = part.toolInvocation as Record<string, unknown> | undefined;
                 if (toolInvocation?.toolCallId && typeof toolInvocation.toolCallId === "string") {
@@ -157,6 +157,26 @@ export function createOpenCodeAdapter(projectId: string, initialSessionId?: stri
                     args: toolInvocation.args,
                     state: (toolInvocation.state as "pending" | "running" | "complete" | "error") || "running",
                     result: toolInvocation.result,
+                  };
+                  streamState.toolCalls.set(toolCall.id, toolCall);
+                  console.log('[OpenCode Adapter] Tool call (legacy):', toolCall.name, toolCall.state);
+                }
+              }
+              
+              // Handle tool parts (current OpenCode format: type: "tool")
+              if (part?.type === "tool") {
+                const callID = part.callID as string | undefined;
+                const toolName = part.tool as string | undefined;
+                const state = part.state as Record<string, unknown> | undefined;
+                
+                if (callID && toolName) {
+                  const status = state?.status as string | undefined;
+                  const toolCall: ToolCall = {
+                    id: callID,
+                    name: toolName,
+                    args: state?.input,
+                    state: status === "completed" ? "complete" : status === "error" ? "error" : "running",
+                    result: state?.output,
                   };
                   streamState.toolCalls.set(toolCall.id, toolCall);
                   console.log('[OpenCode Adapter] Tool call:', toolCall.name, toolCall.state);
@@ -393,19 +413,63 @@ export async function loadMessageHistory(
 
 /**
  * Convert OpenCode messages to assistant-ui format
+ * Includes both text and tool-call parts for proper history display
  */
 export function convertToAssistantMessages(messages: Message[]): Array<{
   role: "user" | "assistant";
-  content: Array<{ type: "text"; text: string }>;
+  content: Array<
+    | { type: "text"; text: string }
+    | { type: "tool-call"; toolCallId: string; toolName: string; args: Record<string, unknown>; argsText: string; result?: unknown }
+  >;
 }> {
   return messages.map((msg) => {
-    const textParts = msg.parts
-      .filter((part) => part.type === "text" && part.text)
-      .map((part) => ({ type: "text" as const, text: part.text! }));
+    const contentParts: Array<
+      | { type: "text"; text: string }
+      | { type: "tool-call"; toolCallId: string; toolName: string; args: Record<string, unknown>; argsText: string; result?: unknown }
+    > = [];
+    
+    for (const part of msg.parts) {
+      // Handle text parts
+      if (part.type === "text" && part.text) {
+        contentParts.push({ type: "text" as const, text: part.text });
+      }
+      
+      // Handle tool parts (OpenCode format)
+      if (part.type === "tool" && part.callID && part.tool) {
+        const args = (part.state?.input ?? {}) as Record<string, unknown>;
+        contentParts.push({
+          type: "tool-call" as const,
+          toolCallId: part.callID,
+          toolName: part.tool,
+          args,
+          argsText: JSON.stringify(args),
+          result: part.state?.output,
+        });
+      }
+      
+      // Handle tool-invocation parts (legacy format)
+      if (part.type === "tool-invocation" && part.toolInvocation) {
+        const ti = part.toolInvocation;
+        const args = (ti.args ?? {}) as Record<string, unknown>;
+        contentParts.push({
+          type: "tool-call" as const,
+          toolCallId: ti.toolCallId,
+          toolName: ti.toolName,
+          args,
+          argsText: JSON.stringify(args),
+          result: ti.result,
+        });
+      }
+    }
+    
+    // Ensure we always have at least one content part
+    if (contentParts.length === 0) {
+      contentParts.push({ type: "text", text: "" });
+    }
 
     return {
       role: msg.info.role,
-      content: textParts.length > 0 ? textParts : [{ type: "text", text: "" }],
+      content: contentParts,
     };
   });
 }

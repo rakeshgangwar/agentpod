@@ -45,6 +45,9 @@ importers:
       '@lucide/svelte':
         specifier: ^0.544.0
         version: 0.544.0(svelte@5.45.5)
+      '@opencode-ai/sdk':
+        specifier: ^1.0.134
+        version: 1.0.134
       '@sveltejs/adapter-static':
         specifier: ^3.0.6
         version: 3.0.10(@sveltejs/kit@2.49.1(@sveltejs/vite-plugin-svelte@5.1.1(svelte@5.45.5)(vite@6.4.1(jiti@2.6.1)(lightningcss@1.30.2)))(svelte@5.45.5)(vite@6.4.1(jiti@2.6.1)(lightningcss@1.30.2)))
@@ -346,6 +349,9 @@ packages:
     resolution: {integrity: sha512-9f9O6uxng2pLB01sxNySHduJN3HTl5p0HDu4H26VR51vhZfiMzyOMe9Mhof3XAk4l813eTtl+/DYRvGyoRR+yw==}
     peerDependencies:
       svelte: ^5
+
+  '@opencode-ai/sdk@1.0.134':
+    resolution: {integrity: sha512-9dc75GjcKQBikfCKVdxGKe1dlaatnSzdOl0FsxcGyY32vbO8y071D7IUZdcwlaI/OaS5ztgRot++Y3l7suu34A==}
 
   '@polka/url@1.0.0-next.29':
     resolution: {integrity: sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==}
@@ -1930,6 +1936,8 @@ snapshots:
   '@lucide/svelte@0.544.0(svelte@5.45.5)':
     dependencies:
       svelte: 5.45.5
+
+  '@opencode-ai/sdk@1.0.134': {}
 
   '@polka/url@1.0.0-next.29': {}
 
