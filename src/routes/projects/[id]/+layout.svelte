@@ -1,11 +1,14 @@
 <script lang="ts">
   import { page } from "$app/stores";
   import { goto } from "$app/navigation";
+  import { toast } from "svelte-sonner";
   import { connection } from "$lib/stores/connection.svelte";
   import { projects, fetchProjects, startProject, stopProject, getProject } from "$lib/stores/projects.svelte";
+  import * as api from "$lib/api/tauri";
   import { Button } from "$lib/components/ui/button";
   import { Badge } from "$lib/components/ui/badge";
   import * as Tabs from "$lib/components/ui/tabs";
+  import * as Dialog from "$lib/components/ui/dialog";
 
   let { children } = $props();
 
@@ -27,9 +30,44 @@
     const path = $page.url.pathname;
     if (path.includes("/chat")) return "chat";
     if (path.includes("/files")) return "files";
+    if (path.includes("/logs")) return "logs";
     if (path.includes("/sync")) return "sync";
     return "chat";
   });
+
+  // Deploy state
+  let isDeploying = $state(false);
+  let deployError = $state<string | null>(null);
+  let showDeployDialog = $state(false);
+
+  async function handleDeploy(force: boolean = false) {
+    if (!project) return;
+    
+    isDeploying = true;
+    deployError = null;
+    
+    try {
+      const result = await api.deployProject(project.id, force);
+      showDeployDialog = false;
+      
+      // Show success toast with deployment info
+      toast.success("Deployment triggered", {
+        description: result.deploymentId 
+          ? `Deployment ID: ${result.deploymentId.slice(0, 8)}...` 
+          : "Container is being rebuilt",
+      });
+      
+      // Refresh project to get updated status
+      await fetchProjects();
+    } catch (e) {
+      deployError = e instanceof Error ? e.message : "Deploy failed";
+      toast.error("Deployment failed", {
+        description: deployError,
+      });
+    } finally {
+      isDeploying = false;
+    }
+  }
 
   // Load projects if not already loaded
   $effect(() => {
@@ -84,14 +122,48 @@
               Stop
             </Button>
           {/if}
+          <Button size="sm" variant="outline" onclick={() => showDeployDialog = true}>
+            Deploy
+          </Button>
         </div>
       </div>
 
+      <!-- Deploy Confirmation Dialog -->
+      <Dialog.Root bind:open={showDeployDialog}>
+        <Dialog.Content>
+          <Dialog.Header>
+            <Dialog.Title>Deploy Project</Dialog.Title>
+            <Dialog.Description>
+              This will rebuild and redeploy the container. The project will be temporarily unavailable during deployment.
+            </Dialog.Description>
+          </Dialog.Header>
+          
+          {#if deployError}
+            <div class="text-sm p-3 rounded-md bg-destructive/10 text-destructive">
+              {deployError}
+            </div>
+          {/if}
+          
+          <Dialog.Footer>
+            <Button variant="outline" onclick={() => showDeployDialog = false} disabled={isDeploying}>
+              Cancel
+            </Button>
+            <Button onclick={() => handleDeploy(false)} disabled={isDeploying}>
+              {isDeploying ? "Deploying..." : "Deploy"}
+            </Button>
+            <Button variant="secondary" onclick={() => handleDeploy(true)} disabled={isDeploying}>
+              {isDeploying ? "Deploying..." : "Force Deploy"}
+            </Button>
+          </Dialog.Footer>
+        </Dialog.Content>
+      </Dialog.Root>
+
       <!-- Tabs Navigation -->
       <Tabs.Root value={currentTab()} onValueChange={handleTabChange}>
-        <Tabs.List class="grid w-full grid-cols-3 max-w-md">
+        <Tabs.List class="grid w-full grid-cols-4 max-w-lg">
           <Tabs.Trigger value="chat">Chat</Tabs.Trigger>
           <Tabs.Trigger value="files">Files</Tabs.Trigger>
+          <Tabs.Trigger value="logs">Logs</Tabs.Trigger>
           <Tabs.Trigger value="sync">Sync</Tabs.Trigger>
         </Tabs.List>
       </Tabs.Root>

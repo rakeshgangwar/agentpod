@@ -14,6 +14,10 @@ use commands::{
     // Project commands
     list_projects, get_project, create_project, delete_project,
     start_project, stop_project, restart_project,
+    get_project_logs, deploy_project,
+    // Settings commands
+    get_settings, save_settings, list_providers, get_default_provider,
+    export_settings, import_settings,
     // OpenCode commands
     opencode_get_app_info, opencode_health_check,
     opencode_list_sessions, opencode_create_session, opencode_get_session,
@@ -39,6 +43,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![
             // Connection commands
             connect,
@@ -53,6 +59,15 @@ pub fn run() {
             start_project,
             stop_project,
             restart_project,
+            get_project_logs,
+            deploy_project,
+            // Settings commands
+            get_settings,
+            save_settings,
+            list_providers,
+            get_default_provider,
+            export_settings,
+            import_settings,
             // OpenCode commands - App Info & Health
             opencode_get_app_info,
             opencode_health_check,

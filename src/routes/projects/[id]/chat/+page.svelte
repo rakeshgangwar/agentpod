@@ -9,9 +9,20 @@
     opencodeListSessions,
     opencodeCreateSession,
     opencodeDeleteSession,
+    opencodeFindFiles,
     type Session,
   } from "$lib/api/tauri";
   import { confirm } from "@tauri-apps/plugin-dialog";
+
+  // File finder wrapper for ChatThread
+  async function findFiles(projectId: string, pattern: string): Promise<string[]> {
+    try {
+      return await opencodeFindFiles(projectId, pattern);
+    } catch (err) {
+      console.error("Failed to find files:", err);
+      return [];
+    }
+  }
 
   // Wrap React components for use in Svelte
   const react = sveltify({ RuntimeProvider, ChatThread });
@@ -206,7 +217,7 @@
       {#if selectedSessionId}
         {#key selectedSessionId}
           <react.RuntimeProvider {projectId} sessionId={selectedSessionId}>
-            <react.ChatThread />
+            <react.ChatThread {projectId} {findFiles} />
           </react.RuntimeProvider>
         {/key}
       {:else}

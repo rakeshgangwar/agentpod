@@ -8,6 +8,8 @@
     "opener:default",
     "oauth:allow-start",
     "oauth:allow-cancel",
-    "dialog:default"
+    "dialog:default",
+    "notification:default",
+    "fs:default"
   ]
 }

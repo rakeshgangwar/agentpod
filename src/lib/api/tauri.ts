@@ -156,6 +156,30 @@ export async function restartProject(id: string): Promise<Project> {
   return invoke<Project>("restart_project", { id });
 }
 
+/**
+ * Get container logs for a project
+ * @param id Project ID
+ * @param lines Number of log lines to return (default 100, max 1000)
+ */
+export async function getProjectLogs(id: string, lines?: number): Promise<string> {
+  return invoke<string>("get_project_logs", { id, lines });
+}
+
+export interface DeployResponse {
+  success: boolean;
+  message: string;
+  deploymentId?: string;
+}
+
+/**
+ * Deploy/rebuild a project container
+ * @param id Project ID
+ * @param force Force deployment even if no changes (default false)
+ */
+export async function deployProject(id: string, force?: boolean): Promise<DeployResponse> {
+  return invoke<DeployResponse>("deploy_project", { id, force });
+}
+
 // =============================================================================
 // OpenCode Types
 // =============================================================================
@@ -518,6 +542,85 @@ export async function onStreamStatus(
     callback(event.payload);
   });
 }
+
+// =============================================================================
+// Settings Types
+// =============================================================================
+
+export type Theme = "light" | "dark" | "system";
+
+export interface AppSettings {
+  theme: Theme;
+  defaultProviderId: string | null;
+  autoRefreshInterval: number;
+  inAppNotifications: boolean;
+  systemNotifications: boolean;
+}
+
+export interface Provider {
+  id: string;
+  name: string;
+  type: string; // "api-key" or "oauth"
+  isConfigured: boolean;
+  isDefault: boolean;
+}
+
+export interface ExportData {
+  version: string;
+  exportedAt: string;
+  settings: AppSettings;
+  apiUrl: string | null;
+}
+
+// =============================================================================
+// Settings Commands
+// =============================================================================
+
+/**
+ * Get current app settings from local storage
+ */
+export async function getSettings(): Promise<AppSettings> {
+  return invoke<AppSettings>("get_settings");
+}
+
+/**
+ * Save app settings to local storage
+ */
+export async function saveSettings(settings: AppSettings): Promise<void> {
+  return invoke("save_settings", { settings });
+}
+
+/**
+ * List LLM providers from Management API
+ */
+export async function listProviders(): Promise<Provider[]> {
+  return invoke<Provider[]>("list_providers");
+}
+
+/**
+ * Get the default LLM provider from Management API
+ */
+export async function getDefaultProvider(): Promise<Provider | null> {
+  return invoke<Provider | null>("get_default_provider");
+}
+
+/**
+ * Export settings to a JSON string for backup/transfer
+ */
+export async function exportSettings(): Promise<string> {
+  return invoke<string>("export_settings");
+}
+
+/**
+ * Import settings from a JSON string
+ */
+export async function importSettings(json: string): Promise<AppSettings> {
+  return invoke<AppSettings>("import_settings", { json });
+}
+
+// =============================================================================
+// Stream Helper Class
+// =============================================================================
 
 /**
  * Helper class for managing a stream connection with automatic cleanup

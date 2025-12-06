@@ -3,9 +3,11 @@
 
 pub mod error;
 pub mod opencode;
+pub mod settings;
 
 pub use error::AppError;
 pub use opencode::*;
+pub use settings::*;
 use serde::{Deserialize, Serialize};
 
 /// Project status enum
@@ -124,4 +126,13 @@ pub struct SuccessResponse {
 pub struct ErrorResponse {
     pub error: String,
     pub details: Option<String>,
+}
+
+/// Deploy response from API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeployResponse {
+    pub success: bool,
+    pub message: String,
+    pub deployment_id: Option<String>,
 }

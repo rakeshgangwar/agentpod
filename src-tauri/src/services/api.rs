@@ -3,9 +3,9 @@
 //! This module provides a typed HTTP client for all Management API operations.
 
 use crate::models::{
-    AppError, AppInfo, ConnectionConfig, CreateProjectInput, ErrorResponse, FileContent, FileNode,
-    HealthResponse, Message, OpenCodeHealth, Project, ProjectResponse, ProjectsResponse,
-    SendMessageInput, Session, SuccessResponse,
+    AppError, AppInfo, ConnectionConfig, CreateProjectInput, DeployResponse, ErrorResponse, 
+    FileContent, FileNode, HealthResponse, Message, OpenCodeHealth, Project, ProjectResponse, 
+    ProjectsResponse, SendMessageInput, Session, SuccessResponse,
 };
 use reqwest::Client;
 use std::time::Duration;
@@ -20,8 +20,17 @@ pub struct ApiClient {
 }
 
 impl ApiClient {
+    /// Create a new API client using stored connection config
+    /// 
+    /// This is a convenience method that loads the connection config from storage.
+    pub fn new() -> Result<Self, AppError> {
+        let config = crate::services::StorageService::load_config()?
+            .ok_or_else(|| AppError::InvalidConfig("No connection configured".to_string()))?;
+        Self::with_config(&config)
+    }
+    
     /// Create a new API client with the given configuration
-    pub fn new(config: &ConnectionConfig) -> Result<Self, AppError> {
+    pub fn with_config(config: &ConnectionConfig) -> Result<Self, AppError> {
         let client = Client::builder()
             .timeout(Duration::from_secs(30))
             .build()
@@ -38,6 +47,26 @@ impl ApiClient {
             base_url: config.api_url.trim_end_matches('/').to_string(),
             api_key: config.api_key.clone(),
         })
+    }
+    
+    /// Make a GET request to the API
+    pub async fn get<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<T, AppError> {
+        let url = format!("{}{}", self.base_url, path);
+        let request = self.add_auth(self.client.get(&url));
+        let response = request.send().await?;
+        self.handle_response(response).await
+    }
+    
+    /// Make a POST request to the API
+    pub async fn post<T: serde::de::DeserializeOwned, B: serde::Serialize>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<T, AppError> {
+        let url = format!("{}{}", self.base_url, path);
+        let request = self.add_auth(self.client.post(&url)).json(body);
+        let response = request.send().await?;
+        self.handle_response(response).await
     }
 
     /// Add authorization header if API key is configured
@@ -149,6 +178,31 @@ impl ApiClient {
         let response = request.send().await?;
         let result: ProjectResponse = self.handle_response(response).await?;
         Ok(result.project)
+    }
+
+    /// Get container logs for a project
+    pub async fn get_project_logs(&self, id: &str, lines: Option<u32>) -> Result<String, AppError> {
+        let lines = lines.unwrap_or(100);
+        let url = format!("{}/api/projects/{}/logs?lines={}", self.base_url, id, lines);
+        let request = self.add_auth(self.client.get(&url));
+        let response = request.send().await?;
+        
+        #[derive(serde::Deserialize)]
+        struct LogsResponse {
+            logs: String,
+        }
+        
+        let result: LogsResponse = self.handle_response(response).await?;
+        Ok(result.logs)
+    }
+
+    /// Deploy/rebuild a project container
+    pub async fn deploy_project(&self, id: &str, force: bool) -> Result<DeployResponse, AppError> {
+        let url = format!("{}/api/projects/{}/deploy", self.base_url, id);
+        let body = serde_json::json!({ "force": force });
+        let request = self.add_auth(self.client.post(&url)).json(&body);
+        let response = request.send().await?;
+        self.handle_response(response).await
     }
 
     // =========================================================================
@@ -323,17 +377,17 @@ impl ApiClient {
         self.handle_response(response).await
     }
 
-    /// Find files by pattern
+    /// Find files by query
     pub async fn opencode_find_files(
         &self,
         project_id: &str,
-        pattern: &str,
+        query: &str,
     ) -> Result<Vec<String>, AppError> {
         let url = format!(
-            "{}/api/projects/{}/opencode/find/file?pattern={}",
+            "{}/api/projects/{}/opencode/find/file?query={}",
             self.base_url,
             project_id,
-            urlencoding::encode(pattern)
+            urlencoding::encode(query)
         );
         let request = self.add_auth(self.client.get(&url));
         let response = request.send().await?;

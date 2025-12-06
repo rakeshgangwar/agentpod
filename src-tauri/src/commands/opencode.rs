@@ -8,7 +8,7 @@ use crate::models::{
     OpenCodeEvent, OpenCodeHealth, SendMessageInput, Session, StreamConnection,
     StreamEventPayload, StreamStatus, StreamStatusPayload,
 };
-use crate::services::{api::ApiClient, storage::StorageService};
+use crate::services::ApiClient;
 use futures::StreamExt;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -17,8 +17,7 @@ use tokio::sync::Mutex;
 
 /// Helper to get an authenticated API client
 fn get_client() -> Result<ApiClient, AppError> {
-    let config = StorageService::load_config()?.ok_or(AppError::NotConnected)?;
-    ApiClient::new(&config)
+    ApiClient::new()
 }
 
 // =============================================================================

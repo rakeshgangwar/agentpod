@@ -2,14 +2,12 @@
 //!
 //! Commands for CRUD operations and container control for projects.
 
-use crate::models::{AppError, CreateProjectInput, Project};
-use crate::services::{api::ApiClient, storage::StorageService};
+use crate::models::{AppError, CreateProjectInput, DeployResponse, Project};
+use crate::services::ApiClient;
 
 /// Helper to get an authenticated API client
 fn get_client() -> Result<ApiClient, AppError> {
-    let config = StorageService::load_config()?
-        .ok_or(AppError::NotConnected)?;
-    ApiClient::new(&config)
+    ApiClient::new()
 }
 
 /// List all projects
@@ -72,4 +70,18 @@ pub async fn stop_project(id: String) -> Result<Project, AppError> {
 pub async fn restart_project(id: String) -> Result<Project, AppError> {
     let client = get_client()?;
     client.restart_project(&id).await
+}
+
+/// Get container logs for a project
+#[tauri::command]
+pub async fn get_project_logs(id: String, lines: Option<u32>) -> Result<String, AppError> {
+    let client = get_client()?;
+    client.get_project_logs(&id, lines).await
+}
+
+/// Deploy/rebuild a project container
+#[tauri::command]
+pub async fn deploy_project(id: String, force: Option<bool>) -> Result<DeployResponse, AppError> {
+    let client = get_client()?;
+    client.deploy_project(&id, force.unwrap_or(false)).await
 }

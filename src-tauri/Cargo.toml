@@ -30,6 +30,8 @@ futures = "0.3"
 uuid = { version = "1", features = ["v4"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tauri-plugin-notification = "2.3.3"
+tauri-plugin-fs = "2.4.4"
 
 [dev-dependencies]
 tokio-test = "0.4"

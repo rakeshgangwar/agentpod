@@ -24,7 +24,7 @@ pub async fn connect(api_url: String, api_key: Option<String>) -> Result<Connect
         api_key,
     };
     
-    let client = ApiClient::new(&config)?;
+    let client = ApiClient::with_config(&config)?;
     
     // Test the connection with a health check
     match client.health_check().await {
@@ -68,7 +68,7 @@ pub async fn test_connection() -> Result<ConnectionStatus, AppError> {
     
     match config {
         Some(config) => {
-            let client = ApiClient::new(&config)?;
+            let client = ApiClient::with_config(&config)?;
             
             match client.health_check().await {
                 Ok(_health) => {

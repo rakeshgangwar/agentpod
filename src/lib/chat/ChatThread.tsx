@@ -5,16 +5,19 @@
  * Styled to match our shadcn-based design system.
  */
 
-import { type FC, type PropsWithChildren } from "react";
+import { type FC, type PropsWithChildren, useState, useRef, useCallback, useEffect } from "react";
 import {
   ThreadPrimitive,
   ComposerPrimitive,
   MessagePrimitive,
   useThread,
   useMessage,
+  useComposerRuntime,
   type ToolCallMessagePartProps,
 } from "@assistant-ui/react";
 import { MarkdownTextPrimitive } from "@assistant-ui/react-markdown";
+import { CommandPicker, type Command } from "./CommandPicker";
+import { FilePicker } from "./FilePicker";
 
 /**
  * TextPart component renders a text part with markdown support.
@@ -148,24 +151,164 @@ function AssistantMessage() {
 }
 
 /**
- * Composer component for message input
+ * Composer component for message input with slash commands and file picker
  */
-function Composer() {
+interface ComposerProps {
+  projectId?: string;
+  findFiles?: (projectId: string, pattern: string) => Promise<string[]>;
+}
+
+function Composer({ projectId, findFiles }: ComposerProps) {
+  const composerRuntime = useComposerRuntime();
+  const [inputValue, setInputValue] = useState("");
+  const [showCommandPicker, setShowCommandPicker] = useState(false);
+  const [showFilePicker, setShowFilePicker] = useState(false);
+  const [commandQuery, setCommandQuery] = useState("");
+  const [fileQuery, setFileQuery] = useState("");
+  const [pickerPosition, setPickerPosition] = useState({ top: 60, left: 0 });
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Track cursor position for @ detection
+  const [cursorPosition, setCursorPosition] = useState(0);
+  
+  // Handle input changes
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    const cursor = e.target.selectionStart || 0;
+    setInputValue(value);
+    setCursorPosition(cursor);
+    
+    // Check for slash command (only at start of input)
+    if (value.startsWith("/")) {
+      const query = value.slice(1).split(/\s/)[0]; // Get text after "/" until space
+      setCommandQuery(query);
+      setShowCommandPicker(true);
+      setShowFilePicker(false);
+    } else {
+      setShowCommandPicker(false);
+    }
+    
+    // Check for @ mention
+    const textBeforeCursor = value.slice(0, cursor);
+    const atMatch = textBeforeCursor.match(/@([^\s@]*)$/);
+    if (atMatch) {
+      setFileQuery(atMatch[1]);
+      setShowFilePicker(true);
+      setShowCommandPicker(false);
+      
+      // Position the picker near the @ symbol
+      if (inputRef.current) {
+        const rect = inputRef.current.getBoundingClientRect();
+        setPickerPosition({ top: 60, left: Math.min(atMatch.index || 0, rect.width - 320) });
+      }
+    } else if (!value.startsWith("/")) {
+      setShowFilePicker(false);
+    }
+  }, []);
+  
+  // Handle command selection
+  const handleCommandSelect = useCallback((command: Command) => {
+    const newValue = `/${command.name} `;
+    setInputValue(newValue);
+    setShowCommandPicker(false);
+    inputRef.current?.focus();
+  }, []);
+  
+  // Handle file selection
+  const handleFileSelect = useCallback((filePath: string) => {
+    const textBeforeCursor = inputValue.slice(0, cursorPosition);
+    const textAfterCursor = inputValue.slice(cursorPosition);
+    
+    // Replace @query with @filepath
+    const atMatch = textBeforeCursor.match(/@([^\s@]*)$/);
+    if (atMatch) {
+      const beforeAt = textBeforeCursor.slice(0, atMatch.index);
+      const newValue = `${beforeAt}@${filePath} ${textAfterCursor}`;
+      setInputValue(newValue);
+    }
+    
+    setShowFilePicker(false);
+    inputRef.current?.focus();
+  }, [inputValue, cursorPosition]);
+  
+  // Handle form submission
+  const handleSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputValue.trim()) return;
+    
+    // Use the composer runtime to send the message
+    composerRuntime.setText(inputValue);
+    composerRuntime.send();
+    setInputValue("");
+  }, [inputValue, composerRuntime]);
+  
+  // Handle key events for picker navigation
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    // Let the pickers handle their own navigation
+    if (showCommandPicker || showFilePicker) {
+      if (["ArrowUp", "ArrowDown", "Escape"].includes(e.key)) {
+        return; // Picker will handle these
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        return; // Picker will handle these
+      }
+    }
+    
+    // Handle Enter to send (when no picker is open)
+    if (e.key === "Enter" && !e.shiftKey && !showCommandPicker && !showFilePicker) {
+      e.preventDefault();
+      handleSubmit(e);
+    }
+  }, [showCommandPicker, showFilePicker, handleSubmit]);
+  
   return (
-    <ComposerPrimitive.Root className="border-t p-4 bg-background">
-      <div className="flex gap-2">
-        <ComposerPrimitive.Input
-          placeholder="Type a message..."
-          className="flex-1 min-h-[40px] px-3 py-2 bg-input border border-border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+    <div className="border-t p-4 bg-background relative">
+      {/* Command Picker */}
+      <CommandPicker
+        query={commandQuery}
+        position={pickerPosition}
+        onSelect={handleCommandSelect}
+        onClose={() => setShowCommandPicker(false)}
+        visible={showCommandPicker}
+      />
+      
+      {/* File Picker */}
+      {projectId && findFiles && (
+        <FilePicker
+          projectId={projectId}
+          query={fileQuery}
+          position={pickerPosition}
+          onSelect={handleFileSelect}
+          onClose={() => setShowFilePicker(false)}
+          visible={showFilePicker}
+          findFiles={findFiles}
         />
-        <ComposerPrimitive.Send className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">
-          Send
-        </ComposerPrimitive.Send>
-      </div>
+      )}
+      
+      <form onSubmit={handleSubmit}>
+        <div className="flex gap-2">
+          <textarea
+            ref={inputRef}
+            value={inputValue}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            placeholder="Type a message... (/ for commands, @ for files)"
+            className="flex-1 min-h-[40px] max-h-[200px] px-3 py-2 bg-input border border-border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+            rows={1}
+          />
+          <button
+            type="submit"
+            disabled={!inputValue.trim()}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Send
+          </button>
+        </div>
+      </form>
       <p className="text-xs text-muted-foreground mt-2">
-        Press Enter to send, Shift+Enter for new line
+        Press Enter to send, Shift+Enter for new line · Type <kbd className="px-1 bg-muted rounded">/</kbd> for commands · Type <kbd className="px-1 bg-muted rounded">@</kbd> for files
       </p>
-    </ComposerPrimitive.Root>
+    </div>
   );
 }
 
@@ -237,9 +380,19 @@ function LoadingIndicator() {
 }
 
 /**
+ * ChatThread props
+ */
+export interface ChatThreadProps {
+  /** Project ID for file search */
+  projectId?: string;
+  /** Function to find files in the project */
+  findFiles?: (projectId: string, pattern: string) => Promise<string[]>;
+}
+
+/**
  * ChatThread component renders the full chat interface
  */
-export function ChatThread() {
+export function ChatThread({ projectId, findFiles }: ChatThreadProps) {
   return (
     <ThreadPrimitive.Root className="flex flex-col h-full">
       <ThreadPrimitive.Viewport className="flex-1 overflow-y-auto">
@@ -262,7 +415,7 @@ export function ChatThread() {
         <ThreadPrimitive.ViewportFooter />
       </ThreadPrimitive.Viewport>
       
-      <Composer />
+      <Composer projectId={projectId} findFiles={findFiles} />
     </ThreadPrimitive.Root>
   );
 }

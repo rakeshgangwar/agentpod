@@ -25,6 +25,9 @@ pub enum AppError {
 
     #[error("Network error: {0}")]
     NetworkError(String),
+    
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
 }
 
 /// Make AppError serializable for Tauri commands
