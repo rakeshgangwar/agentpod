@@ -5,6 +5,7 @@
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { ScrollArea } from "$lib/components/ui/scroll-area";
   import { CodeBlock } from "$lib/components/ui/code-block";
+  import { MarkdownViewer } from "$lib/components/ui/markdown";
   import {
     opencodeListFiles,
     opencodeGetFileContent,
@@ -32,6 +33,15 @@
   
   // Track folders currently being loaded
   let loadingFolders = $state<Set<string>>(new Set());
+
+  // View mode for markdown files: "preview" or "raw"
+  let markdownViewMode = $state<"preview" | "raw">("preview");
+
+  // Check if file is markdown
+  function isMarkdownFile(filename: string): boolean {
+    const ext = filename.split(".").pop()?.toLowerCase();
+    return ext === "md" || ext === "mdx";
+  }
 
   // Load file tree when project changes
   $effect(() => {
@@ -280,6 +290,26 @@
             </Card.Description>
           </div>
           <div class="flex gap-2">
+            {#if isMarkdownFile(selectedFile.name)}
+              <div class="flex border rounded-md overflow-hidden">
+                <button
+                  class="px-2 py-1 text-xs transition-colors {markdownViewMode === 'preview' 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'bg-muted hover:bg-muted/80'}"
+                  onclick={() => markdownViewMode = "preview"}
+                >
+                  Preview
+                </button>
+                <button
+                  class="px-2 py-1 text-xs transition-colors {markdownViewMode === 'raw' 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'bg-muted hover:bg-muted/80'}"
+                  onclick={() => markdownViewMode = "raw"}
+                >
+                  Raw
+                </button>
+              </div>
+            {/if}
             <Button
               size="sm"
               variant="outline"
@@ -306,11 +336,18 @@
           {:else if contentError}
             <div class="p-4 text-sm text-destructive">{contentError}</div>
           {:else if fileContent}
-            <CodeBlock 
-              code={fileContent.content} 
-              language={getLanguage(selectedFile.name)}
-              class="h-full"
-            />
+            {#if isMarkdownFile(selectedFile.name) && markdownViewMode === "preview"}
+              <MarkdownViewer 
+                content={fileContent.content}
+                class="h-full"
+              />
+            {:else}
+              <CodeBlock 
+                code={fileContent.content} 
+                language={getLanguage(selectedFile.name)}
+                class="h-full"
+              />
+            {/if}
           {/if}
         </ScrollArea>
       </Card.Content>
