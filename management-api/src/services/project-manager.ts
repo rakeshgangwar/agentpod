@@ -276,7 +276,7 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       domains: fqdnUrl ?? undefined,  // Set the domain for Traefik routing
       instantDeploy: false, // We'll set env vars first, then deploy
       healthCheckEnabled: true,
-      healthCheckPath: '/session',  // Use /session instead of /app (which returns HTML)
+      healthCheckPath: '/app',  // Use /app endpoint - simple JSON response always available
       healthCheckPort: String(containerPort),
     });
     
@@ -288,7 +288,7 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       ports_exposes: String(containerPort),
       domains: fqdnUrl ?? undefined,
       health_check_enabled: true,
-      health_check_path: '/session',
+      health_check_path: '/app',
       health_check_port: String(containerPort),
     });
     
