@@ -331,7 +331,7 @@
         </div>
       </Card.Header>
       <Card.Content class="flex-1 p-0 overflow-hidden">
-        <ScrollArea class="h-full">
+        <ScrollArea class="h-full" orientation="both">
           {#if isLoadingContent}
             <div class="p-4 space-y-2">
               {#each [1, 2, 3, 4, 5, 6, 7, 8] as _}
