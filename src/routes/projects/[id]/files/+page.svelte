@@ -35,7 +35,7 @@
   let loadingFolders = $state<Set<string>>(new Set());
 
   // View mode for markdown files: "preview" or "raw"
-  let markdownViewMode = $state<"preview" | "raw">("preview");
+  let markdownViewMode = $state<"preview" | "raw">("raw");
 
   // Check if file is markdown
   function isMarkdownFile(filename: string): boolean {
