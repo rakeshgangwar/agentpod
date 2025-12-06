@@ -37,6 +37,32 @@
   // View mode for markdown files: "preview" or "raw"
   let markdownViewMode = $state<"preview" | "raw">("raw");
 
+  /**
+   * Decode base64 content to plain text
+   * OpenCode API returns file content as base64 encoded strings
+   */
+  function decodeBase64(encoded: string): string {
+    try {
+      // Use atob for browser-based base64 decoding
+      return atob(encoded);
+    } catch {
+      // If decoding fails, return original (might already be plain text)
+      return encoded;
+    }
+  }
+
+  /**
+   * Check if a string appears to be base64 encoded
+   * Base64 strings contain only A-Z, a-z, 0-9, +, /, and = padding
+   */
+  function isBase64(str: string): boolean {
+    if (!str || str.length === 0) return false;
+    // Base64 regex pattern
+    const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+    // Must be valid base64 length (multiple of 4 after padding)
+    return base64Regex.test(str) && str.length % 4 === 0;
+  }
+
   // Check if file is markdown
   function isMarkdownFile(filename: string): boolean {
     const ext = filename.split(".").pop()?.toLowerCase();
@@ -78,7 +104,18 @@
     fileContent = null;
 
     try {
-      fileContent = await opencodeGetFileContent(projectId, node.path);
+      const response = await opencodeGetFileContent(projectId, node.path);
+      
+      // OpenCode API returns base64 encoded content - decode it
+      let content = response.content;
+      if (content && isBase64(content)) {
+        content = decodeBase64(content);
+      }
+      
+      fileContent = {
+        ...response,
+        content,
+      };
     } catch (err) {
       contentError = err instanceof Error ? err.message : "Failed to load file";
       console.error("Failed to load file content:", err);
