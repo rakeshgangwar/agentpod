@@ -70,6 +70,20 @@ RUN printf '%s\\n' \\
     '    echo "{}" > "\$AUTH_FILE"' \\
     'fi' \\
     '' \\
+    '# Create opencode.json for permissions and configuration' \\
+    'CONFIG_FILE="/workspace/opencode.json"' \\
+    '' \\
+    '# If OPENCODE_CONFIG_JSON is provided, write it to opencode.json' \\
+    'if [ -n "\$OPENCODE_CONFIG_JSON" ]; then' \\
+    '    echo "Writing opencode.json from OPENCODE_CONFIG_JSON..."' \\
+    '    echo "\$OPENCODE_CONFIG_JSON" > "\$CONFIG_FILE"' \\
+    '    echo "Config: \$(cat \$CONFIG_FILE | jq -c . 2>/dev/null || echo unknown)"' \\
+    'else' \\
+    '    echo "Creating default opencode.json with secure permissions..."' \\
+    '    echo '"'"'{"\\$schema":"https://opencode.ai/config.json","permissions":{"bash":"ask","edit":"grant","read":"grant","write":"ask","webfetch":"ask","glob":"grant","grep":"grant","todoread":"grant","todowrite":"grant","mcp":"ask"}}'"'"' > "\$CONFIG_FILE"' \\
+    '    echo "Default permissions: bash/write/webfetch/mcp require approval"' \\
+    'fi' \\
+    '' \\
     '# Clone repository' \\
     'if [ ! -d "/workspace/.git" ] && [ -n "\$FORGEJO_REPO_URL" ]; then' \\
     '    echo "Cloning repository from Forgejo..."' \\
