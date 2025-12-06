@@ -202,4 +202,51 @@ export const migrations: Migration[] = [
       console.warn('Rollback not supported for this migration - llm_model column will remain');
     },
   },
+  
+  // Migration 4: Add user OpenCode config tables
+  // Stores user's global OpenCode settings (opencode.json, agents, commands, tools, plugins)
+  // Applied via OPENCODE_CONFIG and OPENCODE_CONFIG_DIR environment variables
+  {
+    version: 4,
+    name: 'add_user_opencode_config_tables',
+    up: () => {
+      // Create user_opencode_config table for settings and AGENTS.md
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS user_opencode_config (
+          id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+          user_id TEXT NOT NULL UNIQUE,
+          settings TEXT NOT NULL DEFAULT '{}',
+          agents_md TEXT,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+      
+      // Create user_opencode_files table for agents, commands, tools, plugins
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS user_opencode_files (
+          id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+          user_id TEXT NOT NULL,
+          type TEXT NOT NULL CHECK(type IN ('agent', 'command', 'tool', 'plugin')),
+          name TEXT NOT NULL,
+          extension TEXT NOT NULL CHECK(extension IN ('md', 'ts', 'js')),
+          content TEXT NOT NULL,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now')),
+          UNIQUE(user_id, type, name)
+        )
+      `);
+      
+      // Create indexes
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_user_opencode_config_user_id ON user_opencode_config(user_id);
+        CREATE INDEX IF NOT EXISTS idx_user_opencode_files_user_id ON user_opencode_files(user_id);
+        CREATE INDEX IF NOT EXISTS idx_user_opencode_files_type ON user_opencode_files(user_id, type);
+      `);
+    },
+    down: () => {
+      db.exec('DROP TABLE IF EXISTS user_opencode_files');
+      db.exec('DROP TABLE IF EXISTS user_opencode_config');
+    },
+  },
 ];

@@ -41,26 +41,36 @@ RUN apt-get update && \\
 # Install OpenCode globally
 RUN npm install -g opencode-ai
 
-# Create workspace directory
+# Create workspace and config directories
 WORKDIR /workspace
+RUN mkdir -p /root/.config/opencode /app/user-config-dir/{agent,command,tool,plugin}
 
 # Environment variables (will be overridden by Coolify env vars)
 ENV OPENCODE_PORT=4096
 ENV OPENCODE_HOST=0.0.0.0
 
-# Create entrypoint script using printf (heredocs don't work well in Dockerfile)
+# Create platform defaults in ~/.config/opencode/ (Layer 1 - lowest priority)
+# These provide secure baseline settings for all containers
+RUN echo '{"$schema":"https://opencode.ai/config.json","autoupdate":false,"share":"disabled","permission":{"bash":"ask","write":"ask","edit":"allow","webfetch":"ask","mcp":"ask","doom_loop":"ask","external_directory":"ask"}}' > /root/.config/opencode/opencode.json
+
+# Create entrypoint script
 RUN printf '%s\\n' \\
     '#!/bin/bash' \\
     'set -e' \\
     '' \\
     'echo "=== OpenCode Container Starting ==="' \\
     '' \\
-    '# Create auth.json for OpenCode authentication' \\
+    '# --- Layer 1: Platform defaults already in ~/.config/opencode/ ---' \\
+    'echo "Platform defaults loaded from ~/.config/opencode/"' \\
+    '' \\
+    '# --- Setup directories ---' \\
+    'USER_CONFIG_FILE="/app/user-config.json"' \\
+    'USER_CONFIG_DIR="/app/user-config-dir"' \\
     'OPENCODE_DATA_DIR="\${HOME}/.local/share/opencode"' \\
     'AUTH_FILE="\${OPENCODE_DATA_DIR}/auth.json"' \\
-    'mkdir -p "\$OPENCODE_DATA_DIR"' \\
+    'mkdir -p "\$OPENCODE_DATA_DIR" "\$USER_CONFIG_DIR"/{agent,command,tool,plugin}' \\
     '' \\
-    '# If OPENCODE_AUTH_JSON is provided, write it directly to auth.json' \\
+    '# --- Auth configuration ---' \\
     'if [ -n "\$OPENCODE_AUTH_JSON" ]; then' \\
     '    echo "Writing auth.json from OPENCODE_AUTH_JSON..."' \\
     '    echo "\$OPENCODE_AUTH_JSON" > "\$AUTH_FILE"' \\
@@ -70,7 +80,81 @@ RUN printf '%s\\n' \\
     '    echo "{}" > "\$AUTH_FILE"' \\
     'fi' \\
     '' \\
-    '# Clone repository first (before creating opencode.json)' \\
+    '# --- Layer 3 & 4: Fetch user config from Management API ---' \\
+    'fetch_user_config() {' \\
+    '    local max_retries=5' \\
+    '    local retry_delay=2' \\
+    '    ' \\
+    '    for i in \$(seq 1 \$max_retries); do' \\
+    '        echo "Fetching user config (attempt \$i/\$max_retries)..."' \\
+    '        ' \\
+    '        # Fetch user config from Management API' \\
+    '        if curl -sf "\$MANAGEMENT_API_URL/users/\$USER_ID/opencode/config" \\' \\
+    '            -H "Authorization: Bearer \$AUTH_TOKEN" \\' \\
+    '            -o /tmp/user-config-response.json; then' \\
+    '            ' \\
+    '            # Extract settings to user config file (Layer 3)' \\
+    '            jq -r ".settings // {}" /tmp/user-config-response.json > "\$USER_CONFIG_FILE"' \\
+    '            echo "User settings loaded: \$(cat \$USER_CONFIG_FILE | jq -c . 2>/dev/null || echo {})"' \\
+    '            ' \\
+    '            # Write AGENTS.md if present' \\
+    '            AGENTS_MD=\$(jq -r ".agents_md // empty" /tmp/user-config-response.json)' \\
+    '            if [ -n "\$AGENTS_MD" ] && [ "\$AGENTS_MD" != "null" ]; then' \\
+    '                echo "\$AGENTS_MD" > "\$USER_CONFIG_DIR/AGENTS.md"' \\
+    '                echo "User AGENTS.md loaded"' \\
+    '            fi' \\
+    '            ' \\
+    '            # Write agent files (Layer 4)' \\
+    '            jq -r ".files[]? | select(.type==\"agent\") | \"\\(.name).\\(.extension)\\t\\(.content)\"" /tmp/user-config-response.json 2>/dev/null | \\' \\
+    '                while IFS=\$'"'"'\\t'"'"' read -r filename content; do' \\
+    '                    [ -n "\$filename" ] && echo "\$content" > "\$USER_CONFIG_DIR/agent/\$filename"' \\
+    '                done' \\
+    '            ' \\
+    '            # Write command files' \\
+    '            jq -r ".files[]? | select(.type==\"command\") | \"\\(.name).\\(.extension)\\t\\(.content)\"" /tmp/user-config-response.json 2>/dev/null | \\' \\
+    '                while IFS=\$'"'"'\\t'"'"' read -r filename content; do' \\
+    '                    [ -n "\$filename" ] && echo "\$content" > "\$USER_CONFIG_DIR/command/\$filename"' \\
+    '                done' \\
+    '            ' \\
+    '            # Write tool files' \\
+    '            jq -r ".files[]? | select(.type==\"tool\") | \"\\(.name).\\(.extension)\\t\\(.content)\"" /tmp/user-config-response.json 2>/dev/null | \\' \\
+    '                while IFS=\$'"'"'\\t'"'"' read -r filename content; do' \\
+    '                    [ -n "\$filename" ] && echo "\$content" > "\$USER_CONFIG_DIR/tool/\$filename"' \\
+    '                done' \\
+    '            ' \\
+    '            # Write plugin files' \\
+    '            jq -r ".files[]? | select(.type==\"plugin\") | \"\\(.name).\\(.extension)\\t\\(.content)\"" /tmp/user-config-response.json 2>/dev/null | \\' \\
+    '                while IFS=\$'"'"'\\t'"'"' read -r filename content; do' \\
+    '                    [ -n "\$filename" ] && echo "\$content" > "\$USER_CONFIG_DIR/plugin/\$filename"' \\
+    '                done' \\
+    '            ' \\
+    '            rm -f /tmp/user-config-response.json' \\
+    '            echo "User config files loaded successfully"' \\
+    '            return 0' \\
+    '        fi' \\
+    '        ' \\
+    '        echo "Failed to fetch config, waiting \${retry_delay}s..."' \\
+    '        sleep \$retry_delay' \\
+    '        retry_delay=\$((retry_delay * 2))' \\
+    '    done' \\
+    '    ' \\
+    '    echo "Failed to fetch user config after \$max_retries attempts, using defaults"' \\
+    '    echo "{}" > "\$USER_CONFIG_FILE"' \\
+    '    return 1' \\
+    '}' \\
+    '' \\
+    'if [ -n "\$MANAGEMENT_API_URL" ] && [ -n "\$USER_ID" ]; then' \\
+    '    fetch_user_config || true' \\
+    '    export OPENCODE_CONFIG="\$USER_CONFIG_FILE"' \\
+    '    export OPENCODE_CONFIG_DIR="\$USER_CONFIG_DIR"' \\
+    '    echo "OPENCODE_CONFIG=\$OPENCODE_CONFIG"' \\
+    '    echo "OPENCODE_CONFIG_DIR=\$OPENCODE_CONFIG_DIR"' \\
+    'else' \\
+    '    echo "No Management API configured, using platform defaults only"' \\
+    '    echo "{}" > "\$USER_CONFIG_FILE"' \\
+    'fi' \\
+    '' \\
+    '# --- Layer 2: Clone repository (includes project .opencode/) ---' \\
     'if [ ! -d "/workspace/.git" ] && [ -n "\$FORGEJO_REPO_URL" ]; then' \\
     '    echo "Cloning repository from Forgejo..."' \\
     '    if [ -n "\$FORGEJO_USER" ] && [ -n "\$FORGEJO_TOKEN" ]; then' \\
@@ -86,32 +170,20 @@ RUN printf '%s\\n' \\
     '    echo "No repository URL provided. Starting with empty workspace."' \\
     'fi' \\
     '' \\
-    '# Create opencode.json for permissions and configuration (after clone)' \\
-    'CONFIG_FILE="/workspace/opencode.json"' \\
-    '' \\
-    '# Only create if it does not exist (repo might have its own)' \\
-    'if [ ! -f "\$CONFIG_FILE" ]; then' \\
-    '    if [ -n "\$OPENCODE_CONFIG_JSON" ]; then' \\
-    '        echo "Writing opencode.json from OPENCODE_CONFIG_JSON..."' \\
-    '        echo "\$OPENCODE_CONFIG_JSON" > "\$CONFIG_FILE"' \\
-    '        echo "Config: \$(cat \$CONFIG_FILE | jq -c . 2>/dev/null || echo unknown)"' \\
-    '    else' \\
-    '        echo "Creating default opencode.json with secure permissions..."' \\
-    '        echo '"'"'{"\\$schema":"https://opencode.ai/config.json","permissions":{"bash":"ask","edit":"grant","read":"grant","write":"ask","webfetch":"ask","glob":"grant","grep":"grant","todoread":"grant","todowrite":"grant","mcp":"ask"}}'"'"' > "\$CONFIG_FILE"' \\
-    '        echo "Default permissions: bash/write/webfetch/mcp require approval"' \\
-    '    fi' \\
-    'else' \\
-    '    echo "Using existing opencode.json from repository"' \\
-    'fi' \\
-    '' \\
+    '# --- Git configuration ---' \\
     'git config --global user.email "\${GIT_USER_EMAIL:-opencode@local}"' \\
     'git config --global user.name "\${GIT_USER_NAME:-OpenCode}"' \\
     'git config --global --add safe.directory /workspace' \\
     '' \\
-    'echo "=== Configuration ==="' \\
+    '# --- Summary ---' \\
+    'echo "=== Configuration Layers ==="' \\
+    'echo "Layer 1 (Platform): ~/.config/opencode/opencode.json"' \\
+    'echo "Layer 2 (Project):  /workspace/.opencode/ (from git)"' \\
+    'echo "Layer 3 (User JSON): \$OPENCODE_CONFIG"' \\
+    'echo "Layer 4 (User Dir):  \$OPENCODE_CONFIG_DIR"' \\
     'echo "Workspace: /workspace"' \\
     'echo "Port: \${OPENCODE_PORT:-4096}"' \\
-    'echo "===================="' \\
+    'echo "============================="' \\
     '' \\
     'cd /workspace' \\
     'echo "Starting OpenCode server..."' \\

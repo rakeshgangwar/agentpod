@@ -121,6 +121,56 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 
 -- =============================================================================
+-- User OpenCode Config Table
+-- =============================================================================
+-- Stores user's global OpenCode settings (opencode.json content)
+-- Applied via OPENCODE_CONFIG environment variable
+CREATE TABLE IF NOT EXISTS user_opencode_config (
+  id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  user_id TEXT NOT NULL UNIQUE,
+  
+  -- opencode.json content (Layer 3)
+  -- Stored as JSON string
+  settings TEXT NOT NULL DEFAULT '{}',
+  
+  -- AGENTS.md content (optional global instructions)
+  agents_md TEXT,
+  
+  -- Timestamps
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+-- =============================================================================
+-- User OpenCode Files Table
+-- =============================================================================
+-- Stores user's global agents, commands, tools, and plugins
+-- Applied via OPENCODE_CONFIG_DIR environment variable
+CREATE TABLE IF NOT EXISTS user_opencode_files (
+  id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  user_id TEXT NOT NULL,
+  
+  -- File type: 'agent', 'command', 'tool', 'plugin'
+  type TEXT NOT NULL CHECK(type IN ('agent', 'command', 'tool', 'plugin')),
+  
+  -- Filename without extension (e.g., 'reviewer', 'deploy')
+  name TEXT NOT NULL,
+  
+  -- File extension: 'md' for agents/commands, 'ts' or 'js' for tools/plugins
+  extension TEXT NOT NULL CHECK(extension IN ('md', 'ts', 'js')),
+  
+  -- File content
+  content TEXT NOT NULL,
+  
+  -- Timestamps
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  
+  -- Unique constraint: one file per type/name per user
+  UNIQUE(user_id, type, name)
+);
+
+-- =============================================================================
 -- Indexes
 -- =============================================================================
 CREATE INDEX IF NOT EXISTS idx_projects_slug ON projects(slug);
@@ -130,6 +180,9 @@ CREATE INDEX IF NOT EXISTS idx_providers_is_default ON providers(is_default);
 CREATE INDEX IF NOT EXISTS idx_provider_credentials_provider_id ON provider_credentials(provider_id);
 CREATE INDEX IF NOT EXISTS idx_oauth_state_provider_id ON oauth_state(provider_id);
 CREATE INDEX IF NOT EXISTS idx_oauth_state_status ON oauth_state(status);
+CREATE INDEX IF NOT EXISTS idx_user_opencode_config_user_id ON user_opencode_config(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_opencode_files_user_id ON user_opencode_files(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_opencode_files_type ON user_opencode_files(user_id, type);
 
 -- =============================================================================
 -- Seed Data: Default Providers

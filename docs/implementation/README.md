@@ -70,3 +70,7 @@ Use the checkboxes in each phase's `tasks.md` to track progress. When a phase is
 | Coolify Dashboard | https://admin.superchotu.com |
 | Forgejo Git | https://forgejo.superchotu.com |
 | Management API | https://api.superchotu.com |
+
+## Architecture Documents
+
+- [OpenCode Configuration Architecture](./opencode-config-architecture.md) - Comprehensive guide for managing OpenCode configurations (permissions, agents, commands, tools, plugins)

@@ -10,6 +10,7 @@ import { projectRoutes } from './routes/projects.ts';
 import { providerRoutes } from './routes/providers.ts';
 import { syncRoutes } from './routes/sync.ts';
 import { opencodeRoutes } from './routes/opencode.ts';
+import { userRoutes } from './routes/users.ts';
 
 // Initialize database
 console.log('Initializing database...');
@@ -33,7 +34,8 @@ const app = new Hono()
   .route('/api/projects', opencodeRoutes) // OpenCode proxy routes are under /api/projects/:id/opencode/*
   .route('/api/projects', syncRoutes) // Sync routes are under /api/projects/:id/sync
   .route('/api/projects', projectRoutes)
-  .route('/api/providers', providerRoutes);
+  .route('/api/providers', providerRoutes)
+  .route('/api/users', userRoutes); // User OpenCode config routes
 
 // Export type for Hono Client (type-safe RPC from mobile app)
 export type AppType = typeof app;
@@ -62,6 +64,13 @@ console.log(`
 ║  - POST .../session/:sid/message               Send message   ║
 ║  - GET  /api/projects/:id/opencode/event       SSE stream     ║
 ║  - GET  /api/projects/:id/opencode/file        List files     ║
+╠═══════════════════════════════════════════════════════════════╣
+║  User OpenCode Config Endpoints:                              ║
+║  - GET  /api/users/:id/opencode/config      Full config       ║
+║  - PUT  /api/users/:id/opencode/settings    Update settings   ║
+║  - PUT  /api/users/:id/opencode/agents-md   Update AGENTS.md  ║
+║  - GET  /api/users/:id/opencode/files       List files        ║
+║  - PUT  /api/users/:id/opencode/files/:t/:n Upsert file       ║
 ╠═══════════════════════════════════════════════════════════════╣
 ║  Provider Endpoints:                                          ║
 ║  - GET  /api/providers             List providers             ║
