@@ -31,39 +31,64 @@ Desktop App (Tauri) → Management API → OpenCode Container
 - Better theme support (native VS Code themes)
 - First-class markdown integration packages
 - Easy light/dark mode switching
+- **200+ languages supported** - no need to maintain language lists
 
 **Packages:**
 ```bash
 pnpm add shiki marked
 ```
 
-**Usage for Markdown with code highlighting:**
-```typescript
-import { marked } from 'marked';
-import { codeToHtml, createHighlighter } from 'shiki';
+**Actual Implementation - CodeBlock Component:**
+```svelte
+<!-- src/lib/components/ui/code-block/code-block.svelte -->
+<script lang="ts">
+  import { codeToHtml, type BundledTheme } from "shiki";
 
-// Create highlighter once
-const highlighter = await createHighlighter({
-  themes: ['github-dark', 'github-light'],
-  langs: ['typescript', 'javascript', 'python', 'rust', 'bash', 'json', 'markdown']
-});
+  let { code, language = "plaintext" }: { code: string; language?: string } = $props();
+  let highlightedHtml = $state<string>("");
 
-// Custom renderer for code blocks
-marked.use({
-  async: true,
-  renderer: {
-    code(code: string, lang: string) {
-      return highlighter.codeToHtml(code, { 
-        lang: lang || 'text', 
-        theme: 'github-dark' 
+  async function highlightCode() {
+    try {
+      // Shiki handles language detection - just pass the extension directly
+      const html = await codeToHtml(code, {
+        lang: language.toLowerCase() || "plaintext",
+        themes: {
+          light: "github-light",
+          dark: "github-dark",
+        },
+        defaultColor: false, // Let CSS handle theme switching
       });
+      highlightedHtml = html;
+    } catch {
+      // Fallback to plaintext if language not supported
+      const html = await codeToHtml(code, {
+        lang: "plaintext",
+        themes: { light: "github-light", dark: "github-dark" },
+        defaultColor: false,
+      });
+      highlightedHtml = html;
     }
   }
-});
 
-// Render markdown with highlighted code
-const html = await marked.parse(markdownContent);
+  $effect(() => { code; language; highlightCode(); });
+</script>
+
+<div class="code-block">{@html highlightedHtml}</div>
+
+<style>
+  /* Dual theme support - each span has its own --shiki-light/dark values */
+  .code-block :global(.shiki) { background-color: var(--shiki-light-bg) !important; }
+  .code-block :global(.shiki span) { color: var(--shiki-light); }
+  
+  :global(.dark) .code-block :global(.shiki) { background-color: var(--shiki-dark-bg) !important; }
+  :global(.dark) .code-block :global(.shiki span) { color: var(--shiki-dark); }
+</style>
 ```
+
+**Key Design Decisions:**
+1. **No hardcoded language list** - Shiki supports 200+ languages and handles extension mapping
+2. **Dual themes** - Uses CSS variables so theme switching doesn't require re-highlighting
+3. **Graceful fallback** - Falls back to plaintext for unsupported languages
 
 ### SSE Implementation: reqwest with manual parsing
 **Approach:** Use reqwest's `bytes_stream()` with manual SSE parsing
@@ -146,6 +171,201 @@ src/routes/
 └── activity/
     └── +page.svelte         # Activity feed (optional)
 ```
+
+---
+
+## Base64 File Content Handling
+
+OpenCode API returns file contents as base64 encoded strings. We decode on the client side.
+
+```typescript
+// In src/routes/projects/[id]/files/+page.svelte
+
+/**
+ * Decode base64 content to plain text
+ */
+function decodeBase64(encoded: string): string {
+  try {
+    return atob(encoded);
+  } catch {
+    return encoded; // Return original if decoding fails
+  }
+}
+
+/**
+ * Check if a string appears to be base64 encoded
+ */
+function isBase64(str: string): boolean {
+  if (!str || str.length === 0) return false;
+  const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+  return base64Regex.test(str) && str.length % 4 === 0;
+}
+
+// Usage when fetching file content:
+const response = await opencodeGetFileContent(projectId, path);
+let content = response.content;
+if (content && isBase64(content)) {
+  content = decodeBase64(content);
+}
+```
+
+---
+
+## assistant-ui Integration (React in Svelte)
+
+We use **assistant-ui** for the chat interface, which is a React library. Here's how we integrate it with Svelte:
+
+### RuntimeProvider.tsx
+```tsx
+// src/lib/chat/RuntimeProvider.tsx
+import { useLocalRuntime, AssistantRuntimeProvider } from "@assistant-ui/react";
+import { createOpenCodeAdapter } from "./adapter";
+
+export function RuntimeProvider({ 
+  projectId, 
+  initialMessages,
+  children 
+}: Props) {
+  const adapter = useMemo(
+    () => createOpenCodeAdapter(projectId, sessionId),
+    [projectId, sessionId]
+  );
+
+  const runtime = useLocalRuntime(adapter, { initialMessages });
+
+  return (
+    <AssistantRuntimeProvider runtime={runtime}>
+      {children}
+    </AssistantRuntimeProvider>
+  );
+}
+```
+
+### OpenCode Adapter
+```typescript
+// src/lib/chat/adapter.ts
+export function createOpenCodeAdapter(projectId: string): ChatModelAdapter {
+  return {
+    async *run({ messages, abortSignal }) {
+      // Connect to SSE stream
+      const stream = new OpenCodeStream(projectId);
+      await stream.connect((event) => {
+        // Handle message.part.updated events
+        if (event.eventType === "message.part.updated") {
+          const part = event.data?.properties?.part;
+          
+          // Handle text parts
+          if (part?.type === "text") {
+            streamState.accumulatedText = part.text;
+          }
+          
+          // Handle tool parts (OpenCode format)
+          if (part?.type === "tool") {
+            streamState.toolCalls.set(part.callID, {
+              id: part.callID,
+              name: part.tool,
+              args: part.state?.input,
+              state: part.state?.status === "completed" ? "complete" : "running",
+              result: part.state?.output,
+            });
+          }
+        }
+      });
+
+      // Send message and yield updates
+      await opencodeSendMessage(projectId, sessionId, text);
+      
+      // Yield content as it streams
+      yield {
+        content: [
+          { type: "text", text: streamState.accumulatedText },
+          ...Array.from(streamState.toolCalls.values()).map(tc => ({
+            type: "tool-call",
+            toolCallId: tc.id,
+            toolName: tc.name,
+            args: tc.args,
+            result: tc.result,
+          })),
+        ],
+      };
+    },
+  };
+}
+```
+
+### Svelte Wrapper
+```svelte
+<!-- src/routes/projects/[id]/chat/+page.svelte -->
+<script lang="ts">
+  import RuntimeProvider from "$lib/chat/RuntimeProvider";
+  import ChatThread from "$lib/chat/ChatThread";
+</script>
+
+<RuntimeProvider {projectId} {initialMessages}>
+  <ChatThread />
+</RuntimeProvider>
+```
+
+---
+
+## Tool Call Display
+
+Tool calls are displayed during streaming with status indicators:
+
+```tsx
+// src/lib/chat/ChatThread.tsx
+function ToolCallPart({ toolName, args, result }: ToolCallMessagePartProps) {
+  const isComplete = result !== undefined;
+  
+  return (
+    <div className="rounded-lg border bg-muted/50">
+      <div className="flex items-center gap-2 px-3 py-2">
+        <span className={`w-2 h-2 rounded-full ${
+          isComplete ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'
+        }`} />
+        <span className="font-mono text-sm">{toolName}</span>
+        <span className="text-xs text-muted-foreground">
+          {isComplete ? 'completed' : 'running...'}
+        </span>
+      </div>
+      <details>
+        <summary>Show details</summary>
+        <pre>{JSON.stringify(args, null, 2)}</pre>
+        <pre>{result}</pre>
+      </details>
+    </div>
+  );
+}
+```
+
+---
+
+## File Viewer Layout
+
+Key CSS fixes for proper scrolling:
+
+```svelte
+<!-- Outer container -->
+<div class="flex h-[calc(100vh-200px)] gap-4 overflow-hidden">
+  <!-- File tree - fixed width, no shrink -->
+  <Card.Root class="w-72 flex-shrink-0 flex flex-col">
+    ...
+  </Card.Root>
+
+  <!-- Content panel - flexible, with min-w-0 for proper shrinking -->
+  <Card.Root class="flex-1 min-w-0 flex flex-col overflow-hidden">
+    <!-- ScrollArea with both axes for horizontal scrolling -->
+    <ScrollArea orientation="both">
+      <CodeBlock code={content} language={extension} />
+    </ScrollArea>
+  </Card.Root>
+</div>
+```
+
+**Key CSS Properties:**
+- `min-w-0` on flex items allows them to shrink below content size
+- `overflow-hidden` on containers prevents content from expanding the parent
+- `ScrollArea orientation="both"` enables horizontal scrollbar for long lines
 
 ---
 

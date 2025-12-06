@@ -121,6 +121,9 @@ All OpenCode communication is proxied through the Management API, enabling:
 
 1. **Resolved**: Tool calls not showing during streaming - Fixed by handling OpenCode's `type: "tool"` format
 2. **Resolved**: Chat UI not rendering - Fixed adapter to properly yield tool calls and text
+3. **Resolved**: Base64 file content - OpenCode API returns base64 encoded content, now decoded client-side with `atob()`
+4. **Resolved**: Missing syntax highlighting for Python and other languages - Removed hardcoded language list, letting Shiki handle detection automatically
+5. **Resolved**: File viewer horizontal overflow - Added `min-w-0` and `ScrollArea orientation="both"` for proper scrolling
 
 ## Files in This Phase
 
