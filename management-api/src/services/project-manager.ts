@@ -485,10 +485,20 @@ export async function deployProject(
   log.info('Deploying project', { projectId, name: project.name, force });
   
   try {
-    // Always update the Dockerfile to ensure latest version is used
-    // This is necessary because Coolify caches the Dockerfile at creation time
-    log.info('Updating Dockerfile before deployment', { projectId });
-    await coolify.updateDockerfile(project.coolifyAppUuid, OPENCODE_DOCKERFILE);
+    // Try to update the Dockerfile before deployment
+    // Note: Coolify's PATCH API may not support updating dockerfile field directly
+    // In that case, we log a warning and continue with deployment using the cached Dockerfile
+    try {
+      log.info('Attempting to update Dockerfile before deployment', { projectId });
+      await coolify.updateDockerfile(project.coolifyAppUuid, OPENCODE_DOCKERFILE);
+      log.info('Dockerfile updated successfully');
+    } catch (updateError) {
+      // Log warning but continue - the cached Dockerfile from creation will be used
+      log.warn('Failed to update Dockerfile (will use cached version)', { 
+        projectId, 
+        error: updateError instanceof Error ? updateError.message : 'Unknown error'
+      });
+    }
     
     const result = await coolify.deployApplication(project.coolifyAppUuid, force);
     
