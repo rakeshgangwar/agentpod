@@ -485,6 +485,11 @@ export async function deployProject(
   log.info('Deploying project', { projectId, name: project.name, force });
   
   try {
+    // Always update the Dockerfile to ensure latest version is used
+    // This is necessary because Coolify caches the Dockerfile at creation time
+    log.info('Updating Dockerfile before deployment', { projectId });
+    await coolify.updateDockerfile(project.coolifyAppUuid, OPENCODE_DOCKERFILE);
+    
     const result = await coolify.deployApplication(project.coolifyAppUuid, force);
     
     // Extract deployment info from the response

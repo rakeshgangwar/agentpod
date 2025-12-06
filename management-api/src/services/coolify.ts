@@ -300,8 +300,20 @@ export const coolify = {
     health_check_enabled?: boolean;
     health_check_path?: string;
     health_check_port?: string;
+    dockerfile?: string; // Base64 encoded Dockerfile content
   }): Promise<void> {
     await request<unknown>('PATCH', `/applications/${uuid}`, settings);
+  },
+  
+  /**
+   * Update application Dockerfile
+   * Use this to update the Dockerfile content for an existing application
+   */
+  async updateDockerfile(uuid: string, dockerfile: string): Promise<void> {
+    const dockerfileBase64 = Buffer.from(dockerfile).toString('base64');
+    await request<unknown>('PATCH', `/applications/${uuid}`, {
+      dockerfile: dockerfileBase64,
+    });
   },
 
   /**
