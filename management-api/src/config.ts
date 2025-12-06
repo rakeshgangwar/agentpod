@@ -70,6 +70,12 @@ export const config = {
   database: {
     path: getEnv('DATABASE_PATH', './data/database.sqlite'),
   },
+  
+  // Management API public URL (for containers to call back)
+  publicUrl: getEnv('MANAGEMENT_API_PUBLIC_URL', 'http://localhost:3001'),
+  
+  // Default user ID (until we have proper authentication)
+  defaultUserId: getEnv('DEFAULT_USER_ID', 'default-user'),
 } as const;
 
 export type Config = typeof config;

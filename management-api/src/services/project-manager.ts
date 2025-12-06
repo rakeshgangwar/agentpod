@@ -32,20 +32,22 @@ const log = createLogger('project-manager');
 // =============================================================================
 
 // Base64 encoded entrypoint script to avoid escaping issues
-// The script sets up platform defaults, auth, clones repo, and starts opencode
+// The script sets up platform defaults, fetches user config, auth, clones repo, and starts opencode
 const ENTRYPOINT_SCRIPT = `#!/bin/bash
 set -e
 
 echo "=== OpenCode Container Starting ==="
 
-# Platform defaults
-echo "Platform defaults loaded from ~/.config/opencode/"
+# Platform defaults (Layer 1)
+echo "Layer 1: Platform defaults from ~/.config/opencode/"
 cat ~/.config/opencode/opencode.json | jq -c . 2>/dev/null || echo "(parse error)"
 
 # Setup directories
 OPENCODE_DATA_DIR="\$HOME/.local/share/opencode"
 AUTH_FILE="\$OPENCODE_DATA_DIR/auth.json"
-mkdir -p "\$OPENCODE_DATA_DIR"
+USER_CONFIG_FILE="/app/user-config.json"
+USER_CONFIG_DIR="/app/user-config-dir"
+mkdir -p "\$OPENCODE_DATA_DIR" "\$USER_CONFIG_DIR"/{agent,command,tool,plugin}
 
 # Auth configuration
 if [ -n "\$OPENCODE_AUTH_JSON" ]; then
@@ -57,9 +59,61 @@ else
     echo "{}" > "\$AUTH_FILE"
 fi
 
-# Clone repository
+# Fetch user config from Management API (Layer 3 & 4)
+if [ -n "\$MANAGEMENT_API_URL" ] && [ -n "\$USER_ID" ]; then
+    echo "Fetching user config from Management API..."
+    
+    max_retries=3
+    retry_delay=2
+    
+    for i in \$(seq 1 \$max_retries); do
+        if curl -sf "\$MANAGEMENT_API_URL/api/users/\$USER_ID/opencode/config" \\
+            -H "Authorization: Bearer \$AUTH_TOKEN" \\
+            -o /tmp/user-config.json 2>/dev/null; then
+            
+            # Extract settings (Layer 3)
+            jq -r '.settings // {}' /tmp/user-config.json > "\$USER_CONFIG_FILE"
+            echo "Layer 3: User settings loaded"
+            cat "\$USER_CONFIG_FILE" | jq -c . 2>/dev/null || echo "{}"
+            
+            # Write AGENTS.md if present
+            agents_md=\$(jq -r '.agents_md // empty' /tmp/user-config.json)
+            if [ -n "\$agents_md" ] && [ "\$agents_md" != "null" ]; then
+                echo "\$agents_md" > "\$USER_CONFIG_DIR/AGENTS.md"
+                echo "User AGENTS.md loaded"
+            fi
+            
+            # Write agent files (Layer 4)
+            jq -r '.files[]? | select(.type=="agent") | "\\(.name).\\(.extension) \\(.content)"' /tmp/user-config.json 2>/dev/null | \\
+                while read -r filename content; do
+                    [ -n "\$filename" ] && echo "\$content" > "\$USER_CONFIG_DIR/agent/\$filename"
+                done
+            
+            # Write command files
+            jq -r '.files[]? | select(.type=="command") | "\\(.name).\\(.extension) \\(.content)"' /tmp/user-config.json 2>/dev/null | \\
+                while read -r filename content; do
+                    [ -n "\$filename" ] && echo "\$content" > "\$USER_CONFIG_DIR/command/\$filename"
+                done
+            
+            rm -f /tmp/user-config.json
+            export OPENCODE_CONFIG="\$USER_CONFIG_FILE"
+            export OPENCODE_CONFIG_DIR="\$USER_CONFIG_DIR"
+            echo "Layer 4: User config dir set to \$USER_CONFIG_DIR"
+            break
+        fi
+        
+        echo "Attempt \$i/\$max_retries failed, retrying in \${retry_delay}s..."
+        sleep \$retry_delay
+        retry_delay=\$((retry_delay * 2))
+    done
+else
+    echo "No MANAGEMENT_API_URL or USER_ID set, skipping user config"
+    echo "{}" > "\$USER_CONFIG_FILE"
+fi
+
+# Clone repository (Layer 2 - project config)
 if [ ! -d "/workspace/.git" ] && [ -n "\$FORGEJO_REPO_URL" ]; then
-    echo "Cloning repository from Forgejo..."
+    echo "Layer 2: Cloning repository from Forgejo..."
     if [ -n "\$FORGEJO_USER" ] && [ -n "\$FORGEJO_TOKEN" ]; then
         REPO_URL_WITH_AUTH=\$(echo "\$FORGEJO_REPO_URL" | sed "s|://|://\$FORGEJO_USER:\$FORGEJO_TOKEN@|")
         git clone "\$REPO_URL_WITH_AUTH" /workspace
@@ -68,9 +122,9 @@ if [ ! -d "/workspace/.git" ] && [ -n "\$FORGEJO_REPO_URL" ]; then
     fi
     echo "Repository cloned."
 elif [ -d "/workspace/.git" ]; then
-    echo "Existing git repository found."
+    echo "Layer 2: Existing git repository found."
 else
-    echo "No repository URL provided."
+    echo "Layer 2: No repository URL provided."
 fi
 
 # Git configuration
@@ -79,11 +133,13 @@ git config --global user.name "\${GIT_USER_NAME:-OpenCode}"
 git config --global --add safe.directory /workspace
 
 # Summary
-echo "=== Configuration ==="
-echo "Platform: ~/.config/opencode/opencode.json"
-echo "Project:  /workspace/.opencode/"
+echo "=== Configuration Summary ==="
+echo "Layer 1 (Platform): ~/.config/opencode/opencode.json"
+echo "Layer 2 (Project):  /workspace/.opencode/"
+echo "Layer 3 (User):     \$OPENCODE_CONFIG"
+echo "Layer 4 (User Dir): \$OPENCODE_CONFIG_DIR"
 echo "Port: \${OPENCODE_PORT:-4096}"
-echo "===================="
+echo "============================="
 
 cd /workspace
 echo "Starting OpenCode server..."
@@ -281,6 +337,10 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       GIT_USER_NAME: 'OpenCode',
       // Project info
       PROJECT_NAME: name,
+      // User config (for fetching OpenCode configuration from Management API)
+      MANAGEMENT_API_URL: config.publicUrl,
+      USER_ID: config.defaultUserId,
+      AUTH_TOKEN: config.auth.token,
     };
     
     // Add LLM credentials
