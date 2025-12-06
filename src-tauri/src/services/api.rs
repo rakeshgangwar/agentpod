@@ -332,6 +332,42 @@ impl ApiClient {
     }
 
     // =========================================================================
+    // OpenCode - Permissions
+    // =========================================================================
+
+    /// Respond to a permission request
+    ///
+    /// When a tool requires user approval (permission is set to "ask"), OpenCode will
+    /// pause and emit a permission.updated event. This method responds to that request.
+    ///
+    /// # Arguments
+    /// * `project_id` - The project ID
+    /// * `session_id` - The session ID where the permission was requested
+    /// * `permission_id` - The permission request ID
+    /// * `response` - The response: "once" (allow this time), "always" (allow pattern), "reject" (deny)
+    ///
+    /// # Returns
+    /// * `Ok(true)` - Permission was successfully responded to
+    /// * `Err(_)` - Failed to respond to permission
+    pub async fn opencode_respond_permission(
+        &self,
+        project_id: &str,
+        session_id: &str,
+        permission_id: &str,
+        response: &str,
+    ) -> Result<bool, AppError> {
+        let url = format!(
+            "{}/api/projects/{}/opencode/session/{}/permissions/{}",
+            self.base_url, project_id, session_id, permission_id
+        );
+        let body = serde_json::json!({ "response": response });
+        let request = self.add_auth(self.client.post(&url)).json(&body);
+        let resp = request.send().await?;
+        let _: SuccessResponse = self.handle_response(resp).await?;
+        Ok(true)
+    }
+
+    // =========================================================================
     // OpenCode - Messages
     // =========================================================================
 

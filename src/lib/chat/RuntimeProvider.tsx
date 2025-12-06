@@ -7,6 +7,8 @@
  * We use useExternalStoreRuntime which gives us full control over the message
  * state, allowing us to properly handle OpenCode's multi-message pattern
  * (multiple assistant messages per user question during tool calls).
+ * 
+ * This also integrates the Permission system for human-in-the-loop approvals.
  */
 
 import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
@@ -26,7 +28,10 @@ import {
   type Message,
   type OpenCodeEvent,
   type ModelSelection,
+  type PermissionRequest,
 } from "../api/tauri";
+import { PermissionProvider, usePermissions } from "./PermissionContext";
+import { PermissionBar } from "./PermissionBar";
 
 interface RuntimeProviderProps {
   projectId: string;
@@ -34,6 +39,9 @@ interface RuntimeProviderProps {
   selectedModel?: ModelSelection;
   children: ReactNode;
 }
+
+// Tool call status for tracking state
+type ToolCallStatus = "pending" | "running" | "completed" | "error";
 
 // Internal message type (mutable) that we manage
 interface InternalMessage {
@@ -45,6 +53,7 @@ interface InternalMessage {
     toolName: string;
     args: Record<string, unknown>;
     result?: unknown;
+    status?: ToolCallStatus;
   }>;
   createdAt?: Date;
 }
@@ -80,7 +89,7 @@ function convertOpenCodeMessage(msg: Message): InternalMessage {
       const callID = part.callID;
       const toolName = part.tool || "unknown";
       const state = part.state;
-      const status = state.status;
+      const status = state.status as ToolCallStatus | undefined;
       const input = state.input ?? {};
       const output = state.output;
       
@@ -89,6 +98,7 @@ function convertOpenCodeMessage(msg: Message): InternalMessage {
         toolName,
         args: input,
         result: status === "completed" || status === "error" ? output : undefined,
+        status: status,
       });
     }
     // Warn about unhandled tool parts
@@ -111,13 +121,20 @@ function convertToThreadMessage(msg: InternalMessage): ThreadMessageLike {
   }
   
   for (const tc of msg.toolCalls.values()) {
+    // For tool calls with error status but no result, provide an error result
+    // so assistant-ui knows the tool is no longer running
+    let result = tc.result;
+    if (tc.status === "error" && result === undefined) {
+      result = { error: "Tool execution failed or was rejected" };
+    }
+    
     (content as unknown[]).push({
       type: "tool-call",
       toolCallId: tc.toolCallId,
       toolName: tc.toolName,
       args: tc.args,
       argsText: JSON.stringify(tc.args),
-      result: tc.result,
+      result: result,
     });
   }
   
@@ -135,10 +152,10 @@ function convertToThreadMessage(msg: InternalMessage): ThreadMessageLike {
 }
 
 /**
- * RuntimeProvider wraps children with the assistant-ui runtime
- * configured for OpenCode using External Store Runtime.
+ * Inner runtime component that has access to the permission context.
+ * This is where all the SSE handling and runtime logic lives.
  */
-export function RuntimeProvider({ projectId, sessionId: initialSessionId, selectedModel, children }: RuntimeProviderProps) {
+function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selectedModel, children }: RuntimeProviderProps) {
   // Internal message state (mutable, managed by us)
   const [internalMessages, setInternalMessages] = useState<InternalMessage[]>([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -150,6 +167,14 @@ export function RuntimeProvider({ projectId, sessionId: initialSessionId, select
   
   // Stream reference for SSE
   const streamRef = useRef<OpenCodeStream | null>(null);
+  
+  // Permission context
+  const { addPermission, removePermission, clearPermissions } = usePermissions();
+
+  // Clear permissions when session changes
+  useEffect(() => {
+    clearPermissions();
+  }, [sessionId, clearPermissions]);
 
   // Load initial messages when session changes
   useEffect(() => {
@@ -206,6 +231,41 @@ export function RuntimeProvider({ projectId, sessionId: initialSessionId, select
   const handleSSEEvent = useCallback((event: OpenCodeEvent) => {
     const eventData = event.data as Record<string, unknown>;
     const properties = eventData?.properties as Record<string, unknown> | undefined;
+
+    // Log all events for debugging
+    console.log("[RuntimeProvider] SSE Event:", event.eventType, properties);
+
+    // Handle permission.updated - permission request received
+    if (event.eventType === "permission.updated") {
+      console.log("[RuntimeProvider] Permission request received:", properties);
+      
+      // The permission data is in properties directly
+      if (properties && typeof properties.id === "string") {
+        const permission: PermissionRequest = {
+          id: properties.id as string,
+          type: (properties.type as string) || "unknown",
+          pattern: properties.pattern as string | string[] | undefined,
+          sessionID: (properties.sessionID as string) || sessionId || "",
+          messageID: (properties.messageID as string) || "",
+          callID: properties.callID as string | undefined,
+          title: (properties.title as string) || "Permission Required",
+          metadata: (properties.metadata as Record<string, unknown>) || {},
+          time: (properties.time as { created: number }) || { created: Date.now() },
+        };
+        
+        addPermission(permission);
+      }
+    }
+    
+    // Handle permission.replied - permission was responded to (from another client/source)
+    if (event.eventType === "permission.replied") {
+      console.log("[RuntimeProvider] Permission replied:", properties);
+      
+      const permissionId = properties?.permissionID as string | undefined;
+      if (permissionId) {
+        removePermission(permissionId);
+      }
+    }
 
     // Handle message.updated - new message created
     if (event.eventType === "message.updated") {
@@ -306,7 +366,7 @@ export function RuntimeProvider({ projectId, sessionId: initialSessionId, select
             const state = part.state as Record<string, unknown> | undefined;
             
             if (callID) {
-              const status = state?.status as string | undefined;
+              const status = state?.status as ToolCallStatus | undefined;
               const input = (state?.input as Record<string, unknown>) ?? {};
               const output = state?.output;
               
@@ -315,6 +375,7 @@ export function RuntimeProvider({ projectId, sessionId: initialSessionId, select
                 toolName,
                 args: input,
                 result: status === "completed" || status === "error" ? output : undefined,
+                status: status,
               });
             }
           }
@@ -363,7 +424,7 @@ export function RuntimeProvider({ projectId, sessionId: initialSessionId, select
             const state = part.state as Record<string, unknown> | undefined;
             
             if (callID) {
-              const status = state?.status as string | undefined;
+              const status = state?.status as ToolCallStatus | undefined;
               const input = (state?.input as Record<string, unknown>) ?? {};
               const output = state?.output;
               
@@ -372,6 +433,7 @@ export function RuntimeProvider({ projectId, sessionId: initialSessionId, select
                 toolName,
                 args: input,
                 result: status === "completed" || status === "error" ? output : undefined,
+                status: status,
               });
             }
           }
@@ -394,7 +456,7 @@ export function RuntimeProvider({ projectId, sessionId: initialSessionId, select
         setIsRunning(false);
       }
     }
-  }, []);
+  }, [sessionId, addPermission, removePermission]);
 
   // Connect to SSE stream when session is available
   useEffect(() => {
@@ -528,8 +590,34 @@ export function RuntimeProvider({ projectId, sessionId: initialSessionId, select
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      {children}
+      <div className="flex flex-col flex-1 min-h-0">
+        <div className="flex-1 min-h-0">
+          {children}
+        </div>
+        <PermissionBar />
+      </div>
     </AssistantRuntimeProvider>
+  );
+}
+
+/**
+ * RuntimeProvider wraps children with the assistant-ui runtime
+ * configured for OpenCode using External Store Runtime.
+ * 
+ * This includes the Permission system for human-in-the-loop approvals,
+ * with a PermissionBar sticky at the bottom of the chat.
+ */
+export function RuntimeProvider({ projectId, sessionId, selectedModel, children }: RuntimeProviderProps) {
+  return (
+    <PermissionProvider projectId={projectId}>
+      <RuntimeProviderInner
+        projectId={projectId}
+        sessionId={sessionId}
+        selectedModel={selectedModel}
+      >
+        {children}
+      </RuntimeProviderInner>
+    </PermissionProvider>
   );
 }
 

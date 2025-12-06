@@ -27,6 +27,7 @@ use commands::{
     opencode_get_app_info, opencode_health_check, opencode_get_providers,
     opencode_list_sessions, opencode_create_session, opencode_get_session,
     opencode_delete_session, opencode_abort_session,
+    opencode_respond_permission,
     opencode_list_messages, opencode_send_message, opencode_send_message_with_files,
     opencode_get_message,
     opencode_list_files, opencode_get_file_content, opencode_find_files,
@@ -92,6 +93,8 @@ pub fn run() {
             opencode_get_session,
             opencode_delete_session,
             opencode_abort_session,
+            // OpenCode commands - Permissions
+            opencode_respond_permission,
             // OpenCode commands - Messages
             opencode_list_messages,
             opencode_send_message,

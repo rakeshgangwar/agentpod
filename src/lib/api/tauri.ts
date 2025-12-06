@@ -425,6 +425,36 @@ export async function opencodeAbortSession(projectId: string, sessionId: string)
 }
 
 // =============================================================================
+// OpenCode - Permission Commands
+// =============================================================================
+
+/**
+ * Respond to a permission request.
+ * 
+ * When a tool requires user approval (permission is set to "ask"), OpenCode will
+ * pause and emit a permission.updated event. This function responds to that request.
+ * 
+ * @param projectId - The project ID
+ * @param sessionId - The session ID where the permission was requested
+ * @param permissionId - The permission request ID
+ * @param response - The response: "once" (allow this time), "always" (allow pattern), "reject" (deny)
+ * @returns true if the permission was successfully responded to
+ */
+export async function opencodeRespondPermission(
+  projectId: string,
+  sessionId: string,
+  permissionId: string,
+  response: PermissionResponseType
+): Promise<boolean> {
+  return invoke<boolean>("opencode_respond_permission", { 
+    projectId, 
+    sessionId, 
+    permissionId, 
+    response 
+  });
+}
+
+// =============================================================================
 // OpenCode - Message Commands
 // =============================================================================
 
@@ -518,6 +548,56 @@ export async function opencodeGetFileContent(projectId: string, path: string): P
  */
 export async function opencodeFindFiles(projectId: string, pattern: string): Promise<string[]> {
   return invoke<string[]>("opencode_find_files", { projectId, pattern });
+}
+
+// =============================================================================
+// OpenCode - Permission Types
+// =============================================================================
+
+/** Permission response types */
+export type PermissionResponseType = "once" | "always" | "reject";
+
+/** Permission time info */
+export interface PermissionTime {
+  created: number;
+}
+
+/**
+ * Permission request from OpenCode SSE stream.
+ * 
+ * This is emitted when a tool requires user approval (when permission is set to "ask").
+ * The frontend should display this to the user and call the respond endpoint.
+ */
+export interface PermissionRequest {
+  /** Unique permission request ID */
+  id: string;
+  /** Permission type: "bash", "edit", "external_directory", "webfetch", etc. */
+  type: string;
+  /** Pattern for the permission (command pattern, file path pattern, etc.) */
+  pattern?: string | string[];
+  /** Session ID where this permission was requested */
+  sessionID: string;
+  /** Message ID that triggered this permission request */
+  messageID: string;
+  /** Tool call ID (links to the tool part waiting for permission) */
+  callID?: string;
+  /** Human-readable title describing what permission is being requested */
+  title: string;
+  /** Additional metadata about the permission request */
+  metadata: Record<string, unknown>;
+  /** Time when the permission was requested */
+  time: PermissionTime;
+}
+
+/**
+ * Permission replied event from SSE stream.
+ * 
+ * This is emitted when a permission request has been responded to.
+ */
+export interface PermissionReplied {
+  sessionID: string;
+  permissionID: string;
+  response: PermissionResponseType;
 }
 
 // =============================================================================

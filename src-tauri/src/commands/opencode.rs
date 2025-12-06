@@ -92,6 +92,33 @@ pub async fn opencode_abort_session(project_id: String, session_id: String) -> R
 }
 
 // =============================================================================
+// Permissions
+// =============================================================================
+
+/// Respond to a permission request
+/// 
+/// When a tool requires user approval (permission is set to "ask"), OpenCode will
+/// pause and emit a permission.updated event. This command responds to that request.
+/// 
+/// # Arguments
+/// * `project_id` - The project ID
+/// * `session_id` - The session ID where the permission was requested
+/// * `permission_id` - The permission request ID
+/// * `response` - The response: "once" (allow this time), "always" (allow pattern), "reject" (deny)
+#[tauri::command]
+pub async fn opencode_respond_permission(
+    project_id: String,
+    session_id: String,
+    permission_id: String,
+    response: String,
+) -> Result<bool, AppError> {
+    let client = get_client()?;
+    client
+        .opencode_respond_permission(&project_id, &session_id, &permission_id, &response)
+        .await
+}
+
+// =============================================================================
 // Messages
 // =============================================================================
 

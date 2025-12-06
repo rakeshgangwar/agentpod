@@ -373,3 +373,103 @@ pub struct StreamStatusPayload {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
+
+// =============================================================================
+// Permission Models
+// =============================================================================
+
+/// Permission time info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PermissionTime {
+    pub created: i64,
+}
+
+/// Permission request from OpenCode SSE stream
+/// 
+/// This is emitted when a tool requires user approval (when permission is set to "ask").
+/// The frontend should display this to the user and call the respond endpoint.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PermissionRequest {
+    /// Unique permission request ID
+    pub id: String,
+    
+    /// Permission type: "bash", "edit", "external_directory", "webfetch", etc.
+    #[serde(rename = "type")]
+    pub permission_type: String,
+    
+    /// Pattern for the permission (command pattern, file path pattern, etc.)
+    /// Can be a single string or array of strings
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pattern: Option<serde_json::Value>,
+    
+    /// Session ID where this permission was requested
+    #[serde(rename = "sessionID")]
+    pub session_id: String,
+    
+    /// Message ID that triggered this permission request
+    #[serde(rename = "messageID")]
+    pub message_id: String,
+    
+    /// Tool call ID (links to the tool part waiting for permission)
+    #[serde(rename = "callID", skip_serializing_if = "Option::is_none")]
+    pub call_id: Option<String>,
+    
+    /// Human-readable title describing what permission is being requested
+    pub title: String,
+    
+    /// Additional metadata about the permission request
+    #[serde(default)]
+    pub metadata: serde_json::Value,
+    
+    /// Time when the permission was requested
+    pub time: PermissionTime,
+}
+
+/// Permission response type
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PermissionResponseType {
+    /// Allow this specific request only
+    Once,
+    /// Allow all future requests matching this pattern
+    Always,
+    /// Deny this request
+    Reject,
+}
+
+impl std::fmt::Display for PermissionResponseType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PermissionResponseType::Once => write!(f, "once"),
+            PermissionResponseType::Always => write!(f, "always"),
+            PermissionResponseType::Reject => write!(f, "reject"),
+        }
+    }
+}
+
+impl std::str::FromStr for PermissionResponseType {
+    type Err = String;
+    
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "once" => Ok(PermissionResponseType::Once),
+            "always" => Ok(PermissionResponseType::Always),
+            "reject" => Ok(PermissionResponseType::Reject),
+            _ => Err(format!("Invalid permission response: {}. Must be 'once', 'always', or 'reject'", s)),
+        }
+    }
+}
+
+/// Permission replied event from SSE stream
+/// 
+/// This is emitted when a permission request has been responded to.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PermissionReplied {
+    #[serde(rename = "sessionID")]
+    pub session_id: String,
+    #[serde(rename = "permissionID")]
+    pub permission_id: String,
+    pub response: String,
+}
