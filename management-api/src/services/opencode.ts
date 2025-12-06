@@ -358,8 +358,15 @@ export const opencode = {
 
   /**
    * Get configured providers and their models from OpenCode
+   * 
+   * Note: OpenCode returns models as an object (keyed by model ID), but we 
+   * transform it to an array for easier consumption by the mobile app.
    */
-  async getProviders(projectId: string): Promise<unknown> {
+  async getProviders(projectId: string): Promise<Array<{
+    id: string;
+    name: string;
+    models: Array<{ id: string; name: string }>;
+  }>> {
     const { project } = await getClient(projectId);
     const baseUrl = await getOpenCodeUrl(project);
     
@@ -378,7 +385,24 @@ export const opencode = {
       );
     }
     
-    return response.json();
+    // OpenCode returns: { providers: [{ id, name, models: { modelId: { id, name, ... }, ... } }] }
+    // We transform to: [{ id, name, models: [{ id, name }, ...] }]
+    const data = await response.json() as { 
+      providers: Array<{
+        id: string;
+        name: string;
+        models: Record<string, { id: string; name: string }>;
+      }>;
+    };
+    
+    return data.providers.map(provider => ({
+      id: provider.id,
+      name: provider.name,
+      models: Object.values(provider.models || {}).map(model => ({
+        id: model.id,
+        name: model.name,
+      })),
+    }));
   },
 
   // ---------------------------------------------------------------------------
