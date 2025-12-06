@@ -15,6 +15,8 @@ pub struct ApiClient {
     client: Client,
     /// Separate client for SSE streams (no timeout)
     sse_client: Client,
+    /// Separate client for long-running operations (5 minute timeout)
+    long_running_client: Client,
     base_url: String,
     api_key: Option<String>,
 }
@@ -41,9 +43,17 @@ impl ApiClient {
             .build()
             .map_err(|e| AppError::NetworkError(format!("Failed to create SSE client: {}", e)))?;
 
+        // Long-running client for operations like sending messages to LLMs
+        // LLM responses can take several minutes depending on model and complexity
+        let long_running_client = Client::builder()
+            .timeout(Duration::from_secs(300)) // 5 minute timeout
+            .build()
+            .map_err(|e| AppError::NetworkError(format!("Failed to create long-running client: {}", e)))?;
+
         Ok(Self {
             client,
             sse_client,
+            long_running_client,
             base_url: config.api_url.trim_end_matches('/').to_string(),
             api_key: config.api_key.clone(),
         })
@@ -90,6 +100,12 @@ impl ApiClient {
             Some(key) => request.header("Authorization", format!("Bearer {}", key)),
             None => request,
         }
+    }
+    
+    /// Create a POST request with a specific client and add auth
+    fn add_auth_to_client(&self, client: &Client, url: &str) -> reqwest::RequestBuilder {
+        let request = client.post(url);
+        self.add_auth(request)
     }
 
     /// Handle API response, converting errors appropriately
@@ -335,6 +351,9 @@ impl ApiClient {
     }
 
     /// Send a message to a session
+    /// 
+    /// Uses a longer timeout (5 minutes) since LLM responses can take
+    /// a significant amount of time depending on model and complexity.
     pub async fn opencode_send_message(
         &self,
         project_id: &str,
@@ -345,7 +364,9 @@ impl ApiClient {
             "{}/api/projects/{}/opencode/session/{}/message",
             self.base_url, project_id, session_id
         );
-        let request = self.add_auth(self.client.post(&url)).json(&input);
+        // Use long_running_client for message sending as LLM responses can take minutes
+        let request = self.add_auth_to_client(&self.long_running_client, &url)
+            .json(&input);
         let response = request.send().await?;
         self.handle_response(response).await
     }

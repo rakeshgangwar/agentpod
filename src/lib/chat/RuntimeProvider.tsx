@@ -261,6 +261,68 @@ export function RuntimeProvider({ projectId, sessionId: initialSessionId, select
       if (!part) return;
 
       setInternalMessages((prev) => {
+        // Check if message exists
+        const messageExists = prev.some((m) => m.id === messageId);
+        
+        // If message doesn't exist yet (race condition: part.updated arrived before message.updated),
+        // create it now. This typically happens with assistant messages during streaming.
+        if (!messageExists) {
+          const newMessage: InternalMessage = {
+            id: messageId,
+            role: "assistant", // Parts arriving before message.updated are typically from assistant
+            text: "",
+            toolCalls: new Map(),
+            createdAt: new Date(),
+          };
+          
+          // Apply the part update to the new message
+          if (part.type === "text") {
+            const delta = properties?.delta as string | undefined;
+            if (typeof part.text === "string") {
+              newMessage.text = part.text;
+            } else if (delta) {
+              newMessage.text = delta;
+            }
+          }
+          
+          // Handle tool-invocation format (legacy)
+          if (part.type === "tool-invocation") {
+            const toolInvocation = part.toolInvocation as Record<string, unknown> | undefined;
+            if (toolInvocation?.toolCallId) {
+              const toolName = (toolInvocation.toolName as string) || "unknown";
+              newMessage.toolCalls.set(toolInvocation.toolCallId as string, {
+                toolCallId: toolInvocation.toolCallId as string,
+                toolName,
+                args: (toolInvocation.args as Record<string, unknown>) ?? {},
+                result: toolInvocation.result,
+              });
+            }
+          }
+          
+          // Handle "tool" format (from SSE stream)
+          if (part.type === "tool") {
+            const callID = part.callID as string | undefined;
+            const toolName = (part.tool as string | undefined) || "unknown";
+            const state = part.state as Record<string, unknown> | undefined;
+            
+            if (callID) {
+              const status = state?.status as string | undefined;
+              const input = (state?.input as Record<string, unknown>) ?? {};
+              const output = state?.output;
+              
+              newMessage.toolCalls.set(callID, {
+                toolCallId: callID,
+                toolName,
+                args: input,
+                result: status === "completed" || status === "error" ? output : undefined,
+              });
+            }
+          }
+          
+          return [...prev, newMessage];
+        }
+        
+        // Message exists, update it
         return prev.map((m) => {
           if (m.id !== messageId) return m;
 

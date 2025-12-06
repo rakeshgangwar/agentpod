@@ -101,14 +101,14 @@
         {#each projects.list as project (project.id)}
           <Card.Root class="cursor-pointer hover:shadow-md transition-shadow" onclick={(e: MouseEvent) => handleProjectClick(e, project.id)}>
             <Card.Header>
-              <div class="flex items-start justify-between">
-                <div class="min-w-0 flex-1">
+              <div class="flex items-start justify-between gap-2 overflow-hidden">
+                <div class="min-w-0 flex-1 overflow-hidden">
                   <Card.Title class="text-lg truncate">{project.name}</Card.Title>
                   <Card.Description class="text-sm truncate">
                     {project.slug}
                   </Card.Description>
                 </div>
-                <Badge variant={getStatusColor(project.status)} class="ml-2 shrink-0">
+                <Badge variant={getStatusColor(project.status)} class="shrink-0 whitespace-nowrap">
                   {project.status}
                 </Badge>
               </div>

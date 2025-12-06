@@ -100,15 +100,15 @@
           <Button variant="ghost" size="sm" onclick={() => goto("/projects")}>
             ← Back
           </Button>
-          <div>
-            <div class="flex items-center gap-2">
-              <h1 class="text-2xl font-bold">{project.name}</h1>
-              <Badge variant={getStatusColor(project.status)}>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 overflow-hidden">
+              <h1 class="text-2xl font-bold truncate">{project.name}</h1>
+              <Badge variant={getStatusColor(project.status)} class="shrink-0 whitespace-nowrap">
                 {project.status}
               </Badge>
             </div>
             {#if project.description}
-              <p class="text-muted-foreground text-sm">{project.description}</p>
+              <p class="text-muted-foreground text-sm truncate">{project.description}</p>
             {/if}
           </div>
         </div>
