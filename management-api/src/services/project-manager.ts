@@ -169,7 +169,7 @@ ENV OPENCODE_HOST=0.0.0.0
 
 # Create platform defaults in ~/.config/opencode/ (Layer 1 - lowest priority)
 # These provide secure baseline settings for all containers
-RUN echo '{"$$schema":"https://opencode.ai/config.json","autoupdate":false,"share":"disabled","permission":{"bash":"ask","write":"ask","edit":"allow","webfetch":"ask","mcp":"ask","doom_loop":"ask","external_directory":"ask"}}' > /root/.config/opencode/opencode.json
+RUN echo '{"autoupdate":false,"share":"disabled","permission":{"bash":"ask","write":"ask","edit":"allow","webfetch":"ask","mcp":"ask","doom_loop":"ask","external_directory":"ask"}}' > /root/.config/opencode/opencode.json
 
 # Create entrypoint script from base64
 RUN echo "${ENTRYPOINT_BASE64}" | base64 -d > /entrypoint.sh && chmod +x /entrypoint.sh
