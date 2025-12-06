@@ -978,10 +978,128 @@ export class OpenCodeStream {
     this.pendingStatuses = [];
   }
 
-  /**
-   * Check if the stream is connected
-   */
+/**
+ * Check if the stream is connected
+ */
   get isConnected(): boolean {
     return this.streamId !== null;
   }
+}
+
+// =============================================================================
+// User OpenCode Config Types
+// =============================================================================
+
+/** Permission level for OpenCode tools */
+export type PermissionLevel = "allow" | "ask" | "deny";
+
+/** User's OpenCode permission settings (snake_case to match OpenCode config) */
+export interface PermissionSettings {
+  bash?: PermissionLevel;
+  write?: PermissionLevel;
+  edit?: PermissionLevel;
+  webfetch?: PermissionLevel;
+  mcp?: PermissionLevel;
+  doom_loop?: PermissionLevel;
+  external_directory?: PermissionLevel;
+}
+
+/** User's OpenCode settings (Layer 3) */
+export interface UserOpencodeSettings {
+  theme?: string;
+  permission?: PermissionSettings;
+  provider?: Record<string, unknown>;
+}
+
+/** User OpenCode config file */
+export interface UserOpencodeFile {
+  name: string;
+  type: "agent" | "command" | "tool" | "plugin";
+  extension: string;
+  content: string;
+  // Optional fields - only present in file list response
+  id?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** Full user OpenCode config */
+export interface UserOpencodeConfig {
+  settings: UserOpencodeSettings;
+  agents_md?: string;
+  files: UserOpencodeFile[];
+}
+
+// =============================================================================
+// User OpenCode Config Commands
+// =============================================================================
+
+/**
+ * Get user's full OpenCode configuration
+ */
+export async function getUserOpencodeConfig(userId?: string): Promise<UserOpencodeConfig> {
+  return invoke<UserOpencodeConfig>("get_user_opencode_config", { userId });
+}
+
+/**
+ * Update user's OpenCode settings
+ */
+export async function updateUserOpencodeSettings(
+  settings: UserOpencodeSettings,
+  userId?: string
+): Promise<UserOpencodeSettings> {
+  return invoke<UserOpencodeSettings>("update_user_opencode_settings", { 
+    userId, 
+    settings 
+  });
+}
+
+/**
+ * Update user's AGENTS.md content
+ */
+export async function updateUserAgentsMd(content: string, userId?: string): Promise<void> {
+  return invoke("update_user_agents_md", { userId, content });
+}
+
+/**
+ * List user's OpenCode config files
+ */
+export async function listUserOpencodeFiles(
+  fileType?: "agent" | "command" | "tool" | "plugin",
+  userId?: string
+): Promise<UserOpencodeFile[]> {
+  return invoke<UserOpencodeFile[]>("list_user_opencode_files", { 
+    userId, 
+    fileType 
+  });
+}
+
+/**
+ * Create or update a user's OpenCode config file
+ */
+export async function upsertUserOpencodeFile(
+  fileType: "agent" | "command" | "tool" | "plugin",
+  name: string,
+  content: string,
+  extension?: string,
+  userId?: string
+): Promise<UserOpencodeFile> {
+  return invoke<UserOpencodeFile>("upsert_user_opencode_file", { 
+    userId, 
+    fileType, 
+    name, 
+    content,
+    extension
+  });
+}
+
+/**
+ * Delete a user's OpenCode config file
+ */
+export async function deleteUserOpencodeFile(
+  fileType: "agent" | "command" | "tool" | "plugin",
+  name: string,
+  userId?: string
+): Promise<void> {
+  return invoke("delete_user_opencode_file", { userId, fileType, name });
 }

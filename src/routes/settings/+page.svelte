@@ -21,7 +21,11 @@
     importSettingsJson,
     resetSettings 
   } from "$lib/stores/settings.svelte";
-  import type { Theme } from "$lib/api/tauri";
+  import type { Theme, PermissionLevel, PermissionSettings, UserOpencodeSettings } from "$lib/api/tauri";
+  import { 
+    getUserOpencodeConfig, 
+    updateUserOpencodeSettings 
+  } from "$lib/api/tauri";
   import { Button } from "$lib/components/ui/button";
   import { Label } from "$lib/components/ui/label";
   import { Input } from "$lib/components/ui/input";
@@ -62,6 +66,82 @@
   // LLM Provider selector state
   let selectedModel = $state("");
   let showAllProviders = $state(false);
+
+  // OpenCode Config state
+  let opencodeConfigLoading = $state(false);
+  let opencodeConfigSaving = $state(false);
+  let opencodeConfigError = $state<string | null>(null);
+  let permissionSettings = $state<PermissionSettings>({});
+  
+  // Load OpenCode config on mount
+  $effect(() => {
+    if (connection.isConnected) {
+      loadOpencodeConfig();
+    }
+  });
+
+  async function loadOpencodeConfig() {
+    opencodeConfigLoading = true;
+    opencodeConfigError = null;
+    try {
+      const config = await getUserOpencodeConfig();
+      permissionSettings = config.settings.permission || {};
+    } catch (e) {
+      const error = e as Error;
+      opencodeConfigError = error.message || "Failed to load OpenCode configuration";
+      console.error("Failed to load OpenCode config:", e);
+    } finally {
+      opencodeConfigLoading = false;
+    }
+  }
+
+  async function handlePermissionChange(tool: keyof PermissionSettings, value: PermissionLevel) {
+    opencodeConfigSaving = true;
+    opencodeConfigError = null;
+    
+    // Update local state immediately for responsive UI
+    const previousValue = permissionSettings[tool];
+    permissionSettings = { ...permissionSettings, [tool]: value };
+    
+    try {
+      const updatedSettings: UserOpencodeSettings = {
+        permission: permissionSettings
+      };
+      await updateUserOpencodeSettings(updatedSettings);
+      toast.success(`${tool} permission updated to "${value}"`);
+    } catch (e) {
+      // Revert on error
+      permissionSettings = { ...permissionSettings, [tool]: previousValue };
+      const error = e as Error;
+      opencodeConfigError = error.message || "Failed to save permission settings";
+      toast.error("Failed to save permission settings", {
+        description: opencodeConfigError
+      });
+      console.error("Failed to save permission settings:", e);
+    } finally {
+      opencodeConfigSaving = false;
+    }
+  }
+
+  // Permission tool descriptions
+  const permissionTools = [
+    { key: "bash" as const, name: "Bash", description: "Execute shell commands" },
+    { key: "write" as const, name: "Write", description: "Create new files" },
+    { key: "edit" as const, name: "Edit", description: "Modify existing files" },
+    { key: "webfetch" as const, name: "Web Fetch", description: "Fetch content from URLs" },
+    { key: "mcp" as const, name: "MCP", description: "Use MCP server tools" },
+  ];
+
+  const permissionLevels: { value: PermissionLevel; label: string }[] = [
+    { value: "allow", label: "Allow" },
+    { value: "ask", label: "Ask" },
+    { value: "deny", label: "Deny" },
+  ];
+
+  function getPermissionLabel(level: PermissionLevel | undefined): string {
+    if (!level) return "Ask (default)";
+    return permissionLevels.find(p => p.value === level)?.label ?? "Ask";
+  }
 
   async function handleDisconnect() {
     await disconnect();
@@ -272,6 +352,81 @@
             bind:showAllProviders
           />
         </Card.Content>
+      </Card.Root>
+
+      <!-- OpenCode Configuration -->
+      <Card.Root class="md:col-span-2">
+        <Card.Header>
+          <Card.Title>OpenCode Permissions</Card.Title>
+          <Card.Description>
+            Control what actions OpenCode can perform without asking for permission.
+            These settings apply to all your projects.
+          </Card.Description>
+        </Card.Header>
+        <Card.Content class="space-y-4">
+          {#if opencodeConfigLoading}
+            <div class="flex items-center justify-center py-8">
+              <div class="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
+              <span class="ml-2 text-muted-foreground">Loading configuration...</span>
+            </div>
+          {:else if opencodeConfigError}
+            <div class="p-4 rounded-md bg-destructive/10 text-destructive">
+              <p class="font-medium">Failed to load configuration</p>
+              <p class="text-sm">{opencodeConfigError}</p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onclick={loadOpencodeConfig}
+                class="mt-2"
+              >
+                Retry
+              </Button>
+            </div>
+          {:else}
+            <div class="grid gap-4">
+              {#each permissionTools as tool}
+                <div class="flex items-center justify-between p-3 border rounded-lg">
+                  <div class="space-y-0.5">
+                    <Label class="font-medium">{tool.name}</Label>
+                    <p class="text-xs text-muted-foreground">{tool.description}</p>
+                  </div>
+                  <Select.Root 
+                    type="single"
+                    value={permissionSettings[tool.key] || "ask"}
+                    onValueChange={(v) => {
+                      if (v) handlePermissionChange(tool.key, v as PermissionLevel);
+                    }}
+                    disabled={opencodeConfigSaving}
+                  >
+                    <Select.Trigger class="w-28">
+                      {getPermissionLabel(permissionSettings[tool.key])}
+                    </Select.Trigger>
+                    <Select.Content>
+                      {#each permissionLevels as level}
+                        <Select.Item value={level.value} label={level.label} />
+                      {/each}
+                    </Select.Content>
+                  </Select.Root>
+                </div>
+              {/each}
+            </div>
+            
+            <div class="mt-4 p-3 bg-muted rounded-lg">
+              <p class="text-sm text-muted-foreground">
+                <strong>Allow:</strong> Execute automatically without asking<br/>
+                <strong>Ask:</strong> Request permission each time (default)<br/>
+                <strong>Deny:</strong> Never allow this action
+              </p>
+            </div>
+          {/if}
+        </Card.Content>
+        {#if !opencodeConfigLoading && !opencodeConfigError}
+          <Card.Footer>
+            <p class="text-xs text-muted-foreground">
+              Changes are saved automatically and apply to new OpenCode sessions.
+            </p>
+          </Card.Footer>
+        {/if}
       </Card.Root>
 
       <!-- Preferences -->

@@ -170,3 +170,110 @@ pub struct ExportData {
     /// API URL (not the key for security)
     pub api_url: Option<String>,
 }
+
+// =============================================================================
+// User OpenCode Config Types (from Management API)
+// =============================================================================
+
+/// Permission level for OpenCode tools
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum PermissionLevel {
+    Allow,
+    #[default]
+    Ask,
+    Deny,
+}
+
+/// User's OpenCode permission settings
+/// Uses snake_case to match OpenCode's config format
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct PermissionSettings {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bash: Option<PermissionLevel>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub write: Option<PermissionLevel>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub edit: Option<PermissionLevel>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub webfetch: Option<PermissionLevel>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mcp: Option<PermissionLevel>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub doom_loop: Option<PermissionLevel>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub external_directory: Option<PermissionLevel>,
+}
+
+/// User's OpenCode settings (Layer 3)
+/// Uses snake_case to match OpenCode's config format
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct UserOpencodeSettings {
+    /// Theme: "opencode", "gruvbox", "catppuccin", etc.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub theme: Option<String>,
+    
+    /// Permission settings
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub permission: Option<PermissionSettings>,
+    
+    /// Provider configuration
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider: Option<serde_json::Value>,
+}
+
+/// User OpenCode config file (agents, commands, tools, plugins)
+/// Note: When returned in full config, only type/name/extension/content are present
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct UserOpencodeFile {
+    #[serde(default)]
+    pub name: String,
+    #[serde(rename = "type", default)]
+    pub file_type: String,  // "agent", "command", "tool", "plugin"
+    #[serde(default)]
+    pub extension: String,  // "md" or "ts"
+    #[serde(default)]
+    pub content: String,
+    // These fields are optional - only present in file list response, not in full config
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(rename = "createdAt", skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<String>,
+    #[serde(rename = "updatedAt", skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
+}
+
+/// Full user OpenCode config (for container startup)
+/// Note: API returns snake_case fields
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct UserOpencodeConfig {
+    #[serde(default)]
+    pub settings: UserOpencodeSettings,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agents_md: Option<String>,
+    #[serde(default)]
+    pub files: Vec<UserOpencodeFile>,
+}
+
+/// Response wrapper for user config
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserOpencodeConfigResponse {
+    #[serde(flatten)]
+    pub config: UserOpencodeConfig,
+}
+
+/// Response wrapper for settings update
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SettingsUpdateResponse {
+    pub success: bool,
+    pub settings: UserOpencodeSettings,
+}
+
+/// Response wrapper for file list
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FilesListResponse {
+    pub files: Vec<UserOpencodeFile>,
+}

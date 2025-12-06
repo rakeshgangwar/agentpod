@@ -89,6 +89,18 @@ impl ApiClient {
         self.handle_response(response).await
     }
 
+    /// Make a PUT request to the API
+    pub async fn put<T: serde::de::DeserializeOwned, B: serde::Serialize>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<T, AppError> {
+        let url = format!("{}{}", self.base_url, path);
+        let request = self.add_auth(self.client.put(&url)).json(body);
+        let response = request.send().await?;
+        self.handle_response(response).await
+    }
+
     /// Add authorization header if API key is configured
     pub fn add_auth_header(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
         self.add_auth(request)

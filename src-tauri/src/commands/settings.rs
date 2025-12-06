@@ -5,6 +5,7 @@
 use crate::models::{
     AppError, AppSettings, ExportData, Provider, ProvidersResponse,
     ProviderWithModels, ProvidersWithModelsResponse, OAuthFlowInit, OAuthFlowStatus,
+    UserOpencodeConfig, UserOpencodeSettings, UserOpencodeFile, SettingsUpdateResponse, FilesListResponse,
 };
 use crate::services::{ApiClient, SettingsService};
 use chrono::Utc;
@@ -226,4 +227,142 @@ pub async fn import_settings(json: String) -> Result<AppSettings, AppError> {
     }
     
     Ok(export_data.settings)
+}
+
+// =============================================================================
+// User OpenCode Config Commands
+// =============================================================================
+
+/// Get user's full OpenCode configuration
+/// This is used to display and edit the user's OpenCode settings in the mobile app
+#[tauri::command]
+pub async fn get_user_opencode_config(user_id: Option<String>) -> Result<UserOpencodeConfig, AppError> {
+    let client = ApiClient::new()?;
+    let uid = user_id.unwrap_or_else(|| "default-user".to_string());
+    
+    let path = format!("/api/users/{}/opencode/config", uid);
+    let response: UserOpencodeConfig = client.get(&path).await?;
+    
+    Ok(response)
+}
+
+/// Update user's OpenCode settings (Layer 3)
+#[tauri::command]
+pub async fn update_user_opencode_settings(
+    user_id: Option<String>,
+    settings: UserOpencodeSettings
+) -> Result<UserOpencodeSettings, AppError> {
+    let client = ApiClient::new()?;
+    let uid = user_id.unwrap_or_else(|| "default-user".to_string());
+    
+    // API expects { "settings": {...} } wrapper
+    #[derive(serde::Serialize)]
+    struct Body {
+        settings: UserOpencodeSettings,
+    }
+    
+    let path = format!("/api/users/{}/opencode/settings", uid);
+    let response: SettingsUpdateResponse = client.put(&path, &Body { settings }).await?;
+    
+    Ok(response.settings)
+}
+
+/// Update user's AGENTS.md content
+#[tauri::command]
+pub async fn update_user_agents_md(
+    user_id: Option<String>,
+    content: String
+) -> Result<(), AppError> {
+    let client = ApiClient::new()?;
+    let uid = user_id.unwrap_or_else(|| "default-user".to_string());
+    
+    #[derive(serde::Serialize)]
+    struct Body {
+        content: String,
+    }
+    
+    #[derive(serde::Deserialize)]
+    struct Response {
+        success: bool,
+    }
+    
+    let path = format!("/api/users/{}/opencode/agents-md", uid);
+    let _response: Response = client.put(&path, &Body { content }).await?;
+    
+    Ok(())
+}
+
+/// List user's OpenCode config files (agents, commands, tools, plugins)
+#[tauri::command]
+pub async fn list_user_opencode_files(
+    user_id: Option<String>,
+    file_type: Option<String>
+) -> Result<Vec<UserOpencodeFile>, AppError> {
+    let client = ApiClient::new()?;
+    let uid = user_id.unwrap_or_else(|| "default-user".to_string());
+    
+    let mut path = format!("/api/users/{}/opencode/files", uid);
+    if let Some(ft) = file_type {
+        path = format!("{}?type={}", path, ft);
+    }
+    
+    let response: FilesListResponse = client.get(&path).await?;
+    
+    Ok(response.files)
+}
+
+/// Create or update a user's OpenCode config file
+#[tauri::command]
+pub async fn upsert_user_opencode_file(
+    user_id: Option<String>,
+    file_type: String,
+    name: String,
+    content: String,
+    extension: Option<String>
+) -> Result<UserOpencodeFile, AppError> {
+    let client = ApiClient::new()?;
+    let uid = user_id.unwrap_or_else(|| "default-user".to_string());
+    
+    #[derive(serde::Serialize)]
+    struct Body {
+        content: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        extension: Option<String>,
+    }
+    
+    #[derive(serde::Deserialize)]
+    struct Response {
+        file: UserOpencodeFile,
+    }
+    
+    let path = format!("/api/users/{}/opencode/files/{}/{}", uid, file_type, name);
+    let response: Response = client.put(&path, &Body { content, extension }).await?;
+    
+    Ok(response.file)
+}
+
+/// Delete a user's OpenCode config file
+#[tauri::command]
+pub async fn delete_user_opencode_file(
+    user_id: Option<String>,
+    file_type: String,
+    name: String
+) -> Result<(), AppError> {
+    let client = ApiClient::new()?;
+    let uid = user_id.unwrap_or_else(|| "default-user".to_string());
+    
+    let path = format!("/api/users/{}/opencode/files/{}/{}", uid, file_type, name);
+    
+    // DELETE request
+    let url = format!("{}{}", client.base_url(), path);
+    let request = client.client().delete(&url);
+    let request = client.add_auth_header(request);
+    let response = request.send().await
+        .map_err(|e| AppError::NetworkError(e.to_string()))?;
+    
+    if !response.status().is_success() {
+        return Err(AppError::ApiError(format!("Failed to delete file: {}", response.status())));
+    }
+    
+    Ok(())
 }

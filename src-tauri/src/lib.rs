@@ -23,6 +23,10 @@ use commands::{
     init_oauth_flow, poll_oauth_flow, cancel_oauth_flow,
     remove_provider_credentials, set_default_provider,
     list_configured_providers,
+    // User OpenCode config commands
+    get_user_opencode_config, update_user_opencode_settings,
+    update_user_agents_md, list_user_opencode_files,
+    upsert_user_opencode_file, delete_user_opencode_file,
     // OpenCode commands
     opencode_get_app_info, opencode_health_check, opencode_get_providers,
     opencode_list_sessions, opencode_create_session, opencode_get_session,
@@ -83,6 +87,13 @@ pub fn run() {
             cancel_oauth_flow,
             remove_provider_credentials,
             set_default_provider,
+            // User OpenCode config commands
+            get_user_opencode_config,
+            update_user_opencode_settings,
+            update_user_agents_md,
+            list_user_opencode_files,
+            upsert_user_opencode_file,
+            delete_user_opencode_file,
             // OpenCode commands - App Info & Health
             opencode_get_app_info,
             opencode_health_check,
