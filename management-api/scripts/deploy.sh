@@ -91,10 +91,11 @@ deploy_to_coolify() {
     
     log_info "Triggering deployment for app: ${APP_UUID}"
     
+    # Use deploy endpoint to rebuild from git, not just restart
     response=$(curl -s -X GET \
         -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
         -H "Content-Type: application/json" \
-        "${COOLIFY_URL}/api/v1/applications/${APP_UUID}/restart")
+        "${COOLIFY_URL}/api/v1/deploy?uuid=${APP_UUID}")
     
     echo "$response" | jq . 2>/dev/null || echo "$response"
     
