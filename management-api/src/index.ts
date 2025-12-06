@@ -72,6 +72,11 @@ console.log(`
 ║  - GET  /api/users/:id/opencode/files       List files        ║
 ║  - PUT  /api/users/:id/opencode/files/:t/:n Upsert file       ║
 ╠═══════════════════════════════════════════════════════════════╣
+║  Sync Endpoints (per project):                                ║
+║  - GET  /api/projects/:id/sync/status       Get sync status   ║
+║  - POST /api/projects/:id/sync              Trigger sync      ║
+║  - POST /api/projects/:id/sync/commit-config Commit config    ║
+╠═══════════════════════════════════════════════════════════════╣
 ║  Provider Endpoints:                                          ║
 ║  - GET  /api/providers             List providers             ║
 ║  - POST /api/providers/:id/configure  Set credentials         ║
