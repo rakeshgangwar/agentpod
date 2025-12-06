@@ -361,6 +361,11 @@ export const opencode = {
    * 
    * Note: OpenCode returns models as an object (keyed by model ID), but we 
    * transform it to an array for easier consumption by the mobile app.
+   * 
+   * We also filter out providers with source="env" as these are auto-detected
+   * from environment variables and may not actually be configured by the user.
+   * For example, when GitHub Copilot OAuth is set up, GITHUB_TOKEN leaks to
+   * github-models provider even though it wasn't explicitly configured.
    */
   async getProviders(projectId: string): Promise<Array<{
     id: string;
@@ -385,24 +390,28 @@ export const opencode = {
       );
     }
     
-    // OpenCode returns: { providers: [{ id, name, models: { modelId: { id, name, ... }, ... } }] }
+    // OpenCode returns: { providers: [{ id, name, source, models: { modelId: { id, name, ... }, ... } }] }
     // We transform to: [{ id, name, models: [{ id, name }, ...] }]
+    // We filter out providers with source="env" (auto-detected from environment)
     const data = await response.json() as { 
       providers: Array<{
         id: string;
         name: string;
+        source?: string;
         models: Record<string, { id: string; name: string }>;
       }>;
     };
     
-    return data.providers.map(provider => ({
-      id: provider.id,
-      name: provider.name,
-      models: Object.values(provider.models || {}).map(model => ({
-        id: model.id,
-        name: model.name,
-      })),
-    }));
+    return data.providers
+      .filter(provider => provider.source !== 'env')
+      .map(provider => ({
+        id: provider.id,
+        name: provider.name,
+        models: Object.values(provider.models || {}).map(model => ({
+          id: model.id,
+          name: model.name,
+        })),
+      }));
   },
 
   // ---------------------------------------------------------------------------
