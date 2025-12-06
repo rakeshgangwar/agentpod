@@ -28,6 +28,7 @@
   import { Switch } from "$lib/components/ui/switch";
   import * as Card from "$lib/components/ui/card";
   import * as Select from "$lib/components/ui/select";
+  import LlmProviderSelector from "$lib/components/llm-provider-selector.svelte";
 
   // Redirect if not connected
   $effect(() => {
@@ -57,6 +58,10 @@
   let exportData = $state<string | null>(null);
   let importInput = $state("");
   let showImportDialog = $state(false);
+  
+  // LLM Provider selector state
+  let selectedModel = $state("");
+  let showAllProviders = $state(false);
 
   async function handleDisconnect() {
     await disconnect();
@@ -254,57 +259,18 @@
       </Card.Root>
 
       <!-- LLM Providers -->
-      <Card.Root>
+      <Card.Root class="md:col-span-2">
         <Card.Header>
           <Card.Title>LLM Providers</Card.Title>
           <Card.Description>
-            Configure AI model providers
+            Configure AI model providers. Click "Configure" to add API keys or authenticate with OAuth.
           </Card.Description>
         </Card.Header>
-        <Card.Content class="space-y-4">
-          {#if settings.providers.length > 0}
-            <div class="space-y-2">
-              <Label for="default-provider">Default Provider</Label>
-              <Select.Root 
-                type="single"
-                value={settings.defaultProviderId ?? ""}
-                onValueChange={(v) => handleProviderChange(v || undefined)}
-              >
-                <Select.Trigger class="w-full">
-                  {settings.defaultProvider?.name ?? "Select a provider..."}
-                </Select.Trigger>
-                <Select.Content>
-                  {#each settings.configuredProviders as provider}
-                    <Select.Item value={provider.id} label={provider.isDefault ? `${provider.name} (API default)` : provider.name} />
-                  {/each}
-                </Select.Content>
-              </Select.Root>
-              <p class="text-xs text-muted-foreground">
-                Used when creating new projects
-              </p>
-            </div>
-
-            <div class="space-y-2">
-              <Label class="text-muted-foreground text-xs">Available Providers</Label>
-              <div class="space-y-2">
-                {#each settings.providers as provider}
-                  <div class="flex items-center justify-between p-2 border rounded-md text-sm">
-                    <div class="flex items-center gap-2">
-                      <span class="h-2 w-2 rounded-full {provider.isConfigured ? 'bg-green-500' : 'bg-muted'}"></span>
-                      <span>{provider.name}</span>
-                    </div>
-                    <span class="text-xs text-muted-foreground">
-                      {provider.isConfigured ? "Configured" : "Not configured"}
-                    </span>
-                  </div>
-                {/each}
-              </div>
-            </div>
-          {:else if settings.isLoading}
-            <p class="text-sm text-muted-foreground">Loading providers...</p>
-          {:else}
-            <p class="text-sm text-muted-foreground">No providers available. Configure providers in the Management API.</p>
-          {/if}
+        <Card.Content>
+          <LlmProviderSelector
+            bind:selectedModel
+            bind:showAllProviders
+          />
         </Card.Content>
       </Card.Root>
 
