@@ -25,6 +25,41 @@ else
 fi
 
 # =============================================================================
+# Create opencode.json for OpenCode configuration (permissions, MCP, etc.)
+# =============================================================================
+CONFIG_FILE="/workspace/opencode.json"
+
+# If OPENCODE_CONFIG_JSON is provided, write it to opencode.json in workspace
+# This configures permissions, MCP servers, and other settings
+if [ -n "$OPENCODE_CONFIG_JSON" ]; then
+    echo "Writing opencode.json from OPENCODE_CONFIG_JSON environment variable..."
+    echo "$OPENCODE_CONFIG_JSON" > "$CONFIG_FILE"
+    echo "OpenCode configuration complete:"
+    cat "$CONFIG_FILE" | jq '.' 2>/dev/null || echo "(could not parse JSON)"
+else
+    # Create a default opencode.json with secure permission defaults
+    echo "No OPENCODE_CONFIG_JSON provided. Creating default secure configuration..."
+    cat > "$CONFIG_FILE" << 'EOF'
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permissions": {
+    "bash": "ask",
+    "edit": "grant",
+    "read": "grant",
+    "write": "ask",
+    "glob": "grant",
+    "grep": "grant",
+    "webfetch": "ask",
+    "todoread": "grant",
+    "todowrite": "grant",
+    "mcp": "ask"
+  }
+}
+EOF
+    echo "Default permissions configured (bash, write, webfetch, mcp require approval)"
+fi
+
+# =============================================================================
 # Clone repository
 # =============================================================================
 
