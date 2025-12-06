@@ -21,10 +21,20 @@
     importSettingsJson,
     resetSettings 
   } from "$lib/stores/settings.svelte";
-  import type { Theme, PermissionLevel, PermissionSettings, UserOpencodeSettings } from "$lib/api/tauri";
+  import type { 
+    Theme, 
+    PermissionLevel, 
+    PermissionSettings, 
+    UserOpencodeSettings,
+    UserOpencodeFile 
+  } from "$lib/api/tauri";
   import { 
     getUserOpencodeConfig, 
-    updateUserOpencodeSettings 
+    updateUserOpencodeSettings,
+    updateUserAgentsMd,
+    listUserOpencodeFiles,
+    upsertUserOpencodeFile,
+    deleteUserOpencodeFile
   } from "$lib/api/tauri";
   import { Button } from "$lib/components/ui/button";
   import { Label } from "$lib/components/ui/label";
@@ -32,6 +42,8 @@
   import { Switch } from "$lib/components/ui/switch";
   import * as Card from "$lib/components/ui/card";
   import * as Select from "$lib/components/ui/select";
+  import * as Tabs from "$lib/components/ui/tabs";
+  import * as Dialog from "$lib/components/ui/dialog";
   import LlmProviderSelector from "$lib/components/llm-provider-selector.svelte";
 
   // Redirect if not connected
@@ -73,6 +85,32 @@
   let opencodeConfigError = $state<string | null>(null);
   let permissionSettings = $state<PermissionSettings>({});
   
+  // AGENTS.md state
+  let agentsMd = $state("");
+  let agentsMdOriginal = $state("");
+  let agentsMdSaving = $state(false);
+  
+  // Config files state
+  let configFiles = $state<UserOpencodeFile[]>([]);
+  let configFilesLoading = $state(false);
+  let selectedFileType = $state<"agent" | "command" | "tool" | "plugin">("agent");
+  let selectedFile = $state<UserOpencodeFile | null>(null);
+  let editingFileContent = $state("");
+  let fileSaving = $state(false);
+  
+  // New file dialog state
+  let showNewFileDialog = $state(false);
+  let newFileName = $state("");
+  let newFileType = $state<"agent" | "command" | "tool" | "plugin">("agent");
+  let newFileExtension = $state<"md" | "ts" | "js">("md");
+  let newFileContent = $state("");
+  let newFileCreating = $state(false);
+  
+  // Delete confirmation state
+  let showDeleteDialog = $state(false);
+  let fileToDelete = $state<UserOpencodeFile | null>(null);
+  let fileDeleting = $state(false);
+  
   // Load OpenCode config on mount
   $effect(() => {
     if (connection.isConnected) {
@@ -86,6 +124,9 @@
     try {
       const config = await getUserOpencodeConfig();
       permissionSettings = config.settings.permission || {};
+      agentsMd = config.agents_md || "";
+      agentsMdOriginal = agentsMd;
+      configFiles = config.files || [];
     } catch (e) {
       const error = e as Error;
       opencodeConfigError = error.message || "Failed to load OpenCode configuration";
@@ -94,6 +135,205 @@
       opencodeConfigLoading = false;
     }
   }
+  
+  // AGENTS.md handlers
+  async function handleSaveAgentsMd() {
+    agentsMdSaving = true;
+    try {
+      await updateUserAgentsMd(agentsMd);
+      agentsMdOriginal = agentsMd;
+      toast.success("AGENTS.md saved successfully");
+    } catch (e) {
+      const error = e as Error;
+      toast.error("Failed to save AGENTS.md", { description: error.message });
+    } finally {
+      agentsMdSaving = false;
+    }
+  }
+  
+  function handleResetAgentsMd() {
+    agentsMd = agentsMdOriginal;
+  }
+  
+  // Config files handlers
+  async function loadConfigFiles(fileType?: "agent" | "command" | "tool" | "plugin") {
+    configFilesLoading = true;
+    try {
+      configFiles = await listUserOpencodeFiles(fileType);
+    } catch (e) {
+      console.error("Failed to load config files:", e);
+    } finally {
+      configFilesLoading = false;
+    }
+  }
+  
+  function handleSelectFile(file: UserOpencodeFile) {
+    selectedFile = file;
+    editingFileContent = file.content;
+  }
+  
+  async function handleSaveFile() {
+    if (!selectedFile) return;
+    fileSaving = true;
+    try {
+      await upsertUserOpencodeFile(
+        selectedFile.type,
+        selectedFile.name,
+        editingFileContent,
+        selectedFile.extension
+      );
+      // Update local state
+      selectedFile = { ...selectedFile, content: editingFileContent };
+      configFiles = configFiles.map(f => 
+        f.name === selectedFile!.name && f.type === selectedFile!.type 
+          ? { ...f, content: editingFileContent }
+          : f
+      );
+      toast.success(`${selectedFile.name}.${selectedFile.extension} saved`);
+    } catch (e) {
+      const error = e as Error;
+      toast.error("Failed to save file", { description: error.message });
+    } finally {
+      fileSaving = false;
+    }
+  }
+  
+  function handleCloseFile() {
+    selectedFile = null;
+    editingFileContent = "";
+  }
+  
+  // New file handlers
+  function handleOpenNewFileDialog() {
+    newFileName = "";
+    newFileType = selectedFileType;
+    newFileExtension = selectedFileType === "agent" || selectedFileType === "command" ? "md" : "ts";
+    newFileContent = getDefaultFileContent(newFileType);
+    showNewFileDialog = true;
+  }
+  
+  function getDefaultFileContent(type: "agent" | "command" | "tool" | "plugin"): string {
+    switch (type) {
+      case "agent":
+        return `---
+description: My custom agent
+mode: subagent
+model: anthropic/claude-sonnet-4-5
+temperature: 0.7
+---
+
+You are a helpful assistant.
+
+## Guidelines
+- Be concise and helpful
+- Focus on the task at hand
+`;
+      case "command":
+        return `---
+description: My custom command
+---
+
+# Instructions
+
+This command does the following:
+
+1. First step
+2. Second step
+`;
+      case "tool":
+      case "plugin":
+        return `// ${type === "tool" ? "Custom tool" : "Custom plugin"} implementation
+export default {
+  name: "my-${type}",
+  description: "A custom ${type}",
+  
+  async execute(args: unknown) {
+    // Implementation here
+    return { success: true };
+  }
+};
+`;
+      default:
+        return "";
+    }
+  }
+  
+  async function handleCreateFile() {
+    if (!newFileName.trim()) {
+      toast.error("File name is required");
+      return;
+    }
+    
+    // Validate filename (alphanumeric, dashes, underscores)
+    if (!/^[a-zA-Z0-9_-]+$/.test(newFileName)) {
+      toast.error("Invalid file name", { 
+        description: "Use only letters, numbers, dashes, and underscores" 
+      });
+      return;
+    }
+    
+    newFileCreating = true;
+    try {
+      const file = await upsertUserOpencodeFile(
+        newFileType,
+        newFileName,
+        newFileContent,
+        newFileExtension
+      );
+      configFiles = [...configFiles, file];
+      showNewFileDialog = false;
+      toast.success(`${newFileName}.${newFileExtension} created`);
+      // Select the new file
+      handleSelectFile(file);
+    } catch (e) {
+      const error = e as Error;
+      toast.error("Failed to create file", { description: error.message });
+    } finally {
+      newFileCreating = false;
+    }
+  }
+  
+  // Delete handlers
+  function handleDeleteFile(file: UserOpencodeFile) {
+    fileToDelete = file;
+    showDeleteDialog = true;
+  }
+  
+  async function handleConfirmDelete() {
+    if (!fileToDelete) return;
+    fileDeleting = true;
+    try {
+      await deleteUserOpencodeFile(fileToDelete.type, fileToDelete.name);
+      configFiles = configFiles.filter(f => 
+        !(f.name === fileToDelete!.name && f.type === fileToDelete!.type)
+      );
+      if (selectedFile?.name === fileToDelete.name && selectedFile?.type === fileToDelete.type) {
+        selectedFile = null;
+        editingFileContent = "";
+      }
+      toast.success(`${fileToDelete.name}.${fileToDelete.extension} deleted`);
+      showDeleteDialog = false;
+      fileToDelete = null;
+    } catch (e) {
+      const error = e as Error;
+      toast.error("Failed to delete file", { description: error.message });
+    } finally {
+      fileDeleting = false;
+    }
+  }
+  
+  // Filter files by type
+  function getFilteredFiles(type: "agent" | "command" | "tool" | "plugin"): UserOpencodeFile[] {
+    return configFiles.filter(f => f.type === type);
+  }
+  
+  // File type tabs config
+  const fileTypeTabs = [
+    { value: "agent", label: "Agents", description: "Custom AI agent definitions" },
+    { value: "command", label: "Commands", description: "Custom slash commands" },
+    { value: "tool", label: "Tools", description: "Custom tool implementations" },
+    { value: "plugin", label: "Plugins", description: "Custom plugins" },
+  ] as const;
 
   async function handlePermissionChange(tool: keyof PermissionSettings, value: PermissionLevel) {
     opencodeConfigSaving = true;
@@ -429,6 +669,190 @@
         {/if}
       </Card.Root>
 
+      <!-- AGENTS.md Editor -->
+      <Card.Root class="md:col-span-2">
+        <Card.Header>
+          <Card.Title>Global Instructions (AGENTS.md)</Card.Title>
+          <Card.Description>
+            Define global instructions and context for OpenCode that apply to all your projects.
+            This is your personal AGENTS.md file.
+          </Card.Description>
+        </Card.Header>
+        <Card.Content class="space-y-4">
+          {#if opencodeConfigLoading}
+            <div class="flex items-center justify-center py-8">
+              <div class="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
+              <span class="ml-2 text-muted-foreground">Loading...</span>
+            </div>
+          {:else}
+            <textarea 
+              bind:value={agentsMd}
+              placeholder="# My Global Instructions&#10;&#10;Add your personal coding preferences, guidelines, and context here..."
+              class="w-full h-64 p-3 text-sm font-mono border rounded-md bg-background resize-y"
+            ></textarea>
+            <p class="text-xs text-muted-foreground">
+              Use Markdown formatting. These instructions will be included in all your OpenCode sessions.
+            </p>
+          {/if}
+        </Card.Content>
+        <Card.Footer class="flex gap-2">
+          <Button 
+            onclick={handleSaveAgentsMd}
+            disabled={agentsMdSaving || agentsMd === agentsMdOriginal}
+          >
+            {agentsMdSaving ? "Saving..." : "Save Changes"}
+          </Button>
+          <Button 
+            variant="outline"
+            onclick={handleResetAgentsMd}
+            disabled={agentsMd === agentsMdOriginal}
+          >
+            Discard Changes
+          </Button>
+        </Card.Footer>
+      </Card.Root>
+
+      <!-- Config Files Management -->
+      <Card.Root class="md:col-span-2">
+        <Card.Header>
+          <div class="flex items-center justify-between">
+            <div>
+              <Card.Title>Custom Agents & Commands</Card.Title>
+              <Card.Description>
+                Create and manage custom agents, commands, tools, and plugins.
+                These are available in all your projects.
+              </Card.Description>
+            </div>
+            <Button onclick={handleOpenNewFileDialog} size="sm">
+              + New File
+            </Button>
+          </div>
+        </Card.Header>
+        <Card.Content class="space-y-4">
+          {#if opencodeConfigLoading}
+            <div class="flex items-center justify-center py-8">
+              <div class="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
+              <span class="ml-2 text-muted-foreground">Loading files...</span>
+            </div>
+          {:else}
+            <Tabs.Root bind:value={selectedFileType}>
+              <Tabs.List class="grid w-full grid-cols-4">
+                {#each fileTypeTabs as tab}
+                  <Tabs.Trigger value={tab.value}>
+                    {tab.label}
+                    {#if getFilteredFiles(tab.value).length > 0}
+                      <span class="ml-1 text-xs bg-muted px-1.5 py-0.5 rounded-full">
+                        {getFilteredFiles(tab.value).length}
+                      </span>
+                    {/if}
+                  </Tabs.Trigger>
+                {/each}
+              </Tabs.List>
+              
+              {#each fileTypeTabs as tab}
+                <Tabs.Content value={tab.value} class="mt-4">
+                  <p class="text-sm text-muted-foreground mb-3">{tab.description}</p>
+                  
+                  {#if getFilteredFiles(tab.value).length === 0}
+                    <div class="text-center py-8 border-2 border-dashed rounded-lg">
+                      <p class="text-muted-foreground">No {tab.label.toLowerCase()} yet</p>
+                      <Button 
+                        variant="link" 
+                        onclick={() => {
+                          newFileType = tab.value;
+                          handleOpenNewFileDialog();
+                        }}
+                      >
+                        Create your first {tab.value}
+                      </Button>
+                    </div>
+                  {:else}
+                    <div class="space-y-2">
+                      {#each getFilteredFiles(tab.value) as file}
+                        <div 
+                          class="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors {selectedFile?.name === file.name && selectedFile?.type === file.type ? 'bg-muted border-primary' : ''}"
+                          onclick={() => handleSelectFile(file)}
+                          onkeydown={(e) => e.key === 'Enter' && handleSelectFile(file)}
+                          tabindex="0"
+                          role="button"
+                        >
+                          <div class="flex items-center gap-3">
+                            <span class="text-lg">
+                              {#if file.type === "agent"}
+                                🤖
+                              {:else if file.type === "command"}
+                                ⚡
+                              {:else if file.type === "tool"}
+                                🔧
+                              {:else}
+                                🔌
+                              {/if}
+                            </span>
+                            <div>
+                              <p class="font-medium">{file.name}</p>
+                              <p class="text-xs text-muted-foreground">{file.name}.{file.extension}</p>
+                            </div>
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onclick={(e: MouseEvent) => {
+                              e.stopPropagation();
+                              handleDeleteFile(file);
+                            }}
+                            class="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      {/each}
+                    </div>
+                  {/if}
+                  
+                  <!-- File Editor -->
+                  {#if selectedFile && selectedFile.type === tab.value}
+                    <div class="mt-4 p-4 border rounded-lg bg-muted/30">
+                      <div class="flex items-center justify-between mb-3">
+                        <h4 class="font-medium">
+                          Editing: {selectedFile.name}.{selectedFile.extension}
+                        </h4>
+                        <Button variant="ghost" size="sm" onclick={handleCloseFile}>
+                          Close
+                        </Button>
+                      </div>
+                      <textarea 
+                        bind:value={editingFileContent}
+                        class="w-full h-64 p-3 text-sm font-mono border rounded-md bg-background resize-y"
+                      ></textarea>
+                      <div class="flex gap-2 mt-3">
+                        <Button 
+                          onclick={handleSaveFile}
+                          disabled={fileSaving || editingFileContent === selectedFile.content}
+                        >
+                          {fileSaving ? "Saving..." : "Save"}
+                        </Button>
+                        <Button 
+                          variant="outline"
+                          onclick={() => editingFileContent = selectedFile?.content || ""}
+                          disabled={editingFileContent === selectedFile.content}
+                        >
+                          Reset
+                        </Button>
+                      </div>
+                    </div>
+                  {/if}
+                </Tabs.Content>
+              {/each}
+            </Tabs.Root>
+          {/if}
+        </Card.Content>
+        <Card.Footer>
+          <p class="text-xs text-muted-foreground">
+            Changes require container restart to take effect.
+          </p>
+        </Card.Footer>
+      </Card.Root>
+
       <!-- Preferences -->
       <Card.Root>
         <Card.Header>
@@ -636,3 +1060,121 @@
     </div>
   </div>
 </main>
+
+<!-- New File Dialog -->
+<Dialog.Root bind:open={showNewFileDialog}>
+  <Dialog.Content class="sm:max-w-lg">
+    <Dialog.Header>
+      <Dialog.Title>Create New File</Dialog.Title>
+      <Dialog.Description>
+        Create a new {newFileType} file that will be available in all your projects.
+      </Dialog.Description>
+    </Dialog.Header>
+    <div class="space-y-4 py-4">
+      <div class="space-y-2">
+        <Label for="new-file-type">Type</Label>
+        <Select.Root 
+          type="single"
+          value={newFileType}
+          onValueChange={(v) => {
+            if (v) {
+              newFileType = v as typeof newFileType;
+              newFileExtension = v === "agent" || v === "command" ? "md" : "ts";
+              newFileContent = getDefaultFileContent(v as typeof newFileType);
+            }
+          }}
+        >
+          <Select.Trigger class="w-full">
+            {fileTypeTabs.find(t => t.value === newFileType)?.label ?? "Agent"}
+          </Select.Trigger>
+          <Select.Content>
+            {#each fileTypeTabs as tab}
+              <Select.Item value={tab.value} label={tab.label} />
+            {/each}
+          </Select.Content>
+        </Select.Root>
+      </div>
+      
+      <div class="space-y-2">
+        <Label for="new-file-name">Name</Label>
+        <div class="flex items-center gap-2">
+          <Input 
+            id="new-file-name"
+            bind:value={newFileName}
+            placeholder="my-{newFileType}"
+            class="flex-1"
+          />
+          <span class="text-muted-foreground">.{newFileExtension}</span>
+        </div>
+        <p class="text-xs text-muted-foreground">
+          Use lowercase letters, numbers, dashes, and underscores only.
+        </p>
+      </div>
+      
+      {#if newFileType === "tool" || newFileType === "plugin"}
+        <div class="space-y-2">
+          <Label>Extension</Label>
+          <Select.Root 
+            type="single"
+            value={newFileExtension}
+            onValueChange={(v) => {
+              if (v) newFileExtension = v as typeof newFileExtension;
+            }}
+          >
+            <Select.Trigger class="w-24">
+              .{newFileExtension}
+            </Select.Trigger>
+            <Select.Content>
+              <Select.Item value="ts" label=".ts" />
+              <Select.Item value="js" label=".js" />
+            </Select.Content>
+          </Select.Root>
+        </div>
+      {/if}
+      
+      <div class="space-y-2">
+        <Label>Content</Label>
+        <textarea 
+          bind:value={newFileContent}
+          class="w-full h-48 p-3 text-sm font-mono border rounded-md bg-background resize-y"
+        ></textarea>
+      </div>
+    </div>
+    <Dialog.Footer>
+      <Button variant="outline" onclick={() => showNewFileDialog = false}>
+        Cancel
+      </Button>
+      <Button 
+        onclick={handleCreateFile}
+        disabled={newFileCreating || !newFileName.trim()}
+      >
+        {newFileCreating ? "Creating..." : "Create"}
+      </Button>
+    </Dialog.Footer>
+  </Dialog.Content>
+</Dialog.Root>
+
+<!-- Delete Confirmation Dialog -->
+<Dialog.Root bind:open={showDeleteDialog}>
+  <Dialog.Content class="sm:max-w-md">
+    <Dialog.Header>
+      <Dialog.Title>Delete File</Dialog.Title>
+      <Dialog.Description>
+        Are you sure you want to delete "{fileToDelete?.name}.{fileToDelete?.extension}"?
+        This action cannot be undone.
+      </Dialog.Description>
+    </Dialog.Header>
+    <Dialog.Footer>
+      <Button variant="outline" onclick={() => showDeleteDialog = false}>
+        Cancel
+      </Button>
+      <Button 
+        variant="destructive"
+        onclick={handleConfirmDelete}
+        disabled={fileDeleting}
+      >
+        {fileDeleting ? "Deleting..." : "Delete"}
+      </Button>
+    </Dialog.Footer>
+  </Dialog.Content>
+</Dialog.Root>
