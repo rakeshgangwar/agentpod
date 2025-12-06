@@ -161,6 +161,52 @@ export const opencodeRoutes = new Hono()
   })
 
   // ===========================================================================
+  // Permissions
+  // ===========================================================================
+
+  /**
+   * POST /api/projects/:id/opencode/session/:sessionId/permissions/:permissionId
+   * Respond to a permission request
+   * 
+   * Body: { response: "once" | "always" | "reject" }
+   * - "once": Allow this specific request only
+   * - "always": Allow all future requests matching this pattern
+   * - "reject": Deny this request
+   */
+  .post('/:id/opencode/session/:sessionId/permissions/:permissionId', async (c) => {
+    const projectId = c.req.param('id');
+    const sessionId = c.req.param('sessionId');
+    const permissionId = c.req.param('permissionId');
+    
+    try {
+      const body = await c.req.json();
+      const response = body.response;
+      
+      // Validate response value
+      if (!['once', 'always', 'reject'].includes(response)) {
+        return c.json({ 
+          error: 'Invalid response value. Must be "once", "always", or "reject"' 
+        }, 400);
+      }
+      
+      const result = await opencode.respondToPermission(
+        projectId, 
+        sessionId, 
+        permissionId, 
+        response
+      );
+      
+      return c.json({ success: result });
+    } catch (error) {
+      if (error instanceof OpenCodeProxyError) {
+        return c.json({ error: error.message, details: error.details }, error.statusCode as 400);
+      }
+      log.error('Failed to respond to permission', { projectId, sessionId, permissionId, error });
+      return c.json({ error: 'Internal server error' }, 500);
+    }
+  })
+
+  // ===========================================================================
   // Messages
   // ===========================================================================
 

@@ -415,6 +415,73 @@ export const opencode = {
   },
 
   // ---------------------------------------------------------------------------
+  // Permissions
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Respond to a permission request
+   * 
+   * @param projectId - The project ID
+   * @param sessionId - The session ID
+   * @param permissionId - The permission request ID
+   * @param response - "once" (allow this time), "always" (allow pattern), "reject" (deny)
+   */
+  async respondToPermission(
+    projectId: string,
+    sessionId: string,
+    permissionId: string,
+    response: 'once' | 'always' | 'reject'
+  ): Promise<boolean> {
+    const { project } = await getClient(projectId);
+    const baseUrl = await getOpenCodeUrl(project);
+    
+    // Make direct HTTP call to the permissions endpoint
+    // POST /session/{sessionId}/permissions/{permissionId}
+    const url = new URL(`/session/${sessionId}/permissions/${permissionId}`, baseUrl);
+    
+    log.info('Responding to permission request', { 
+      projectId, 
+      sessionId, 
+      permissionId, 
+      response 
+    });
+    
+    const httpResponse = await fetch(url.toString(), {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({ response }),
+    });
+    
+    if (!httpResponse.ok) {
+      const errorText = await httpResponse.text().catch(() => 'Unknown error');
+      log.error('Failed to respond to permission', { 
+        projectId, 
+        sessionId, 
+        permissionId, 
+        status: httpResponse.status,
+        error: errorText 
+      });
+      throw new OpenCodeProxyError(
+        `Failed to respond to permission: ${httpResponse.statusText}`,
+        httpResponse.status,
+        errorText
+      );
+    }
+    
+    log.info('Permission response sent successfully', { 
+      projectId, 
+      sessionId, 
+      permissionId, 
+      response 
+    });
+    
+    return true;
+  },
+
+  // ---------------------------------------------------------------------------
   // Events (SSE)
   // ---------------------------------------------------------------------------
 
