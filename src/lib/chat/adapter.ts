@@ -36,13 +36,14 @@ interface SessionState {
  * Create an OpenCode chat model adapter for a specific project
  * 
  * @param projectId - The project ID to connect to
+ * @param initialSessionId - Optional session ID to use (if not provided, uses most recent or creates new)
  * @returns ChatModelAdapter compatible with assistant-ui
  */
-export function createOpenCodeAdapter(projectId: string): ChatModelAdapter {
+export function createOpenCodeAdapter(projectId: string, initialSessionId?: string): ChatModelAdapter {
   // Session state - persisted across runs
   const state: SessionState = {
     projectId,
-    sessionId: null,
+    sessionId: initialSessionId || null,
   };
 
   // Stream instance for SSE events
@@ -82,13 +83,11 @@ export function createOpenCodeAdapter(projectId: string): ChatModelAdapter {
         // Set up streaming state
         let accumulatedText = "";
         let assistantMessageId: string | null = null;
-        let streamingResolve: ((value: void) => void) | null = null;
         let streamError: Error | null = null;
-
-        // Create a promise that resolves when streaming is done
-        const streamingComplete = new Promise<void>((resolve) => {
-          streamingResolve = resolve;
-        });
+        let isStreamingDone = false;
+        
+        // Helper to mark streaming as done
+        const markDone = () => { isStreamingDone = true; };
 
         // Connect to SSE stream
         console.log('[OpenCode Adapter] Connecting to SSE stream for project:', state.projectId);
@@ -149,29 +148,29 @@ export function createOpenCodeAdapter(projectId: string): ChatModelAdapter {
             
             // Session idle = processing complete
             if (event.eventType === "session.idle") {
-              streamingResolve?.();
+              markDone();
             }
             
             // Also check session.status for idle state
             if (event.eventType === "session.status") {
               const status = eventData.properties?.status;
               if (status?.type === "idle") {
-                streamingResolve?.();
+                markDone();
               }
             }
             
             // Handle errors
             if (event.eventType === "error") {
               streamError = new Error(String(event.data));
-              streamingResolve?.();
+              markDone();
             }
           },
           (status, error) => {
             if (status === "error") {
               streamError = new Error(error || "Stream error");
-              streamingResolve?.();
+              markDone();
             } else if (status === "disconnected") {
-              streamingResolve?.();
+              markDone();
             }
           }
         );
@@ -182,15 +181,33 @@ export function createOpenCodeAdapter(projectId: string): ChatModelAdapter {
             opencodeAbortSession(state.projectId, state.sessionId).catch(console.error);
           }
           stream?.disconnect().catch(console.error);
-          streamingResolve?.();
+          markDone();
         };
         abortSignal?.addEventListener("abort", abortHandler);
 
         // Send the message (this triggers the AI response)
         console.log('[OpenCode Adapter] Sending message to session:', state.sessionId);
         try {
-          await opencodeSendMessage(state.projectId, state.sessionId, textContent.text);
-          console.log('[OpenCode Adapter] Message sent successfully');
+          const sendResponse = await opencodeSendMessage(state.projectId, state.sessionId, textContent.text);
+          console.log('[OpenCode Adapter] Message sent successfully, response:', sendResponse);
+          
+          // Extract text from the response parts as fallback
+          if (sendResponse && sendResponse.parts) {
+            const textParts = sendResponse.parts
+              .filter((part: { type: string; text?: string }) => part.type === "text" && part.text)
+              .map((part: { text?: string }) => part.text!)
+              .join("");
+            if (textParts && !accumulatedText) {
+              accumulatedText = textParts;
+              console.log('[OpenCode Adapter] Using response text as fallback:', accumulatedText);
+            }
+          }
+          
+          // If the response has a finish state, we're done (no need to wait for SSE)
+          if (sendResponse?.info?.finish) {
+            console.log('[OpenCode Adapter] Response complete with finish state:', sendResponse.info.finish);
+            markDone();
+          }
         } catch (sendError) {
           console.error('[OpenCode Adapter] Failed to send message:', sendError);
           throw sendError;
@@ -198,12 +215,12 @@ export function createOpenCodeAdapter(projectId: string): ChatModelAdapter {
 
         // Poll for updates and yield streaming results
         let lastYieldedText = "";
-        while (true) {
-          // Check if streaming is complete
-          const raceResult = await Promise.race([
-            streamingComplete.then(() => "done" as const),
-            new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 100)),
-          ]);
+        const maxWaitTime = 60000; // 60 seconds max wait
+        const startTime = Date.now();
+        
+        while (!isStreamingDone && (Date.now() - startTime) < maxWaitTime) {
+          // Wait a bit before checking again
+          await new Promise((resolve) => setTimeout(resolve, 100));
 
           // Yield current state if text has changed
           if (accumulatedText !== lastYieldedText) {
@@ -211,10 +228,6 @@ export function createOpenCodeAdapter(projectId: string): ChatModelAdapter {
             yield {
               content: [{ type: "text", text: accumulatedText }],
             };
-          }
-
-          if (raceResult === "done") {
-            break;
           }
         }
 

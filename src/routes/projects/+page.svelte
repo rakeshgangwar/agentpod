@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import { confirm } from "@tauri-apps/plugin-dialog";
   import { connection } from "$lib/stores/connection.svelte";
   import { projects, fetchProjects, startProject, stopProject, deleteProject, createProject } from "$lib/stores/projects.svelte";
   import { Button } from "$lib/components/ui/button";
@@ -57,7 +58,12 @@
     }
   }
 
-  function handleProjectClick(projectId: string) {
+  function handleProjectClick(e: MouseEvent, projectId: string) {
+    // Don't navigate if clicking on a button or inside a button
+    const target = e.target as HTMLElement;
+    if (target.closest('button')) {
+      return;
+    }
     goto(`/projects/${projectId}`);
   }
 </script>
@@ -154,7 +160,7 @@
     {:else}
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {#each projects.list as project (project.id)}
-          <Card.Root class="cursor-pointer hover:shadow-md transition-shadow" onclick={() => handleProjectClick(project.id)}>
+          <Card.Root class="cursor-pointer hover:shadow-md transition-shadow" onclick={(e: MouseEvent) => handleProjectClick(e, project.id)}>
             <Card.Header>
               <div class="flex items-start justify-between">
                 <div class="min-w-0 flex-1">
@@ -175,7 +181,7 @@
                 </p>
               </Card.Content>
             {/if}
-            <Card.Footer class="flex flex-wrap gap-2">
+            <Card.Footer class="flex flex-wrap gap-2 relative z-10">
               {#if project.status === "stopped"}
                 <Button 
                   size="sm" 
@@ -197,9 +203,14 @@
               <Button 
                 size="sm" 
                 variant="destructive"
-                onclick={(e: MouseEvent) => {
+                onclick={async (e: MouseEvent) => {
                   e.stopPropagation();
-                  if (confirm(`Delete project "${project.name}"?`)) {
+                  console.log("Delete button clicked for project:", project.name);
+                  const shouldDelete = await confirm(`Delete project "${project.name}"?`, {
+                    title: "Confirm Delete",
+                    kind: "warning",
+                  });
+                  if (shouldDelete) {
                     deleteProject(project.id);
                   }
                 }}
