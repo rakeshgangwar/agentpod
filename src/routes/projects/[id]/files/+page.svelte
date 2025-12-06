@@ -4,6 +4,7 @@
   import { Button } from "$lib/components/ui/button";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { ScrollArea } from "$lib/components/ui/scroll-area";
+  import { CodeBlock } from "$lib/components/ui/code-block";
   import {
     opencodeListFiles,
     opencodeGetFileContent,
@@ -305,9 +306,11 @@
           {:else if contentError}
             <div class="p-4 text-sm text-destructive">{contentError}</div>
           {:else if fileContent}
-            <pre
-              class="p-4 text-sm font-mono whitespace-pre-wrap break-words leading-relaxed"
-            ><code>{fileContent.content}</code></pre>
+            <CodeBlock 
+              code={fileContent.content} 
+              language={getLanguage(selectedFile.name)}
+              class="h-full"
+            />
           {/if}
         </ScrollArea>
       </Card.Content>
