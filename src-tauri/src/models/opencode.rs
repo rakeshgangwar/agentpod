@@ -289,7 +289,6 @@ pub struct OpenCodeHealth {
 #[serde(rename_all = "camelCase")]
 pub struct OpenCodeEvent {
     /// Event type (e.g., "session.updated", "message.part.updated", "tool.execute")
-    #[serde(rename = "type")]
     pub event_type: String,
     /// Event data (varies by event type)
     pub data: serde_json::Value,
@@ -297,6 +296,7 @@ pub struct OpenCodeEvent {
 
 /// SSE stream connection result
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StreamConnection {
     /// Unique stream ID for this connection
     pub stream_id: String,

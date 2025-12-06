@@ -66,6 +66,9 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.3
         version: 19.2.3(@types/react@19.2.7)
+      assistant-stream:
+        specifier: ^0.2.42
+        version: 0.2.42
       bits-ui:
         specifier: ^2.14.4
         version: 2.14.4(@internationalized/date@3.10.0)(@sveltejs/kit@2.49.1(@sveltejs/vite-plugin-svelte@5.1.1(svelte@5.45.5)(vite@6.4.1(jiti@2.6.1)(lightningcss@1.30.2)))(svelte@5.45.5)(vite@6.4.1(jiti@2.6.1)(lightningcss@1.30.2)))(svelte@5.45.5)

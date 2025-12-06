@@ -2,7 +2,7 @@
 
 Implement the main user-facing features: project management, chat interface, file browser, and real-time updates.
 
-## Current Status: In Progress (70% Complete)
+## Current Status: In Progress (90% Complete)
 
 **Last Updated:** 2025-12-06
 
@@ -15,13 +15,20 @@ Implement the main user-facing features: project management, chat interface, fil
 - Rust integration tests for API client
 - Session management (create, list, get)
 - Message sending via SDK
+- **File browser with lazy-loading** - Folders load contents on expand
+- **Shiki syntax highlighting** - VS Code-quality highlighting for 30+ languages
+- **Markdown rendering with marked** - Full GFM support with code block highlighting
+- File viewer with Raw/Preview toggle for markdown files
 
 ### In Progress
 - Chat UI message rendering (SSE events received but display issues)
-- Intermittent 502 errors from Management API proxy
+
+### Remaining
+- Settings store and commands
+- OAuth integration skeleton
 
 ### Blockers
-- Intermittent 502 Bad Gateway errors when proxying to OpenCode containers
+- Intermittent 502 Bad Gateway errors when proxying to OpenCode containers (less frequent)
 - Chat adapter correctly parses SSE events but UI not rendering responses
 
 ## Architecture Overview
@@ -64,7 +71,7 @@ All OpenCode communication is proxied through the Management API, enabling:
 1. ~~Routing structure refactor~~ ✅
 2. ~~Project detail view with tabs~~ ✅
 3. Chat interface (core feature) - 80% complete
-4. File browser - Not started
+4. ~~File browser~~ ✅ (with lazy-loading, syntax highlighting, markdown preview)
 5. ~~SSE streaming~~ ✅ (infrastructure complete)
 6. Settings & deferred items - Partial
 
@@ -74,10 +81,11 @@ All OpenCode communication is proxied through the Management API, enabling:
 - [x] Project list with status indicators
 - [x] Project detail with tabs (Chat, Files, Sync)
 - [ ] Chat interface with real-time streaming (UI rendering issues)
-- [ ] File browser with Shiki syntax highlighting
+- [x] File browser with Shiki syntax highlighting
+- [x] Markdown rendering with marked
 - [x] SSE event streaming from OpenCode (backend complete)
 - [ ] Settings store and OAuth skeleton
-- [ ] Additional shadcn components
+- [x] Additional shadcn components
 
 ## Technology Choices
 
@@ -95,7 +103,7 @@ All OpenCode communication is proxied through the Management API, enabling:
 1. ~~Can navigate between projects, chat, files, settings via URLs~~ ✅
 2. ~~Can create a project from the app~~ ✅
 3. Can send prompts and see streamed responses in real-time - Partially working
-4. Can browse files and view with syntax highlighting - Not started
+4. ~~Can browse files and view with syntax highlighting~~ ✅
 5. ~~SSE events update UI automatically~~ ✅ (events flow, rendering issues)
 6. Settings are persisted and restorable - Not started
 

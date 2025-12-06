@@ -483,7 +483,9 @@ export async function opcodeDisconnectStream(streamId: string): Promise<void> {
 export async function onStreamEvent(
   callback: (payload: StreamEventPayload) => void
 ): Promise<UnlistenFn> {
+  console.log('[onStreamEvent] Setting up listener for opencode:event');
   return listen<StreamEventPayload>("opencode:event", (event) => {
+    console.log('[onStreamEvent] Received event:', event.payload.event.eventType, 'for project:', event.payload.projectId);
     callback(event.payload);
   });
 }
@@ -497,7 +499,9 @@ export async function onStreamEvent(
 export async function onStreamStatus(
   callback: (payload: StreamStatusPayload) => void
 ): Promise<UnlistenFn> {
+  console.log('[onStreamStatus] Setting up listener for opencode:stream-status');
   return listen<StreamStatusPayload>("opencode:stream-status", (event) => {
+    console.log('[onStreamStatus] Received status:', event.payload.status, 'for project:', event.payload.projectId);
     callback(event.payload);
   });
 }
@@ -512,6 +516,11 @@ export class OpenCodeStream {
   private statusUnlisten: UnlistenFn | null = null;
   private onEvent: ((event: OpenCodeEvent) => void) | null = null;
   private onStatus: ((status: StreamStatus, error?: string) => void) | null = null;
+  // Buffer events received before streamId is set
+  private pendingEvents: StreamEventPayload[] = [];
+  private pendingStatuses: StreamStatusPayload[] = [];
+  // Flag to indicate we're waiting for streamId
+  private waitingForStreamId = true;
 
   constructor(projectId: string) {
     this.projectId = projectId;
@@ -526,23 +535,71 @@ export class OpenCodeStream {
   ): Promise<void> {
     this.onEvent = onEvent;
     this.onStatus = onStatus ?? null;
+    this.waitingForStreamId = true;
 
+    console.log('[OpenCodeStream] Setting up event listeners before connecting...');
+    
     // Set up event listeners before connecting
+    // Buffer events until we have the streamId
     this.eventUnlisten = await onStreamEvent((payload) => {
-      if (payload.streamId === this.streamId && this.onEvent) {
-        this.onEvent(payload.event);
+      console.log('[OpenCodeStream] Event callback - projectId match:', payload.projectId === this.projectId, 'waitingForStreamId:', this.waitingForStreamId, 'streamId:', this.streamId, 'payload.streamId:', payload.streamId);
+      // Match by projectId initially, then by streamId once we have it
+      if (payload.projectId === this.projectId) {
+        if (this.waitingForStreamId) {
+          // Buffer until we have streamId
+          console.log('[OpenCodeStream] Buffering event (waiting for streamId)');
+          this.pendingEvents.push(payload);
+        } else if (payload.streamId === this.streamId && this.onEvent) {
+          console.log('[OpenCodeStream] Forwarding event to handler:', payload.event.eventType);
+          this.onEvent(payload.event);
+        } else {
+          console.log('[OpenCodeStream] Ignoring event - streamId mismatch:', payload.streamId, '!==', this.streamId);
+        }
       }
     });
 
     this.statusUnlisten = await onStreamStatus((payload) => {
-      if (payload.streamId === this.streamId && this.onStatus) {
-        this.onStatus(payload.status, payload.error);
+      console.log('[OpenCodeStream] Status callback - projectId match:', payload.projectId === this.projectId, 'waitingForStreamId:', this.waitingForStreamId);
+      if (payload.projectId === this.projectId) {
+        if (this.waitingForStreamId) {
+          // Buffer until we have streamId
+          console.log('[OpenCodeStream] Buffering status (waiting for streamId)');
+          this.pendingStatuses.push(payload);
+        } else if (payload.streamId === this.streamId && this.onStatus) {
+          console.log('[OpenCodeStream] Forwarding status to handler:', payload.status);
+          this.onStatus(payload.status, payload.error);
+        }
       }
     });
 
     // Connect to the stream
+    console.log('[OpenCodeStream] Calling opencodeConnectStream...');
     const connection = await opencodeConnectStream(this.projectId);
+    console.log('[OpenCodeStream] opencodeConnectStream returned:', JSON.stringify(connection));
     this.streamId = connection.streamId;
+    this.waitingForStreamId = false;
+    console.log('[OpenCodeStream] Connected with streamId:', this.streamId);
+    
+    // Process any buffered events that match our streamId
+    console.log('[OpenCodeStream] Processing', this.pendingEvents.length, 'buffered events');
+    for (const payload of this.pendingEvents) {
+      if (payload.streamId === this.streamId && this.onEvent) {
+        console.log('[OpenCodeStream] Processing buffered event:', payload.event.eventType);
+        this.onEvent(payload.event);
+      } else {
+        console.log('[OpenCodeStream] Discarding buffered event - streamId mismatch:', payload.streamId, '!==', this.streamId);
+      }
+    }
+    this.pendingEvents = [];
+    
+    console.log('[OpenCodeStream] Processing', this.pendingStatuses.length, 'buffered statuses');
+    for (const payload of this.pendingStatuses) {
+      if (payload.streamId === this.streamId && this.onStatus) {
+        console.log('[OpenCodeStream] Processing buffered status:', payload.status);
+        this.onStatus(payload.status, payload.error);
+      }
+    }
+    this.pendingStatuses = [];
   }
 
   /**
@@ -553,6 +610,8 @@ export class OpenCodeStream {
       await opcodeDisconnectStream(this.streamId);
       this.streamId = null;
     }
+    
+    this.waitingForStreamId = true;
 
     if (this.eventUnlisten) {
       this.eventUnlisten();
@@ -566,6 +625,8 @@ export class OpenCodeStream {
 
     this.onEvent = null;
     this.onStatus = null;
+    this.pendingEvents = [];
+    this.pendingStatuses = [];
   }
 
   /**

@@ -13,6 +13,8 @@ use std::time::Duration;
 /// API client for the Management API
 pub struct ApiClient {
     client: Client,
+    /// Separate client for SSE streams (no timeout)
+    sse_client: Client,
     base_url: String,
     api_key: Option<String>,
 }
@@ -25,8 +27,14 @@ impl ApiClient {
             .build()
             .map_err(|e| AppError::NetworkError(format!("Failed to create HTTP client: {}", e)))?;
 
+        // SSE client without timeout for long-lived streams
+        let sse_client = Client::builder()
+            .build()
+            .map_err(|e| AppError::NetworkError(format!("Failed to create SSE client: {}", e)))?;
+
         Ok(Self {
             client,
+            sse_client,
             base_url: config.api_url.trim_end_matches('/').to_string(),
             api_key: config.api_key.clone(),
         })
@@ -347,9 +355,13 @@ impl ApiClient {
         project_id: &str,
     ) -> Result<reqwest::Response, AppError> {
         let url = self.opencode_event_stream_url(project_id);
-        let request = self
-            .add_auth(self.client.get(&url))
+        let mut request = self.sse_client.get(&url)
             .header("Accept", "text/event-stream");
+        
+        // Add auth header manually since we're using sse_client
+        if let Some(key) = &self.api_key {
+            request = request.header("Authorization", format!("Bearer {}", key));
+        }
         
         let response = request.send().await?;
         

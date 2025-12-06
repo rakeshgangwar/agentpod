@@ -8,10 +8,12 @@
  * 1. message.updated (role: "user") - User message registered
  * 2. message.updated (role: "assistant") - Assistant message created (initially empty)
  * 3. message.part.updated (type: "text") - Text streaming updates with delta
- * 4. session.idle - Processing complete
+ * 4. message.part.updated (type: "tool-invocation") - Tool calls
+ * 5. session.idle - Processing complete
  */
 
 import type { ChatModelAdapter, ChatModelRunOptions, ChatModelRunResult } from "@assistant-ui/react";
+import type { ReadonlyJSONObject } from "assistant-stream/utils";
 import {
   opencodeCreateSession,
   opencodeListSessions,
@@ -30,6 +32,17 @@ import {
 interface SessionState {
   projectId: string;
   sessionId: string | null;
+}
+
+/**
+ * Tool call tracking for UI display
+ */
+interface ToolCall {
+  id: string;
+  name: string;
+  args?: unknown;
+  state: "pending" | "running" | "complete" | "error";
+  result?: unknown;
 }
 
 /**
@@ -80,154 +93,217 @@ export function createOpenCodeAdapter(projectId: string, initialSessionId?: stri
           throw new Error("No text content in user message");
         }
 
-        // Set up streaming state
-        let accumulatedText = "";
-        let assistantMessageId: string | null = null;
-        let streamError: Error | null = null;
-        let isStreamingDone = false;
-        
-        // Helper to mark streaming as done
-        const markDone = () => { isStreamingDone = true; };
+        // Streaming state - use a mutable object so SSE callbacks can update it
+        const streamState = {
+          accumulatedText: "",
+          toolCalls: new Map<string, ToolCall>(),
+          assistantMessageId: null as string | null,
+          isComplete: false,
+          error: null as Error | null,
+          lastUpdate: Date.now(),
+        };
 
-        // Connect to SSE stream
+        // Connect to SSE stream FIRST (before sending message)
         console.log('[OpenCode Adapter] Connecting to SSE stream for project:', state.projectId);
         stream = new OpenCodeStream(state.projectId);
+        
+        let receivedAnyEvent = false;
+        
         await stream.connect(
           (event: OpenCodeEvent) => {
-            console.log('[OpenCode Adapter] SSE Event:', event.eventType);
-            // SSE event structure from OpenCode:
-            // { eventType: "message.part.updated", data: { type: "...", properties: { ... } } }
-            const eventData = event.data as { 
-              type?: string; 
-              properties?: {
-                part?: { 
-                  type?: string; 
-                  text?: string;
-                  messageID?: string;
-                };
-                info?: { 
-                  id?: string;
-                  role?: string;
-                  parentID?: string;
-                };
-                delta?: string;
-                status?: { type?: string };
-                sessionID?: string;
-              };
-            };
+            receivedAnyEvent = true;
+            streamState.lastUpdate = Date.now();
+            console.log('[OpenCode Adapter] SSE Event:', event.eventType, JSON.stringify(event.data).slice(0, 300));
+            
+            // The event.data contains the full SSE payload: {"type":"...", "properties":{...}}
+            // event.eventType is extracted from data.type by the Rust parser
+            const eventData = event.data as Record<string, unknown>;
+            const properties = eventData?.properties as Record<string, unknown> | undefined;
             
             // Track assistant message IDs from message.updated events
             if (event.eventType === "message.updated") {
-              const info = eventData.properties?.info;
-              if (info?.role === "assistant" && info.id) {
-                assistantMessageId = info.id;
+              const info = properties?.info as Record<string, unknown> | undefined;
+              if (info?.role === "assistant" && typeof info.id === "string") {
+                streamState.assistantMessageId = info.id;
+                console.log('[OpenCode Adapter] Assistant message ID:', streamState.assistantMessageId);
               }
             }
             
-            // Handle text part updates - only for assistant messages
+            // Handle text part updates
             if (event.eventType === "message.part.updated") {
-              const part = eventData.properties?.part;
-              const delta = eventData.properties?.delta;
+              const part = properties?.part as Record<string, unknown> | undefined;
+              const delta = properties?.delta as string | undefined;
               
-              // Only process text parts that belong to assistant messages
+              console.log('[OpenCode Adapter] Part update - type:', part?.type, 'has text:', !!part?.text, 'has delta:', !!delta);
+              
               if (part?.type === "text") {
-                const isAssistantPart = assistantMessageId && part.messageID === assistantMessageId;
-                
-                // If we can't determine message ownership, still use the text (fallback)
-                if (isAssistantPart || !part.messageID) {
-                  // Prefer using the full text, which is always up-to-date
-                  if (part.text) {
-                    accumulatedText = part.text;
-                  } else if (delta) {
-                    // Fallback to delta if no full text
-                    accumulatedText += delta;
-                  }
+                // Use full text if available, otherwise use delta
+                if (typeof part.text === "string") {
+                  streamState.accumulatedText = part.text;
+                  console.log('[OpenCode Adapter] Text update (full), length:', streamState.accumulatedText.length);
+                } else if (delta) {
+                  streamState.accumulatedText += delta;
+                  console.log('[OpenCode Adapter] Text update (delta), total length:', streamState.accumulatedText.length);
+                }
+              }
+              
+              // Handle tool invocations
+              if (part?.type === "tool-invocation") {
+                const toolInvocation = part.toolInvocation as Record<string, unknown> | undefined;
+                if (toolInvocation?.toolCallId && typeof toolInvocation.toolCallId === "string") {
+                  const toolCall: ToolCall = {
+                    id: toolInvocation.toolCallId,
+                    name: (toolInvocation.toolName as string) || "unknown",
+                    args: toolInvocation.args,
+                    state: (toolInvocation.state as "pending" | "running" | "complete" | "error") || "running",
+                    result: toolInvocation.result,
+                  };
+                  streamState.toolCalls.set(toolCall.id, toolCall);
+                  console.log('[OpenCode Adapter] Tool call:', toolCall.name, toolCall.state);
                 }
               }
             }
             
             // Session idle = processing complete
             if (event.eventType === "session.idle") {
-              markDone();
+              console.log('[OpenCode Adapter] Session idle - streaming complete');
+              streamState.isComplete = true;
             }
             
-            // Also check session.status for idle state
-            if (event.eventType === "session.status") {
-              const status = eventData.properties?.status;
+            // Also check session.updated for status changes
+            if (event.eventType === "session.updated") {
+              const info = properties?.info as Record<string, unknown> | undefined;
+              const status = info?.status as Record<string, unknown> | undefined;
               if (status?.type === "idle") {
-                markDone();
+                console.log('[OpenCode Adapter] Session status idle via session.updated - streaming complete');
+                streamState.isComplete = true;
               }
             }
             
             // Handle errors
             if (event.eventType === "error") {
-              streamError = new Error(String(event.data));
-              markDone();
+              console.error('[OpenCode Adapter] Error event:', event.data);
+              streamState.error = new Error(String(event.data));
+              streamState.isComplete = true;
             }
           },
           (status, error) => {
+            console.log('[OpenCode Adapter] Stream status:', status, error);
             if (status === "error") {
-              streamError = new Error(error || "Stream error");
-              markDone();
+              streamState.error = new Error(error || "Stream error");
+              streamState.isComplete = true;
             } else if (status === "disconnected") {
-              markDone();
+              // Only mark complete if we've already started getting text
+              // Otherwise, disconnection might happen before we get any data
+              if (streamState.accumulatedText) {
+                streamState.isComplete = true;
+              }
             }
           }
         );
 
         // Handle abort signal
         const abortHandler = () => {
+          console.log('[OpenCode Adapter] Abort signal received');
           if (state.sessionId) {
             opencodeAbortSession(state.projectId, state.sessionId).catch(console.error);
           }
           stream?.disconnect().catch(console.error);
-          markDone();
+          streamState.isComplete = true;
         };
         abortSignal?.addEventListener("abort", abortHandler);
 
-        // Send the message (this triggers the AI response)
+        // Small delay to ensure stream is fully established
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        console.log('[OpenCode Adapter] Stream connected, sending message...');
+
+        // Send the message WITHOUT awaiting - this is fire-and-forget
+        // The actual response comes through SSE events
         console.log('[OpenCode Adapter] Sending message to session:', state.sessionId);
+        let sendPromise: Promise<unknown> | null = null;
         try {
-          const sendResponse = await opencodeSendMessage(state.projectId, state.sessionId, textContent.text);
-          console.log('[OpenCode Adapter] Message sent successfully, response:', sendResponse);
-          
-          // Extract text from the response parts as fallback
-          if (sendResponse && sendResponse.parts) {
-            const textParts = sendResponse.parts
-              .filter((part: { type: string; text?: string }) => part.type === "text" && part.text)
-              .map((part: { text?: string }) => part.text!)
-              .join("");
-            if (textParts && !accumulatedText) {
-              accumulatedText = textParts;
-              console.log('[OpenCode Adapter] Using response text as fallback:', accumulatedText);
-            }
-          }
-          
-          // If the response has a finish state, we're done (no need to wait for SSE)
-          if (sendResponse?.info?.finish) {
-            console.log('[OpenCode Adapter] Response complete with finish state:', sendResponse.info.finish);
-            markDone();
-          }
+          // Fire and forget - don't await here!
+          sendPromise = opencodeSendMessage(state.projectId, state.sessionId, textContent.text)
+            .then((response) => {
+              console.log('[OpenCode Adapter] Message send completed, response has parts:', response?.parts?.length);
+            })
+            .catch((sendError) => {
+              console.error('[OpenCode Adapter] Failed to send message:', sendError);
+              streamState.error = sendError instanceof Error ? sendError : new Error(String(sendError));
+              streamState.isComplete = true;
+            });
         } catch (sendError) {
-          console.error('[OpenCode Adapter] Failed to send message:', sendError);
+          console.error('[OpenCode Adapter] Failed to initiate send:', sendError);
           throw sendError;
         }
 
-        // Poll for updates and yield streaming results
+        // Polling loop - yield updates as they come in
         let lastYieldedText = "";
-        const maxWaitTime = 60000; // 60 seconds max wait
+        let lastYieldedToolCount = 0;
+        const maxWaitTime = 120000; // 2 minutes max wait
         const startTime = Date.now();
+        const idleTimeout = 5000; // Consider complete if no updates for 5 seconds after getting text
+        let pollCount = 0;
         
-        while (!isStreamingDone && (Date.now() - startTime) < maxWaitTime) {
+        while (!streamState.isComplete && (Date.now() - startTime) < maxWaitTime) {
           // Wait a bit before checking again
-          await new Promise((resolve) => setTimeout(resolve, 100));
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          pollCount++;
+          
+          // Log progress every 2 seconds
+          if (pollCount % 40 === 0) {
+            console.log('[OpenCode Adapter] Poll check:', {
+              pollCount,
+              receivedAnyEvent,
+              isComplete: streamState.isComplete,
+              textLength: streamState.accumulatedText.length,
+              toolCalls: streamState.toolCalls.size,
+              elapsedMs: Date.now() - startTime,
+            });
+          }
 
-          // Yield current state if text has changed
-          if (accumulatedText !== lastYieldedText) {
-            lastYieldedText = accumulatedText;
-            yield {
-              content: [{ type: "text", text: accumulatedText }],
-            };
+          // Check if we have text and should yield an update
+          const hasNewText = streamState.accumulatedText !== lastYieldedText;
+          const hasNewTools = streamState.toolCalls.size !== lastYieldedToolCount;
+          
+          if (hasNewText || hasNewTools) {
+            lastYieldedText = streamState.accumulatedText;
+            lastYieldedToolCount = streamState.toolCalls.size;
+            
+            // Build the content array with text and tool calls
+            const contentParts: Array<
+              | { type: "text"; text: string }
+              | { type: "tool-call"; toolCallId: string; toolName: string; args: ReadonlyJSONObject; argsText: string; result?: unknown }
+            > = [];
+            
+            // Add text if we have any
+            if (streamState.accumulatedText) {
+              contentParts.push({ type: "text" as const, text: streamState.accumulatedText });
+            }
+            
+            // Add tool calls
+            for (const [, toolCall] of streamState.toolCalls) {
+              const args = (toolCall.args ?? {}) as ReadonlyJSONObject;
+              contentParts.push({
+                type: "tool-call" as const,
+                toolCallId: toolCall.id,
+                toolName: toolCall.name,
+                args,
+                argsText: JSON.stringify(args),
+                result: toolCall.state === "complete" ? toolCall.result : undefined,
+              });
+            }
+            
+            if (contentParts.length > 0) {
+              console.log('[OpenCode Adapter] Yielding update, text length:', streamState.accumulatedText.length, 'tool calls:', streamState.toolCalls.size);
+              yield { content: contentParts as ChatModelRunResult["content"] };
+            }
+          }
+          
+          // If we have text and haven't received updates for a while, consider it complete
+          if (streamState.accumulatedText && (Date.now() - streamState.lastUpdate) > idleTimeout) {
+            console.log('[OpenCode Adapter] Idle timeout - marking complete');
+            streamState.isComplete = true;
           }
         }
 
@@ -236,18 +312,55 @@ export function createOpenCodeAdapter(projectId: string, initialSessionId?: stri
         await stream?.disconnect();
         stream = null;
 
-        if (streamError) {
-          throw streamError;
+        if (streamState.error) {
+          throw streamState.error;
         }
 
-        // Final yield with complete response (ensure we yield at least once)
-        if (accumulatedText && accumulatedText !== lastYieldedText) {
-          yield {
-            content: [{ type: "text", text: accumulatedText }],
-          };
+        // Final yield with complete response
+        const hasNewContent = streamState.accumulatedText !== lastYieldedText || streamState.toolCalls.size !== lastYieldedToolCount;
+        if (hasNewContent) {
+          const contentParts: Array<
+            | { type: "text"; text: string }
+            | { type: "tool-call"; toolCallId: string; toolName: string; args: ReadonlyJSONObject; argsText: string; result?: unknown }
+          > = [];
+          
+          if (streamState.accumulatedText) {
+            contentParts.push({ type: "text" as const, text: streamState.accumulatedText });
+          }
+          
+          for (const [, toolCall] of streamState.toolCalls) {
+            const args = (toolCall.args ?? {}) as ReadonlyJSONObject;
+            contentParts.push({
+              type: "tool-call" as const,
+              toolCallId: toolCall.id,
+              toolName: toolCall.name,
+              args,
+              argsText: JSON.stringify(args),
+              result: toolCall.state === "complete" ? toolCall.result : undefined,
+            });
+          }
+          
+          if (contentParts.length > 0) {
+            console.log('[OpenCode Adapter] Final yield, text length:', streamState.accumulatedText.length, 'tool calls:', streamState.toolCalls.size);
+            yield { content: contentParts as ChatModelRunResult["content"] };
+          }
         }
+        
+        // If we never got any text, this might be an issue
+        if (!streamState.accumulatedText) {
+          console.warn('[OpenCode Adapter] No text accumulated during streaming. Events received:', receivedAnyEvent);
+        }
+        
+        console.log('[OpenCode Adapter] Streaming complete:', {
+          receivedAnyEvent,
+          finalTextLength: streamState.accumulatedText.length,
+          toolCallsCount: streamState.toolCalls.size,
+          totalPolls: pollCount,
+          elapsedMs: Date.now() - startTime,
+        });
 
       } catch (error) {
+        console.error('[OpenCode Adapter] Error in run:', error);
         // Clean up on error
         await stream?.disconnect();
         stream = null;

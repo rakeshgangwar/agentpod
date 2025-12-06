@@ -14,8 +14,8 @@
 ## 0. Prerequisites & Setup
 
 ### 0.1 Install Additional Dependencies
-- [ ] Install Shiki for syntax highlighting: `pnpm add shiki`
-- [ ] Install marked for markdown: `pnpm add marked`
+- [x] Install Shiki for syntax highlighting: `pnpm add shiki`
+- [x] Install marked for markdown: `pnpm add marked`
 - [ ] Install additional shadcn components:
   ```bash
   pnpm dlx shadcn-svelte@next add dialog tabs scroll-area separator avatar dropdown-menu
@@ -23,7 +23,7 @@
 - [ ] Install sonner for toast notifications: `pnpm add sonner`
 
 ### 0.2 Management API Updates
-- [ ] Add OpenCode proxy endpoints to Management API:
+- [x] Add OpenCode proxy endpoints to Management API:
   - `GET /api/projects/:id/opencode/session` - List sessions
   - `POST /api/projects/:id/opencode/session` - Create session
   - `GET /api/projects/:id/opencode/session/:sid` - Get session
@@ -39,49 +39,49 @@
 ## 1. Routing Structure Refactor
 
 ### 1.1 Base Layout Updates
-- [ ] Update `src/routes/+layout.svelte` for connection guard
-- [ ] Create root redirect logic in `src/routes/+page.svelte`
+- [x] Update `src/routes/+layout.svelte` for connection guard
+- [x] Create root redirect logic in `src/routes/+page.svelte`
 
 ### 1.2 Setup Route
-- [ ] Create `src/routes/setup/+page.svelte`
-- [ ] Move connection form from current +page.svelte
-- [ ] Redirect to /projects after successful connection
+- [x] Create `src/routes/setup/+page.svelte`
+- [x] Move connection form from current +page.svelte
+- [x] Redirect to /projects after successful connection
 
 ### 1.3 Projects Routes
-- [ ] Create `src/routes/projects/+page.svelte` (project list)
-- [ ] Create `src/routes/projects/new/+page.svelte` (create project)
-- [ ] Create `src/routes/projects/[id]/+layout.svelte` (project shell)
-- [ ] Create `src/routes/projects/[id]/+page.svelte` (redirect to chat)
-- [ ] Create `src/routes/projects/[id]/chat/+page.svelte`
-- [ ] Create `src/routes/projects/[id]/files/+page.svelte`
-- [ ] Create `src/routes/projects/[id]/sync/+page.svelte`
+- [x] Create `src/routes/projects/+page.svelte` (project list)
+- [x] Create `src/routes/projects/new/+page.svelte` (create project)
+- [x] Create `src/routes/projects/[id]/+layout.svelte` (project shell)
+- [x] Create `src/routes/projects/[id]/+page.svelte` (redirect to chat)
+- [x] Create `src/routes/projects/[id]/chat/+page.svelte`
+- [x] Create `src/routes/projects/[id]/files/+page.svelte`
+- [x] Create `src/routes/projects/[id]/sync/+page.svelte`
 
 ### 1.4 Settings Route
-- [ ] Create `src/routes/settings/+page.svelte`
-- [ ] Move settings content from current +page.svelte
+- [x] Create `src/routes/settings/+page.svelte`
+- [x] Move settings content from current +page.svelte
 
 ---
 
 ## 2. Project List UI
 
 ### 1.1 Project List Screen
-- [ ] Create `src/routes/projects/+page.svelte`
-- [ ] Display projects in card format
-- [ ] Show status indicator (running/stopped/error)
+- [x] Create `src/routes/projects/+page.svelte`
+- [x] Display projects in card format
+- [x] Show status indicator (running/stopped/error)
 - [ ] Pull-to-refresh functionality
-- [ ] Empty state with "Create Project" CTA
+- [x] Empty state with "Create Project" CTA
 
 ### 1.2 Project Card Component
-- [ ] Create `src/lib/components/ProjectCard.svelte`
-- [ ] Display: name, description, status, last activity
+- [x] Create `src/lib/components/ProjectCard.svelte`
+- [x] Display: name, description, status, last activity
 - [ ] Quick actions: start/stop toggle
-- [ ] Tap to open project detail
+- [x] Tap to open project detail
 
 ### 1.3 Status Indicators
-- [ ] 🟢 Running (green dot)
-- [ ] 🔴 Stopped (red dot)
-- [ ] 🟡 Starting/Stopping (yellow, animated)
-- [ ] ⚪ Unknown (gray)
+- [x] Running (green dot)
+- [x] Stopped (red dot)
+- [x] Starting/Stopping (yellow, animated)
+- [x] Unknown (gray)
 
 ---
 
@@ -118,60 +118,60 @@
 ## 3. Project Detail View
 
 ### 3.1 Project Screen with Tabs
-- [ ] Create `src/routes/projects/[id]/+page.svelte`
-- [ ] Header: project name, settings button, sync button
-- [ ] Tab bar: Chat | Files | Sync
+- [x] Create `src/routes/projects/[id]/+page.svelte`
+- [x] Header: project name, settings button, sync button
+- [x] Tab bar: Chat | Files | Sync
 
 ### 3.2 Tab Navigation
-- [ ] Implement tab switching
-- [ ] Preserve tab state when switching
-- [ ] Deep linking support (`/projects/123/files`)
+- [x] Implement tab switching
+- [x] Preserve tab state when switching
+- [x] Deep linking support (`/projects/123/files`)
 
 ---
 
 ## 4. Chat Interface
 
 ### 4.1 Session List
-- [ ] Create `src/lib/components/SessionList.svelte`
-- [ ] List previous sessions with:
+- [x] Create `src/lib/components/SessionList.svelte`
+- [x] List previous sessions with:
   - Title/first message preview
   - Date/time
   - Status (complete/active)
-- [ ] "New Session" button
+- [x] "New Session" button
 
 ### 4.2 Chat View
-- [ ] Create `src/lib/components/Chat.svelte`
-- [ ] Message list (scrollable)
-- [ ] Input bar at bottom
-- [ ] Send button
+- [x] Create `src/lib/components/Chat.svelte`
+- [x] Message list (scrollable)
+- [x] Input bar at bottom
+- [x] Send button
 
 ### 4.3 Message Components
-- [ ] Create `src/lib/components/Message.svelte`
-- [ ] User message style (right aligned, blue)
-- [ ] Assistant message style (left aligned, gray)
-- [ ] Tool call display (expandable)
-- [ ] Code block rendering with syntax highlighting
+- [x] Create `src/lib/components/Message.svelte`
+- [x] User message style (right aligned, blue)
+- [x] Assistant message style (left aligned, gray)
+- [ ] Tool call display (expandable) - partial
+- [x] Code block rendering with syntax highlighting
 
 ### 4.4 Input Bar
-- [ ] Create `src/lib/components/ChatInput.svelte`
-- [ ] Multi-line text input (auto-grow)
+- [x] Create `src/lib/components/ChatInput.svelte`
+- [x] Multi-line text input (auto-grow)
 - [ ] File reference button (@)
-- [ ] Send button (disabled when empty)
-- [ ] Loading state while sending
+- [x] Send button (disabled when empty)
+- [x] Loading state while sending
 
 ---
 
 ## 5. Real-time Streaming (SSE)
 
 ### 5.1 SSE Client in Rust
-- [ ] Use `reqwest` with `stream` feature (no external crate needed)
-- [ ] Create `src-tauri/src/services/sse.rs`
-- [ ] Implement SSE parsing with manual `data:` line parsing
-- [ ] Handle reconnection logic
+- [x] Use `reqwest` with `stream` feature (no external crate needed)
+- [x] Create `src-tauri/src/services/sse.rs`
+- [x] Implement SSE parsing with manual `data:` line parsing
+- [x] Handle reconnection logic
 
 ### 5.2 Tauri Event Bridge
-- [ ] Emit events from Rust to frontend via `app.emit()`
-- [ ] Event types (from OpenCode):
+- [x] Emit events from Rust to frontend via `app.emit()`
+- [x] Event types (from OpenCode):
   - `session.updated` - Session status/cost changed
   - `message.part.updated` - Streaming text chunk
   - `tool.execute` - Tool being executed
@@ -179,57 +179,63 @@
   - `file.edited` - File was modified
 
 ### 5.3 Frontend Event Handling
-- [ ] Create `src/lib/stores/chat.ts`
-- [ ] Subscribe to Tauri events
-- [ ] Update message store on events
-- [ ] Handle reconnection
+- [x] Create `src/lib/stores/chat.ts`
+- [x] Subscribe to Tauri events
+- [x] Update message store on events
+- [x] Handle reconnection
 
 ### 5.4 Streaming UI
-- [ ] Show "thinking" indicator
-- [ ] Render message as it streams
-- [ ] Smooth scroll to bottom
-- [ ] Handle stream completion
+- [x] Show "thinking" indicator
+- [ ] Render message as it streams - partial (events received but display issues)
+- [x] Smooth scroll to bottom
+- [x] Handle stream completion
 
 ---
 
 ## 6. OpenCode API Integration
 
 ### 6.1 Rust Commands for OpenCode (via Management API)
-- [ ] Create `src-tauri/src/commands/opencode.rs`
-- [ ] Commands (all proxy through Management API):
+- [x] Create `src-tauri/src/commands/opencode.rs`
+- [x] Commands (all proxy through Management API):
   - `opencode_list_sessions(project_id)`
   - `opencode_get_session(project_id, session_id)`
   - `opencode_create_session(project_id)`
   - `opencode_send_prompt(project_id, session_id, prompt)`
   - `opencode_abort_session(project_id, session_id)`
   - `opencode_subscribe_events(project_id)`
-  - `opencode_list_files(project_id)`
+  - `opencode_list_files(project_id, path)` - with lazy loading support
   - `opencode_get_file(project_id, path)`
 
 ### 6.2 Frontend API Wrapper
-- [ ] Update `src/lib/api/tauri.ts` with OpenCode commands
-- [ ] Type definitions for Session, Message, FileNode
+- [x] Update `src/lib/api/tauri.ts` with OpenCode commands
+- [x] Type definitions for Session, Message, FileNode
 
 ---
 
 ## 7. File Browser
 
 ### 7.1 File Tree Component
-- [ ] Create `src/lib/components/FileBrowser.svelte`
-- [ ] Fetch file tree from OpenCode API
-- [ ] Display folder structure
-- [ ] Expand/collapse folders
-- [ ] File icons by type
+- [x] Create `src/lib/components/FileBrowser.svelte`
+- [x] Fetch file tree from OpenCode API
+- [x] Display folder structure
+- [x] Expand/collapse folders (with lazy-loading)
+- [x] File icons by type
 
 ### 7.2 File Viewer
-- [ ] Create `src/lib/components/FileViewer.svelte`
-- [ ] Fetch file contents via Management API → OpenCode
-- [ ] Syntax highlighting with Shiki
-- [ ] Line numbers
+- [x] Create `src/lib/components/FileViewer.svelte`
+- [x] Fetch file contents via Management API -> OpenCode
+- [x] Syntax highlighting with Shiki (30+ languages, dual theme)
+- [x] Line numbers
 - [ ] Copy path button
 - [ ] "Use in Chat" button
 
-### 7.3 File Reference Picker
+### 7.3 Markdown Rendering
+- [x] Create `src/lib/components/ui/markdown/` component
+- [x] Render markdown with marked (GFM support)
+- [x] Syntax-highlighted code blocks within markdown
+- [x] Raw/Preview toggle (defaults to raw)
+
+### 7.4 File Reference Picker
 - [ ] Create `src/lib/components/FileReferencePicker.svelte`
 - [ ] Triggered by @ in chat input
 - [ ] Search/filter files
@@ -240,7 +246,7 @@
 ## 8. Container Management
 
 ### 8.1 Status Display
-- [ ] Show container status on project detail
+- [x] Show container status on project detail
 - [ ] Auto-refresh status periodically
 
 ### 8.2 Start/Stop Controls
@@ -308,11 +314,11 @@
 
 ## 11. Testing
 
-- [ ] Test project creation flow end-to-end
-- [ ] Test chat with real OpenCode container
-- [ ] Test file browser navigation
-- [ ] Test SSE streaming
-- [ ] Test routing and navigation
+- [x] Test project creation flow end-to-end
+- [x] Test chat with real OpenCode container
+- [x] Test file browser navigation
+- [x] Test SSE streaming
+- [x] Test routing and navigation
 - [ ] Test settings persistence
 
 ---

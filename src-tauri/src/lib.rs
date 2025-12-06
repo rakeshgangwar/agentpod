@@ -24,9 +24,18 @@ use commands::{
     // OpenCode streaming commands
     opencode_connect_stream, opencode_disconnect_stream,
 };
+use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Initialize tracing subscriber for logging
+    tracing_subscriber::registry()
+        .with(fmt::layer())
+        .with(EnvFilter::from_default_env().add_directive("codeopen_lib=debug".parse().unwrap()))
+        .init();
+    
+    tracing::info!("Starting CodeOpen with tracing enabled");
+    
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())

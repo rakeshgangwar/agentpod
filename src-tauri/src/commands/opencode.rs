@@ -283,11 +283,16 @@ pub async fn opencode_connect_stream(
         // Process the stream
         let mut bytes_stream = response.bytes_stream();
         let mut buffer = String::new();
+        let mut chunk_count = 0u64;
+        let mut event_count = 0u64;
+        
+        tracing::info!("Starting SSE stream processing for project {}", project_id);
         
         loop {
             tokio::select! {
                 // Check for abort signal
                 _ = &mut abort_rx => {
+                    tracing::info!("SSE stream aborted for project {}", project_id);
                     break;
                 }
                 
@@ -295,12 +300,17 @@ pub async fn opencode_connect_stream(
                 chunk = bytes_stream.next() => {
                     match chunk {
                         Some(Ok(bytes)) => {
+                            chunk_count += 1;
                             let text = String::from_utf8_lossy(&bytes);
+                            tracing::debug!("SSE chunk #{} ({} bytes): {:?}", chunk_count, bytes.len(), 
+                                if text.len() > 200 { format!("{}...", &text[..200]) } else { text.to_string() });
                             buffer.push_str(&text);
                             
                             // Process complete SSE events from buffer
                             while let Some(event) = parse_sse_event(&mut buffer) {
-                                let _ = app_clone.emit(
+                                event_count += 1;
+                                tracing::info!("Emitting SSE event #{}: type={}", event_count, event.event_type);
+                                let emit_result = app_clone.emit(
                                     "opencode:event",
                                     StreamEventPayload {
                                         stream_id: stream_id.clone(),
@@ -308,9 +318,13 @@ pub async fn opencode_connect_stream(
                                         event,
                                     },
                                 );
+                                if let Err(e) = emit_result {
+                                    tracing::error!("Failed to emit SSE event: {}", e);
+                                }
                             }
                         }
                         Some(Err(e)) => {
+                            tracing::error!("SSE stream error for project {}: {}", project_id, e);
                             // Emit error status
                             let _ = app_clone.emit(
                                 "opencode:stream-status",
@@ -324,7 +338,8 @@ pub async fn opencode_connect_stream(
                             break;
                         }
                         None => {
-                            // Stream ended
+                            tracing::info!("SSE stream ended for project {} (chunks={}, events={})", 
+                                project_id, chunk_count, event_count);
                             break;
                         }
                     }
@@ -379,6 +394,14 @@ fn parse_sse_event(buffer: &mut String) -> Option<OpenCodeEvent> {
         let event_str = buffer[..event_end].to_string();
         buffer.drain(..event_end + 2);
         
+        // Skip SSE comments (lines starting with ':')
+        // The server sends ": connected" as a keep-alive/connection confirmation
+        let is_comment = event_str.lines().all(|line| line.starts_with(':') || line.is_empty());
+        if is_comment {
+            tracing::debug!("Skipping SSE comment: {:?}", event_str);
+            return None;
+        }
+        
         // Parse the SSE event
         let mut event_type = String::new();
         let mut data = String::new();
@@ -392,19 +415,42 @@ fn parse_sse_event(buffer: &mut String) -> Option<OpenCodeEvent> {
                 }
                 data.push_str(value.trim());
             }
+            // Ignore comment lines starting with ':'
         }
         
-        // If no event type specified, use "message" as default
+        // If no data, skip this event
+        if data.is_empty() {
+            tracing::debug!("Skipping SSE event with no data: {:?}", event_str);
+            return None;
+        }
+        
+        // Store data length for logging before it might be moved
+        let data_len = data.len();
+        
+        // Try to parse data as JSON
+        let data_value = serde_json::from_str(&data).unwrap_or_else(|e| {
+            tracing::warn!("Failed to parse SSE data as JSON: {} - data: {:?}", e, &data);
+            serde_json::Value::String(data)
+        });
+        
+        // If no event type specified via `event:` line, try to extract from JSON data
+        // OpenCode sends events like: data: {"type":"message.part.updated","properties":{...}}
+        if event_type.is_empty() {
+            if let Some(obj) = data_value.as_object() {
+                if let Some(type_val) = obj.get("type") {
+                    if let Some(t) = type_val.as_str() {
+                        event_type = t.to_string();
+                    }
+                }
+            }
+        }
+        
+        // Default to "message" if still no event type
         if event_type.is_empty() {
             event_type = "message".to_string();
         }
         
-        // Try to parse data as JSON
-        let data_value = if data.is_empty() {
-            serde_json::Value::Null
-        } else {
-            serde_json::from_str(&data).unwrap_or_else(|_| serde_json::Value::String(data))
-        };
+        tracing::debug!("Parsed SSE event: type={}, data_len={}", event_type, data_len);
         
         Some(OpenCodeEvent {
             event_type,

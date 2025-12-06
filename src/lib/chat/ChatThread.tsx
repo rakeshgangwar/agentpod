@@ -5,11 +5,12 @@
  * Styled to match our shadcn-based design system.
  */
 
-import React from "react";
+import { type FC, type PropsWithChildren } from "react";
 import {
   ThreadPrimitive,
   ComposerPrimitive,
   MessagePrimitive,
+  type ToolCallMessagePartProps,
 } from "@assistant-ui/react";
 import { MarkdownTextPrimitive } from "@assistant-ui/react-markdown";
 
@@ -24,6 +25,67 @@ function TextPart() {
     />
   );
 }
+
+/**
+ * ToolCallPart component renders a tool call with its status
+ * Props are passed by assistant-ui via ToolCallMessagePartProps
+ */
+function ToolCallPart({ toolName, args, result }: ToolCallMessagePartProps) {
+  const isComplete = result !== undefined;
+  
+  return (
+    <div className="my-2 rounded-lg border border-border bg-muted/50 overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2 bg-muted border-b border-border">
+        <span className={`w-2 h-2 rounded-full ${isComplete ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
+        <span className="font-mono text-sm font-medium">{toolName}</span>
+        <span className="text-xs text-muted-foreground">
+          {isComplete ? 'completed' : 'running...'}
+        </span>
+      </div>
+      <details className="group">
+        <summary className="px-3 py-2 text-xs text-muted-foreground cursor-pointer hover:bg-muted/50">
+          {isComplete ? 'Show details' : 'Show arguments'}
+        </summary>
+        <div className="px-3 py-2 space-y-2">
+          <div>
+            <span className="text-xs font-medium text-muted-foreground">Arguments:</span>
+            <pre className="mt-1 text-xs bg-background rounded p-2 overflow-auto max-h-32">
+              {JSON.stringify(args, null, 2)}
+            </pre>
+          </div>
+          {isComplete && (
+            <div>
+              <span className="text-xs font-medium text-muted-foreground">Result:</span>
+              <pre className="mt-1 text-xs bg-background rounded p-2 overflow-auto max-h-32">
+                {typeof result === 'string' ? result : JSON.stringify(result, null, 2)}
+              </pre>
+            </div>
+          )}
+        </div>
+      </details>
+    </div>
+  );
+}
+
+/**
+ * ToolGroup component groups consecutive tool calls
+ */
+const ToolGroup: FC<PropsWithChildren<{ startIndex: number; endIndex: number }>> = ({ 
+  startIndex, 
+  endIndex, 
+  children 
+}) => {
+  const toolCount = endIndex - startIndex + 1;
+
+  return (
+    <details className="my-2" open>
+      <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground">
+        {toolCount} tool {toolCount === 1 ? "call" : "calls"}
+      </summary>
+      <div className="mt-1 space-y-1">{children}</div>
+    </details>
+  );
+};
 
 /**
  * UserMessage component renders user messages
@@ -52,6 +114,10 @@ function AssistantMessage() {
         <MessagePrimitive.Content
           components={{
             Text: TextPart,
+            tools: {
+              Fallback: ToolCallPart,
+            },
+            ToolGroup: ToolGroup,
           }}
         />
       </div>
