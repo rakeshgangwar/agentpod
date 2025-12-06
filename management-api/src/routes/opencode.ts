@@ -196,7 +196,7 @@ export const opencodeRoutes = new Hono()
         response
       );
       
-      return c.json({ success: result });
+      return c.json({ success: result, message: 'Permission response sent' });
     } catch (error) {
       if (error instanceof OpenCodeProxyError) {
         return c.json({ error: error.message, details: error.details }, error.statusCode as 400);
