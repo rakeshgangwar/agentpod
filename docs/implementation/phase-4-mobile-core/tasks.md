@@ -88,30 +88,30 @@
 ## 2. Create Project Flow
 
 ### 2.1 New Project Modal/Screen
-- [ ] Create `src/routes/projects/new/+page.svelte`
-- [ ] Tabs: "From Scratch" / "Import from GitHub"
+- [x] Create `src/routes/projects/new/+page.svelte`
+- [x] Tabs: "From Scratch" / "Import from GitHub"
 
 ### 2.2 From Scratch Form
-- [ ] Project name input
-- [ ] Description input (optional)
+- [x] Project name input
+- [x] Description input (optional)
 - [ ] LLM provider selector (default or override)
-- [ ] Create button
+- [x] Create button
 
 ### 2.3 GitHub Import Form
-- [ ] Repository URL input
-- [ ] URL validation (GitHub/GitLab format)
+- [x] Repository URL input
+- [x] URL validation (GitHub/GitLab format)
 - [ ] Sync options:
   - Enable sync toggle
   - Sync direction selector
-- [ ] Import button
+- [x] Import button
 
 ### 2.4 Creation Progress
-- [ ] Show progress steps:
+- [x] Show progress steps:
   1. Creating repository...
   2. Setting up container...
   3. Starting OpenCode...
-- [ ] Success → redirect to project
-- [ ] Error → show message, retry option
+- [x] Success → redirect to project
+- [x] Error → show message, retry option
 
 ---
 
@@ -149,7 +149,7 @@
 - [x] Create `src/lib/components/Message.svelte`
 - [x] User message style (right aligned, blue)
 - [x] Assistant message style (left aligned, gray)
-- [ ] Tool call display (expandable) - partial
+- [x] Tool call display (expandable) - with status indicators and collapsible details
 - [x] Code block rendering with syntax highlighting
 
 ### 4.4 Input Bar
@@ -186,7 +186,7 @@
 
 ### 5.4 Streaming UI
 - [x] Show "thinking" indicator
-- [ ] Render message as it streams - partial (events received but display issues)
+- [x] Render message as it streams - tool calls and text now display during streaming
 - [x] Smooth scroll to bottom
 - [x] Handle stream completion
 
@@ -315,9 +315,11 @@
 ## 11. Testing
 
 - [x] Test project creation flow end-to-end
+- [x] Test GitHub import flow
 - [x] Test chat with real OpenCode container
 - [x] Test file browser navigation
 - [x] Test SSE streaming
+- [x] Test tool call display during streaming
 - [x] Test routing and navigation
 - [ ] Test settings persistence
 

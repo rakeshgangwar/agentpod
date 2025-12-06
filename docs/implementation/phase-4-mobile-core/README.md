@@ -2,16 +2,18 @@
 
 Implement the main user-facing features: project management, chat interface, file browser, and real-time updates.
 
-## Current Status: In Progress (90% Complete)
+## Current Status: In Progress (95% Complete)
 
 **Last Updated:** 2025-12-06
 
 ### Completed
 - Routing structure with SvelteKit
 - Project list and detail views
+- **Project creation flow** - Both "From Scratch" and "Import from GitHub" working
 - OpenCode proxy endpoints in Management API (using official SDK)
 - SSE streaming infrastructure (Rust backend + frontend adapter)
 - Chat interface with assistant-ui React integration
+- **Tool call display** - Shows during streaming with status indicators
 - Rust integration tests for API client
 - Session management (create, list, get)
 - Message sending via SDK
@@ -21,15 +23,22 @@ Implement the main user-facing features: project management, chat interface, fil
 - File viewer with Raw/Preview toggle for markdown files
 
 ### In Progress
-- Chat UI message rendering (SSE events received but display issues)
+- None - core features complete
 
-### Remaining
+### Remaining (Nice-to-haves / Polish)
 - Settings store and commands
 - OAuth integration skeleton
+- Pull-to-refresh on project list
+- Quick start/stop toggle on project cards
+- File reference picker (@mentions in chat)
+- Copy path button in file viewer
+- Auto-refresh container status
+- Bottom navigation component
+- Page transitions and animations
+- Skeleton loaders
 
 ### Blockers
-- Intermittent 502 Bad Gateway errors when proxying to OpenCode containers (less frequent)
-- Chat adapter correctly parses SSE events but UI not rendering responses
+- None currently
 
 ## Architecture Overview
 
@@ -70,21 +79,22 @@ All OpenCode communication is proxied through the Management API, enabling:
 
 1. ~~Routing structure refactor~~ ✅
 2. ~~Project detail view with tabs~~ ✅
-3. Chat interface (core feature) - 80% complete
+3. ~~Chat interface (core feature)~~ ✅ - with tool call streaming
 4. ~~File browser~~ ✅ (with lazy-loading, syntax highlighting, markdown preview)
-5. ~~SSE streaming~~ ✅ (infrastructure complete)
-6. Settings & deferred items - Partial
+5. ~~SSE streaming~~ ✅ (infrastructure complete, tool calls display)
+6. Settings & deferred items - Partial (deferred to Phase 5)
 
 ## Deliverables
 
 - [x] Proper SvelteKit routing (`/projects`, `/projects/[id]/chat`, etc.)
 - [x] Project list with status indicators
+- [x] Project creation (from scratch and GitHub import)
 - [x] Project detail with tabs (Chat, Files, Sync)
-- [ ] Chat interface with real-time streaming (UI rendering issues)
+- [x] Chat interface with real-time streaming (tool calls and text)
 - [x] File browser with Shiki syntax highlighting
 - [x] Markdown rendering with marked
-- [x] SSE event streaming from OpenCode (backend complete)
-- [ ] Settings store and OAuth skeleton
+- [x] SSE event streaming from OpenCode
+- [ ] Settings store and OAuth skeleton (deferred to Phase 5)
 - [x] Additional shadcn components
 
 ## Technology Choices
@@ -101,17 +111,16 @@ All OpenCode communication is proxied through the Management API, enabling:
 ## Success Criteria
 
 1. ~~Can navigate between projects, chat, files, settings via URLs~~ ✅
-2. ~~Can create a project from the app~~ ✅
-3. Can send prompts and see streamed responses in real-time - Partially working
+2. ~~Can create a project from the app (both scratch and GitHub import)~~ ✅
+3. ~~Can send prompts and see streamed responses in real-time~~ ✅
 4. ~~Can browse files and view with syntax highlighting~~ ✅
-5. ~~SSE events update UI automatically~~ ✅ (events flow, rendering issues)
-6. Settings are persisted and restorable - Not started
+5. ~~SSE events update UI automatically~~ ✅
+6. Settings are persisted and restorable - Deferred to Phase 5
 
 ## Known Issues
 
-1. **Intermittent 502 Errors**: The Management API sometimes returns 502 Bad Gateway when proxying requests to OpenCode containers. This appears to be related to connection pooling or container readiness.
-
-2. **Chat UI Not Rendering**: The SSE events are correctly parsed in the adapter but the assistant-ui components are not rendering the responses. Debug logging has been added.
+1. **Resolved**: Tool calls not showing during streaming - Fixed by handling OpenCode's `type: "tool"` format
+2. **Resolved**: Chat UI not rendering - Fixed adapter to properly yield tool calls and text
 
 ## Files in This Phase
 
