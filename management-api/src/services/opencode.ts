@@ -308,7 +308,14 @@ export const opencode = {
       );
     }
     
-    return response.json();
+    return response.json() as Promise<Array<{
+      name: string;
+      path: string;
+      absolute?: string;
+      type: 'file' | 'directory';
+      ignored: boolean;
+      children?: unknown[];
+    }>>;
   },
 
   // ---------------------------------------------------------------------------
@@ -338,10 +345,12 @@ export const opencode = {
   /**
    * Subscribe to SSE events for a project
    * Returns an async iterator of events
+   * @param projectId - The project ID
+   * @param signal - Optional AbortSignal to cancel the subscription
    */
-  async subscribeToEvents(projectId: string): Promise<AsyncIterable<{ type: string; properties: unknown }>> {
+  async subscribeToEvents(projectId: string, signal?: AbortSignal): Promise<AsyncIterable<{ type: string; properties: unknown }>> {
     const { client } = await getClient(projectId);
-    const result = await client.event.subscribe();
+    const result = await client.event.subscribe({ signal });
     return result.stream!;
   },
 

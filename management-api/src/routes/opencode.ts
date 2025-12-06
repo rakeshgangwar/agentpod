@@ -301,8 +301,11 @@ export const opencodeRoutes = new Hono()
     try {
       log.info('Starting SSE proxy via SDK', { projectId });
       
-      // Get the async iterator of events from the SDK
-      const eventIterator = await opencode.subscribeToEvents(projectId);
+      // Create an AbortController to cancel the SDK request when client disconnects
+      const abortController = new AbortController();
+      
+      // Get the async iterator of events from the SDK with abort signal
+      const eventIterator = await opencode.subscribeToEvents(projectId, abortController.signal);
       const encoder = new TextEncoder();
       
       // Track if stream is still open
@@ -325,6 +328,12 @@ export const opencodeRoutes = new Hono()
               controller.enqueue(encoder.encode(sseMessage));
             }
           } catch (err) {
+            // Ignore abort errors - these are expected when client disconnects
+            if (err instanceof Error && err.name === 'AbortError') {
+              log.debug('SSE stream aborted', { projectId });
+              return;
+            }
+            
             const errorMessage = err instanceof Error ? err.message : String(err);
             log.error('SSE stream error', { projectId, error: errorMessage });
             
@@ -351,6 +360,8 @@ export const opencodeRoutes = new Hono()
         cancel() {
           log.info('SSE client disconnected', { projectId });
           isOpen = false;
+          // Abort the SDK's SSE connection to free up resources
+          abortController.abort();
         }
       });
       
