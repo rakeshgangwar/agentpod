@@ -275,9 +275,7 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       description: `OpenCode container for ${name}`,
       domains: fqdnUrl ?? undefined,  // Set the domain for Traefik routing
       instantDeploy: false, // We'll set env vars first, then deploy
-      healthCheckEnabled: true,
-      healthCheckPath: '/app',  // Use /app endpoint - simple JSON response always available
-      healthCheckPort: String(containerPort),
+      healthCheckEnabled: false,  // Disable Coolify healthcheck - container has its own HEALTHCHECK
     });
     
     log.info('Coolify application created', { uuid: coolifyApp.uuid });
@@ -287,9 +285,7 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
     await coolify.updateApplication(coolifyApp.uuid, {
       ports_exposes: String(containerPort),
       domains: fqdnUrl ?? undefined,
-      health_check_enabled: true,
-      health_check_path: '/app',
-      health_check_port: String(containerPort),
+      health_check_enabled: false,  // Disable Coolify healthcheck - container has its own HEALTHCHECK
     });
     
     log.info('Coolify application settings updated', { 
