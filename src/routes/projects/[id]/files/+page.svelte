@@ -25,6 +25,12 @@
 
   // Track expanded folders
   let expandedPaths = $state<Set<string>>(new Set());
+  
+  // Cache for folder contents (lazy loaded)
+  let folderContents = $state<Map<string, FileNode[]>>(new Map());
+  
+  // Track folders currently being loaded
+  let loadingFolders = $state<Set<string>>(new Set());
 
   // Load file tree when project changes
   $effect(() => {
@@ -36,16 +42,11 @@
   async function loadFileTree() {
     isLoadingTree = true;
     treeError = null;
+    // Reset folder contents cache
+    folderContents = new Map();
+    expandedPaths = new Set();
     try {
       fileTree = await opencodeListFiles(projectId);
-      // Auto-expand root level
-      fileTree.forEach((node) => {
-        if (node.type === "directory") {
-          expandedPaths.add(node.path);
-        }
-      });
-      // Trigger reactivity
-      expandedPaths = new Set(expandedPaths);
     } catch (err) {
       treeError = err instanceof Error ? err.message : "Failed to load files";
       console.error("Failed to load file tree:", err);
@@ -56,7 +57,7 @@
 
   async function selectFile(node: FileNode) {
     if (node.type === "directory") {
-      toggleFolder(node.path);
+      await toggleFolder(node.path);
       return;
     }
 
@@ -75,14 +76,43 @@
     }
   }
 
-  function toggleFolder(path: string) {
+  async function toggleFolder(path: string) {
     if (expandedPaths.has(path)) {
+      // Collapse folder
       expandedPaths.delete(path);
+      expandedPaths = new Set(expandedPaths);
     } else {
+      // Expand folder - fetch contents if not cached
+      if (!folderContents.has(path)) {
+        await loadFolderContents(path);
+      }
       expandedPaths.add(path);
+      expandedPaths = new Set(expandedPaths);
     }
-    // Trigger reactivity
-    expandedPaths = new Set(expandedPaths);
+  }
+  
+  async function loadFolderContents(path: string) {
+    loadingFolders.add(path);
+    loadingFolders = new Set(loadingFolders);
+    
+    try {
+      const contents = await opencodeListFiles(projectId, path);
+      folderContents.set(path, contents);
+      folderContents = new Map(folderContents);
+    } catch (err) {
+      console.error(`Failed to load folder contents for ${path}:`, err);
+      // Set empty array to prevent infinite retries
+      folderContents.set(path, []);
+      folderContents = new Map(folderContents);
+    } finally {
+      loadingFolders.delete(path);
+      loadingFolders = new Set(loadingFolders);
+    }
+  }
+  
+  // Get children for a folder (from cache)
+  function getChildren(path: string): FileNode[] {
+    return folderContents.get(path) ?? [];
   }
 
   function getFileIcon(node: FileNode): string {
@@ -212,11 +242,17 @@
                 role="button"
                 tabindex="0"
               >
-                <span class="flex-shrink-0">{getFileIcon(node)}</span>
+                <span class="flex-shrink-0">
+                  {#if node.type === "directory" && loadingFolders.has(node.path)}
+                    <span class="animate-spin">⏳</span>
+                  {:else}
+                    {getFileIcon(node)}
+                  {/if}
+                </span>
                 <span class="truncate">{node.name}</span>
               </div>
-              {#if node.type === "directory" && node.children && expandedPaths.has(node.path)}
-                {#each sortNodes(node.children) as child (child.path)}
+              {#if node.type === "directory" && expandedPaths.has(node.path)}
+                {#each sortNodes(getChildren(node.path)) as child (child.path)}
                   {@render renderNode(child, depth + 1)}
                 {/each}
               {/if}

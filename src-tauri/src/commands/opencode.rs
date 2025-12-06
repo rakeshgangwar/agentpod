@@ -184,11 +184,12 @@ pub async fn opencode_get_message(
 // Files
 // =============================================================================
 
-/// List files in a project
+/// List files in a project directory
 #[tauri::command]
-pub async fn opencode_list_files(project_id: String) -> Result<Vec<FileNode>, AppError> {
+pub async fn opencode_list_files(project_id: String, path: Option<String>) -> Result<Vec<FileNode>, AppError> {
     let client = get_client()?;
-    client.opencode_list_files(&project_id).await
+    let path = path.unwrap_or_else(|| "/".to_string());
+    client.opencode_list_files(&project_id, &path).await
 }
 
 /// Get file content

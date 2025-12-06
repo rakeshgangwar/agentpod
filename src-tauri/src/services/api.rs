@@ -285,9 +285,14 @@ impl ApiClient {
     // OpenCode - Files
     // =========================================================================
 
-    /// List files in a project
-    pub async fn opencode_list_files(&self, project_id: &str) -> Result<Vec<FileNode>, AppError> {
-        let url = format!("{}/api/projects/{}/opencode/file", self.base_url, project_id);
+    /// List files in a project directory
+    pub async fn opencode_list_files(&self, project_id: &str, path: &str) -> Result<Vec<FileNode>, AppError> {
+        let url = format!(
+            "{}/api/projects/{}/opencode/file?path={}",
+            self.base_url,
+            project_id,
+            urlencoding::encode(path)
+        );
         let request = self.add_auth(self.client.get(&url));
         let response = request.send().await?;
         self.handle_response(response).await

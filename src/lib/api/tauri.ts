@@ -400,10 +400,12 @@ export async function opencodeGetMessage(
 // =============================================================================
 
 /**
- * List files in a project
+ * List files in a project directory
+ * @param projectId Project ID
+ * @param path Directory path (defaults to "/" for root)
  */
-export async function opencodeListFiles(projectId: string): Promise<FileNode[]> {
-  return invoke<FileNode[]>("opencode_list_files", { projectId });
+export async function opencodeListFiles(projectId: string, path: string = "/"): Promise<FileNode[]> {
+  return invoke<FileNode[]>("opencode_list_files", { projectId, path });
 }
 
 /**
