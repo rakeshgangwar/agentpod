@@ -119,7 +119,7 @@ export function configureProvider(id: string, input: ConfigureProviderInput): Pr
   }
   
   const updates: string[] = [];
-  const params: Record<string, unknown> = { $id: id };
+  const params: Record<string, string | number | null> = { $id: id };
   
   if (input.apiKey !== undefined) {
     updates.push('api_key = $apiKey');
@@ -198,57 +198,50 @@ export function removeProviderConfig(id: string): Provider | null {
  * Get environment variables for a provider (to inject into containers)
  * Uses encrypted credentials from provider_credentials table
  * and env var names from Models.dev API
+ * 
+ * Also includes OPENCODE_AUTH_JSON with the full auth.json content
+ * for the OpenCode container to use.
  */
 export async function getProviderEnvVars(providerId?: string): Promise<Record<string, string>> {
   // If no providerId specified, try to get from settings
   const targetProviderId = providerId ?? getSetting('default_provider');
   
+  const envVars: Record<string, string> = {};
+  
+  // Always build the full auth.json with all configured providers
+  // This allows OpenCode to access all providers, not just the default one
+  const authJson = await buildOpenCodeAuthJson();
+  if (authJson && authJson !== '{}') {
+    envVars['OPENCODE_AUTH_JSON'] = authJson;
+  }
+  
   if (!targetProviderId) {
-    return {};
+    return envVars;
   }
   
   // Get decrypted credentials
   const credential = await getCredential(targetProviderId);
   if (!credential) {
-    return {};
+    return envVars;
   }
   
   // Get env var name from Models.dev
   const provider = await modelsDev.getProvider(targetProviderId);
   
-  // Fallback env var map for providers not in Models.dev or without apiKeyEnvVar
-  const fallbackEnvVarMap: Record<string, string> = {
-    'anthropic': 'ANTHROPIC_API_KEY',
-    'openai': 'OPENAI_API_KEY',
-    'openrouter': 'OPENROUTER_API_KEY',
-    'google': 'GOOGLE_GENERATIVE_AI_API_KEY',
-    'amazon-bedrock': 'AWS_ACCESS_KEY_ID',
-    'github-copilot': 'GITHUB_TOKEN',
-    'azure': 'AZURE_API_KEY',
-    'groq': 'GROQ_API_KEY',
-    'mistral': 'MISTRAL_API_KEY',
-    'xai': 'XAI_API_KEY',
-    'together': 'TOGETHER_API_KEY',
-    'perplexity': 'PERPLEXITY_API_KEY',
-    'cohere': 'COHERE_API_KEY',
-    'deepseek': 'DEEPSEEK_API_KEY',
-  };
-  
-  const envVar = provider?.apiKeyEnvVar ?? fallbackEnvVarMap[targetProviderId];
+  // Use the env var from Models.dev if available
+  const envVar = provider?.apiKeyEnvVar;
   if (!envVar) {
-    return {};
+    return envVars;
   }
   
-  // Return the appropriate credential
+  // Return the appropriate credential (for backwards compatibility with other tools)
   if (credential.authType === 'api_key' && credential.apiKey) {
-    return { [envVar]: credential.apiKey };
+    envVars[envVar] = credential.apiKey;
+  } else if ((credential.authType === 'oauth' || credential.authType === 'device_flow') && credential.accessToken) {
+    envVars[envVar] = credential.accessToken;
   }
   
-  if ((credential.authType === 'oauth' || credential.authType === 'device_flow') && credential.accessToken) {
-    return { [envVar]: credential.accessToken };
-  }
-  
-  return {};
+  return envVars;
 }
 
 /**
@@ -257,6 +250,76 @@ export async function getProviderEnvVars(providerId?: string): Promise<Record<st
 export function hasConfiguredProvider(): boolean {
   const row = db.query('SELECT 1 FROM providers WHERE is_configured = 1 LIMIT 1').get();
   return !!row;
+}
+
+/**
+ * OpenCode auth.json entry format
+ */
+interface OpenCodeAuthEntry {
+  type: 'api' | 'oauth';
+  key?: string;       // For API key auth
+  refresh?: string;   // For OAuth (the token we received)
+  access?: string;    // For OAuth (same as refresh for device flow)
+  expires?: number;   // Token expiry timestamp in ms
+}
+
+/**
+ * Build the auth.json content for OpenCode container
+ * This is the format OpenCode expects in ~/.local/share/opencode/auth.json
+ * 
+ * @param providerId - Optional specific provider, otherwise includes all configured
+ * @returns JSON string for auth.json content
+ */
+export async function buildOpenCodeAuthJson(providerId?: string): Promise<string> {
+  const authJson: Record<string, OpenCodeAuthEntry> = {};
+  
+  if (providerId) {
+    // Get specific provider credential
+    const credential = await getCredential(providerId);
+    if (credential) {
+      authJson[providerId] = credentialToAuthEntry(credential);
+    }
+  } else {
+    // Get all configured credentials
+    const { getAllCredentials } = await import('./provider-credentials.ts');
+    const allCredentials = await getAllCredentials();
+    
+    for (const credential of allCredentials) {
+      authJson[credential.providerId] = credentialToAuthEntry(credential);
+    }
+  }
+  
+  return JSON.stringify(authJson);
+}
+
+/**
+ * Convert a ProviderCredential to OpenCode auth.json entry format
+ */
+function credentialToAuthEntry(credential: Awaited<ReturnType<typeof getCredential>>): OpenCodeAuthEntry {
+  if (!credential) {
+    return { type: 'api' };
+  }
+  
+  if (credential.authType === 'api_key' && credential.apiKey) {
+    return {
+      type: 'api',
+      key: credential.apiKey,
+    };
+  }
+  
+  if ((credential.authType === 'oauth' || credential.authType === 'device_flow') && credential.accessToken) {
+    // For device flow (like GitHub Copilot), the access token is also used as refresh token
+    return {
+      type: 'oauth',
+      refresh: credential.accessToken,
+      access: credential.accessToken,
+      expires: credential.tokenExpiresAt 
+        ? new Date(credential.tokenExpiresAt).getTime() 
+        : 0,
+    };
+  }
+  
+  return { type: 'api' };
 }
 
 // =============================================================================

@@ -13,6 +13,7 @@ import { forgejo } from './forgejo.ts';
 import {
   createProject as dbCreateProject,
   getProjectById,
+  listProjects,
   updateProject,
   updateProjectStatus,
   deleteProject as dbDeleteProject,
@@ -102,8 +103,10 @@ export interface CreateProjectOptions {
   description?: string;
   /** Import from GitHub URL (uses Forgejo mirror) */
   githubUrl?: string;
-  /** Use specific LLM provider (defaults to default provider) */
+  /** Use specific LLM provider ID (defaults to default provider) */
   llmProviderId?: string;
+  /** Use specific LLM model ID */
+  llmModelId?: string;
 }
 
 export interface ProjectWithStatus extends Project {
@@ -119,7 +122,7 @@ export interface ProjectWithStatus extends Project {
  * Create a new project with Forgejo repo and Coolify container
  */
 export async function createNewProject(options: CreateProjectOptions): Promise<Project> {
-  const { name, description, githubUrl, llmProviderId } = options;
+  const { name, description, githubUrl, llmProviderId, llmModelId } = options;
   
   log.info('Creating new project', { name, githubUrl });
   
@@ -273,6 +276,7 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       githubSyncEnabled: !!githubUrl,
       githubSyncDirection: 'push',
       llmProvider: llmProviderId ?? getSetting('default_provider') ?? undefined,
+      llmModel: llmModelId,
     };
     
     const project = dbCreateProject(projectInput);
@@ -507,6 +511,55 @@ export async function updateProjectCredentials(
   
   log.info('Project credentials updated', { projectId });
   return getProjectById(projectId)!;
+}
+
+/**
+ * Sync credentials to all running projects
+ * Called when a new provider is configured or credentials change
+ * This ensures all running containers have the latest auth.json
+ */
+export async function syncCredentialsToAllProjects(): Promise<{ updated: number; failed: number }> {
+  log.info('Syncing credentials to all running projects');
+  
+  // Get all running projects
+  const allProjects = listProjects();
+  const runningProjects = allProjects.filter(p => p.status === 'running');
+  
+  if (runningProjects.length === 0) {
+    log.info('No running projects to update');
+    return { updated: 0, failed: 0 };
+  }
+  
+  log.info('Found running projects to update', { count: runningProjects.length });
+  
+  // Get the latest auth.json with all credentials
+  const envVars = await getProviderEnvVars();
+  
+  let updated = 0;
+  let failed = 0;
+  
+  for (const project of runningProjects) {
+    try {
+      // Update Coolify env vars
+      await coolify.setEnvVars(project.coolifyAppUuid, envVars);
+      
+      // Restart to apply new credentials
+      await coolify.restartApplication(project.coolifyAppUuid);
+      
+      log.info('Updated credentials for project', { projectId: project.id, name: project.name });
+      updated++;
+    } catch (error) {
+      log.error('Failed to update credentials for project', { 
+        projectId: project.id, 
+        name: project.name, 
+        error 
+      });
+      failed++;
+    }
+  }
+  
+  log.info('Credentials sync complete', { updated, failed });
+  return { updated, failed };
 }
 
 // =============================================================================

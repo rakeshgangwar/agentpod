@@ -31,6 +31,7 @@ pub async fn create_project(
     description: Option<String>,
     github_url: Option<String>,
     llm_provider_id: Option<String>,
+    llm_model_id: Option<String>,
 ) -> Result<Project, AppError> {
     let client = get_client()?;
     
@@ -39,6 +40,7 @@ pub async fn create_project(
         description,
         github_url,
         llm_provider_id,
+        llm_model_id,
     };
     
     client.create_project(input).await

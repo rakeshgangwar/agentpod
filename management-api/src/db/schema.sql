@@ -29,7 +29,8 @@ CREATE TABLE IF NOT EXISTS projects (
   last_sync_at TEXT,
   
   -- LLM configuration
-  llm_provider TEXT,  -- NULL = use default provider
+  llm_provider TEXT,  -- Provider ID: 'zai', 'anthropic', etc. NULL = use default
+  llm_model TEXT,     -- Model ID: 'glm-4.6', 'claude-3-5-sonnet', etc.
   
   -- Status
   status TEXT DEFAULT 'creating', -- 'creating', 'running', 'stopped', 'error'

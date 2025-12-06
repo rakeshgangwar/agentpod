@@ -34,12 +34,14 @@ const createProjectSchema = z.object({
   description: z.string().max(500).optional(),
   githubUrl: z.string().url().optional(),
   llmProviderId: z.string().optional(),
+  llmModelId: z.string().optional(),
 });
 
 const updateProjectSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(500).optional(),
   llmProvider: z.string().optional(),
+  llmModel: z.string().optional(),
 });
 
 const deleteProjectSchema = z.object({
@@ -117,6 +119,7 @@ export const projectRoutes = new Hono()
         description: body.description,
         githubUrl: body.githubUrl,
         llmProviderId: body.llmProviderId,
+        llmModelId: body.llmModelId,
       });
       
       return c.json({ project }, 201);

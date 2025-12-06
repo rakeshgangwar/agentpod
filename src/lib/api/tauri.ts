@@ -38,7 +38,8 @@ export interface Project {
   lastSyncAt: string | null;
   
   // LLM
-  llmProvider: string | null;
+  llmProvider: string | null;  // Provider ID: 'zai', 'anthropic', etc.
+  llmModel: string | null;     // Model ID: 'glm-4.6', 'claude-3-5-sonnet', etc.
   
   // Status
   status: ProjectStatus;
@@ -61,6 +62,7 @@ export interface CreateProjectInput {
   description?: string;
   githubUrl?: string;
   llmProviderId?: string;
+  llmModelId?: string;
 }
 
 // =============================================================================
@@ -123,6 +125,7 @@ export async function createProject(input: CreateProjectInput): Promise<Project>
     description: input.description ?? null,
     githubUrl: input.githubUrl ?? null,
     llmProviderId: input.llmProviderId ?? null,
+    llmModelId: input.llmModelId ?? null,
   };
   
   return invoke<Project>("create_project", params);

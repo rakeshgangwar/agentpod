@@ -17,6 +17,7 @@ import {
 } from '../models/provider-credentials.ts';
 import { githubCopilotOAuth } from '../services/oauth/github-copilot.ts';
 import { getSetting, setSetting } from '../models/provider.ts';
+import { syncCredentialsToAllProjects } from '../services/project-manager.ts';
 
 // =============================================================================
 // Validation Schemas
@@ -190,6 +191,11 @@ export const providerRoutes = new Hono()
     // Save the encrypted API key
     await saveApiKey({ providerId: id, apiKey });
     
+    // Sync credentials to all running projects (in background)
+    syncCredentialsToAllProjects().catch(err => {
+      console.error('Failed to sync credentials to projects:', err);
+    });
+    
     return c.json({
       success: true,
       message: 'Provider configured successfully',
@@ -311,6 +317,13 @@ export const providerRoutes = new Hono()
     
     try {
       const status = await githubCopilotOAuth.pollToken(stateId);
+      
+      // If OAuth completed, sync credentials to all running projects
+      if (status.status === 'completed') {
+        syncCredentialsToAllProjects().catch(err => {
+          console.error('Failed to sync credentials to projects:', err);
+        });
+      }
       
       return c.json({
         status: status.status,

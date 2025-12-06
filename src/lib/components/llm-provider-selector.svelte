@@ -21,10 +21,12 @@
   // Props
   let {
     selectedModel = $bindable(""),
+    selectedProvider = $bindable(""),
     showAllProviders = $bindable(false),
     disabled = false,
   }: {
     selectedModel?: string;
+    selectedProvider?: string;
     showAllProviders?: boolean;
     disabled?: boolean;
   } = $props();
@@ -107,8 +109,9 @@
     loadProviders();
   }
   
-  function selectModel(modelId: string) {
+  function selectModel(providerId: string, modelId: string) {
     if (!disabled) {
+      selectedProvider = providerId;
       selectedModel = modelId;
     }
   }
@@ -199,7 +202,7 @@
           <button
             type="button"
             class="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors text-left border-b last:border-b-0 {isSelected ? 'bg-primary/5 border-l-2 border-l-primary' : ''}"
-            onclick={() => selectModel(model.id)}
+            onclick={() => selectModel(provider.id, model.id)}
             {disabled}
           >
             <div class="flex items-center gap-3">
@@ -301,9 +304,9 @@
   {/if}
   
   <!-- Selected model display -->
-  {#if selectedModel}
+  {#if selectedModel && selectedProvider}
     <div class="text-xs text-muted-foreground bg-muted p-2 rounded-md">
-      Selected: <span class="font-mono text-foreground">{selectedModel}</span>
+      Selected: <span class="font-mono text-foreground">{selectedProvider}/{selectedModel}</span>
     </div>
   {/if}
 </div>

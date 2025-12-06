@@ -181,4 +181,25 @@ export const migrations: Migration[] = [
       db.exec('DROP TABLE IF EXISTS provider_credentials');
     },
   },
+  
+  // Migration 3: Add llm_model column to projects table
+  // Previously only llm_provider was stored, but we need to track both provider and model separately
+  // This fixes the bug where model ID was incorrectly stored in llm_provider field
+  {
+    version: 3,
+    name: 'add_llm_model_to_projects',
+    up: () => {
+      // Check if column already exists (for idempotency)
+      const tableInfo = db.query("PRAGMA table_info(projects)").all() as Array<{ name: string }>;
+      const columnExists = tableInfo.some(col => col.name === 'llm_model');
+      if (!columnExists) {
+        db.exec('ALTER TABLE projects ADD COLUMN llm_model TEXT');
+      }
+    },
+    down: () => {
+      // SQLite doesn't support DROP COLUMN in older versions
+      // For rollback, we'd need to recreate the table without the column
+      console.warn('Rollback not supported for this migration - llm_model column will remain');
+    },
+  },
 ];

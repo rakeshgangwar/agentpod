@@ -56,6 +56,7 @@ pub struct Project {
 
     // LLM
     pub llm_provider: Option<String>,
+    pub llm_model: Option<String>,
 
     // Status
     pub status: ProjectStatus,
@@ -77,6 +78,8 @@ pub struct CreateProjectInput {
     pub github_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub llm_provider_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub llm_model_id: Option<String>,
 }
 
 /// Connection configuration stored securely

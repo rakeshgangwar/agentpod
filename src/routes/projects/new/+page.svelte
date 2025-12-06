@@ -29,6 +29,7 @@
   
   // LLM Provider selection
   let selectedModel = $state("");
+  let selectedProvider = $state("");
   let showAllProviders = $state(false);
   
   // Submission state
@@ -75,13 +76,11 @@
         // From Scratch
         creationProgress = [...creationProgress, "Creating repository..."];
         
-        // Extract provider ID from selected model (format: "provider/model")
-        const llmProviderId = selectedModel ? selectedModel.split("/")[0] : undefined;
-        
         const project = await createProject({
           name: projectName.trim(),
           description: projectDescription.trim() || undefined,
-          llmProviderId,
+          llmProviderId: selectedProvider || undefined,
+          llmModelId: selectedModel || undefined,
         });
         
         if (project) {
@@ -101,13 +100,11 @@
         // Extract name from URL if not provided
         const repoName = extractRepoName(githubUrl);
         
-        // Extract provider ID from selected model (format: "provider/model")
-        const llmProviderId = selectedModel ? selectedModel.split("/")[0] : undefined;
-        
         const project = await createProject({
           name: repoName || "imported-project",
           githubUrl: githubUrl.trim(),
-          llmProviderId,
+          llmProviderId: selectedProvider || undefined,
+          llmModelId: selectedModel || undefined,
         });
         
         if (project) {
@@ -224,6 +221,7 @@
                 <div class="space-y-2 border-t pt-4">
                   <LlmProviderSelector
                     bind:selectedModel
+                    bind:selectedProvider
                     bind:showAllProviders
                     disabled={isSubmitting}
                   />
@@ -273,6 +271,7 @@
                 <div class="space-y-2 border-t pt-4">
                   <LlmProviderSelector
                     bind:selectedModel
+                    bind:selectedProvider
                     bind:showAllProviders
                     disabled={isSubmitting}
                   />

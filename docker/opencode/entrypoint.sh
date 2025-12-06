@@ -3,6 +3,31 @@ set -e
 
 echo "=== OpenCode Container Starting ==="
 
+# =============================================================================
+# Create auth.json for OpenCode authentication
+# =============================================================================
+OPENCODE_DATA_DIR="${HOME}/.local/share/opencode"
+AUTH_FILE="${OPENCODE_DATA_DIR}/auth.json"
+
+mkdir -p "$OPENCODE_DATA_DIR"
+
+# If OPENCODE_AUTH_JSON is provided, write it directly to auth.json
+# This is the preferred method - Management API builds the complete auth.json
+if [ -n "$OPENCODE_AUTH_JSON" ]; then
+    echo "Writing auth.json from OPENCODE_AUTH_JSON environment variable..."
+    echo "$OPENCODE_AUTH_JSON" > "$AUTH_FILE"
+    echo "Auth configuration complete. Providers configured:"
+    cat "$AUTH_FILE" | jq 'keys' 2>/dev/null || echo "(could not parse JSON)"
+else
+    # Fallback: Initialize empty auth.json if nothing provided
+    echo "No OPENCODE_AUTH_JSON provided. Starting with empty auth configuration."
+    echo "{}" > "$AUTH_FILE"
+fi
+
+# =============================================================================
+# Clone repository
+# =============================================================================
+
 # Clone project if workspace is empty and repo URL is provided
 if [ ! -d "/workspace/.git" ] && [ -n "$FORGEJO_REPO_URL" ]; then
     echo "Cloning repository from Forgejo..."

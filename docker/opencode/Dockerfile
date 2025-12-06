@@ -2,7 +2,7 @@ FROM node:20-slim
 
 # Install required packages
 RUN apt-get update && \
-    apt-get install -y git curl && \
+    apt-get install -y git curl jq && \
     rm -rf /var/lib/apt/lists/*
 
 # Install OpenCode globally

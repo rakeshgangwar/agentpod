@@ -32,7 +32,8 @@ export interface Project {
   lastSyncAt: string | null;
   
   // LLM
-  llmProvider: string | null;
+  llmProvider: string | null;  // Provider ID: 'zai', 'anthropic', etc.
+  llmModel: string | null;     // Model ID: 'glm-4.6', 'claude-3-5-sonnet', etc.
   
   // Status
   status: ProjectStatus;
@@ -57,6 +58,7 @@ export interface CreateProjectInput {
   githubSyncEnabled?: boolean;
   githubSyncDirection?: SyncDirection;
   llmProvider?: string;
+  llmModel?: string;
 }
 
 export interface UpdateProjectInput {
@@ -69,6 +71,7 @@ export interface UpdateProjectInput {
   githubSyncDirection?: SyncDirection;
   lastSyncAt?: string;
   llmProvider?: string;
+  llmModel?: string;
 }
 
 // =============================================================================
@@ -92,6 +95,7 @@ interface ProjectRow {
   github_sync_direction: string;
   last_sync_at: string | null;
   llm_provider: string | null;
+  llm_model: string | null;
   status: string;
   error_message: string | null;
   created_at: string;
@@ -116,6 +120,7 @@ function rowToProject(row: ProjectRow): Project {
     githubSyncDirection: row.github_sync_direction as SyncDirection,
     lastSyncAt: row.last_sync_at,
     llmProvider: row.llm_provider,
+    llmModel: row.llm_model,
     status: row.status as ProjectStatus,
     errorMessage: row.error_message,
     createdAt: row.created_at,
@@ -140,13 +145,13 @@ export function createProject(input: CreateProjectInput): Project {
       forgejo_repo_url, forgejo_repo_id, forgejo_owner,
       coolify_app_uuid, coolify_server_uuid, container_port, fqdn_url,
       github_repo_url, github_sync_enabled, github_sync_direction,
-      llm_provider, status
+      llm_provider, llm_model, status
     ) VALUES (
       $id, $name, $slug, $description,
       $forgejoRepoUrl, $forgejoRepoId, $forgejoOwner,
       $coolifyAppUuid, $coolifyServerUuid, $containerPort, $fqdnUrl,
       $githubRepoUrl, $githubSyncEnabled, $githubSyncDirection,
-      $llmProvider, $status
+      $llmProvider, $llmModel, $status
     )
   `);
   
@@ -166,6 +171,7 @@ export function createProject(input: CreateProjectInput): Project {
     $githubSyncEnabled: input.githubSyncEnabled ? 1 : 0,
     $githubSyncDirection: input.githubSyncDirection ?? 'push',
     $llmProvider: input.llmProvider ?? null,
+    $llmModel: input.llmModel ?? null,
     $status: 'creating',
   });
   
@@ -239,6 +245,10 @@ export function updateProject(id: string, input: UpdateProjectInput): Project | 
     updates.push('llm_provider = $llmProvider');
     params.$llmProvider = input.llmProvider;
   }
+  if (input.llmModel !== undefined) {
+    updates.push('llm_model = $llmModel');
+    params.$llmModel = input.llmModel;
+  }
   
   if (updates.length === 0) {
     return getProjectById(id);
@@ -247,7 +257,7 @@ export function updateProject(id: string, input: UpdateProjectInput): Project | 
   updates.push("updated_at = datetime('now')");
   
   const sql = `UPDATE projects SET ${updates.join(', ')} WHERE id = $id`;
-  db.query(sql).run(params);
+  db.query(sql).run(params as Record<string, string | number | boolean | null>);
   
   return getProjectById(id);
 }
