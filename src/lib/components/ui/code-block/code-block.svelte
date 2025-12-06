@@ -212,18 +212,25 @@
     word-wrap: normal;
   }
 
-  /* Dual theme support - show light theme by default */
-  .code-block :global(.shiki),
-  .code-block :global(.shiki span) {
-    color: var(--shiki-light) !important;
+  /* Dual theme support - Shiki sets --shiki-light and --shiki-dark on each span */
+  /* We just need to tell spans which variable to use based on theme */
+  
+  /* Light mode (default) - use --shiki-light variables */
+  .code-block :global(.shiki) {
     background-color: var(--shiki-light-bg) !important;
   }
+  
+  .code-block :global(.shiki span) {
+    color: var(--shiki-light);
+  }
 
-  /* Dark mode - show dark theme */
-  :global(.dark) .code-block :global(.shiki),
-  :global(.dark) .code-block :global(.shiki span) {
-    color: var(--shiki-dark) !important;
+  /* Dark mode - use --shiki-dark variables */
+  :global(.dark) .code-block :global(.shiki) {
     background-color: var(--shiki-dark-bg) !important;
+  }
+  
+  :global(.dark) .code-block :global(.shiki span) {
+    color: var(--shiki-dark);
   }
 </style>
 

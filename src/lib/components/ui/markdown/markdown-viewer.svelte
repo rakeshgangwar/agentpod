@@ -233,16 +233,24 @@
   }
 
   /* Dual theme support for code blocks */
-  .markdown-content :global(.shiki),
-  .markdown-content :global(.shiki span) {
-    color: var(--shiki-light) !important;
+  /* Shiki sets --shiki-light and --shiki-dark on each span */
+  
+  /* Light mode (default) */
+  .markdown-content :global(.shiki) {
     background-color: var(--shiki-light-bg) !important;
   }
+  
+  .markdown-content :global(.shiki span) {
+    color: var(--shiki-light);
+  }
 
-  :global(.dark) .markdown-content :global(.shiki),
-  :global(.dark) .markdown-content :global(.shiki span) {
-    color: var(--shiki-dark) !important;
+  /* Dark mode */
+  :global(.dark) .markdown-content :global(.shiki) {
     background-color: var(--shiki-dark-bg) !important;
+  }
+  
+  :global(.dark) .markdown-content :global(.shiki span) {
+    color: var(--shiki-dark);
   }
 
   /* Blockquotes */
