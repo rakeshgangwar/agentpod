@@ -275,12 +275,40 @@ export const opencode = {
   },
 
   /**
-   * Get file status (list tracked files)
+   * List files in a directory
+   * 
+   * Note: The SDK's file.read() with a path returns file content, but
+   * the OpenCode server's GET /file?path=X endpoint returns directory
+   * listings when path is a directory. We make a direct HTTP call here.
    */
-  async listFiles(projectId: string, _path: string = '/'): Promise<unknown[]> {
-    const { client } = await getClient(projectId);
-    const result = await client.file.status({});
-    return result.data ?? [];
+  async listFiles(projectId: string, path: string = '/'): Promise<Array<{
+    name: string;
+    path: string;
+    absolute?: string;
+    type: 'file' | 'directory';
+    ignored: boolean;
+    children?: unknown[];
+  }>> {
+    const { project } = await getClient(projectId);
+    const baseUrl = await getOpenCodeUrl(project);
+    
+    // Make direct HTTP call to the file list endpoint
+    const url = new URL('/file', baseUrl);
+    url.searchParams.set('path', path);
+    
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+    });
+    
+    if (!response.ok) {
+      throw new OpenCodeProxyError(
+        `Failed to list files: ${response.statusText}`,
+        response.status
+      );
+    }
+    
+    return response.json();
   },
 
   // ---------------------------------------------------------------------------

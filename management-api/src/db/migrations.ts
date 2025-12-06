@@ -116,7 +116,12 @@ export const migrations: Migration[] = [
     version: 1,
     name: 'add_fqdn_url_to_projects',
     up: () => {
-      db.exec('ALTER TABLE projects ADD COLUMN fqdn_url TEXT');
+      // Check if column already exists (for idempotency)
+      const tableInfo = db.query("PRAGMA table_info(projects)").all() as Array<{ name: string }>;
+      const columnExists = tableInfo.some(col => col.name === 'fqdn_url');
+      if (!columnExists) {
+        db.exec('ALTER TABLE projects ADD COLUMN fqdn_url TEXT');
+      }
     },
     down: () => {
       // SQLite doesn't support DROP COLUMN in older versions
