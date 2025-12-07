@@ -44,7 +44,7 @@ fetch_user_config() {
         if ! echo "$RESPONSE" | jq empty 2>/dev/null; then
             echo "  Warning: Invalid JSON response from Management API. Using defaults."
             return 1
-        }
+        fi
         
         echo "  Configuration fetched successfully."
         
