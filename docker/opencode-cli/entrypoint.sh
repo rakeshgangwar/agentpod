@@ -111,21 +111,15 @@ setup_fallback_config() {
         echo "  Writing opencode.json from OPENCODE_CONFIG_JSON"
         echo "$OPENCODE_CONFIG_JSON" > "$WORKSPACE/opencode.json"
     else
-        echo "  Creating default opencode.json with secure permissions"
+        echo "  Creating default opencode.json with permissions"
         cat > "$WORKSPACE/opencode.json" << 'EOF'
 {
   "$schema": "https://opencode.ai/config.json",
-  "permissions": {
-    "bash": "ask",
-    "edit": "grant",
-    "read": "grant",
-    "write": "ask",
-    "glob": "grant",
-    "grep": "grant",
-    "webfetch": "ask",
-    "todoread": "grant",
-    "todowrite": "grant",
-    "mcp": "ask"
+  "permission": {
+    "edit": "allow",
+    "bash": "allow",
+    "webfetch": "allow",
+    "external_directory": "allow"
   }
 }
 EOF

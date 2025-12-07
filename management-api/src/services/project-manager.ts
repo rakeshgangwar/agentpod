@@ -320,9 +320,8 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
     await coolify.updateApplication(coolifyApp.uuid, {
       ports_exposes: exposedPorts,
       domains: fqdnUrl ?? undefined,
-      health_check_enabled: true,
-      health_check_path: '/app',
-      health_check_port: String(containerPort),
+      // Disable Coolify healthcheck for now - container has its own HEALTHCHECK
+      health_check_enabled: false,
       // Apply resource limits from tier
       ...resourceLimits,
     });

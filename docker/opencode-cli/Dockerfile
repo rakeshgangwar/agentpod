@@ -214,6 +214,13 @@ COPY scripts/ /scripts/
 RUN chmod +x /entrypoint.sh && \
     chmod +x /scripts/*.sh 2>/dev/null || true
 
+# Create healthcheck script for reliable healthcheck execution
+# Uses curl with fallback to wget, both should be available
+RUN echo '#!/bin/sh' > /healthcheck.sh && \
+    echo 'PORT="${OPENCODE_PORT:-4096}"' >> /healthcheck.sh && \
+    echo 'curl -sf "http://localhost:${PORT}/app" > /dev/null 2>&1 || wget -q --spider "http://localhost:${PORT}/app" > /dev/null 2>&1' >> /healthcheck.sh && \
+    chmod +x /healthcheck.sh
+
 # =============================================================================
 # Expose ports and set user
 # =============================================================================
@@ -222,8 +229,9 @@ EXPOSE 4096
 USER $USERNAME
 WORKDIR $WORKSPACE
 
-# Health check - use shell form to ensure runtime ENV variable is evaluated
-HEALTHCHECK --interval=15s --timeout=5s --start-period=45s --retries=3 \
-    CMD /bin/sh -c 'curl -sf http://localhost:${OPENCODE_PORT:-4096}/app || exit 1'
+# Health check - use script for reliable execution with runtime ENV
+# Increased start-period to 60s and retries to 5 for OpenCode server startup
+HEALTHCHECK --interval=15s --timeout=10s --start-period=60s --retries=5 \
+    CMD /healthcheck.sh
 
 ENTRYPOINT ["/entrypoint.sh"]

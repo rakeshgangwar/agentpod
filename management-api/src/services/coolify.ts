@@ -300,6 +300,10 @@ export const coolify = {
     health_check_enabled?: boolean;
     health_check_path?: string;
     health_check_port?: string;
+    health_check_interval?: number;  // seconds between checks
+    health_check_timeout?: number;   // seconds before check times out
+    health_check_retries?: number;   // number of retries before unhealthy
+    health_check_start_period?: number; // seconds to wait before first check
     dockerfile?: string; // Base64 encoded Dockerfile content
   }): Promise<void> {
     await request<unknown>('PATCH', `/applications/${uuid}`, settings);
