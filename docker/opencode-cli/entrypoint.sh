@@ -275,11 +275,13 @@ show_startup_info
 cd "$WORKSPACE"
 
 # Export environment variables for supervisor
-export OPENCODE_PORT="${OPENCODE_PORT:-4096}"
-export OPENCODE_HOST="${OPENCODE_HOST:-0.0.0.0}"
 export CODE_SERVER_PORT="${CODE_SERVER_PORT:-8080}"
 export CODE_SERVER_AUTH="${CODE_SERVER_AUTH:-none}"
 
-# Start services via supervisor
-echo "Starting services via supervisord..."
-exec /usr/bin/supervisord -c /etc/supervisor/conf.d/opencode.conf
+# Start code-server in background via supervisor
+echo "Starting code-server in background..."
+/usr/bin/supervisord -c /etc/supervisor/conf.d/opencode.conf
+
+# Start OpenCode server in foreground (keeps container running)
+echo "Starting OpenCode server..."
+exec opencode serve --port "${OPENCODE_PORT:-4096}" --hostname "${OPENCODE_HOST:-0.0.0.0}"
