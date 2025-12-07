@@ -9,13 +9,16 @@ echo "=============================================="
 # Environment Variables (expected)
 # =============================================================================
 # MANAGEMENT_API_URL    - URL of the Management API
+# AUTH_TOKEN            - Bearer token for Management API authentication
 # USER_ID               - User identifier for fetching config
 # PROJECT_SLUG          - Project slug for workspace
 # FORGEJO_REPO_URL      - Git repository URL
 # FORGEJO_USER          - Git username for auth
 # FORGEJO_TOKEN         - Git token for auth
-# OPENCODE_AUTH_JSON    - Pre-built auth.json content (optional, fallback)
+# OPENCODE_AUTH_JSON    - Pre-built auth.json content (for LLM providers)
 # OPENCODE_CONFIG_JSON  - Pre-built opencode.json content (optional, fallback)
+# OPENCODE_PORT         - Port for OpenCode server (default: 4096)
+# OPENCODE_HOST         - Host for OpenCode server (default: 0.0.0.0)
 # =============================================================================
 
 HOME_DIR="/home/developer"
@@ -28,65 +31,79 @@ OPENCODE_DATA_DIR="${HOME_DIR}/.local/share/opencode"
 # Fetch User Configuration from Management API
 # =============================================================================
 fetch_user_config() {
-    if [ -n "$MANAGEMENT_API_URL" ] && [ -n "$USER_ID" ]; then
-        echo "Fetching user configuration from Management API..."
-        
-        CONFIG_URL="${MANAGEMENT_API_URL}/api/users/${USER_ID}/opencode-config"
-        echo "  URL: $CONFIG_URL"
-        
-        # Fetch config with timeout
-        RESPONSE=$(curl -sf --connect-timeout 10 --max-time 30 "$CONFIG_URL" 2>/dev/null) || {
-            echo "  Warning: Failed to fetch config from Management API. Using defaults."
-            return 1
-        }
-        
-        # Validate JSON response
-        if ! echo "$RESPONSE" | jq empty 2>/dev/null; then
-            echo "  Warning: Invalid JSON response from Management API. Using defaults."
-            return 1
-        fi
-        
-        echo "  Configuration fetched successfully."
-        
-        # Extract and write AGENTS.md (global instructions)
-        AGENTS_CONTENT=$(echo "$RESPONSE" | jq -r '.agentsMd // empty')
-        if [ -n "$AGENTS_CONTENT" ] && [ "$AGENTS_CONTENT" != "null" ]; then
-            echo "  Writing AGENTS.md to $OPENCODE_CONFIG_DIR/AGENTS.md"
-            mkdir -p "$OPENCODE_CONFIG_DIR"
-            echo "$AGENTS_CONTENT" > "$OPENCODE_CONFIG_DIR/AGENTS.md"
-        fi
-        
-        # Extract and write custom config files (agents, commands, tools, plugins)
-        mkdir -p "$OPENCODE_CUSTOM_CONFIG_DIR"
-        
-        # Write each config file type
-        for FILE_TYPE in agents commands tools plugins; do
-            FILES=$(echo "$RESPONSE" | jq -r ".configFiles.${FILE_TYPE} // [] | .[]" 2>/dev/null)
-            if [ -n "$FILES" ]; then
-                echo "$FILES" | while IFS= read -r file_json; do
-                    FILENAME=$(echo "$file_json" | jq -r '.filename // empty')
-                    CONTENT=$(echo "$file_json" | jq -r '.content // empty')
-                    if [ -n "$FILENAME" ] && [ -n "$CONTENT" ]; then
-                        echo "  Writing custom config: $OPENCODE_CUSTOM_CONFIG_DIR/$FILENAME"
-                        echo "$CONTENT" > "$OPENCODE_CUSTOM_CONFIG_DIR/$FILENAME"
-                    fi
-                done
-            fi
-        done
-        
-        # Extract auth configuration
-        AUTH_JSON=$(echo "$RESPONSE" | jq -r '.auth // empty')
-        if [ -n "$AUTH_JSON" ] && [ "$AUTH_JSON" != "null" ] && [ "$AUTH_JSON" != "{}" ]; then
-            echo "  Writing auth.json"
-            mkdir -p "$OPENCODE_DATA_DIR"
-            echo "$AUTH_JSON" > "$OPENCODE_DATA_DIR/auth.json"
-        fi
-        
-        return 0
-    else
+    if [ -z "$MANAGEMENT_API_URL" ] || [ -z "$USER_ID" ]; then
         echo "No MANAGEMENT_API_URL or USER_ID provided. Skipping remote config fetch."
         return 1
     fi
+    
+    echo "Fetching user configuration from Management API..."
+    
+    # Build the correct API endpoint URL
+    CONFIG_URL="${MANAGEMENT_API_URL}/api/users/${USER_ID}/opencode/config"
+    echo "  URL: $CONFIG_URL"
+    
+    # Build curl command with optional auth header
+    CURL_OPTS="-sf --connect-timeout 10 --max-time 30"
+    if [ -n "$AUTH_TOKEN" ]; then
+        CURL_OPTS="$CURL_OPTS -H 'Authorization: Bearer ${AUTH_TOKEN}'"
+    fi
+    
+    # Fetch config
+    RESPONSE=$(eval curl $CURL_OPTS "'$CONFIG_URL'" 2>/dev/null) || {
+        echo "  Warning: Failed to fetch config from Management API. Using defaults."
+        return 1
+    }
+    
+    # Validate JSON response
+    if ! echo "$RESPONSE" | jq empty 2>/dev/null; then
+        echo "  Warning: Invalid JSON response from Management API. Using defaults."
+        return 1
+    fi
+    
+    echo "  Configuration fetched successfully."
+    
+    # Extract and write AGENTS.md (global instructions)
+    # API returns 'agents_md' (snake_case)
+    AGENTS_CONTENT=$(echo "$RESPONSE" | jq -r '.agents_md // empty')
+    if [ -n "$AGENTS_CONTENT" ] && [ "$AGENTS_CONTENT" != "null" ]; then
+        echo "  Writing AGENTS.md to $OPENCODE_CONFIG_DIR/AGENTS.md"
+        mkdir -p "$OPENCODE_CONFIG_DIR"
+        echo "$AGENTS_CONTENT" > "$OPENCODE_CONFIG_DIR/AGENTS.md"
+    fi
+    
+    # Extract and write user settings to opencode.json
+    SETTINGS=$(echo "$RESPONSE" | jq -r '.settings // {}')
+    if [ "$SETTINGS" != "{}" ] && [ "$SETTINGS" != "null" ]; then
+        echo "  Writing user settings to $OPENCODE_CONFIG_DIR/opencode.json"
+        mkdir -p "$OPENCODE_CONFIG_DIR"
+        echo "$SETTINGS" > "$OPENCODE_CONFIG_DIR/opencode.json"
+    fi
+    
+    # Extract and write custom config files (agents, commands, tools, plugins)
+    # API returns 'files' array with {type, name, extension, content}
+    mkdir -p "$OPENCODE_CUSTOM_CONFIG_DIR"/{agent,command,tool,plugin}
+    
+    # Process each file type
+    for FILE_TYPE in agent command tool plugin; do
+        echo "$RESPONSE" | jq -c ".files[]? | select(.type==\"$FILE_TYPE\")" 2>/dev/null | while IFS= read -r file_json; do
+            if [ -n "$file_json" ]; then
+                NAME=$(echo "$file_json" | jq -r '.name // empty')
+                EXT=$(echo "$file_json" | jq -r '.extension // "md"')
+                CONTENT=$(echo "$file_json" | jq -r '.content // empty')
+                
+                if [ -n "$NAME" ] && [ -n "$CONTENT" ]; then
+                    FILENAME="${NAME}.${EXT}"
+                    echo "  Writing custom config: $OPENCODE_CUSTOM_CONFIG_DIR/$FILE_TYPE/$FILENAME"
+                    echo "$CONTENT" > "$OPENCODE_CUSTOM_CONFIG_DIR/$FILE_TYPE/$FILENAME"
+                fi
+            fi
+        done
+    done
+    
+    # Set OPENCODE_CONFIG_DIR env var for OpenCode to find custom configs
+    export OPENCODE_CONFIG_DIR="$OPENCODE_CUSTOM_CONFIG_DIR"
+    
+    return 0
 }
 
 # =============================================================================
@@ -95,7 +112,7 @@ fetch_user_config() {
 setup_fallback_config() {
     echo "Setting up configuration from environment variables..."
     
-    # Auth configuration
+    # Auth configuration (LLM provider credentials)
     if [ -n "$OPENCODE_AUTH_JSON" ]; then
         echo "  Writing auth.json from OPENCODE_AUTH_JSON"
         mkdir -p "$OPENCODE_DATA_DIR"
@@ -109,9 +126,12 @@ setup_fallback_config() {
     # OpenCode project config
     if [ -n "$OPENCODE_CONFIG_JSON" ]; then
         echo "  Writing opencode.json from OPENCODE_CONFIG_JSON"
+        mkdir -p "$WORKSPACE"
         echo "$OPENCODE_CONFIG_JSON" > "$WORKSPACE/opencode.json"
     else
         echo "  Creating default opencode.json with permissions"
+        mkdir -p "$WORKSPACE"
+        # Use OpenCode 1.0 format: 'permission' (singular) with 'allow'/'deny'/'ask' values
         cat > "$WORKSPACE/opencode.json" << 'EOF'
 {
   "$schema": "https://opencode.ai/config.json",
@@ -123,6 +143,19 @@ setup_fallback_config() {
   }
 }
 EOF
+    fi
+}
+
+# =============================================================================
+# Setup Auth from Environment
+# =============================================================================
+setup_auth() {
+    # Always write auth.json from OPENCODE_AUTH_JSON if provided
+    # This contains LLM provider credentials injected by the Management API
+    if [ -n "$OPENCODE_AUTH_JSON" ]; then
+        echo "  Writing auth.json from OPENCODE_AUTH_JSON"
+        mkdir -p "$OPENCODE_DATA_DIR"
+        echo "$OPENCODE_AUTH_JSON" > "$OPENCODE_DATA_DIR/auth.json"
     fi
 }
 
@@ -225,6 +258,9 @@ mkdir -p "$WORKSPACE"
 
 # Try to fetch config from Management API, fall back to env vars
 fetch_user_config || setup_fallback_config
+
+# Always setup auth from OPENCODE_AUTH_JSON (LLM credentials)
+setup_auth
 
 # Configure git
 configure_git
