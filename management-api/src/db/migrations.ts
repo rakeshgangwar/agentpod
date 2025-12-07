@@ -249,4 +249,65 @@ export const migrations: Migration[] = [
       db.exec('DROP TABLE IF EXISTS user_opencode_config');
     },
   },
+  
+  // Migration 5: Add container tiers table and container columns to projects
+  // Supports tiered container deployments with different resource allocations
+  {
+    version: 5,
+    name: 'add_container_tiers',
+    up: () => {
+      // Create container_tiers table
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS container_tiers (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          description TEXT,
+          image_type TEXT NOT NULL,
+          cpu_limit TEXT NOT NULL,
+          memory_limit TEXT NOT NULL,
+          memory_reservation TEXT,
+          storage_gb INTEGER NOT NULL,
+          has_desktop_access INTEGER DEFAULT 0,
+          is_default INTEGER DEFAULT 0,
+          sort_order INTEGER DEFAULT 0,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+      
+      // Create index
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_container_tiers_default ON container_tiers(is_default);
+      `);
+      
+      // Seed container tiers
+      db.exec(`
+        INSERT OR IGNORE INTO container_tiers (id, name, description, image_type, cpu_limit, memory_limit, memory_reservation, storage_gb, has_desktop_access, is_default, sort_order) VALUES
+          ('lite', 'Lite', 'Basic tier for simple projects and learning. CLI access only.', 'cli', '1', '2Gi', '1Gi', 20, 0, 1, 1),
+          ('standard', 'Standard', 'Balanced tier for web development and typical projects. CLI access only.', 'cli', '2', '4Gi', '2Gi', 30, 0, 0, 2),
+          ('pro', 'Pro', 'High-performance tier for full-stack development with multiple services. CLI access only.', 'cli', '4', '8Gi', '4Gi', 50, 0, 0, 3),
+          ('desktop', 'Desktop', 'Full desktop environment with GUI access via browser. Includes all Pro tier resources plus VNC.', 'desktop', '8', '16Gi', '8Gi', 75, 1, 0, 4);
+      `);
+      
+      // Add container columns to projects table
+      const tableInfo = db.query("PRAGMA table_info(projects)").all() as Array<{ name: string }>;
+      
+      if (!tableInfo.some(col => col.name === 'container_tier_id')) {
+        db.exec("ALTER TABLE projects ADD COLUMN container_tier_id TEXT DEFAULT 'lite'");
+      }
+      
+      if (!tableInfo.some(col => col.name === 'container_version')) {
+        db.exec("ALTER TABLE projects ADD COLUMN container_version TEXT DEFAULT '0.0.1'");
+      }
+      
+      if (!tableInfo.some(col => col.name === 'container_update_available')) {
+        db.exec("ALTER TABLE projects ADD COLUMN container_update_available INTEGER DEFAULT 0");
+      }
+    },
+    down: () => {
+      db.exec('DROP TABLE IF EXISTS container_tiers');
+      // Note: SQLite doesn't support DROP COLUMN easily, columns will remain
+      console.warn('Rollback: container_tiers table dropped, but project columns will remain');
+    },
+  },
 ];

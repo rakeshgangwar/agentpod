@@ -60,10 +60,21 @@ export const config = {
 
   // OpenCode containers
   opencode: {
+    // Legacy image setting (deprecated, use registry settings below)
     image: getEnv('OPENCODE_IMAGE', 'opencode-server:latest'),
     basePort: getEnvInt('OPENCODE_BASE_PORT', 4001),
     // Wildcard domain for OpenCode container URLs (e.g., superchotu.com -> opencode-{slug}.superchotu.com)
     wildcardDomain: getEnv('OPENCODE_WILDCARD_DOMAIN', ''),
+  },
+  
+  // Container Registry (Forgejo Package Registry)
+  registry: {
+    // Registry URL (without protocol, used for docker pull)
+    url: getEnv('OPENCODE_REGISTRY_URL', 'forgejo.superchotu.com'),
+    // Registry owner/namespace
+    owner: getEnv('OPENCODE_REGISTRY_OWNER', 'rakeshgangwar'),
+    // Current container version to deploy
+    version: getEnv('OPENCODE_CONTAINER_VERSION', '0.0.1'),
   },
 
   // Database

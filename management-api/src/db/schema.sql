@@ -22,6 +22,11 @@ CREATE TABLE IF NOT EXISTS projects (
   container_port INTEGER DEFAULT 4096,
   fqdn_url TEXT,  -- Public URL for the OpenCode container (e.g., https://opencode-myproject.superchotu.com)
   
+  -- Container configuration
+  container_tier_id TEXT DEFAULT 'lite',  -- References container_tiers(id)
+  container_version TEXT DEFAULT '0.0.1', -- Current container image version
+  container_update_available INTEGER DEFAULT 0, -- Flag for available updates
+  
   -- GitHub sync (optional)
   github_repo_url TEXT,
   github_sync_enabled INTEGER DEFAULT 0,
@@ -185,6 +190,29 @@ CREATE INDEX IF NOT EXISTS idx_user_opencode_files_user_id ON user_opencode_file
 CREATE INDEX IF NOT EXISTS idx_user_opencode_files_type ON user_opencode_files(user_id, type);
 
 -- =============================================================================
+-- Container Tiers Table
+-- =============================================================================
+-- Defines available container tiers with resource limits
+CREATE TABLE IF NOT EXISTS container_tiers (
+  id TEXT PRIMARY KEY,                    -- 'lite', 'standard', 'pro', 'desktop'
+  name TEXT NOT NULL,                     -- Display name
+  description TEXT,                       -- Description of the tier
+  image_type TEXT NOT NULL,               -- 'cli' or 'desktop'
+  cpu_limit TEXT NOT NULL,                -- Docker CPU limit (e.g., '1', '2', '4')
+  memory_limit TEXT NOT NULL,             -- Docker memory limit (e.g., '2Gi', '4Gi')
+  memory_reservation TEXT,                -- Docker memory reservation
+  storage_gb INTEGER NOT NULL,            -- Storage allocation in GB
+  has_desktop_access INTEGER DEFAULT 0,   -- Whether VNC/noVNC is available
+  is_default INTEGER DEFAULT 0,           -- Default tier for new projects
+  sort_order INTEGER DEFAULT 0,           -- Display order
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Index for default tier lookup
+CREATE INDEX IF NOT EXISTS idx_container_tiers_default ON container_tiers(is_default);
+
+-- =============================================================================
 -- Seed Data: Default Providers
 -- =============================================================================
 INSERT OR IGNORE INTO providers (id, name, type, is_configured, is_default) VALUES
@@ -194,3 +222,12 @@ INSERT OR IGNORE INTO providers (id, name, type, is_configured, is_default) VALU
   ('github-copilot', 'GitHub Copilot', 'oauth', 0, 0),
   ('google', 'Google AI', 'api_key', 0, 0),
   ('amazon-bedrock', 'Amazon Bedrock', 'api_key', 0, 0);
+
+-- =============================================================================
+-- Seed Data: Container Tiers
+-- =============================================================================
+INSERT OR IGNORE INTO container_tiers (id, name, description, image_type, cpu_limit, memory_limit, memory_reservation, storage_gb, has_desktop_access, is_default, sort_order) VALUES
+  ('lite', 'Lite', 'Basic tier for simple projects and learning. CLI access only.', 'cli', '1', '2Gi', '1Gi', 20, 0, 1, 1),
+  ('standard', 'Standard', 'Balanced tier for web development and typical projects. CLI access only.', 'cli', '2', '4Gi', '2Gi', 30, 0, 0, 2),
+  ('pro', 'Pro', 'High-performance tier for full-stack development with multiple services. CLI access only.', 'cli', '4', '8Gi', '4Gi', 50, 0, 0, 3),
+  ('desktop', 'Desktop', 'Full desktop environment with GUI access via browser. Includes all Pro tier resources plus VNC.', 'desktop', '8', '16Gi', '8Gi', 75, 1, 0, 4);

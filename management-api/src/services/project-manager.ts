@@ -22,6 +22,14 @@ import {
   type CreateProjectInput,
 } from '../models/project.ts';
 import { getProviderEnvVars, getSetting } from '../models/provider.ts';
+import { 
+  getTierById, 
+  getDefaultTier, 
+  getImageNameForTier,
+  getResourceLimitsForTier,
+  getExposedPortsForTier,
+  type ContainerTier,
+} from '../models/container-tier.ts';
 import { createLogger } from '../utils/logger.ts';
 import { ProjectCreationError, ProjectNotFoundError } from '../utils/errors.ts';
 
@@ -196,6 +204,8 @@ export interface CreateProjectOptions {
   llmProviderId?: string;
   /** Use specific LLM model ID */
   llmModelId?: string;
+  /** Container tier ID (defaults to 'lite') */
+  containerTierId?: string;
 }
 
 export interface ProjectWithStatus extends Project {
@@ -209,14 +219,30 @@ export interface ProjectWithStatus extends Project {
 
 /**
  * Create a new project with Forgejo repo and Coolify container
+ * Now uses Docker Image deployment from Forgejo Container Registry
  */
 export async function createNewProject(options: CreateProjectOptions): Promise<Project> {
-  const { name, description, githubUrl, llmProviderId, llmModelId } = options;
+  const { name, description, githubUrl, llmProviderId, llmModelId, containerTierId } = options;
   
-  log.info('Creating new project', { name, githubUrl });
+  log.info('Creating new project', { name, githubUrl, containerTierId });
   
   const slug = generateUniqueSlug(name);
   const owner = config.forgejo.owner;
+  
+  // Get container tier (defaults to 'lite' or the default tier)
+  const tier = containerTierId 
+    ? getTierById(containerTierId) 
+    : getDefaultTier();
+  
+  if (!tier) {
+    throw new ProjectCreationError(`Container tier '${containerTierId || 'default'}' not found`);
+  }
+  
+  log.info('Using container tier', { 
+    tierId: tier.id, 
+    tierName: tier.name, 
+    imageType: tier.image_type 
+  });
   
   let forgejoRepo;
   let coolifyApp;
@@ -259,40 +285,52 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       ? `https://opencode-${slug}.${config.opencode.wildcardDomain}`
       : null;
     
-    // Step 4: Create Coolify application using embedded Dockerfile
-    // This bypasses the git URL stripping issue that Coolify has with self-hosted Forgejo
-    log.info('Step 2: Creating Coolify application (embedded Dockerfile)', { slug, fqdnUrl });
+    // Step 4: Create Coolify application using Docker Image from Forgejo Registry
+    // This uses our pre-built images (opencode-cli or opencode-desktop based on tier)
+    const imageName = getImageNameForTier(tier, config.registry.url, config.registry.owner);
+    const imageTag = config.registry.version;
+    const exposedPorts = getExposedPortsForTier(tier);
+    const resourceLimits = getResourceLimitsForTier(tier);
     
-    coolifyApp = await coolify.createDockerfileApp({
+    log.info('Step 2: Creating Coolify application (Docker Image)', { 
+      slug, 
+      fqdnUrl,
+      imageName,
+      imageTag,
+      tier: tier.id,
+    });
+    
+    coolifyApp = await coolify.createDockerImageApp({
       projectUuid: config.coolify.projectUuid,
       serverUuid: config.coolify.serverUuid,
       environmentName: 'production',
-      dockerfile: OPENCODE_DOCKERFILE,
-      portsExposes: String(containerPort),
+      imageName: imageName,
+      imageTag: imageTag,
+      portsExposes: exposedPorts,
       name: `opencode-${slug}`,
-      description: `OpenCode container for ${name}`,
-      domains: fqdnUrl ?? undefined,  // Set the domain for Traefik routing
+      description: `OpenCode container for ${name} (${tier.name} tier)`,
+      domains: fqdnUrl ?? undefined,
       instantDeploy: false, // We'll set env vars first, then deploy
-      healthCheckEnabled: true,
-      healthCheckPath: '/session',  // /session returns JSON [], /app returns HTML
-      healthCheckPort: String(containerPort),
     });
     
     log.info('Coolify application created', { uuid: coolifyApp.uuid });
     
-    // Step 4a: Update application settings (Coolify's create endpoint doesn't reliably set these)
-    log.info('Step 2b: Updating Coolify application settings');
+    // Step 4a: Update application settings with resource limits and health check
+    log.info('Step 2b: Updating Coolify application settings with resource limits');
     await coolify.updateApplication(coolifyApp.uuid, {
-      ports_exposes: String(containerPort),
+      ports_exposes: exposedPorts,
       domains: fqdnUrl ?? undefined,
       health_check_enabled: true,
       health_check_path: '/session',
       health_check_port: String(containerPort),
+      // Apply resource limits from tier
+      ...resourceLimits,
     });
     
     log.info('Coolify application settings updated', { 
-      ports: containerPort, 
-      domain: fqdnUrl 
+      ports: exposedPorts, 
+      domain: fqdnUrl,
+      resourceLimits,
     });
     
     // Step 5: Set environment variables
@@ -365,6 +403,8 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       coolifyServerUuid: config.coolify.serverUuid,
       containerPort,
       fqdnUrl: fqdnUrl ?? undefined,
+      containerTierId: tier.id,
+      containerVersion: config.registry.version,
       githubRepoUrl: githubUrl,
       githubSyncEnabled: !!githubUrl,
       githubSyncDirection: 'push',

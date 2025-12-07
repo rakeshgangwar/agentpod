@@ -25,6 +25,11 @@ export interface Project {
   containerPort: number;
   fqdnUrl: string | null;  // Public URL for the OpenCode container
   
+  // Container configuration
+  containerTierId: string;           // References container_tiers(id)
+  containerVersion: string;          // Current container image version
+  containerUpdateAvailable: boolean; // Flag for available updates
+  
   // GitHub sync
   githubRepoUrl: string | null;
   githubSyncEnabled: boolean;
@@ -54,6 +59,8 @@ export interface CreateProjectInput {
   coolifyServerUuid: string;
   containerPort: number;
   fqdnUrl?: string;
+  containerTierId?: string;
+  containerVersion?: string;
   githubRepoUrl?: string;
   githubSyncEnabled?: boolean;
   githubSyncDirection?: SyncDirection;
@@ -90,6 +97,9 @@ interface ProjectRow {
   coolify_server_uuid: string;
   container_port: number;
   fqdn_url: string | null;
+  container_tier_id: string;
+  container_version: string;
+  container_update_available: number;
   github_repo_url: string | null;
   github_sync_enabled: number;
   github_sync_direction: string;
@@ -115,6 +125,9 @@ function rowToProject(row: ProjectRow): Project {
     coolifyServerUuid: row.coolify_server_uuid,
     containerPort: row.container_port,
     fqdnUrl: row.fqdn_url,
+    containerTierId: row.container_tier_id ?? 'lite',
+    containerVersion: row.container_version ?? '0.0.1',
+    containerUpdateAvailable: row.container_update_available === 1,
     githubRepoUrl: row.github_repo_url,
     githubSyncEnabled: row.github_sync_enabled === 1,
     githubSyncDirection: row.github_sync_direction as SyncDirection,
@@ -144,12 +157,14 @@ export function createProject(input: CreateProjectInput): Project {
       id, name, slug, description,
       forgejo_repo_url, forgejo_repo_id, forgejo_owner,
       coolify_app_uuid, coolify_server_uuid, container_port, fqdn_url,
+      container_tier_id, container_version,
       github_repo_url, github_sync_enabled, github_sync_direction,
       llm_provider, llm_model, status
     ) VALUES (
       $id, $name, $slug, $description,
       $forgejoRepoUrl, $forgejoRepoId, $forgejoOwner,
       $coolifyAppUuid, $coolifyServerUuid, $containerPort, $fqdnUrl,
+      $containerTierId, $containerVersion,
       $githubRepoUrl, $githubSyncEnabled, $githubSyncDirection,
       $llmProvider, $llmModel, $status
     )
@@ -167,6 +182,8 @@ export function createProject(input: CreateProjectInput): Project {
     $coolifyServerUuid: input.coolifyServerUuid,
     $containerPort: input.containerPort,
     $fqdnUrl: input.fqdnUrl ?? null,
+    $containerTierId: input.containerTierId ?? 'lite',
+    $containerVersion: input.containerVersion ?? '0.0.1',
     $githubRepoUrl: input.githubRepoUrl ?? null,
     $githubSyncEnabled: input.githubSyncEnabled ? 1 : 0,
     $githubSyncDirection: input.githubSyncDirection ?? 'push',

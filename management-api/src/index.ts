@@ -11,6 +11,7 @@ import { providerRoutes } from './routes/providers.ts';
 import { syncRoutes } from './routes/sync.ts';
 import { opencodeRoutes } from './routes/opencode.ts';
 import { userRoutes } from './routes/users.ts';
+import { containerTiersRouter } from './routes/container-tiers.ts';
 
 // Initialize database
 console.log('Initializing database...');
@@ -35,7 +36,8 @@ const app = new Hono()
   .route('/api/projects', syncRoutes) // Sync routes are under /api/projects/:id/sync
   .route('/api/projects', projectRoutes)
   .route('/api/providers', providerRoutes)
-  .route('/api/users', userRoutes); // User OpenCode config routes
+  .route('/api/users', userRoutes) // User OpenCode config routes
+  .route('/api/container-tiers', containerTiersRouter); // Container tier definitions
 
 // Export type for Hono Client (type-safe RPC from mobile app)
 export type AppType = typeof app;
@@ -80,6 +82,11 @@ console.log(`
 ║  Provider Endpoints:                                          ║
 ║  - GET  /api/providers             List providers             ║
 ║  - POST /api/providers/:id/configure  Set credentials         ║
+╠═══════════════════════════════════════════════════════════════╣
+║  Container Tier Endpoints:                                    ║
+║  - GET  /api/container-tiers         List all tiers           ║
+║  - GET  /api/container-tiers/default Get default tier         ║
+║  - GET  /api/container-tiers/:id     Get tier by ID           ║
 ╚═══════════════════════════════════════════════════════════════╝
 `);
 
