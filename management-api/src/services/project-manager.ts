@@ -275,9 +275,9 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       fullName: forgejoRepo.full_name 
     });
     
-    // Step 2: Calculate container port
-    // Use a simple incrementing port based on repo ID
-    const containerPort = config.opencode.basePort + (forgejoRepo.id % 1000);
+    // Step 2: Container port - use fixed port 4096
+    // Each container is isolated, so no port conflicts. Traefik routes by domain.
+    const containerPort = 4096;
     
     // Step 3: Generate FQDN for the container
     const fqdnUrl = config.opencode.wildcardDomain 
