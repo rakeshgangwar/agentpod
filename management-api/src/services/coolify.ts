@@ -296,6 +296,7 @@ export const coolify = {
    */
   async updateApplication(uuid: string, settings: {
     ports_exposes?: string;
+    ports_mappings?: string;
     domains?: string;
     health_check_enabled?: boolean;
     health_check_path?: string;
@@ -304,8 +305,20 @@ export const coolify = {
     health_check_timeout?: number;   // seconds before check times out
     health_check_retries?: number;   // number of retries before unhealthy
     health_check_start_period?: number; // seconds to wait before first check
+    // Resource limits
+    limits_memory?: string;           // e.g., '2Gi', '4Gi'
+    limits_memory_swap?: string;      // e.g., '4Gi'
+    limits_memory_swappiness?: number; // 0-100
+    limits_memory_reservation?: string; // e.g., '1Gi'
+    limits_cpus?: string;             // e.g., '1', '2', '4'
+    limits_cpuset?: string;           // e.g., '0,1' or '0-3'
+    limits_cpu_shares?: number;       // relative weight
+    // Other settings
     dockerfile?: string; // Base64 encoded Dockerfile content
+    docker_registry_image_name?: string;
+    docker_registry_image_tag?: string;
   }): Promise<void> {
+    log.info('Updating application', { uuid, settings });
     await request<unknown>('PATCH', `/applications/${uuid}`, settings);
   },
   
