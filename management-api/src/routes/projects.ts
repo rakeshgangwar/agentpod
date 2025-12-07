@@ -35,6 +35,7 @@ const createProjectSchema = z.object({
   githubUrl: z.string().url().optional(),
   llmProviderId: z.string().optional(),
   llmModelId: z.string().optional(),
+  containerTierId: z.string().optional(), // 'lite', 'standard', 'pro', 'desktop'
 });
 
 const updateProjectSchema = z.object({
@@ -120,6 +121,7 @@ export const projectRoutes = new Hono()
         githubUrl: body.githubUrl,
         llmProviderId: body.llmProviderId,
         llmModelId: body.llmModelId,
+        containerTierId: body.containerTierId,
       });
       
       return c.json({ project }, 201);
