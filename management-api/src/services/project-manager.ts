@@ -321,7 +321,7 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       ports_exposes: exposedPorts,
       domains: fqdnUrl ?? undefined,
       health_check_enabled: true,
-      health_check_path: '/session',
+      health_check_path: '/app',
       health_check_port: String(containerPort),
       // Apply resource limits from tier
       ...resourceLimits,
