@@ -38,7 +38,7 @@ env:
 jobs:
   build-cli:
     name: Build CLI Image
-    runs-on: ubuntu-latest
+    runs-on: docker
     if: ${{ github.event.inputs.image_type == 'all' || github.event.inputs.image_type == 'cli' || github.event.inputs.image_type == '' }}
     steps:
       - name: Checkout repository
@@ -86,7 +86,7 @@ jobs:
 
   build-desktop:
     name: Build Desktop Image
-    runs-on: ubuntu-latest
+    runs-on: docker
     if: ${{ github.event.inputs.image_type == 'all' || github.event.inputs.image_type == 'desktop' || github.event.inputs.image_type == '' }}
     steps:
       - name: Checkout repository
@@ -134,7 +134,7 @@ jobs:
 
   summary:
     name: Build Summary
-    runs-on: ubuntu-latest
+    runs-on: docker
     needs: [build-cli, build-desktop]
     if: always()
     steps:
