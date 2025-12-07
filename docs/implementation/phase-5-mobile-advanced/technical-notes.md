@@ -563,3 +563,291 @@ function handleDeepLink(url: string) {
   goto(path);
 }
 ```
+
+---
+
+## Container Tiers Implementation
+
+### Overview
+
+Container tiers allow users to select different resource allocations for their OpenCode containers. Each tier has specific CPU, memory, and storage limits, and the Desktop tier includes VNC access for a full graphical environment.
+
+### Database Schema
+
+```sql
+-- container_tiers table (seeded via migration 5)
+CREATE TABLE IF NOT EXISTS container_tiers (
+  id TEXT PRIMARY KEY,              -- 'lite', 'standard', 'pro', 'desktop'
+  name TEXT NOT NULL,               -- Display name
+  description TEXT,                 -- Tier description
+  image_type TEXT NOT NULL,         -- 'cli' or 'desktop'
+  cpu_limit TEXT NOT NULL,          -- Docker CPU limit: '1', '2', '4', '8'
+  memory_limit TEXT NOT NULL,       -- Docker memory: '2g', '4g', '8g', '16g'
+  memory_reservation TEXT,          -- Memory reservation
+  storage_gb INTEGER NOT NULL,      -- Storage allocation
+  has_desktop_access INTEGER DEFAULT 0,  -- VNC available
+  is_default INTEGER DEFAULT 0,     -- Default tier for new projects
+  sort_order INTEGER DEFAULT 0,     -- Display order
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Seeded tiers
+INSERT INTO container_tiers VALUES
+  ('lite', 'Lite', 'Basic tier...', 'cli', '1', '2g', '1g', 20, 0, 1, 1),
+  ('standard', 'Standard', '...', 'cli', '2', '4g', '2g', 30, 0, 0, 2),
+  ('pro', 'Pro', '...', 'cli', '4', '8g', '4g', 50, 0, 0, 3),
+  ('desktop', 'Desktop', '...', 'desktop', '8', '16g', '8g', 75, 1, 0, 4);
+```
+
+### Container Tier Model
+
+```typescript
+// management-api/src/models/container-tier.ts
+
+export interface ContainerTier {
+  id: string;                    // 'lite', 'standard', 'pro', 'desktop'
+  name: string;                  // Display name
+  description: string | null;
+  image_type: 'cli' | 'desktop';
+  cpu_limit: string;             // e.g., '1', '2', '4'
+  memory_limit: string;          // e.g., '2g', '4g'
+  memory_reservation: string | null;
+  storage_gb: number;
+  has_desktop_access: boolean;
+  is_default: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Helper functions
+export function getImageNameForTier(
+  tier: ContainerTier, 
+  registry: string, 
+  owner: string
+): string {
+  const imageName = tier.image_type === 'desktop' ? 'opencode-desktop' : 'opencode-cli';
+  return `${registry}/${owner}/${imageName}`;
+}
+
+export function getResourceLimitsForTier(tier: ContainerTier): {
+  limits_memory: string;
+  limits_memory_reservation: string;
+  limits_cpus: string;
+} {
+  return {
+    limits_memory: tier.memory_limit,
+    limits_memory_reservation: tier.memory_reservation || tier.memory_limit,
+    limits_cpus: tier.cpu_limit,
+  };
+}
+
+export function getExposedPortsForTier(tier: ContainerTier): string {
+  if (tier.has_desktop_access) {
+    // OpenCode API + noVNC
+    return '4096,6080';
+  }
+  return '4096';
+}
+```
+
+### API Routes
+
+```typescript
+// management-api/src/routes/container-tiers.ts
+
+// GET /api/container-tiers - List all tiers
+// Returns enriched tier data with exposedPorts and imageName
+
+// GET /api/container-tiers/:id - Get specific tier
+
+// GET /api/container-tiers/default - Get default tier
+```
+
+### VNC Domain Generation
+
+Desktop containers require two domains - one for OpenCode API and one for noVNC:
+
+```typescript
+// management-api/src/services/project-manager.ts
+
+// Step 3: Generate FQDNs for the container
+let fqdnUrl: string | null = null;
+let vncUrl: string | null = null;
+let domainsConfig: string | undefined;
+
+if (config.opencode.wildcardDomain) {
+  // Main OpenCode API domain
+  fqdnUrl = `https://opencode-${slug}.${config.opencode.wildcardDomain}`;
+  
+  // For desktop tier, add separate VNC domain
+  if (tier.has_desktop_access) {
+    vncUrl = `https://vnc-${slug}.${config.opencode.wildcardDomain}`;
+    // Coolify format: domain1:port1,domain2:port2
+    domainsConfig = `${fqdnUrl}:4096,${vncUrl}:6080`;
+  } else {
+    domainsConfig = fqdnUrl;
+  }
+}
+```
+
+### Coolify Configuration
+
+When creating a desktop container, Coolify is configured with:
+
+```typescript
+// ports_exposes: "4096,6080"
+// domains: "https://opencode-myproject.domain.com:4096,https://vnc-myproject.domain.com:6080"
+
+await coolify.updateApplication(coolifyApp.uuid, {
+  ports_exposes: exposedPorts,  // "4096,6080" for desktop
+  domains: domainsConfig,
+  health_check_enabled: false,
+  limits_memory: tier.memory_limit,      // "16g"
+  limits_memory_reservation: tier.memory_reservation,  // "8g"
+  limits_cpus: tier.cpu_limit,           // "8"
+});
+```
+
+### Project Model with VNC URL
+
+```typescript
+// management-api/src/models/project.ts
+
+export interface Project {
+  // ... other fields
+  fqdnUrl: string | null;   // OpenCode API URL
+  vncUrl: string | null;    // VNC/Desktop URL (desktop tier only)
+  containerTierId: string;  // 'lite', 'standard', 'pro', 'desktop'
+}
+
+// CreateProjectInput includes vncUrl
+export interface CreateProjectInput {
+  // ... other fields
+  vncUrl?: string;
+  containerTierId?: string;
+}
+```
+
+### Mobile App Tier Selector
+
+```svelte
+<!-- src/lib/components/tier-selector.svelte -->
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import { invoke } from '@tauri-apps/api/core';
+  
+  interface ContainerTier {
+    id: string;
+    name: string;
+    description: string;
+    cpuLimit: string;
+    memoryLimit: string;
+    storageGb: number;
+    hasDesktopAccess: boolean;
+    isDefault: boolean;
+  }
+  
+  let { value = $bindable(), disabled = false } = $props();
+  let tiers = $state<ContainerTier[]>([]);
+  let loading = $state(true);
+  
+  onMount(async () => {
+    try {
+      const result = await invoke<{ tiers: ContainerTier[] }>('list_container_tiers');
+      tiers = result.tiers;
+      
+      // Set default if no value
+      if (!value) {
+        const defaultTier = tiers.find(t => t.isDefault);
+        if (defaultTier) value = defaultTier.id;
+      }
+    } catch (e) {
+      console.error('Failed to load tiers:', e);
+    } finally {
+      loading = false;
+    }
+  });
+</script>
+
+<div class="tier-selector">
+  {#each tiers as tier}
+    <button
+      class="tier-card"
+      class:selected={value === tier.id}
+      onclick={() => value = tier.id}
+      {disabled}
+    >
+      <h4>{tier.name}</h4>
+      <p>{tier.description}</p>
+      <div class="specs">
+        <span>{tier.cpuLimit} CPU</span>
+        <span>{tier.memoryLimit} RAM</span>
+        <span>{tier.storageGb}GB Storage</span>
+        {#if tier.hasDesktopAccess}
+          <span class="badge">VNC Desktop</span>
+        {/if}
+      </div>
+    </button>
+  {/each}
+</div>
+```
+
+### Desktop Container Access
+
+After creating a desktop tier project, users can access:
+
+1. **OpenCode Chat API**: `https://opencode-{slug}.domain.com`
+   - Used by the mobile app for chat interface
+   - Standard OpenCode API endpoints
+
+2. **VNC Desktop**: `https://vnc-{slug}.domain.com/vnc.html`
+   - Full graphical desktop environment (Openbox)
+   - Access via browser using noVNC
+   - Includes Firefox, file manager, terminal, text editor
+
+### Project API Response
+
+```json
+{
+  "project": {
+    "id": "abc123",
+    "name": "My Desktop Project",
+    "slug": "my-desktop-project",
+    "fqdnUrl": "https://opencode-my-desktop-project.superchotu.com",
+    "vncUrl": "https://vnc-my-desktop-project.superchotu.com",
+    "containerTierId": "desktop",
+    "status": "running"
+  }
+}
+```
+
+The mobile app can use `vncUrl` to provide an "Open Desktop" button that opens the VNC interface in a webview or browser.
+
+---
+
+## Docker Images
+
+### CLI Image (opencode-cli)
+
+Used for lite, standard, and pro tiers:
+- Node.js 20 + OpenCode
+- Git, curl, jq
+- Exposes port 4096
+
+### Desktop Image (opencode-desktop)
+
+Used for desktop tier:
+- Ubuntu base with X11
+- Openbox window manager
+- tint2 panel
+- x11vnc + noVNC
+- Firefox ESR, file manager, text editor
+- Node.js, Python, Go, Rust
+- Exposes ports 4096 (OpenCode) and 6080 (noVNC)
+
+Both images are built and pushed to Forgejo Container Registry:
+- `forgejo.superchotu.com/rakeshgangwar/opencode-cli:0.0.3`
+- `forgejo.superchotu.com/rakeshgangwar/opencode-desktop:0.0.3`
+
