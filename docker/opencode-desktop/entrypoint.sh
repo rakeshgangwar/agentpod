@@ -2,7 +2,8 @@
 set -e
 
 echo "=============================================="
-echo "  OpenCode Desktop Container v${CONTAINER_VERSION:-0.0.1}"
+echo "  OpenCode Desktop Container v${CONTAINER_VERSION:-0.0.2}"
+echo "  (KasmVNC Edition)"
 echo "=============================================="
 
 # =============================================================================
@@ -22,8 +23,7 @@ echo "=============================================="
 # DISPLAY_NUM           - X display number (default: 1)
 # WIDTH                 - Screen width (default: 1280)
 # HEIGHT                - Screen height (default: 800)
-# VNC_PORT              - VNC port (default: 5901)
-# NOVNC_PORT            - noVNC web port (default: 6080)
+# KASMVNC_PORT          - KasmVNC web port (default: 6080)
 # =============================================================================
 
 HOME_DIR="/home/developer"
@@ -230,12 +230,41 @@ configure_git() {
 
 
 # =============================================================================
+# Initialize KasmVNC
+# =============================================================================
+setup_kasmvnc() {
+    echo "Setting up KasmVNC..."
+    
+    VNC_DIR="${HOME_DIR}/.vnc"
+    mkdir -pm700 "$VNC_DIR"
+    
+    # Ensure .de-was-selected exists (prevents DE selection prompt)
+    touch "$VNC_DIR/.de-was-selected"
+    
+    # Update kasmvnc.yaml with current resolution settings
+    if [ -f "$VNC_DIR/kasmvnc.yaml" ]; then
+        # Use yq to update resolution if available, otherwise use sed
+        if command -v yq &> /dev/null; then
+            yq -i ".desktop.resolution.width = ${WIDTH}" "$VNC_DIR/kasmvnc.yaml"
+            yq -i ".desktop.resolution.height = ${HEIGHT}" "$VNC_DIR/kasmvnc.yaml"
+            yq -i ".network.websocket_port = ${KASMVNC_PORT:-6080}" "$VNC_DIR/kasmvnc.yaml"
+        fi
+    fi
+    
+    # Create KasmVNC password file (required even with -disableBasicAuth)
+    # Using a simple password since auth is disabled anyway
+    echo -e "kasmvnc\nkasmvnc\n" | vncpasswd -u developer -ow 2>/dev/null || true
+    
+    echo "  KasmVNC configured."
+}
+
+# =============================================================================
 # Display Startup Information
 # =============================================================================
 show_startup_info() {
     echo ""
     echo "=============================================="
-    echo "  Desktop Environment Ready"
+    echo "  Desktop Environment Ready (KasmVNC)"
     echo "=============================================="
     echo "  User:        developer"
     echo "  Workspace:   $WORKSPACE"
@@ -243,8 +272,7 @@ show_startup_info() {
     echo "  Services:"
     echo "    - OpenCode:    http://localhost:${OPENCODE_PORT:-4096}"
     echo "    - Code Server: http://localhost:${CODE_SERVER_PORT:-8080}"
-    echo "    - Desktop:     http://localhost:${NOVNC_PORT:-6080}/vnc.html"
-    echo "    - VNC Direct:  localhost:${VNC_PORT:-5901}"
+    echo "    - Desktop:     http://localhost:${KASMVNC_PORT:-6080}"
     echo ""
     echo "  Resolution:  ${WIDTH}x${HEIGHT}"
     echo ""
@@ -279,22 +307,27 @@ setup_auth
 # Configure git
 configure_git
 
+# Setup KasmVNC
+setup_kasmvnc
+
 # Show startup info
 show_startup_info
 
 # Change to workspace directory
 cd "$WORKSPACE"
 
-# Export environment variables for supervisor (X11/VNC)
+# Export environment variables for supervisor (KasmVNC)
 export WIDTH="${WIDTH:-1280}"
 export HEIGHT="${HEIGHT:-800}"
+export DISPLAY_NUM="${DISPLAY_NUM:-1}"
+export KASMVNC_PORT="${KASMVNC_PORT:-6080}"
 
-# Start X11 and VNC services via supervisor
-echo "Starting desktop services (X11, VNC)..."
+# Start KasmVNC via supervisor
+echo "Starting desktop services (KasmVNC)..."
 /usr/bin/supervisord -c /etc/supervisor/conf.d/desktop.conf
 
-# Wait for X server to be ready
-sleep 2
+# Wait for KasmVNC to be ready
+sleep 3
 
 # Start code-server in background
 # Note: code-server respects PORT env var, so we must override it explicitly
