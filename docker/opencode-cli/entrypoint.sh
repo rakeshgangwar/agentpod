@@ -138,12 +138,23 @@ EOF
 clone_repository() {
     if [ -d "$WORKSPACE/.git" ]; then
         echo "Existing git repository found in workspace."
+        echo "  Pulling latest changes..."
+        cd "$WORKSPACE"
+        git pull --ff-only 2>/dev/null || echo "  Note: Could not pull (may have local changes or be detached)"
+        cd - > /dev/null
         return 0
     fi
     
     if [ -z "$FORGEJO_REPO_URL" ]; then
         echo "No repository URL provided. Starting with empty workspace."
         return 0
+    fi
+    
+    # If workspace exists but is not a git repo, clean it up
+    if [ -d "$WORKSPACE" ] && [ "$(ls -A $WORKSPACE 2>/dev/null)" ]; then
+        echo "Workspace exists but is not a git repository. Cleaning up..."
+        rm -rf "$WORKSPACE"
+        mkdir -p "$WORKSPACE"
     fi
     
     echo "Cloning repository from Forgejo..."
@@ -207,17 +218,19 @@ show_startup_info() {
 # Main Execution
 # =============================================================================
 
-# Ensure directories exist
-mkdir -p "$WORKSPACE"
+# Ensure config directories exist (NOT workspace - it will be created by clone)
 mkdir -p "$OPENCODE_CONFIG_DIR"
 mkdir -p "$OPENCODE_CUSTOM_CONFIG_DIR"
 mkdir -p "$OPENCODE_DATA_DIR"
 
+# Clone repository first (this creates/manages the workspace)
+clone_repository
+
+# Ensure workspace exists (for empty project case)
+mkdir -p "$WORKSPACE"
+
 # Try to fetch config from Management API, fall back to env vars
 fetch_user_config || setup_fallback_config
-
-# Clone repository if needed
-clone_repository
 
 # Configure git
 configure_git
