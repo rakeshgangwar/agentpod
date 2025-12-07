@@ -222,8 +222,8 @@ EXPOSE 4096
 USER $USERNAME
 WORKDIR $WORKSPACE
 
-# Health check
+# Health check - use shell form to ensure runtime ENV variable is evaluated
 HEALTHCHECK --interval=15s --timeout=5s --start-period=45s --retries=3 \
-    CMD curl -sf http://localhost:${OPENCODE_PORT}/app || exit 1
+    CMD /bin/sh -c 'curl -sf http://localhost:${OPENCODE_PORT:-4096}/app || exit 1'
 
 ENTRYPOINT ["/entrypoint.sh"]
