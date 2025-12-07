@@ -297,10 +297,11 @@ echo "Starting desktop services (X11, VNC)..."
 sleep 2
 
 # Start code-server in background
+# Note: code-server respects PORT env var, so we must override it explicitly
 CODE_SERVER_PORT="${CODE_SERVER_PORT:-8080}"
 CODE_SERVER_AUTH="${CODE_SERVER_AUTH:-none}"
 echo "Starting code-server in background on port ${CODE_SERVER_PORT}..."
-code-server \
+PORT="${CODE_SERVER_PORT}" code-server \
     --bind-addr "0.0.0.0:${CODE_SERVER_PORT}" \
     --auth "${CODE_SERVER_AUTH}" \
     --disable-telemetry \
