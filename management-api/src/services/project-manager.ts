@@ -27,6 +27,7 @@ import {
   getDefaultTier, 
   getImageNameForTier,
   getResourceLimitsForTier,
+  getExposedPortsForTier,
   type ContainerTier,
 } from '../models/container-tier.ts';
 import { createLogger } from '../utils/logger.ts';
@@ -288,8 +289,8 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
     // This uses our pre-built images (opencode-cli or opencode-desktop based on tier)
     const imageName = getImageNameForTier(tier, config.registry.url, config.registry.owner);
     const imageTag = config.registry.version;
-    // Use containerPort for exposed ports - this must match OPENCODE_PORT env var
-    const exposedPorts = String(containerPort);
+    // Use tier-specific exposed ports: CLI = 4096, Desktop = 4096,6080 (OpenCode + noVNC)
+    const exposedPorts = getExposedPortsForTier(tier);
     const resourceLimits = getResourceLimitsForTier(tier);
     
     log.info('Step 2: Creating Coolify application (Docker Image)', { 
