@@ -68,7 +68,9 @@ jobs:
           
           echo "Pushing $IMAGE_NAME:$VERSION"
           docker push "$IMAGE_NAME:$VERSION"
-          docker push "$IMAGE_NAME:latest"
+          
+          echo "Pushing $IMAGE_NAME:latest"
+          docker push "$IMAGE_NAME:latest" || echo "Warning: Failed to push latest tag"
           
           echo "CLI image pushed successfully"
 
@@ -107,7 +109,9 @@ jobs:
           
           echo "Pushing $IMAGE_NAME:$VERSION"
           docker push "$IMAGE_NAME:$VERSION"
-          docker push "$IMAGE_NAME:latest"
+          
+          echo "Pushing $IMAGE_NAME:latest"
+          docker push "$IMAGE_NAME:latest" || echo "Warning: Failed to push latest tag"
           
           echo "Desktop image pushed successfully"
 
