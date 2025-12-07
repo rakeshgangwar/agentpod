@@ -25,6 +25,7 @@ export interface Project {
   containerPort: number;
   fqdnUrl: string | null;  // Public URL for the OpenCode container
   vncUrl: string | null;   // VNC/Desktop URL for desktop tier containers
+  codeServerUrl: string | null;  // Code Server URL (VS Code in browser)
   
   // Container configuration
   containerTierId: string;           // References container_tiers(id)
@@ -61,6 +62,7 @@ export interface CreateProjectInput {
   containerPort: number;
   fqdnUrl?: string;
   vncUrl?: string;
+  codeServerUrl?: string;
   containerTierId?: string;
   containerVersion?: string;
   githubRepoUrl?: string;
@@ -100,6 +102,7 @@ interface ProjectRow {
   container_port: number;
   fqdn_url: string | null;
   vnc_url: string | null;
+  code_server_url: string | null;
   container_tier_id: string;
   container_version: string;
   container_update_available: number;
@@ -129,6 +132,7 @@ function rowToProject(row: ProjectRow): Project {
     containerPort: row.container_port,
     fqdnUrl: row.fqdn_url,
     vncUrl: row.vnc_url,
+    codeServerUrl: row.code_server_url,
     containerTierId: row.container_tier_id ?? 'lite',
     containerVersion: row.container_version ?? '0.0.1',
     containerUpdateAvailable: row.container_update_available === 1,
@@ -160,14 +164,14 @@ export function createProject(input: CreateProjectInput): Project {
     INSERT INTO projects (
       id, name, slug, description,
       forgejo_repo_url, forgejo_repo_id, forgejo_owner,
-      coolify_app_uuid, coolify_server_uuid, container_port, fqdn_url, vnc_url,
+      coolify_app_uuid, coolify_server_uuid, container_port, fqdn_url, vnc_url, code_server_url,
       container_tier_id, container_version,
       github_repo_url, github_sync_enabled, github_sync_direction,
       llm_provider, llm_model, status
     ) VALUES (
       $id, $name, $slug, $description,
       $forgejoRepoUrl, $forgejoRepoId, $forgejoOwner,
-      $coolifyAppUuid, $coolifyServerUuid, $containerPort, $fqdnUrl, $vncUrl,
+      $coolifyAppUuid, $coolifyServerUuid, $containerPort, $fqdnUrl, $vncUrl, $codeServerUrl,
       $containerTierId, $containerVersion,
       $githubRepoUrl, $githubSyncEnabled, $githubSyncDirection,
       $llmProvider, $llmModel, $status
@@ -187,6 +191,7 @@ export function createProject(input: CreateProjectInput): Project {
     $containerPort: input.containerPort,
     $fqdnUrl: input.fqdnUrl ?? null,
     $vncUrl: input.vncUrl ?? null,
+    $codeServerUrl: input.codeServerUrl ?? null,
     $containerTierId: input.containerTierId ?? 'lite',
     $containerVersion: input.containerVersion ?? '0.0.1',
     $githubRepoUrl: input.githubRepoUrl ?? null,

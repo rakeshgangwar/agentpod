@@ -59,6 +59,7 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y \
     # Process management
     htop \
     procps \
+    supervisor \
     # File utilities
     tree \
     file \
@@ -180,6 +181,11 @@ RUN pip install httpie --break-system-packages
 RUN npm install -g opencode-ai
 
 # =============================================================================
+# Code Server (VS Code in browser)
+# =============================================================================
+RUN curl -fsSL https://code-server.dev/install.sh | sh
+
+# =============================================================================
 # Configuration directories
 # =============================================================================
 USER $USERNAME
@@ -205,12 +211,17 @@ ENV OPENCODE_HOST=0.0.0.0
 ENV OPENCODE_CONFIG_DIR=/home/developer/.config/opencode-custom
 ENV TERM=xterm-256color
 
+# Code Server configuration
+ENV CODE_SERVER_PORT=8080
+ENV CODE_SERVER_AUTH=none
+
 # =============================================================================
-# Copy entrypoint script
+# Copy entrypoint script and supervisor config
 # =============================================================================
 USER root
 COPY entrypoint.sh /entrypoint.sh
 COPY scripts/ /scripts/
+COPY config/supervisord.conf /etc/supervisor/conf.d/opencode.conf
 RUN chmod +x /entrypoint.sh && \
     chmod +x /scripts/*.sh 2>/dev/null || true
 
@@ -224,7 +235,7 @@ RUN echo '#!/bin/sh' > /healthcheck.sh && \
 # =============================================================================
 # Expose ports and set user
 # =============================================================================
-EXPOSE 4096
+EXPOSE 4096 8080
 
 USER $USERNAME
 WORKDIR $WORKSPACE

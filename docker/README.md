@@ -6,8 +6,8 @@ This directory contains Docker images for OpenCode development environments, bui
 
 | Image | Description | Size |
 |-------|-------------|------|
-| `opencode-cli` | CLI-based development environment | ~1.5 GB |
-| `opencode-desktop` | Desktop environment with VNC access | ~1 GB |
+| `opencode-cli` | CLI-based development environment with Code Server | ~1.5 GB |
+| `opencode-desktop` | Desktop environment with VNC access and Code Server | ~1 GB |
 
 ### Registry
 
@@ -19,12 +19,12 @@ forgejo.superchotu.com/rakeshgangwar/opencode-desktop:latest
 
 ## Container Tiers
 
-| Tier | CPU | RAM | Storage | Image |
-|------|-----|-----|---------|-------|
-| Lite (default) | 1 | 2GB | 20GB | opencode-cli |
-| Standard | 2 | 4GB | 30GB | opencode-cli |
-| Pro | 4 | 8GB | 50GB | opencode-cli |
-| Desktop | 8 | 16GB | 75GB | opencode-desktop |
+| Tier | CPU | RAM | Storage | Image | Ports |
+|------|-----|-----|---------|-------|-------|
+| Lite (default) | 1 | 2GB | 20GB | opencode-cli | 4096, 8080 |
+| Standard | 2 | 4GB | 30GB | opencode-cli | 4096, 8080 |
+| Pro | 4 | 8GB | 50GB | opencode-cli | 4096, 8080 |
+| Desktop | 8 | 16GB | 75GB | opencode-desktop | 4096, 8080, 6080 |
 
 ## What's Included
 
@@ -37,6 +37,10 @@ forgejo.superchotu.com/rakeshgangwar/opencode-desktop:latest
 - **Rust**: Latest stable (via rustup)
 - **CLI Tools**: ripgrep, fd, bat, fzf, yq, gh (GitHub CLI), httpie
 - **OpenCode**: Pre-installed globally
+- **Code Server**: VS Code in browser (port 8080)
+- **Ports**:
+  - 4096: OpenCode API
+  - 8080: Code Server (VS Code)
 
 ### opencode-desktop
 
@@ -44,10 +48,45 @@ forgejo.superchotu.com/rakeshgangwar/opencode-desktop:latest
 - **Desktop**: Openbox window manager + tint2 panel
 - **VNC**: x11vnc + noVNC (web-based access)
 - **GUI Apps**: xterm, pcmanfm (file manager), gedit (text editor)
+- **Code Server**: VS Code in browser (port 8080)
 - **Ports**: 
   - 4096: OpenCode API
+  - 8080: Code Server (VS Code)
   - 6080: noVNC (web desktop)
   - 5901: VNC direct access
+
+## Code Server
+
+Both container images include [code-server](https://github.com/coder/code-server), providing VS Code in your browser.
+
+### Access
+
+- **URL Pattern**: `https://code-{project-slug}.{wildcard-domain}`
+- **Port**: 8080
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CODE_SERVER_PORT` | `8080` | Port for code-server |
+| `CODE_SERVER_AUTH` | `none` | Authentication: `none` or `password` |
+| `CODE_SERVER_PASSWORD` | - | Password when `CODE_SERVER_AUTH=password` |
+
+### Authentication (Future)
+
+Currently, code-server runs with `--auth none` for development convenience. To enable password authentication:
+
+```bash
+# Set environment variables when starting container
+CODE_SERVER_AUTH=password
+CODE_SERVER_PASSWORD=your-secure-password
+```
+
+### Extensions
+
+Extensions can be installed directly in code-server. They are stored in `~/.local/share/code-server/extensions/`. Note that extensions are ephemeral - they will be lost when the container is recreated. Future versions will support persistent extension storage.
+
+---
 
 ## CI/CD Pipeline
 

@@ -351,4 +351,22 @@ export const migrations: Migration[] = [
       console.warn('Rollback not supported - vnc_url column will remain');
     },
   },
+  
+  // Migration 8: Add code_server_url column to projects
+  // All containers now have code-server (VS Code in browser) on port 8080
+  {
+    version: 8,
+    name: 'add_code_server_url_to_projects',
+    up: () => {
+      const tableInfo = db.query("PRAGMA table_info(projects)").all() as Array<{ name: string }>;
+      const columnExists = tableInfo.some(col => col.name === 'code_server_url');
+      if (!columnExists) {
+        db.exec('ALTER TABLE projects ADD COLUMN code_server_url TEXT');
+      }
+    },
+    down: () => {
+      // SQLite doesn't support DROP COLUMN in older versions
+      console.warn('Rollback not supported - code_server_url column will remain');
+    },
+  },
 ];

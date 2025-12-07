@@ -31,6 +31,11 @@ export interface Project {
   coolifyServerUuid: string;
   containerPort: number;
   
+  // Container URLs
+  fqdnUrl: string | null;        // OpenCode API URL
+  vncUrl: string | null;         // VNC/Desktop URL (desktop tier only)
+  codeServerUrl: string | null;  // Code Server URL (VS Code in browser)
+  
   // GitHub sync
   githubRepoUrl: string | null;
   githubSyncEnabled: boolean;

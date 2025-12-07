@@ -229,7 +229,10 @@ show_startup_info() {
     echo "=============================================="
     echo "  User:      developer"
     echo "  Workspace: $WORKSPACE"
-    echo "  Port:      ${OPENCODE_PORT:-4096}"
+    echo ""
+    echo "  Services:"
+    echo "    - OpenCode:    http://localhost:${OPENCODE_PORT:-4096}"
+    echo "    - Code Server: http://localhost:${CODE_SERVER_PORT:-8080}"
     echo ""
     echo "  Tools installed:"
     echo "    - Node.js $(node --version 2>/dev/null || echo 'N/A')"
@@ -271,6 +274,12 @@ show_startup_info
 # Change to workspace directory
 cd "$WORKSPACE"
 
-# Start OpenCode server
-echo "Starting OpenCode server..."
-exec opencode serve --port "${OPENCODE_PORT:-4096}" --hostname "${OPENCODE_HOST:-0.0.0.0}"
+# Export environment variables for supervisor
+export OPENCODE_PORT="${OPENCODE_PORT:-4096}"
+export OPENCODE_HOST="${OPENCODE_HOST:-0.0.0.0}"
+export CODE_SERVER_PORT="${CODE_SERVER_PORT:-8080}"
+export CODE_SERVER_AUTH="${CODE_SERVER_AUTH:-none}"
+
+# Start services via supervisor
+echo "Starting services via supervisord..."
+exec /usr/bin/supervisord -c /etc/supervisor/conf.d/opencode.conf
