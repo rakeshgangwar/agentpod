@@ -1,5 +1,9 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  
+  "model": "anthropic/claude-opus-4-5-20251101",
+  "small_model": "anthropic/claude-sonnet-4-5-20250929",
+  
   "mcp": {
     "context7": {
       "type": "remote",
@@ -8,6 +12,114 @@
     "gh_grep": {
       "type": "remote",
       "url": "https://mcp.grep.app"
+    }
+  },
+  
+  "agent": {
+    "ux-design": {
+      "description": "UX design specialist for adaptive cross-platform experiences and agentic AI interfaces",
+      "mode": "primary",
+      "model": "anthropic/claude-opus-4-5-20251101",
+      "prompt": "{file:.opencode/prompts/ux-design.md}",
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true,
+        "webfetch": true
+      }
+    },
+    "ui-review": {
+      "description": "UI reviewer for visual consistency, accessibility, and responsive implementation",
+      "mode": "subagent",
+      "model": "anthropic/claude-opus-4-5-20251101",
+      "prompt": "{file:.opencode/prompts/ui-review.md}",
+      "tools": {
+        "write": false,
+        "edit": false,
+        "bash": false
+      }
+    },
+    "tauri-frontend": {
+      "description": "Expert Tauri v2 and SvelteKit developer for cross-platform applications",
+      "mode": "primary",
+      "model": "anthropic/claude-opus-4-5-20251101",
+      "prompt": "{file:.opencode/prompts/tauri-frontend.md}",
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true
+      }
+    },
+    "agentic-ux": {
+      "description": "Specialist in agentic AI UX patterns, transparency, and trust-building interfaces",
+      "mode": "subagent",
+      "model": "anthropic/claude-opus-4-5-20251101",
+      "prompt": "{file:.opencode/prompts/agentic-ux.md}",
+      "tools": {
+        "write": false,
+        "edit": false
+      }
+    },
+    "plan": {
+      "description": "Planning mode - read-only exploration and design",
+      "mode": "primary",
+      "model": "anthropic/claude-haiku-4-20250514",
+      "tools": {
+        "write": false,
+        "edit": false,
+        "bash": false
+      }
+    }
+  },
+  
+  "command": {
+    "ux-audit": {
+      "template": "{file:.opencode/command/ux-audit.md}",
+      "description": "Perform comprehensive UX audit of application or component",
+      "agent": "ux-design"
+    },
+    "component": {
+      "template": "{file:.opencode/command/component.md}",
+      "description": "Create a new Svelte component following project patterns",
+      "agent": "tauri-frontend"
+    },
+    "responsive": {
+      "template": "{file:.opencode/command/responsive.md}",
+      "description": "Check component or page for responsive design issues",
+      "agent": "ui-review"
+    },
+    "accessibility": {
+      "template": "{file:.opencode/command/accessibility.md}",
+      "description": "Check component or page for a11y compliance (WCAG 2.1 AA)",
+      "agent": "ui-review"
+    },
+    "design-system": {
+      "template": "{file:.opencode/command/design-system.md}",
+      "description": "Work within the project's design language and system",
+      "agent": "ux-design"
+    },
+    "brainstorm": {
+      "template": "Help me brainstorm and design: $ARGUMENTS\n\nFollow the brainstorming skill approach:\n1. First understand the current project context\n2. Ask questions one at a time to refine the idea\n3. Prefer multiple choice questions when possible\n4. Propose 2-3 different approaches with trade-offs\n5. Present design in sections of 200-300 words\n6. Validate each section before moving on\n\nKey principles:\n- YAGNI ruthlessly - remove unnecessary features\n- Explore alternatives before settling\n- Be flexible - go back and clarify when needed",
+      "description": "Brainstorm and refine ideas into designs using Socratic dialogue",
+      "agent": "ux-design"
+    },
+    "write-plan": {
+      "template": "Create a detailed implementation plan for: $ARGUMENTS\n\nFollow the writing-plans skill approach:\n1. Break work into bite-sized tasks (2-5 minutes each)\n2. Each task is one action with clear verification\n3. Include exact file paths\n4. Include complete code snippets (not 'add validation')\n5. Include exact commands with expected output\n6. Follow DRY, YAGNI, TDD principles\n7. Plan frequent commits\n\nSave the plan to docs/plans/YYYY-MM-DD-<feature-name>.md",
+      "description": "Create detailed implementation plan with exact file paths and code",
+      "agent": "ux-design"
+    }
+  },
+  
+  "mode": {
+    "plan": {
+      "model": "anthropic/claude-haiku-4-20250514"
+    }
+  },
+  
+  "tui": {
+    "scroll_speed": 3,
+    "scroll_acceleration": {
+      "enabled": true
     }
   }
 }
