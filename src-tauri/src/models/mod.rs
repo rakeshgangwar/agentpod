@@ -47,6 +47,11 @@ pub struct Project {
     pub coolify_app_uuid: String,
     pub coolify_server_uuid: String,
     pub container_port: i32,
+    
+    // Container URLs
+    pub fqdn_url: Option<String>,      // OpenCode API URL
+    pub vnc_url: Option<String>,        // VNC/Desktop URL (desktop tier only)
+    pub code_server_url: Option<String>, // Code Server URL (VS Code in browser)
 
     // GitHub sync
     pub github_repo_url: Option<String>,

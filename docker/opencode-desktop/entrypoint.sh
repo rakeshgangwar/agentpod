@@ -227,56 +227,7 @@ configure_git() {
     git config --global credential.helper 'cache --timeout=86400'
 }
 
-# =============================================================================
-# Start Desktop Environment
-# =============================================================================
-start_desktop() {
-    echo "Starting desktop environment..."
-    echo "  Display: $DISPLAY"
-    echo "  Resolution: ${WIDTH}x${HEIGHT}"
-    
-    # Start Xvfb (virtual X server)
-    echo "  Starting Xvfb..."
-    Xvfb $DISPLAY -screen 0 ${WIDTH}x${HEIGHT}x24 -ac +extension GLX +render -noreset &
-    XVFB_PID=$!
-    
-    # Wait for Xvfb to start
-    sleep 2
-    
-    # Verify Xvfb is running
-    if ! kill -0 $XVFB_PID 2>/dev/null; then
-        echo "  Error: Xvfb failed to start"
-        exit 1
-    fi
-    
-    # Start D-Bus session
-    echo "  Starting D-Bus..."
-    eval $(dbus-launch --sh-syntax)
-    
-    # Start window manager (Openbox)
-    echo "  Starting Openbox window manager..."
-    openbox --config-file $HOME/.config/openbox/rc.xml &
-    
-    # Wait for window manager
-    sleep 1
-    
-    # Start tint2 panel
-    echo "  Starting tint2 panel..."
-    tint2 -c $HOME/.config/tint2/tint2rc &
-    
-    # Start VNC server
-    echo "  Starting x11vnc..."
-    x11vnc -display $DISPLAY -forever -shared -nopw -rfbport ${VNC_PORT:-5901} -bg -o /tmp/x11vnc.log
-    
-    # Start noVNC (websocket proxy for web access)
-    echo "  Starting noVNC on port ${NOVNC_PORT:-6080}..."
-    /opt/noVNC/utils/novnc_proxy --vnc localhost:${VNC_PORT:-5901} --listen ${NOVNC_PORT:-6080} &
-    
-    echo "  Desktop environment started."
-    echo ""
-    echo "  Access desktop at: http://localhost:${NOVNC_PORT:-6080}/vnc.html"
-    echo ""
-}
+
 
 # =============================================================================
 # Display Startup Information
@@ -288,18 +239,18 @@ show_startup_info() {
     echo "=============================================="
     echo "  User:        developer"
     echo "  Workspace:   $WORKSPACE"
-    echo "  OpenCode:    http://localhost:${OPENCODE_PORT:-4096}"
-    echo "  Desktop:     http://localhost:${NOVNC_PORT:-6080}/vnc.html"
-    echo "  VNC Direct:  localhost:${VNC_PORT:-5901}"
+    echo ""
+    echo "  Services:"
+    echo "    - OpenCode:    http://localhost:${OPENCODE_PORT:-4096}"
+    echo "    - Code Server: http://localhost:${CODE_SERVER_PORT:-8080}"
+    echo "    - Desktop:     http://localhost:${NOVNC_PORT:-6080}/vnc.html"
+    echo "    - VNC Direct:  localhost:${VNC_PORT:-5901}"
     echo ""
     echo "  Resolution:  ${WIDTH}x${HEIGHT}"
     echo ""
     echo "  Tools installed:"
     echo "    - Node.js $(node --version 2>/dev/null || echo 'N/A')"
     echo "    - Python $(python --version 2>/dev/null | awk '{print $2}' || echo 'N/A')"
-    echo "    - Go $(go version 2>/dev/null | awk '{print $3}' || echo 'N/A')"
-    echo "    - Rust $(rustc --version 2>/dev/null | awk '{print $2}' || echo 'N/A')"
-    echo "    - Firefox ESR"
     echo "=============================================="
     echo ""
 }
@@ -328,15 +279,34 @@ setup_auth
 # Configure git
 configure_git
 
-# Start desktop environment
-start_desktop
-
 # Show startup info
 show_startup_info
 
 # Change to workspace directory
 cd "$WORKSPACE"
 
-# Start OpenCode server (foreground to keep container running)
+# Export environment variables for supervisor (X11/VNC)
+export WIDTH="${WIDTH:-1280}"
+export HEIGHT="${HEIGHT:-800}"
+
+# Start X11 and VNC services via supervisor
+echo "Starting desktop services (X11, VNC)..."
+/usr/bin/supervisord -c /etc/supervisor/conf.d/desktop.conf
+
+# Wait for X server to be ready
+sleep 2
+
+# Start code-server in background
+CODE_SERVER_PORT="${CODE_SERVER_PORT:-8080}"
+CODE_SERVER_AUTH="${CODE_SERVER_AUTH:-none}"
+echo "Starting code-server in background on port ${CODE_SERVER_PORT}..."
+code-server \
+    --bind-addr "0.0.0.0:${CODE_SERVER_PORT}" \
+    --auth "${CODE_SERVER_AUTH}" \
+    --disable-telemetry \
+    "$WORKSPACE" \
+    > /tmp/code-server.log 2>&1 &
+
+# Start OpenCode server in foreground (keeps container running)
 echo "Starting OpenCode server..."
 exec opencode serve --port "${OPENCODE_PORT:-4096}" --hostname "${OPENCODE_HOST:-0.0.0.0}"

@@ -281,23 +281,28 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
     const containerPort = 4096;
     
     // Step 3: Generate FQDNs for the container
-    // Desktop tier gets two domains: one for OpenCode API, one for VNC
+    // All tiers get: OpenCode API + Code Server
+    // Desktop tier additionally gets: VNC domain
     let fqdnUrl: string | null = null;
     let vncUrl: string | null = null;
+    let codeServerUrl: string | null = null;
     let domainsConfig: string | undefined;
     
     if (config.opencode.wildcardDomain) {
       // Main OpenCode API domain (always created)
       fqdnUrl = `https://opencode-${slug}.${config.opencode.wildcardDomain}`;
+      // Code Server domain (always created - VS Code in browser)
+      codeServerUrl = `https://code-${slug}.${config.opencode.wildcardDomain}`;
       
       // For desktop tier, add separate VNC domain
       if (tier.has_desktop_access) {
         vncUrl = `https://vnc-${slug}.${config.opencode.wildcardDomain}`;
         // Coolify format: comma-separated domains with port suffix
-        // e.g., "https://opencode-myproject.domain.com:4096,https://vnc-myproject.domain.com:6080"
-        domainsConfig = `${fqdnUrl}:4096,${vncUrl}:6080`;
+        // e.g., "https://opencode-myproject.domain.com:4096,https://code-myproject.domain.com:8080,https://vnc-myproject.domain.com:6080"
+        domainsConfig = `${fqdnUrl}:4096,${codeServerUrl}:8080,${vncUrl}:6080`;
       } else {
-        domainsConfig = fqdnUrl;
+        // CLI tier: OpenCode + Code Server
+        domainsConfig = `${fqdnUrl}:4096,${codeServerUrl}:8080`;
       }
     }
     
@@ -312,6 +317,7 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
     log.info('Step 2: Creating Coolify application (Docker Image)', { 
       slug, 
       fqdnUrl,
+      codeServerUrl,
       vncUrl,
       domainsConfig,
       imageName,
@@ -422,6 +428,7 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       containerPort,
       fqdnUrl: fqdnUrl ?? undefined,
       vncUrl: vncUrl ?? undefined,
+      codeServerUrl: codeServerUrl ?? undefined,
       containerTierId: tier.id,
       containerVersion: config.registry.version,
       githubRepoUrl: githubUrl,

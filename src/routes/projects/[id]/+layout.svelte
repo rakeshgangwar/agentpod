@@ -32,6 +32,7 @@
     if (path.includes("/files")) return "files";
     if (path.includes("/logs")) return "logs";
     if (path.includes("/sync")) return "sync";
+    if (path.includes("/settings")) return "settings";
     return "chat";
   });
 
@@ -160,11 +161,12 @@
 
       <!-- Tabs Navigation -->
       <Tabs.Root value={currentTab()} onValueChange={handleTabChange}>
-        <Tabs.List class="grid w-full grid-cols-4 max-w-lg">
+        <Tabs.List class="grid w-full grid-cols-5 max-w-xl">
           <Tabs.Trigger value="chat">Chat</Tabs.Trigger>
           <Tabs.Trigger value="files">Files</Tabs.Trigger>
           <Tabs.Trigger value="logs">Logs</Tabs.Trigger>
           <Tabs.Trigger value="sync">Sync</Tabs.Trigger>
+          <Tabs.Trigger value="settings">Settings</Tabs.Trigger>
         </Tabs.List>
       </Tabs.Root>
 

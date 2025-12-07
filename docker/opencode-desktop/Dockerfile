@@ -80,6 +80,9 @@ ENV WORKSPACE=/home/$USERNAME/workspace
 RUN useradd -m -s /bin/bash -d $HOME $USERNAME && \
     echo "${USERNAME} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers && \
     mkdir -p $WORKSPACE && \
+    mkdir -p $HOME/.cache && \
+    mkdir -p $HOME/.config && \
+    mkdir -p $HOME/.local/share && \
     chown -R $USERNAME:$USERNAME $HOME
 
 # =============================================================================
@@ -109,18 +112,25 @@ RUN curl -LO https://github.com/BurntSushi/ripgrep/releases/download/14.1.0/ripg
     chmod +x /usr/local/bin/yq
 
 # =============================================================================
+# Code Server (VS Code in browser)
+# =============================================================================
+RUN curl -fsSL https://code-server.dev/install.sh | sh
+
+# =============================================================================
 # Desktop Configuration
 # =============================================================================
 USER $USERNAME
 WORKDIR $HOME
 
 # Create config directories
+# - .cache/opencode: for dynamically downloaded provider packages
 RUN mkdir -p $HOME/.config/openbox \
              $HOME/.config/tint2 \
              $HOME/.config/opencode \
              $HOME/.config/opencode-custom \
              $HOME/.local/share/opencode \
              $HOME/.local/share/applications \
+             $HOME/.cache/opencode \
              $WORKSPACE
 
 # Copy desktop configuration files
@@ -156,6 +166,10 @@ ENV HEIGHT=800
 ENV VNC_PORT=5901
 ENV NOVNC_PORT=6080
 
+# Code Server configuration
+ENV CODE_SERVER_PORT=8080
+ENV CODE_SERVER_AUTH=none
+
 # =============================================================================
 # Copy entrypoint and supervisor config
 # =============================================================================
@@ -167,7 +181,7 @@ RUN chmod +x /entrypoint.sh
 # =============================================================================
 # Expose ports
 # =============================================================================
-EXPOSE 4096 6080 5901
+EXPOSE 4096 6080 5901 8080
 
 # =============================================================================
 # Health check

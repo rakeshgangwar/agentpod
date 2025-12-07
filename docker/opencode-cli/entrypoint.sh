@@ -229,7 +229,10 @@ show_startup_info() {
     echo "=============================================="
     echo "  User:      developer"
     echo "  Workspace: $WORKSPACE"
-    echo "  Port:      ${OPENCODE_PORT:-4096}"
+    echo ""
+    echo "  Services:"
+    echo "    - OpenCode:    http://localhost:${OPENCODE_PORT:-4096}"
+    echo "    - Code Server: http://localhost:${CODE_SERVER_PORT:-8080}"
     echo ""
     echo "  Tools installed:"
     echo "    - Node.js $(node --version 2>/dev/null || echo 'N/A')"
@@ -271,6 +274,17 @@ show_startup_info
 # Change to workspace directory
 cd "$WORKSPACE"
 
-# Start OpenCode server
+# Start code-server in background
+CODE_SERVER_PORT="${CODE_SERVER_PORT:-8080}"
+CODE_SERVER_AUTH="${CODE_SERVER_AUTH:-none}"
+echo "Starting code-server in background on port ${CODE_SERVER_PORT}..."
+code-server \
+    --bind-addr "0.0.0.0:${CODE_SERVER_PORT}" \
+    --auth "${CODE_SERVER_AUTH}" \
+    --disable-telemetry \
+    "$WORKSPACE" \
+    > /tmp/code-server.log 2>&1 &
+
+# Start OpenCode server in foreground (keeps container running)
 echo "Starting OpenCode server..."
 exec opencode serve --port "${OPENCODE_PORT:-4096}" --hostname "${OPENCODE_HOST:-0.0.0.0}"

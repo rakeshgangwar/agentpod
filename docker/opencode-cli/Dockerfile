@@ -59,6 +59,7 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y \
     # Process management
     htop \
     procps \
+
     # File utilities
     tree \
     file \
@@ -96,6 +97,9 @@ ENV WORKSPACE=/home/$USERNAME/workspace
 RUN useradd -m -s /bin/bash -d $HOME $USERNAME && \
     echo "${USERNAME} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers && \
     mkdir -p $WORKSPACE && \
+    mkdir -p $HOME/.cache && \
+    mkdir -p $HOME/.config && \
+    mkdir -p $HOME/.local/share && \
     chown -R $USERNAME:$USERNAME $HOME
 
 # =============================================================================
@@ -180,14 +184,22 @@ RUN pip install httpie --break-system-packages
 RUN npm install -g opencode-ai
 
 # =============================================================================
+# Code Server (VS Code in browser)
+# =============================================================================
+RUN curl -fsSL https://code-server.dev/install.sh | sh
+
+# =============================================================================
 # Configuration directories
 # =============================================================================
 USER $USERNAME
 WORKDIR $HOME
 
 # Create OpenCode config directories
+# - .cache/opencode: for dynamically downloaded provider packages
 RUN mkdir -p $HOME/.config/opencode && \
-    mkdir -p $HOME/.local/share/opencode
+    mkdir -p $HOME/.config/opencode-custom && \
+    mkdir -p $HOME/.local/share/opencode && \
+    mkdir -p $HOME/.cache/opencode
 
 # Create workspace
 RUN mkdir -p $WORKSPACE
@@ -204,6 +216,10 @@ ENV OPENCODE_PORT=4096
 ENV OPENCODE_HOST=0.0.0.0
 ENV OPENCODE_CONFIG_DIR=/home/developer/.config/opencode-custom
 ENV TERM=xterm-256color
+
+# Code Server configuration
+ENV CODE_SERVER_PORT=8080
+ENV CODE_SERVER_AUTH=none
 
 # =============================================================================
 # Copy entrypoint script
@@ -224,7 +240,7 @@ RUN echo '#!/bin/sh' > /healthcheck.sh && \
 # =============================================================================
 # Expose ports and set user
 # =============================================================================
-EXPOSE 4096
+EXPOSE 4096 8080
 
 USER $USERNAME
 WORKDIR $WORKSPACE
