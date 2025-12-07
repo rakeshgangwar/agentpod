@@ -263,6 +263,7 @@ show_startup_info() {
 mkdir -p "$OPENCODE_CONFIG_DIR"
 mkdir -p "$OPENCODE_CUSTOM_CONFIG_DIR"
 mkdir -p "$OPENCODE_DATA_DIR"
+mkdir -p "$HOME_DIR/.cache/opencode"
 
 # Clone repository first (this creates/manages the workspace)
 clone_repository
