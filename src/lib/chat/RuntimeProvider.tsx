@@ -37,6 +37,7 @@ interface RuntimeProviderProps {
   projectId: string;
   sessionId?: string;
   selectedModel?: ModelSelection;
+  onSessionModelDetected?: (model: ModelSelection) => void;
   children: ReactNode;
 }
 
@@ -155,7 +156,7 @@ function convertToThreadMessage(msg: InternalMessage): ThreadMessageLike {
  * Inner runtime component that has access to the permission context.
  * This is where all the SSE handling and runtime logic lives.
  */
-function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selectedModel, children }: RuntimeProviderProps) {
+function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selectedModel, onSessionModelDetected, children }: RuntimeProviderProps) {
   // Internal message state (mutable, managed by us)
   const [internalMessages, setInternalMessages] = useState<InternalMessage[]>([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -209,6 +210,21 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
 
         const converted = opencodeMessages.map(convertOpenCodeMessage);
         setInternalMessages(converted);
+        
+        // Detect model from the last assistant message that has model info
+        if (onSessionModelDetected) {
+          // Find the last assistant message with modelID and providerID
+          for (let i = opencodeMessages.length - 1; i >= 0; i--) {
+            const msg = opencodeMessages[i];
+            if (msg.info.role === "assistant" && msg.info.modelID && msg.info.providerID) {
+              onSessionModelDetected({
+                providerId: msg.info.providerID,
+                modelId: msg.info.modelID,
+              });
+              break;
+            }
+          }
+        }
       } catch (err) {
         if (cancelled) return;
         console.error("[RuntimeProvider] Failed to load messages:", err);
@@ -607,13 +623,14 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
  * This includes the Permission system for human-in-the-loop approvals,
  * with a PermissionBar sticky at the bottom of the chat.
  */
-export function RuntimeProvider({ projectId, sessionId, selectedModel, children }: RuntimeProviderProps) {
+export function RuntimeProvider({ projectId, sessionId, selectedModel, onSessionModelDetected, children }: RuntimeProviderProps) {
   return (
     <PermissionProvider projectId={projectId}>
       <RuntimeProviderInner
         projectId={projectId}
         sessionId={sessionId}
         selectedModel={selectedModel}
+        onSessionModelDetected={onSessionModelDetected}
       >
         {children}
       </RuntimeProviderInner>

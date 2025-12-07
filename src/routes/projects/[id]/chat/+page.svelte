@@ -69,6 +69,27 @@
 
   // Model selection state
   let selectedModel = $state<ModelSelection | undefined>(undefined);
+  
+  // Track which session's model we've loaded to avoid re-detecting
+  let modelLoadedForSession = $state<string | null>(null);
+  
+  // Reset model when session changes so it can be detected from the new session's messages
+  $effect(() => {
+    if (selectedSessionId && selectedSessionId !== modelLoadedForSession) {
+      // New session selected, reset model to allow detection
+      selectedModel = undefined;
+      modelLoadedForSession = null;
+    }
+  });
+  
+  // Callback when RuntimeProvider detects model from existing session messages
+  function handleSessionModelDetected(model: ModelSelection) {
+    // Only update if we haven't already loaded model for this session
+    if (selectedSessionId && modelLoadedForSession !== selectedSessionId) {
+      selectedModel = model;
+      modelLoadedForSession = selectedSessionId;
+    }
+  }
 
   // Load sessions when project changes
   $effect(() => {
@@ -261,7 +282,12 @@
         </div>
         
         {#key selectedSessionId}
-          <react.RuntimeProvider {projectId} sessionId={selectedSessionId} {selectedModel}>
+          <react.RuntimeProvider 
+            {projectId} 
+            sessionId={selectedSessionId} 
+            {selectedModel}
+            onSessionModelDetected={handleSessionModelDetected}
+          >
             <react.ChatThread 
               {projectId} 
               {findFiles} 

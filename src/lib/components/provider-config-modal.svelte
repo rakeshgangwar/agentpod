@@ -15,6 +15,7 @@
     type OAuthFlowInit,
     type AuthType,
   } from "$lib/api/tauri";
+  import { toast } from "svelte-sonner";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
@@ -134,6 +135,7 @@
   
   function copyToClipboard(text: string) {
     navigator.clipboard.writeText(text);
+    toast.success("Code copied to clipboard");
   }
 </script>
 
