@@ -76,11 +76,11 @@ if [ -n "\$MANAGEMENT_API_URL" ] && [ -n "\$USER_ID" ]; then
             echo "Layer 3: User settings loaded"
             cat "\$USER_CONFIG_FILE" | jq -c . 2>/dev/null || echo "{}"
             
-            # Write AGENTS.md if present
+            # Write AGENTS.md if present - goes to ~/.config/opencode/ for global rules
             agents_md=\$(jq -r '.agents_md // empty' /tmp/user-config.json)
             if [ -n "\$agents_md" ] && [ "\$agents_md" != "null" ]; then
-                echo "\$agents_md" > "\$USER_CONFIG_DIR/AGENTS.md"
-                echo "User AGENTS.md loaded"
+                echo "\$agents_md" > /root/.config/opencode/AGENTS.md
+                echo "User AGENTS.md loaded to ~/.config/opencode/"
             fi
             
             # Write agent files (Layer 4)
