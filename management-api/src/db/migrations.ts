@@ -283,10 +283,10 @@ export const migrations: Migration[] = [
       // Seed container tiers
       db.exec(`
         INSERT OR IGNORE INTO container_tiers (id, name, description, image_type, cpu_limit, memory_limit, memory_reservation, storage_gb, has_desktop_access, is_default, sort_order) VALUES
-          ('lite', 'Lite', 'Basic tier for simple projects and learning. CLI access only.', 'cli', '1', '2Gi', '1Gi', 20, 0, 1, 1),
-          ('standard', 'Standard', 'Balanced tier for web development and typical projects. CLI access only.', 'cli', '2', '4Gi', '2Gi', 30, 0, 0, 2),
-          ('pro', 'Pro', 'High-performance tier for full-stack development with multiple services. CLI access only.', 'cli', '4', '8Gi', '4Gi', 50, 0, 0, 3),
-          ('desktop', 'Desktop', 'Full desktop environment with GUI access via browser. Includes all Pro tier resources plus VNC.', 'desktop', '8', '16Gi', '8Gi', 75, 1, 0, 4);
+          ('lite', 'Lite', 'Basic tier for simple projects and learning. CLI access only.', 'cli', '1', '2g', '1g', 20, 0, 1, 1),
+          ('standard', 'Standard', 'Balanced tier for web development and typical projects. CLI access only.', 'cli', '2', '4g', '2g', 30, 0, 0, 2),
+          ('pro', 'Pro', 'High-performance tier for full-stack development with multiple services. CLI access only.', 'cli', '4', '8g', '4g', 50, 0, 0, 3),
+          ('desktop', 'Desktop', 'Full desktop environment with GUI access via browser. Includes all Pro tier resources plus VNC.', 'desktop', '8', '16g', '8g', 75, 1, 0, 4);
       `);
       
       // Add container columns to projects table
@@ -308,6 +308,29 @@ export const migrations: Migration[] = [
       db.exec('DROP TABLE IF EXISTS container_tiers');
       // Note: SQLite doesn't support DROP COLUMN easily, columns will remain
       console.warn('Rollback: container_tiers table dropped, but project columns will remain');
+    },
+  },
+  
+  // Migration 6: Fix container tier memory units (Gi -> g)
+  // Docker Compose expects lowercase 'g' not 'Gi'
+  {
+    version: 6,
+    name: 'fix_container_tier_memory_units',
+    up: () => {
+      db.exec(`
+        UPDATE container_tiers SET 
+          memory_limit = REPLACE(memory_limit, 'Gi', 'g'),
+          memory_reservation = REPLACE(memory_reservation, 'Gi', 'g')
+        WHERE memory_limit LIKE '%Gi' OR memory_reservation LIKE '%Gi';
+      `);
+    },
+    down: () => {
+      db.exec(`
+        UPDATE container_tiers SET 
+          memory_limit = REPLACE(memory_limit, 'g', 'Gi'),
+          memory_reservation = REPLACE(memory_reservation, 'g', 'Gi')
+        WHERE memory_limit LIKE '%g' OR memory_reservation LIKE '%g';
+      `);
     },
   },
 ];
