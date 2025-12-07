@@ -175,9 +175,6 @@ RUN add-apt-repository ppa:deadsnakes/ppa -y && \
     update-alternatives --install /usr/bin/python python /usr/bin/python3.12 1 && \
     rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip
-RUN python -m pip install --upgrade pip --break-system-packages
-
 # =============================================================================
 # Go (latest stable)
 # =============================================================================
