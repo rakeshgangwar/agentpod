@@ -21,6 +21,7 @@
     "@tauri-apps/plugin-fs": "^2.4.4",
     "@tauri-apps/plugin-notification": "^2.3.3",
     "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-os": "^2",
     "lucide-react": "^0.556.0",
     "marked": "^17.0.1",
     "shiki": "^3.19.0",

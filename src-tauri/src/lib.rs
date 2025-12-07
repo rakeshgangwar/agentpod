@@ -40,6 +40,7 @@ use commands::{
     // OpenCode streaming commands
     opencode_connect_stream, opencode_disconnect_stream,
 };
+use tauri::{Manager, RunEvent, WindowEvent};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -57,6 +58,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_os::init())
         .invoke_handler(tauri::generate_handler![
             // Connection commands
             connect,
@@ -124,6 +126,27 @@ pub fn run() {
             opencode_connect_stream,
             opencode_disconnect_stream,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            // Handle window events
+            if let RunEvent::WindowEvent { 
+                label, 
+                event: WindowEvent::CloseRequested { .. }, 
+                .. 
+            } = &event {
+                // When main window close is requested, close all service windows first
+                if label == "main" {
+                    tracing::info!("Main window closing, closing all service windows");
+                    let windows = app_handle.webview_windows();
+                    for (window_label, window) in windows {
+                        // Close all windows that start with "service-"
+                        if window_label.starts_with("service-") {
+                            tracing::debug!("Closing service window: {}", window_label);
+                            let _ = window.close();
+                        }
+                    }
+                }
+            }
+        });
 }

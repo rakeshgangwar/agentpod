@@ -82,6 +82,7 @@ mod tests {
     fn test_default_settings() {
         let settings = AppSettings::default();
         assert_eq!(settings.auto_refresh_interval, 30);
-        assert!(settings.notifications_enabled);
+        assert!(settings.in_app_notifications);
+        assert!(settings.system_notifications);
     }
 }

@@ -5,6 +5,7 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { onMount } from "svelte";
+  import { openServiceWindow, type ServiceType } from "$lib/utils/service-window";
 
   // Get current project ID from route params
   let projectId = $derived($page.params.id ?? "");
@@ -54,9 +55,15 @@
     return health ? "Healthy" : "Unhealthy";
   }
 
-  function openUrl(url: string | null | undefined) {
-    if (url) {
-      window.open(url, "_blank");
+  // Open service URL in-app (desktop) or system browser (mobile)
+  function openService(url: string | null | undefined, title: string, serviceType: ServiceType) {
+    if (url && project) {
+      openServiceWindow({
+        url,
+        title: `${title} - ${project.name}`,
+        serviceType,
+        projectId: project.id,
+      });
     }
   }
 </script>
@@ -78,7 +85,7 @@
           </div>
         </div>
         {#if project?.fqdnUrl}
-          <Button size="sm" variant="outline" onclick={() => openUrl(project?.fqdnUrl)}>
+          <Button size="sm" variant="outline" onclick={() => openService(project?.fqdnUrl, "OpenCode", "opencode")}>
             Open
           </Button>
         {/if}
@@ -93,7 +100,7 @@
           </div>
         </div>
         {#if project?.codeServerUrl}
-          <Button size="sm" variant="outline" onclick={() => openUrl(project?.codeServerUrl)}>
+          <Button size="sm" variant="outline" onclick={() => openService(project?.codeServerUrl, "Code Server", "code-server")}>
             Open
           </Button>
         {/if}
@@ -108,7 +115,7 @@
               {project.vncUrl}
             </div>
           </div>
-          <Button size="sm" variant="outline" onclick={() => openUrl(project?.vncUrl)}>
+          <Button size="sm" variant="outline" onclick={() => openService(project?.vncUrl, "Desktop", "vnc")}>
             Open
           </Button>
         </div>
@@ -206,17 +213,17 @@
       <h3 class="font-medium">Quick Actions</h3>
       <div class="flex flex-wrap gap-2">
         {#if project.fqdnUrl}
-          <Button size="sm" variant="outline" onclick={() => openUrl(project?.fqdnUrl)}>
+          <Button size="sm" variant="outline" onclick={() => openService(project?.fqdnUrl, "OpenCode", "opencode")}>
             Open OpenCode
           </Button>
         {/if}
         {#if project.codeServerUrl}
-          <Button size="sm" variant="outline" onclick={() => openUrl(project?.codeServerUrl)}>
+          <Button size="sm" variant="outline" onclick={() => openService(project?.codeServerUrl, "Code Server", "code-server")}>
             Open Code Server
           </Button>
         {/if}
         {#if project.vncUrl}
-          <Button size="sm" variant="outline" onclick={() => openUrl(project?.vncUrl)}>
+          <Button size="sm" variant="outline" onclick={() => openService(project?.vncUrl, "Desktop", "vnc")}>
             Open Desktop
           </Button>
         {/if}

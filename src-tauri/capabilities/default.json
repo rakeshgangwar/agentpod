@@ -5,7 +5,10 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "core:window:allow-create",
+    "core:webview:allow-create-webview-window",
     "opener:default",
+    "os:default",
     "oauth:allow-start",
     "oauth:allow-cancel",
     "dialog:default",
