@@ -63,6 +63,33 @@ export interface CreateProjectInput {
   githubUrl?: string;
   llmProviderId?: string;
   llmModelId?: string;
+  containerTierId?: string;
+}
+
+// =============================================================================
+// Container Tier Types
+// =============================================================================
+
+export interface TierResources {
+  cpu: string;
+  memory: string;
+  storage: string;
+}
+
+export interface TierFeatures {
+  hasDesktopAccess: boolean;
+  exposedPorts: string[];
+}
+
+export interface ContainerTier {
+  id: string;
+  name: string;
+  description: string;
+  imageType: string;
+  resources: TierResources;
+  features: TierFeatures;
+  isDefault: boolean;
+  sortOrder: number;
 }
 
 // =============================================================================
@@ -126,6 +153,7 @@ export async function createProject(input: CreateProjectInput): Promise<Project>
     githubUrl: input.githubUrl ?? null,
     llmProviderId: input.llmProviderId ?? null,
     llmModelId: input.llmModelId ?? null,
+    containerTierId: input.containerTierId ?? null,
   };
   
   return invoke<Project>("create_project", params);
@@ -181,6 +209,24 @@ export interface DeployResponse {
  */
 export async function deployProject(id: string, force?: boolean): Promise<DeployResponse> {
   return invoke<DeployResponse>("deploy_project", { id, force });
+}
+
+// =============================================================================
+// Container Tier Commands
+// =============================================================================
+
+/**
+ * List all available container tiers
+ */
+export async function listContainerTiers(): Promise<ContainerTier[]> {
+  return invoke<ContainerTier[]>("list_container_tiers");
+}
+
+/**
+ * Get the default container tier
+ */
+export async function getDefaultContainerTier(): Promise<ContainerTier | null> {
+  return invoke<ContainerTier | null>("get_default_container_tier");
 }
 
 // =============================================================================

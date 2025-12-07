@@ -15,6 +15,8 @@ use commands::{
     list_projects, get_project, create_project, delete_project,
     start_project, stop_project, restart_project,
     get_project_logs, deploy_project,
+    // Container tier commands
+    list_container_tiers, get_default_container_tier,
     // Settings commands
     get_settings, save_settings, list_providers, get_default_provider,
     export_settings, import_settings,
@@ -71,6 +73,9 @@ pub fn run() {
             restart_project,
             get_project_logs,
             deploy_project,
+            // Container tier commands
+            list_container_tiers,
+            get_default_container_tier,
             // Settings commands
             get_settings,
             save_settings,

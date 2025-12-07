@@ -3,8 +3,9 @@
 //! This module provides a typed HTTP client for all Management API operations.
 
 use crate::models::{
-    AppError, AppInfo, ConnectionConfig, CreateProjectInput, DeployResponse, ErrorResponse, 
-    FileContent, FileNode, HealthResponse, Message, OpenCodeHealth, Project, ProjectResponse, 
+    AppError, AppInfo, ConnectionConfig, ContainerTier, ContainerTiersResponse, 
+    CreateProjectInput, DeployResponse, ErrorResponse, FileContent, FileNode, 
+    HealthResponse, Message, OpenCodeHealth, Project, ProjectResponse, 
     ProjectsResponse, SendMessageInput, Session, SuccessResponse,
 };
 use reqwest::Client;
@@ -244,6 +245,27 @@ impl ApiClient {
         let url = format!("{}/api/projects/{}/deploy", self.base_url, id);
         let body = serde_json::json!({ "force": force });
         let request = self.add_auth(self.client.post(&url)).json(&body);
+        let response = request.send().await?;
+        self.handle_response(response).await
+    }
+
+    // =========================================================================
+    // Container Tiers
+    // =========================================================================
+
+    /// List all available container tiers
+    pub async fn list_container_tiers(&self) -> Result<Vec<ContainerTier>, AppError> {
+        let url = format!("{}/api/container-tiers", self.base_url);
+        let request = self.add_auth(self.client.get(&url));
+        let response = request.send().await?;
+        let result: ContainerTiersResponse = self.handle_response(response).await?;
+        Ok(result.tiers)
+    }
+
+    /// Get the default container tier
+    pub async fn get_default_container_tier(&self) -> Result<ContainerTier, AppError> {
+        let url = format!("{}/api/container-tiers/default", self.base_url);
+        let request = self.add_auth(self.client.get(&url));
         let response = request.send().await?;
         self.handle_response(response).await
     }

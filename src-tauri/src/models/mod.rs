@@ -80,6 +80,8 @@ pub struct CreateProjectInput {
     pub llm_provider_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub llm_model_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub container_tier_id: Option<String>,
 }
 
 /// Connection configuration stored securely
@@ -138,4 +140,45 @@ pub struct DeployResponse {
     pub success: bool,
     pub message: String,
     pub deployment_id: Option<String>,
+}
+
+// =============================================================================
+// Container Tiers
+// =============================================================================
+
+/// Container tier resources
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TierResources {
+    pub cpu: String,
+    pub memory: String,
+    pub storage: String,
+}
+
+/// Container tier features
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TierFeatures {
+    pub has_desktop_access: bool,
+    pub exposed_ports: Vec<String>,
+}
+
+/// Container tier
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContainerTier {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub image_type: String,
+    pub resources: TierResources,
+    pub features: TierFeatures,
+    pub is_default: bool,
+    pub sort_order: i32,
+}
+
+/// Container tiers list response from API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContainerTiersResponse {
+    pub tiers: Vec<ContainerTier>,
 }

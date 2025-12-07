@@ -1,13 +1,14 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { connection } from "$lib/stores/connection.svelte";
-  import { createProject, startProject } from "$lib/stores/projects.svelte";
+  import { createProject } from "$lib/stores/projects.svelte";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
   import * as Card from "$lib/components/ui/card";
   import * as Tabs from "$lib/components/ui/tabs";
   import LlmProviderSelector from "$lib/components/llm-provider-selector.svelte";
+  import TierSelector from "$lib/components/tier-selector.svelte";
 
   // Redirect if not connected
   $effect(() => {
@@ -31,6 +32,9 @@
   let selectedModel = $state("");
   let selectedProvider = $state("");
   let showAllProviders = $state(false);
+  
+  // Container tier selection
+  let selectedTierId = $state("");
   
   // Submission state
   let isSubmitting = $state(false);
@@ -81,6 +85,7 @@
           description: projectDescription.trim() || undefined,
           llmProviderId: selectedProvider || undefined,
           llmModelId: selectedModel || undefined,
+          containerTierId: selectedTierId || undefined,
         });
         
         if (project) {
@@ -105,6 +110,7 @@
           githubUrl: githubUrl.trim(),
           llmProviderId: selectedProvider || undefined,
           llmModelId: selectedModel || undefined,
+          containerTierId: selectedTierId || undefined,
         });
         
         if (project) {
@@ -226,6 +232,14 @@
                     disabled={isSubmitting}
                   />
                 </div>
+                
+                <!-- Container tier selector -->
+                <div class="space-y-2 border-t pt-4">
+                  <TierSelector
+                    bind:selectedTierId
+                    disabled={isSubmitting}
+                  />
+                </div>
               </Tabs.Content>
               
               <!-- GitHub Import Tab -->
@@ -273,6 +287,14 @@
                     bind:selectedModel
                     bind:selectedProvider
                     bind:showAllProviders
+                    disabled={isSubmitting}
+                  />
+                </div>
+                
+                <!-- Container tier selector -->
+                <div class="space-y-2 border-t pt-4">
+                  <TierSelector
+                    bind:selectedTierId
                     disabled={isSubmitting}
                   />
                 </div>

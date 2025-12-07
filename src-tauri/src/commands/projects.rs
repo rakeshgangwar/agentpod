@@ -2,7 +2,7 @@
 //!
 //! Commands for CRUD operations and container control for projects.
 
-use crate::models::{AppError, CreateProjectInput, DeployResponse, Project};
+use crate::models::{AppError, ContainerTier, CreateProjectInput, DeployResponse, Project};
 use crate::services::ApiClient;
 
 /// Helper to get an authenticated API client
@@ -32,6 +32,7 @@ pub async fn create_project(
     github_url: Option<String>,
     llm_provider_id: Option<String>,
     llm_model_id: Option<String>,
+    container_tier_id: Option<String>,
 ) -> Result<Project, AppError> {
     let client = get_client()?;
     
@@ -41,6 +42,7 @@ pub async fn create_project(
         github_url,
         llm_provider_id,
         llm_model_id,
+        container_tier_id,
     };
     
     client.create_project(input).await
@@ -86,4 +88,22 @@ pub async fn get_project_logs(id: String, lines: Option<u32>) -> Result<String, 
 pub async fn deploy_project(id: String, force: Option<bool>) -> Result<DeployResponse, AppError> {
     let client = get_client()?;
     client.deploy_project(&id, force.unwrap_or(false)).await
+}
+
+// =============================================================================
+// Container Tier Commands
+// =============================================================================
+
+/// List all available container tiers
+#[tauri::command]
+pub async fn list_container_tiers() -> Result<Vec<ContainerTier>, AppError> {
+    let client = get_client()?;
+    client.list_container_tiers().await
+}
+
+/// Get the default container tier
+#[tauri::command]
+pub async fn get_default_container_tier() -> Result<ContainerTier, AppError> {
+    let client = get_client()?;
+    client.get_default_container_tier().await
 }
