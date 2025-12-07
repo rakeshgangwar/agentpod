@@ -333,4 +333,22 @@ export const migrations: Migration[] = [
       `);
     },
   },
+  
+  // Migration 7: Add vnc_url column to projects for desktop tier containers
+  // Desktop containers have two domains: one for OpenCode API, one for VNC/noVNC
+  {
+    version: 7,
+    name: 'add_vnc_url_to_projects',
+    up: () => {
+      const tableInfo = db.query("PRAGMA table_info(projects)").all() as Array<{ name: string }>;
+      const columnExists = tableInfo.some(col => col.name === 'vnc_url');
+      if (!columnExists) {
+        db.exec('ALTER TABLE projects ADD COLUMN vnc_url TEXT');
+      }
+    },
+    down: () => {
+      // SQLite doesn't support DROP COLUMN in older versions
+      console.warn('Rollback not supported - vnc_url column will remain');
+    },
+  },
 ];

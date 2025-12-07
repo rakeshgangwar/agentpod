@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS projects (
   coolify_server_uuid TEXT NOT NULL,
   container_port INTEGER DEFAULT 4096,
   fqdn_url TEXT,  -- Public URL for the OpenCode container (e.g., https://opencode-myproject.superchotu.com)
+  vnc_url TEXT,   -- VNC/Desktop URL for desktop tier (e.g., https://vnc-myproject.superchotu.com)
   
   -- Container configuration
   container_tier_id TEXT DEFAULT 'lite',  -- References container_tiers(id)

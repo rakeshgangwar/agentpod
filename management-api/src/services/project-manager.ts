@@ -280,10 +280,26 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
     // Each container is isolated, so no port conflicts. Traefik routes by domain.
     const containerPort = 4096;
     
-    // Step 3: Generate FQDN for the container
-    const fqdnUrl = config.opencode.wildcardDomain 
-      ? `https://opencode-${slug}.${config.opencode.wildcardDomain}`
-      : null;
+    // Step 3: Generate FQDNs for the container
+    // Desktop tier gets two domains: one for OpenCode API, one for VNC
+    let fqdnUrl: string | null = null;
+    let vncUrl: string | null = null;
+    let domainsConfig: string | undefined;
+    
+    if (config.opencode.wildcardDomain) {
+      // Main OpenCode API domain (always created)
+      fqdnUrl = `https://opencode-${slug}.${config.opencode.wildcardDomain}`;
+      
+      // For desktop tier, add separate VNC domain
+      if (tier.has_desktop_access) {
+        vncUrl = `https://vnc-${slug}.${config.opencode.wildcardDomain}`;
+        // Coolify format: comma-separated domains with port suffix
+        // e.g., "https://opencode-myproject.domain.com:4096,https://vnc-myproject.domain.com:6080"
+        domainsConfig = `${fqdnUrl}:4096,${vncUrl}:6080`;
+      } else {
+        domainsConfig = fqdnUrl;
+      }
+    }
     
     // Step 4: Create Coolify application using Docker Image from Forgejo Registry
     // This uses our pre-built images (opencode-cli or opencode-desktop based on tier)
@@ -296,6 +312,8 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
     log.info('Step 2: Creating Coolify application (Docker Image)', { 
       slug, 
       fqdnUrl,
+      vncUrl,
+      domainsConfig,
       imageName,
       imageTag,
       tier: tier.id,
@@ -310,7 +328,7 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       portsExposes: exposedPorts,
       name: `opencode-${slug}`,
       description: `OpenCode container for ${name} (${tier.name} tier)`,
-      domains: fqdnUrl ?? undefined,
+      domains: domainsConfig,
       instantDeploy: false, // We'll set env vars first, then deploy
     });
     
@@ -320,7 +338,7 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
     log.info('Step 2b: Updating Coolify application settings with resource limits');
     await coolify.updateApplication(coolifyApp.uuid, {
       ports_exposes: exposedPorts,
-      domains: fqdnUrl ?? undefined,
+      domains: domainsConfig,
       // Disable Coolify healthcheck for now - container has its own HEALTHCHECK
       health_check_enabled: false,
       // Apply resource limits from tier
@@ -329,7 +347,7 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
     
     log.info('Coolify application settings updated', { 
       ports: exposedPorts, 
-      domain: fqdnUrl,
+      domains: domainsConfig,
       resourceLimits,
     });
     
@@ -403,6 +421,7 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       coolifyServerUuid: config.coolify.serverUuid,
       containerPort,
       fqdnUrl: fqdnUrl ?? undefined,
+      vncUrl: vncUrl ?? undefined,
       containerTierId: tier.id,
       containerVersion: config.registry.version,
       githubRepoUrl: githubUrl,
