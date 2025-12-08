@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeOpen - Mobile Mockups</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --background: oklch(1 0 0);
+      --foreground: oklch(0.129 0.042 264.695);
+      --card: oklch(1 0 0);
+      --card-foreground: oklch(0.129 0.042 264.695);
+      --primary: oklch(0.208 0.042 265.755);
+      --primary-foreground: oklch(0.984 0.003 247.858);
+      --secondary: oklch(0.968 0.007 247.896);
+      --secondary-foreground: oklch(0.208 0.042 265.755);
+      --muted: oklch(0.968 0.007 247.896);
+      --muted-foreground: oklch(0.554 0.046 257.417);
+      --accent: oklch(0.968 0.007 247.896);
+      --accent-foreground: oklch(0.208 0.042 265.755);
+      --destructive: oklch(0.577 0.245 27.325);
+      --border: oklch(0.929 0.013 255.508);
+      --input: oklch(0.929 0.013 255.508);
+      --ring: oklch(0.704 0.04 256.788);
+      --radius: 0.625rem;
+      
+      --status-active: oklch(0.6 0.2 145);
+      --status-thinking: oklch(0.6 0.2 250);
+      --status-waiting: oklch(0.75 0.15 85);
+      --status-paused: oklch(0.7 0.15 50);
+      --status-error: oklch(0.6 0.25 25);
+      --status-idle: oklch(0.6 0.02 260);
+      
+      --surface-attention: oklch(0.97 0.03 85);
+      --surface-success: oklch(0.97 0.03 145);
+      --surface-error: oklch(0.97 0.03 25);
+    }
+
+    .dark {
+      --background: oklch(0.129 0.042 264.695);
+      --foreground: oklch(0.984 0.003 247.858);
+      --card: oklch(0.17 0.035 265);
+      --card-foreground: oklch(0.984 0.003 247.858);
+      --primary: oklch(0.929 0.013 255.508);
+      --primary-foreground: oklch(0.208 0.042 265.755);
+      --secondary: oklch(0.279 0.041 260.031);
+      --secondary-foreground: oklch(0.984 0.003 247.858);
+      --muted: oklch(0.279 0.041 260.031);
+      --muted-foreground: oklch(0.704 0.04 256.788);
+      --accent: oklch(0.279 0.041 260.031);
+      --accent-foreground: oklch(0.984 0.003 247.858);
+      --destructive: oklch(0.704 0.191 22.216);
+      --border: oklch(1 0 0 / 10%);
+      --input: oklch(1 0 0 / 15%);
+      --ring: oklch(0.551 0.027 264.364);
+      
+      --status-active: oklch(0.65 0.2 145);
+      --status-thinking: oklch(0.65 0.2 250);
+      --status-waiting: oklch(0.7 0.15 85);
+      --status-paused: oklch(0.65 0.15 50);
+      --status-error: oklch(0.65 0.25 25);
+      --status-idle: oklch(0.5 0.02 260);
+      
+      --surface-attention: oklch(0.25 0.04 85);
+      --surface-success: oklch(0.25 0.04 145);
+      --surface-error: oklch(0.25 0.04 25);
+    }
+
+    body {
+      background: var(--muted);
+      color: var(--foreground);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    .phone-frame {
+      width: 375px;
+      height: 812px;
+      border: 8px solid #1a1a2e;
+      border-radius: 44px;
+      overflow: hidden;
+      background: var(--background);
+      position: relative;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+
+    .phone-notch {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 150px;
+      height: 34px;
+      background: #1a1a2e;
+      border-radius: 0 0 20px 20px;
+      z-index: 10;
+    }
+
+    .phone-home-indicator {
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 134px;
+      height: 5px;
+      background: var(--foreground);
+      border-radius: 3px;
+      opacity: 0.3;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: calc(var(--radius) - 2px);
+      font-weight: 500;
+      font-size: 0.875rem;
+      padding: 0.5rem 1rem;
+      height: 2.75rem;
+      cursor: pointer;
+      transition: all 150ms;
+      gap: 0.5rem;
+    }
+    
+    .btn-primary {
+      background: var(--primary);
+      color: var(--primary-foreground);
+      border: none;
+    }
+    
+    .btn-secondary {
+      background: var(--secondary);
+      color: var(--secondary-foreground);
+      border: none;
+    }
+    
+    .btn-outline {
+      background: var(--background);
+      color: var(--foreground);
+      border: 1px solid var(--input);
+    }
+    
+    .btn-ghost {
+      background: transparent;
+      color: var(--foreground);
+      border: none;
+    }
+
+    .input-field {
+      background: var(--background);
+      border: 1px solid var(--input);
+      border-radius: calc(var(--radius) - 2px);
+      padding: 0.75rem 1rem;
+      font-size: 1rem;
+      color: var(--foreground);
+      width: 100%;
+      min-height: 48px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.25rem 0.625rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      border-radius: 9999px;
+      gap: 0.375rem;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+
+    .bottom-nav {
+      display: flex;
+      justify-content: space-around;
+      padding: 0.5rem 0.25rem 1.5rem;
+      background: var(--card);
+      border-top: 1px solid var(--border);
+    }
+
+    .bottom-nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.5rem;
+      font-size: 0.625rem;
+      color: var(--muted-foreground);
+      position: relative;
+    }
+
+    .bottom-nav-item.active {
+      color: var(--primary);
+    }
+
+    .quick-action-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.625rem 1rem;
+      border-radius: 9999px;
+      background: var(--muted);
+      font-size: 0.875rem;
+      white-space: nowrap;
+    }
+
+    .tool-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .tool-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      background: var(--muted);
+      font-size: 0.8125rem;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .animate-bounce { animation: bounce 0.6s infinite; }
+    .animate-pulse { animation: pulse 2s infinite; }
+
+    .page-section {
+      margin-bottom: 4rem;
+    }
+
+    .page-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: var(--foreground);
+    }
+
+    .page-subtitle {
+      color: var(--muted-foreground);
+      margin-bottom: 2rem;
+    }
+
+    .mockup-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2rem;
+      justify-content: center;
+    }
+
+    .mockup-label {
+      text-align: center;
+      margin-top: 1rem;
+      font-size: 0.875rem;
+      color: var(--muted-foreground);
+    }
+  </style>
+</head>
+<body class="min-h-screen p-8">
+  <!-- Theme Toggle -->
+  <div class="fixed top-4 right-4 z-50 flex gap-2">
+    <button onclick="document.body.classList.toggle('dark')" class="btn btn-outline" style="background: var(--background);">
+      Toggle Dark Mode
+    </button>
+    <a href="desktop-mockups.html" class="btn btn-secondary">← View Desktop</a>
+  </div>
+
+  <div class="max-w-7xl mx-auto">
+    <!-- Header -->
+    <header class="text-center py-8 mb-8">
+      <h1 class="text-4xl font-bold mb-2" style="color: var(--foreground);">CodeOpen Mobile Mockups</h1>
+      <p style="color: var(--muted-foreground)">High-fidelity mockups for all mobile views and user journeys</p>
+    </header>
+
+    <!-- ==================== 1. SETUP SCREEN ==================== -->
+    <section class="page-section">
+      <h2 class="page-title">1. Setup / Connection</h2>
+      <p class="page-subtitle">First-time setup or reconnection</p>
+
+      <div class="mockup-grid">
+        <!-- Setup Screen -->
+        <div>
+          <div class="phone-frame">
+            <div class="phone-notch"></div>
+            <div class="flex flex-col h-full pt-12 pb-8">
+              <div class="flex-1 flex flex-col items-center justify-center px-6">
+                <!-- Logo -->
+                <div class="w-20 h-20 rounded-2xl flex items-center justify-center mb-6" style="background: var(--primary);">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--primary-foreground)" stroke-width="2">
+                    <polyline points="16 18 22 12 16 6"></polyline>
+                    <polyline points="8 6 2 12 8 18"></polyline>
+                  </svg>
+                </div>
+                
+                <h1 class="text-2xl font-bold mb-2">Welcome</h1>
+                <p class="text-center mb-8" style="color: var(--muted-foreground);">Connect to your OpenCode server</p>
+                
+                <div class="w-full space-y-4">
+                  <div>
+                    <label class="text-sm font-medium block mb-2">API URL</label>
+                    <input type="text" class="input-field" placeholder="https://your-server.com/api">
+                  </div>
+                  
+                  <button class="btn btn-primary w-full">
+                    Connect
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="phone-home-indicator"></div>
+          </div>
+          <p class="mockup-label">Setup Screen</p>
+        </div>
+
+        <!-- Connection Testing -->
+        <div>
+          <div class="phone-frame">
+            <div class="phone-notch"></div>
+            <div class="flex flex-col h-full pt-12 pb-8">
+              <div class="flex-1 flex flex-col items-center justify-center px-6">
+                <div class="w-16 h-16 rounded-full flex items-center justify-center mb-6" style="background: var(--muted);">
+                  <svg class="animate-spin" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle>
+                    <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
+                  </svg>
+                </div>
+                
+                <h2 class="text-lg font-semibold mb-2">Testing Connection</h2>
+                <p class="text-center text-sm" style="color: var(--muted-foreground);">Verifying API server...</p>
+              </div>
+            </div>
+            <div class="phone-home-indicator"></div>
+          </div>
+          <p class="mockup-label">Connection Testing</p>
+        </div>
+
+        <!-- Connection Error -->
+        <div>
+          <div class="phone-frame">
+            <div class="phone-notch"></div>
+            <div class="flex flex-col h-full pt-12 pb-8">
+              <div class="flex-1 flex flex-col items-center justify-center px-6">
+                <div class="w-16 h-16 rounded-full flex items-center justify-center mb-6" style="background: var(--surface-error);">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--status-error)" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="15" y1="9" x2="9" y2="15"></line>
+                    <line x1="9" y1="9" x2="15" y2="15"></line>
+                  </svg>
+                </div>
+                
+                <h2 class="text-lg font-semibold mb-2">Connection Failed</h2>
+                <p class="text-center text-sm mb-6" style="color: var(--muted-foreground);">Unable to connect to the server. Please check the URL and try again.</p>
+                
+                <button class="btn btn-primary w-full mb-3">
+                  Try Again
+                </button>
+                <button class="btn btn-ghost w-full">
+                  Edit URL
+                </button>
+              </div>
+            </div>
+            <div class="phone-home-indicator"></div>
+          </div>
+          <p class="mockup-label">Connection Error</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 2. INTENT-FIRST HOME ==================== -->
+    <section class="page-section">
+      <h2 class="page-title">2. Intent-First Home</h2>
+      <p class="page-subtitle">"What's on your mind?" with quick actions and attention items</p>
+
+      <div class="mockup-grid">
+        <!-- Home - Clean State -->
+        <div>
+          <div class="phone-frame">
+            <div class="phone-notch"></div>
+            <div class="flex flex-col h-full pt-12">
+              <!-- Content -->
+              <div class="flex-1 overflow-auto px-4 pt-4 pb-4">
+                <!-- Greeting -->
+                <div class="mb-6">
+                  <p class="text-sm" style="color: var(--muted-foreground);">Good morning</p>
+                  <h1 class="text-2xl font-semibold">Alex</h1>
+                </div>
+
+                <!-- Intent Input -->
+                <div class="mb-6">
+                  <p class="text-lg font-light text-center mb-4" style="color: var(--muted-foreground);">What's on your mind?</p>
+                  <div class="relative">
+                    <input 
+                      type="text" 
+                      class="input-field pr-12" 
+                      placeholder="Type or tap a quick action..."
+                      style="border-radius: 9999px;"
+                    >
+                    <button class="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center" style="background: var(--primary);">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary-foreground)" stroke-width="2">
+                        <path d="M5 12h14M12 5l7 7-7 7"></path>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="mb-6">
+                  <div class="flex flex-wrap gap-2">
+                    <button class="quick-action-chip">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"></path>
+                      </svg>
+                      Projects
+                    </button>
+                    <button class="quick-action-chip">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                      </svg>
+                      New Session
+                    </button>
+                    <button class="quick-action-chip">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                      </svg>
+                      Activity
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Active Now -->
+                <div class="mb-4">
+                  <h3 class="text-xs font-semibold uppercase tracking-wide mb-3" style="color: var(--muted-foreground);">Active Now</h3>
+                  <div class="card p-4">
+                    <div class="flex items-center gap-3 mb-2">
+                      <span class="status-dot animate-pulse" style="background: var(--status-thinking);"></span>
+                      <span class="font-medium">frontend</span>
+                    </div>
+                    <p class="text-sm mb-3" style="color: var(--muted-foreground);">Implementing auth flow...</p>
+                    <div class="h-1 rounded-full overflow-hidden" style="background: var(--border);">
+                      <div class="h-full rounded-full" style="width: 65%; background: var(--status-thinking);"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Recent Projects -->
+                <div>
+                  <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-xs font-semibold uppercase tracking-wide" style="color: var(--muted-foreground);">Projects</h3>
+                    <button class="text-xs" style="color: var(--primary);">View all</button>
+                  </div>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div class="card p-3">
+                      <div class="flex items-center gap-2 mb-1">
+                        <span class="status-dot" style="background: var(--status-active);"></span>
+                        <span class="text-sm font-medium">frontend</span>
+                      </div>
+                      <p class="text-xs" style="color: var(--muted-foreground);">2m ago</p>
+                    </div>
+                    <div class="card p-3">
+                      <div class="flex items-center gap-2 mb-1">
+                        <span class="status-dot" style="background: var(--status-active);"></span>
+                        <span class="text-sm font-medium">backend</span>
+                      </div>
+                      <p class="text-xs" style="color: var(--muted-foreground);">15m ago</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Bottom Nav -->
+              <div class="bottom-nav">
+                <button class="bottom-nav-item active">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                  </svg>
+                  Home
+                </button>
+                <button class="bottom-nav-item">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"></path>
+                  </svg>
+                  Projects
+                </button>
+                <button class="bottom-nav-item">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                  </svg>
+                  Activity
+                </button>
+                <button class="bottom-nav-item">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4"></path>
+                  </svg>
+                  Settings
+                </button>
+              </div>
+            </div>
+            <div class="phone-home-indicator"></div>
+          </div>
+          <p class="mockup-label">Home - Clean State</p>
+        </div>
+
+        <!-- Home - With Attention Items -->
+        <div>
+          <div class="phone-frame">
+            <div class="phone-notch"></div>
+            <div class="flex flex-col h-full pt-12">
+              <!-- Attention Banner -->
+              <div class="px-4 py-3" style="background: var(--surface-attention);">
+                <div class="flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full" style="background: var(--status-waiting);"></span>
+                  <span class="text-sm font-medium flex-1">3 items need attention</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 18l6-6-6-6"></path>
+                  </svg>
+                </div>
+              </div>
+
+              <!-- Content -->
+              <div class="flex-1 overflow-auto px-4 pt-4 pb-4">
+                <!-- Greeting -->
+                <div class="mb-4">
+                  <p class="text-sm" style="color: var(--muted-foreground);">Good morning</p>
+                  <h1 class="text-2xl font-semibold">Alex</h1>
+                </div>
+
+                <!-- Needs Attention -->
+                <div class="mb-6">
+                  <h3 class="text-xs font-semibold uppercase tracking-wide mb-3" style="color: var(--muted-foreground);">Needs Attention</h3>
+                  <div class="space-y-2">
+                    <div class="p-3 rounded-lg" style="background: var(--surface-attention); border-left: 3px solid var(--status-waiting);">
+                      <div class="flex items-center gap-2 mb-1">
+                        <span class="status-dot" style="background: var(--status-waiting);"></span>
+                        <span class="text-sm font-medium">Permission: edit api.ts</span>
+                      </div>
+                      <p class="text-xs" style="color: var(--muted-foreground);">frontend · 2m ago</p>
+                    </div>
+                    <div class="p-3 rounded-lg" style="background: var(--surface-error); border-left: 3px solid var(--status-error);">
+                      <div class="flex items-center gap-2 mb-1">
+                        <span class="status-dot" style="background: var(--status-error);"></span>
+                        <span class="text-sm font-medium">Build failed</span>
+                      </div>
+                      <p class="text-xs" style="color: var(--muted-foreground);">analytics · 15m ago</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Quick Actions (scrollable) -->
+                <div class="mb-6 -mx-4 px-4">
+                  <div class="flex gap-2 overflow-x-auto pb-2" style="scrollbar-width: none;">
+                    <button class="quick-action-chip flex-shrink-0">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"></path>
+                      </svg>
+                      Projects
+                    </button>
+                    <button class="quick-action-chip flex-shrink-0">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                      </svg>
+                      New Session
+                    </button>
+                    <button class="quick-action-chip flex-shrink-0">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                      </svg>
+                      Activity
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Active Sessions -->
+                <div class="mb-4">
+                  <h3 class="text-xs font-semibold uppercase tracking-wide mb-3" style="color: var(--muted-foreground);">Active Now</h3>
+                  <div class="space-y-2">
+                    <div class="card p-3">
+                      <div class="flex items-center gap-3 mb-2">
+                        <span class="status-dot animate-pulse" style="background: var(--status-thinking);"></span>
+                        <span class="font-medium text-sm">frontend</span>
+                      </div>
+                      <p class="text-xs" style="color: var(--muted-foreground);">Implementing auth...</p>
+                    </div>
+                    <div class="card p-3">
+                      <div class="flex items-center gap-3 mb-2">
+                        <span class="status-dot" style="background: var(--status-waiting);"></span>
+                        <span class="font-medium text-sm">backend-api</span>
+                      </div>
+                      <p class="text-xs" style="color: var(--muted-foreground);">Waiting for input...</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Bottom Nav -->
+              <div class="bottom-nav">
+                <button class="bottom-nav-item active">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                  </svg>
+                  Home
+                </button>
+                <button class="bottom-nav-item">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"></path>
+                  </svg>
+                  Projects
+                </button>
+                <button class="bottom-nav-item">
+                  <div class="relative">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                    </svg>
+                    <span class="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[10px] flex items-center justify-center" style="background: var(--destructive); color: white;">3</span>
+                  </div>
+                  Activity
+                </button>
+                <button class="bottom-nav-item">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0"></path>
+                  </svg>
+                  Settings
+                </button>
+              </div>
+            </div>
+            <div class="phone-home-indicator"></div>
+          </div>
+          <p class="mockup-label">Home - With Attention</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 3. PROJECTS LIST ==================== -->
+    <section class="page-section">
+      <h2 class="page-title">3. Projects List</h2>
+      <p class="page-subtitle">All projects with status indicators</p>
+
+      <div class="mockup-grid">
+        <div>
+          <div class="phone-frame">
+            <div class="phone-notch"></div>
+            <div class="flex flex-col h-full pt-12">
+              <!-- Header -->
+              <div class="px-4 pt-4 pb-3">
+                <div class="flex items-center justify-between mb-4">
+                  <h1 class="text-xl font-semibold">Projects</h1>
+                  <button class="w-10 h-10 rounded-full flex items-center justify-center" style="background: var(--primary);">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary-foreground)" stroke-width="2">
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                  </button>
+                </div>
+                <div class="relative">
+                  <svg class="absolute left-3 top-1/2 -translate-y-1/2" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                  <input type="text" class="input-field pl-10" placeholder="Search projects..." style="height: 44px;">
+                </div>
+              </div>
+
+              <!-- Project List -->
+              <div class="flex-1 overflow-auto px-4 pb-4">
+                <div class="space-y-3">
+                  <!-- Running Project -->
+                  <div class="card p-4">
+                    <div class="flex items-start justify-between mb-2">
+                      <div>
+                        <h3 class="font-semibold">frontend</h3>
+                        <p class="text-sm" style="color: var(--muted-foreground);">React web app</p>
+                      </div>
+                      <span class="badge" style="background: var(--status-active); color: white;">
+                        <span class="w-1.5 h-1.5 rounded-full" style="background: white;"></span>
+                        Running
+                      </span>
+                    </div>
+                    <div class="flex items-center gap-4 text-xs" style="color: var(--muted-foreground);">
+                      <span>3 sessions</span>
+                      <span>2m ago</span>
+                    </div>
+                  </div>
+
+                  <!-- Thinking Project -->
+                  <div class="card p-4">
+                    <div class="flex items-start justify-between mb-2">
+                      <div>
+                        <h3 class="font-semibold">backend-api</h3>
+                        <p class="text-sm" style="color: var(--muted-foreground);">Node.js REST API</p>
+                      </div>
+                      <span class="badge" style="background: var(--status-thinking); color: white;">
+                        <span class="w-1.5 h-1.5 rounded-full animate-pulse" style="background: white;"></span>
+                        Thinking
+                      </span>
+                    </div>
+                    <div class="flex items-center gap-4 text-xs" style="color: var(--muted-foreground);">
+                      <span>1 session</span>
+                      <span>Working on: DB migrations</span>
+                    </div>
+                  </div>
+
+                  <!-- Waiting Project -->
+                  <div class="card p-4" style="border-left: 3px solid var(--status-waiting);">
+                    <div class="flex items-start justify-between mb-2">
+                      <div>
+                        <h3 class="font-semibold">mobile-app</h3>
+                        <p class="text-sm" style="color: var(--muted-foreground);">React Native</p>
+                      </div>
+                      <span class="badge" style="background: var(--status-waiting); color: black;">
+                        <span class="w-1.5 h-1.5 rounded-full" style="background: black;"></span>
+                        Waiting
+                      </span>
+                    </div>
+                    <div class="p-2 rounded text-xs" style="background: var(--surface-attention);">
+                      ⚠️ Permission required
+                    </div>
+                  </div>
+
+                  <!-- Error Project -->
+                  <div class="card p-4" style="border-left: 3px solid var(--status-error);">
+                    <div class="flex items-start justify-between mb-2">
+                      <div>
+                        <h3 class="font-semibold">analytics</h3>
+                        <p class="text-sm" style="color: var(--muted-foreground);">Data pipeline</p>
+                      </div>
+                      <span class="badge" style="background: var(--status-error); color: white;">
+                        <span class="w-1.5 h-1.5 rounded-full" style="background: white;"></span>
+                        Error
+                      </span>
+                    </div>
+                    <div class="p-2 rounded text-xs" style="background: var(--surface-error); color: var(--status-error);">
+                      Build failed
+                    </div>
+                  </div>
+
+                  <!-- Stopped Project -->
+                  <div class="card p-4">
+                    <div class="flex items-start justify-between mb-2">
+                      <div>
+                        <h3 class="font-semibold">docs</h3>
+                        <p class="text-sm" style="color: var(--muted-foreground);">Documentation</p>
+                      </div>
+                      <span class="badge" style="background: var(--secondary);">
+                        <span class="w-1.5 h-1.5 rounded-full" style="background: var(--status-idle);"></span>
+                        Stopped
+                      </span>
+                    </div>
+                    <div class="text-xs" style="color: var(--muted-foreground);">
+                      Last used 2 days ago
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Bottom Nav -->
+              <div class="bottom-nav">
+                <button class="bottom-nav-item">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                  </svg>
+                  Home
+                </button>
+                <button class="bottom-nav-item active">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"></path>
+                  </svg>
+                  Projects
+                </button>
+                <button class="bottom-nav-item">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                  </svg>
+                  Activity
+                </button>
+                <button class="bottom-nav-item">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 00.33 1.82"></path>
+                  </svg>
+                  Settings
+                </button>
+              </div>
+            </div>
+            <div class="phone-home-indicator"></div>
+          </div>
+          <p class="mockup-label">Projects List</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 4. CHAT INTERFACE ==================== -->
+    <section class="page-section">
+      <h2 class="page-title">4. Chat Interface</h2>
+      <p class="page-subtitle">Main chat view with tool calls and permissions</p>
+
+      <div class="mockup-grid">
+        <!-- Chat with Messages -->
+        <div>
+          <div class="phone-frame">
+            <div class="phone-notch"></div>
+            <div class="flex flex-col h-full pt-12">
+              <!-- Chat Header -->
+              <div class="px-3 py-3 border-b flex items-center gap-3" style="border-color: var(--border);">
+                <button class="w-9 h-9 flex items-center justify-center">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M15 18l-6-6 6-6"></path>
+                  </svg>
+                </button>
+                <div class="flex-1">
+                  <h2 class="font-semibold">frontend</h2>
+                  <div class="flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full" style="background: var(--status-active);"></span>
+                    <span class="text-xs" style="color: var(--muted-foreground);">Running</span>
+                  </div>
+                </div>
+                <button class="w-9 h-9 flex items-center justify-center">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
+
+              <!-- Messages -->
+              <div class="flex-1 overflow-auto p-4 space-y-4">
+                <!-- User Message -->
+                <div class="flex justify-end">
+                  <div class="max-w-[85%] p-3 rounded-2xl rounded-tr-sm" style="background: var(--primary); color: var(--primary-foreground);">
+                    <p class="text-[15px]">Add user authentication with JWT</p>
+                  </div>
+                </div>
+
+                <!-- Assistant Message -->
+                <div class="flex justify-start">
+                  <div class="max-w-[90%] space-y-2">
+                    <div class="p-3 rounded-2xl rounded-tl-sm" style="background: var(--muted);">
+                      <p class="text-[15px]">I'll implement JWT auth. Let me start with the packages.</p>
+                    </div>
+
+                    <!-- Tool Call -->
+                    <div class="tool-card">
+                      <div class="tool-header">
+                        <span class="w-2 h-2 rounded-full" style="background: var(--status-active);"></span>
+                        <span class="font-medium font-mono">bash</span>
+                        <span class="text-xs ml-auto" style="color: var(--muted-foreground);">done</span>
+                      </div>
+                      <div class="p-2 text-xs font-mono" style="background: oklch(0.15 0.02 260); color: oklch(0.9 0 0);">
+                        $ npm install jsonwebtoken
+                      </div>
+                    </div>
+
+                    <!-- Another Tool Call -->
+                    <div class="tool-card">
+                      <div class="tool-header">
+                        <span class="w-2 h-2 rounded-full animate-pulse" style="background: var(--status-thinking);"></span>
+                        <span class="font-medium font-mono">edit</span>
+                        <span class="text-xs ml-auto" style="color: var(--status-thinking);">running...</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Thinking -->
+                <div class="flex justify-start">
+                  <div class="p-3 rounded-2xl" style="background: var(--muted);">
+                    <div class="flex items-center gap-2">
+                      <div class="flex gap-1">
+                        <span class="w-2 h-2 rounded-full animate-bounce" style="background: var(--status-thinking);"></span>
+                        <span class="w-2 h-2 rounded-full animate-bounce" style="background: var(--status-thinking); animation-delay: 150ms;"></span>
+                        <span class="w-2 h-2 rounded-full animate-bounce" style="background: var(--status-thinking); animation-delay: 300ms;"></span>
+                      </div>
+                      <span class="text-sm" style="color: var(--muted-foreground);">Creating routes...</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Input -->
+              <div class="p-3 border-t" style="border-color: var(--border);">
+                <div class="flex gap-2">
+                  <input 
+                    type="text" 
+                    class="input-field flex-1" 
+                    placeholder="Type a message..."
+                    style="height: 44px;"
+                  >
+                  <button class="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0" style="background: var(--primary);">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary-foreground)" stroke-width="2">
+                      <line x1="22" y1="2" x2="11" y2="13"></line>
+                      <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="phone-home-indicator"></div>
+          </div>
+          <p class="mockup-label">Chat with Tool Calls</p>
+        </div>
+
+        <!-- Chat with Permission Bar -->
+        <div>
+          <div class="phone-frame">
+            <div class="phone-notch"></div>
+            <div class="flex flex-col h-full pt-12">
+              <!-- Chat Header -->
+              <div class="px-3 py-3 border-b flex items-center gap-3" style="border-color: var(--border);">
+                <button class="w-9 h-9 flex items-center justify-center">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M15 18l-6-6 6-6"></path>
+                  </svg>
+                </button>
+                <div class="flex-1">
+                  <h2 class="font-semibold">frontend</h2>
+                  <div class="flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full" style="background: var(--status-waiting);"></span>
+                    <span class="text-xs" style="color: var(--muted-foreground);">Waiting</span>
+                  </div>
+                </div>
+                <button class="w-9 h-9 flex items-center justify-center">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
+
+              <!-- Messages -->
+              <div class="flex-1 overflow-auto p-4 space-y-4">
+                <!-- User Message -->
+                <div class="flex justify-end">
+                  <div class="max-w-[85%] p-3 rounded-2xl rounded-tr-sm" style="background: var(--primary); color: var(--primary-foreground);">
+                    <p class="text-[15px]">Fix the login bug</p>
+                  </div>
+                </div>
+
+                <!-- Assistant with completed tools -->
+                <div class="flex justify-start">
+                  <div class="max-w-[90%] space-y-2">
+                    <div class="p-3 rounded-2xl rounded-tl-sm" style="background: var(--muted);">
+                      <p class="text-[15px]">I found the issue. Let me fix the auth middleware.</p>
+                    </div>
+
+                    <!-- Completed Tools Summary -->
+                    <details class="tool-card">
+                      <summary class="tool-header cursor-pointer">
+                        <span class="w-2 h-2 rounded-full" style="background: var(--status-active);"></span>
+                        <span class="text-xs">2 actions completed</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ml-auto">
+                          <path d="M6 9l6 6 6-6"></path>
+                        </svg>
+                      </summary>
+                      <div class="p-2 text-xs space-y-1" style="color: var(--muted-foreground);">
+                        <p>✓ read: src/middleware/auth.ts</p>
+                        <p>✓ grep: "token validation"</p>
+                      </div>
+                    </details>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Permission Bar -->
+              <div class="px-3 py-3" style="background: var(--surface-attention); border-top: 1px solid var(--border);">
+                <div class="flex items-center gap-3 mb-3">
+                  <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style="background: var(--status-waiting);">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                    </svg>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium">Permission Required</p>
+                    <p class="text-xs truncate" style="color: var(--muted-foreground);">Edit src/middleware/auth.ts</p>
+                  </div>
+                </div>
+                <div class="flex gap-2">
+                  <button class="btn btn-outline flex-1" style="height: 40px;">Reject</button>
+                  <button class="btn btn-primary flex-1" style="height: 40px;">Allow</button>
+                </div>
+              </div>
+
+              <!-- Input (disabled while permission pending) -->
+              <div class="p-3 border-t" style="border-color: var(--border);">
+                <div class="flex gap-2">
+                  <input 
+                    type="text" 
+                    class="input-field flex-1 opacity-50" 
+                    placeholder="Waiting for permission..."
+                    disabled
+                    style="height: 44px;"
+                  >
+                  <button class="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 opacity-50" style="background: var(--primary);">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary-foreground)" stroke-width="2">
+                      <line x1="22" y1="2" x2="11" y2="13"></line>
+                      <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="phone-home-indicator"></div>
+          </div>
+          <p class="mockup-label">Permission Required</p>
+        </div>
+
+        <!-- Session Drawer -->
+        <div>
+          <div class="phone-frame">
+            <div class="phone-notch"></div>
+            <div class="flex flex-col h-full pt-12">
+              <!-- Drawer Content -->
+              <div class="flex-1 flex flex-col" style="background: var(--card);">
+                <!-- Drawer Header -->
+                <div class="px-4 py-4 border-b flex items-center justify-between" style="border-color: var(--border);">
+                  <h2 class="font-semibold">Sessions</h2>
+                  <button class="w-9 h-9 flex items-center justify-center">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  </button>
+                </div>
+
+                <!-- New Session Button -->
+                <div class="px-4 py-3 border-b" style="border-color: var(--border);">
+                  <button class="btn btn-primary w-full">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    New Session
+                  </button>
+                </div>
+
+                <!-- Sessions List -->
+                <div class="flex-1 overflow-auto">
+                  <!-- Active Session -->
+                  <div class="px-4 py-3 border-b" style="background: var(--accent); border-color: var(--border);">
+                    <div class="flex items-center gap-2 mb-1">
+                      <span class="w-2 h-2 rounded-full animate-pulse" style="background: var(--status-thinking);"></span>
+                      <span class="font-medium">Add authentication</span>
+                    </div>
+                    <p class="text-xs" style="color: var(--muted-foreground);">Working on JWT...</p>
+                  </div>
+
+                  <!-- Other Sessions -->
+                  <div class="px-4 py-3 border-b" style="border-color: var(--border);">
+                    <div class="flex items-center gap-2 mb-1">
+                      <span class="w-2 h-2 rounded-full" style="background: var(--status-active);"></span>
+                      <span class="font-medium">Fix routing bug</span>
+                    </div>
+                    <p class="text-xs" style="color: var(--muted-foreground);">Completed · 1h ago</p>
+                  </div>
+
+                  <div class="px-4 py-3 border-b" style="border-color: var(--border);">
+                    <div class="flex items-center gap-2 mb-1">
+                      <span class="w-2 h-2 rounded-full" style="background: var(--status-active);"></span>
+                      <span class="font-medium">Setup project</span>
+                    </div>
+                    <p class="text-xs" style="color: var(--muted-foreground);">Completed · 3h ago</p>
+                  </div>
+
+                  <div class="px-4 py-3 border-b" style="border-color: var(--border);">
+                    <div class="flex items-center gap-2 mb-1">
+                      <span class="w-2 h-2 rounded-full" style="background: var(--status-active);"></span>
+                      <span class="font-medium">Initial scaffold</span>
+                    </div>
+                    <p class="text-xs" style="color: var(--muted-foreground);">Completed · 2d ago</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="phone-home-indicator"></div>
+          </div>
+          <p class="mockup-label">Sessions Drawer</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 5. ACTIVITY FEED ==================== -->
+    <section class="page-section">
+      <h2 class="page-title">5. Activity Feed</h2>
+      <p class="page-subtitle">Timeline of all actions</p>
+
+      <div class="mockup-grid">
+        <div>
+          <div class="phone-frame">
+            <div class="phone-notch"></div>
+            <div class="flex flex-col h-full pt-12">
+              <!-- Header -->
+              <div class="px-4 pt-4 pb-3 border-b" style="border-color: var(--border);">
+                <h1 class="text-xl font-semibold mb-3">Activity</h1>
+                <div class="flex gap-2 overflow-x-auto pb-1" style="scrollbar-width: none;">
+                  <button class="badge" style="background: var(--primary); color: var(--primary-foreground);">All</button>
+                  <button class="badge" style="background: var(--secondary);">AI Actions</button>
+                  <button class="badge" style="background: var(--secondary);">Permissions</button>
+                  <button class="badge" style="background: var(--secondary);">System</button>
+                </div>
+              </div>
+
+              <!-- Activity List -->
+              <div class="flex-1 overflow-auto px-4 py-4">
+                <!-- Today -->
+                <h3 class="text-xs font-semibold uppercase tracking-wide mb-3" style="color: var(--muted-foreground);">Today</h3>
+                
+                <div class="space-y-4 mb-6">
+                  <!-- Activity Item -->
+                  <div class="flex gap-3">
+                    <div class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style="background: var(--status-thinking);">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                        <polyline points="16 18 22 12 16 6"></polyline>
+                        <polyline points="8 6 2 12 8 18"></polyline>
+                      </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center justify-between gap-2 mb-0.5">
+                        <span class="font-medium text-sm truncate">frontend</span>
+                        <span class="text-xs flex-shrink-0" style="color: var(--muted-foreground);">2m</span>
+                      </div>
+                      <p class="text-xs" style="color: var(--muted-foreground);">Edited 3 files</p>
+                    </div>
+                  </div>
+
+                  <!-- Permission Activity -->
+                  <div class="flex gap-3">
+                    <div class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style="background: var(--status-waiting);">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                      </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center justify-between gap-2 mb-0.5">
+                        <span class="font-medium text-sm truncate">backend-api</span>
+                        <span class="text-xs flex-shrink-0" style="color: var(--muted-foreground);">15m</span>
+                      </div>
+                      <p class="text-xs" style="color: var(--muted-foreground);">Permission granted</p>
+                    </div>
+                  </div>
+
+                  <!-- Error Activity -->
+                  <div class="flex gap-3">
+                    <div class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style="background: var(--status-error);">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="15" y1="9" x2="9" y2="15"></line>
+                        <line x1="9" y1="9" x2="15" y2="15"></line>
+                      </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center justify-between gap-2 mb-0.5">
+                        <span class="font-medium text-sm truncate">analytics</span>
+                        <span class="text-xs flex-shrink-0" style="color: var(--muted-foreground);">1h</span>
+                      </div>
+                      <p class="text-xs" style="color: var(--status-error);">Build failed</p>
+                    </div>
+                  </div>
+
+                  <!-- Success Activity -->
+                  <div class="flex gap-3">
+                    <div class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style="background: var(--status-active);">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                      </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center justify-between gap-2 mb-0.5">
+                        <span class="font-medium text-sm truncate">frontend</span>
+                        <span class="text-xs flex-shrink-0" style="color: var(--muted-foreground);">2h</span>
+                      </div>
+                      <p class="text-xs" style="color: var(--muted-foreground);">Session completed</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Yesterday -->
+                <h3 class="text-xs font-semibold uppercase tracking-wide mb-3" style="color: var(--muted-foreground);">Yesterday</h3>
+                
+                <div class="space-y-4">
+                  <div class="flex gap-3">
+                    <div class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style="background: var(--status-active);">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                        <path d="M22 11.08V12a10 10 0 11-5.93-9.14"></path>
+                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                      </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center justify-between gap-2 mb-0.5">
+                        <span class="font-medium text-sm truncate">backend-api</span>
+                        <span class="text-xs flex-shrink-0" style="color: var(--muted-foreground);">23h</span>
+                      </div>
+                      <p class="text-xs" style="color: var(--muted-foreground);">Deployed to production</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Bottom Nav -->
+              <div class="bottom-nav">
+                <button class="bottom-nav-item">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                  </svg>
+                  Home
+                </button>
+                <button class="bottom-nav-item">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"></path>
+                  </svg>
+                  Projects
+                </button>
+                <button class="bottom-nav-item active">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                  </svg>
+                  Activity
+                </button>
+                <button class="bottom-nav-item">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 00.33 1.82"></path>
+                  </svg>
+                  Settings
+                </button>
+              </div>
+            </div>
+            <div class="phone-home-indicator"></div>
+          </div>
+          <p class="mockup-label">Activity Feed</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 6. SETTINGS ==================== -->
+    <section class="page-section">
+      <h2 class="page-title">6. Settings</h2>
+      <p class="page-subtitle">App configuration</p>
+
+      <div class="mockup-grid">
+        <div>
+          <div class="phone-frame">
+            <div class="phone-notch"></div>
+            <div class="flex flex-col h-full pt-12">
+              <!-- Header -->
+              <div class="px-4 pt-4 pb-3 border-b" style="border-color: var(--border);">
+                <h1 class="text-xl font-semibold">Settings</h1>
+              </div>
+
+              <!-- Settings List -->
+              <div class="flex-1 overflow-auto">
+                <!-- Connection Section -->
+                <div class="px-4 py-4 border-b" style="border-color: var(--border);">
+                  <h3 class="text-xs font-semibold uppercase tracking-wide mb-3" style="color: var(--muted-foreground);">Connection</h3>
+                  
+                  <div class="card p-4">
+                    <div class="flex items-center justify-between mb-3">
+                      <div>
+                        <p class="font-medium text-sm">API Server</p>
+                        <p class="text-xs truncate" style="color: var(--muted-foreground);">opencode.example.com</p>
+                      </div>
+                      <span class="badge" style="background: var(--status-active); color: white;">Connected</span>
+                    </div>
+                    <button class="btn btn-outline w-full" style="height: 40px;">Change Server</button>
+                  </div>
+                </div>
+
+                <!-- Model Section -->
+                <div class="px-4 py-4 border-b" style="border-color: var(--border);">
+                  <h3 class="text-xs font-semibold uppercase tracking-wide mb-3" style="color: var(--muted-foreground);">Default Model</h3>
+                  
+                  <div class="space-y-3">
+                    <div class="card p-4 flex items-center justify-between">
+                      <div>
+                        <p class="font-medium text-sm">Provider</p>
+                        <p class="text-xs" style="color: var(--muted-foreground);">Anthropic</p>
+                      </div>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2">
+                        <path d="M9 18l6-6-6-6"></path>
+                      </svg>
+                    </div>
+                    <div class="card p-4 flex items-center justify-between">
+                      <div>
+                        <p class="font-medium text-sm">Model</p>
+                        <p class="text-xs" style="color: var(--muted-foreground);">claude-sonnet-4</p>
+                      </div>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2">
+                        <path d="M9 18l6-6-6-6"></path>
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Appearance Section -->
+                <div class="px-4 py-4 border-b" style="border-color: var(--border);">
+                  <h3 class="text-xs font-semibold uppercase tracking-wide mb-3" style="color: var(--muted-foreground);">Appearance</h3>
+                  
+                  <div class="card p-4 flex items-center justify-between">
+                    <div>
+                      <p class="font-medium text-sm">Theme</p>
+                      <p class="text-xs" style="color: var(--muted-foreground);">System</p>
+                    </div>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2">
+                      <path d="M9 18l6-6-6-6"></path>
+                    </svg>
+                  </div>
+                </div>
+
+                <!-- About Section -->
+                <div class="px-4 py-4">
+                  <h3 class="text-xs font-semibold uppercase tracking-wide mb-3" style="color: var(--muted-foreground);">About</h3>
+                  
+                  <div class="space-y-2 text-sm">
+                    <div class="flex justify-between py-2">
+                      <span style="color: var(--muted-foreground);">Version</span>
+                      <span>1.0.0</span>
+                    </div>
+                    <div class="flex justify-between py-2">
+                      <span style="color: var(--muted-foreground);">Built with</span>
+                      <span>Tauri + Svelte</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Bottom Nav -->
+              <div class="bottom-nav">
+                <button class="bottom-nav-item">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                  </svg>
+                  Home
+                </button>
+                <button class="bottom-nav-item">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"></path>
+                  </svg>
+                  Projects
+                </button>
+                <button class="bottom-nav-item">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                  </svg>
+                  Activity
+                </button>
+                <button class="bottom-nav-item active">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"></path>
+                  </svg>
+                  Settings
+                </button>
+              </div>
+            </div>
+            <div class="phone-home-indicator"></div>
+          </div>
+          <p class="mockup-label">Settings</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="text-center py-8" style="color: var(--muted-foreground);">
+      <p>CodeOpen Mobile Mockups · December 2024</p>
+      <p class="text-sm mt-2">Toggle dark mode using the button in the top right corner</p>
+    </footer>
+  </div>
+</body>
+</html>

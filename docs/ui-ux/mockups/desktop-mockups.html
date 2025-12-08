@@ -1,0 +1,1574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeOpen - Desktop Mockups</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --background: oklch(1 0 0);
+      --foreground: oklch(0.129 0.042 264.695);
+      --card: oklch(1 0 0);
+      --card-foreground: oklch(0.129 0.042 264.695);
+      --primary: oklch(0.208 0.042 265.755);
+      --primary-foreground: oklch(0.984 0.003 247.858);
+      --secondary: oklch(0.968 0.007 247.896);
+      --secondary-foreground: oklch(0.208 0.042 265.755);
+      --muted: oklch(0.968 0.007 247.896);
+      --muted-foreground: oklch(0.554 0.046 257.417);
+      --accent: oklch(0.968 0.007 247.896);
+      --accent-foreground: oklch(0.208 0.042 265.755);
+      --destructive: oklch(0.577 0.245 27.325);
+      --border: oklch(0.929 0.013 255.508);
+      --input: oklch(0.929 0.013 255.508);
+      --ring: oklch(0.704 0.04 256.788);
+      --radius: 0.625rem;
+      
+      --status-active: oklch(0.6 0.2 145);
+      --status-thinking: oklch(0.6 0.2 250);
+      --status-waiting: oklch(0.75 0.15 85);
+      --status-paused: oklch(0.7 0.15 50);
+      --status-error: oklch(0.6 0.25 25);
+      --status-idle: oklch(0.6 0.02 260);
+      
+      --surface-attention: oklch(0.97 0.03 85);
+      --surface-success: oklch(0.97 0.03 145);
+      --surface-error: oklch(0.97 0.03 25);
+    }
+
+    .dark {
+      --background: oklch(0.129 0.042 264.695);
+      --foreground: oklch(0.984 0.003 247.858);
+      --card: oklch(0.17 0.035 265);
+      --card-foreground: oklch(0.984 0.003 247.858);
+      --primary: oklch(0.929 0.013 255.508);
+      --primary-foreground: oklch(0.208 0.042 265.755);
+      --secondary: oklch(0.279 0.041 260.031);
+      --secondary-foreground: oklch(0.984 0.003 247.858);
+      --muted: oklch(0.279 0.041 260.031);
+      --muted-foreground: oklch(0.704 0.04 256.788);
+      --accent: oklch(0.279 0.041 260.031);
+      --accent-foreground: oklch(0.984 0.003 247.858);
+      --destructive: oklch(0.704 0.191 22.216);
+      --border: oklch(1 0 0 / 10%);
+      --input: oklch(1 0 0 / 15%);
+      --ring: oklch(0.551 0.027 264.364);
+      
+      --status-active: oklch(0.65 0.2 145);
+      --status-thinking: oklch(0.65 0.2 250);
+      --status-waiting: oklch(0.7 0.15 85);
+      --status-paused: oklch(0.65 0.15 50);
+      --status-error: oklch(0.65 0.25 25);
+      --status-idle: oklch(0.5 0.02 260);
+      
+      --surface-attention: oklch(0.25 0.04 85);
+      --surface-success: oklch(0.25 0.04 145);
+      --surface-error: oklch(0.25 0.04 25);
+    }
+
+    body {
+      background: var(--background);
+      color: var(--foreground);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    .desktop-frame {
+      width: 1280px;
+      height: 800px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      background: var(--background);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: calc(var(--radius) - 2px);
+      font-weight: 500;
+      font-size: 0.875rem;
+      padding: 0.5rem 1rem;
+      height: 2.25rem;
+      cursor: pointer;
+      transition: all 150ms;
+      gap: 0.5rem;
+    }
+    
+    .btn-primary {
+      background: var(--primary);
+      color: var(--primary-foreground);
+      border: none;
+    }
+    
+    .btn-secondary {
+      background: var(--secondary);
+      color: var(--secondary-foreground);
+      border: none;
+    }
+    
+    .btn-destructive {
+      background: var(--destructive);
+      color: white;
+      border: none;
+    }
+    
+    .btn-outline {
+      background: var(--background);
+      color: var(--foreground);
+      border: 1px solid var(--input);
+    }
+    
+    .btn-ghost {
+      background: transparent;
+      color: var(--foreground);
+      border: none;
+    }
+
+    .input-field {
+      background: var(--background);
+      border: 1px solid var(--input);
+      border-radius: calc(var(--radius) - 2px);
+      padding: 0.5rem 0.75rem;
+      font-size: 0.875rem;
+      color: var(--foreground);
+      width: 100%;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.125rem 0.625rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      border-radius: 9999px;
+      gap: 0.375rem;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+
+    .sidebar {
+      width: 240px;
+      border-right: 1px solid var(--border);
+      background: var(--card);
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.625rem 1rem;
+      border-radius: calc(var(--radius) - 2px);
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: background 150ms;
+    }
+
+    .nav-item:hover {
+      background: var(--accent);
+    }
+
+    .nav-item.active {
+      background: var(--accent);
+      font-weight: 500;
+    }
+
+    .section-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 1rem 0;
+    }
+
+    .tool-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .tool-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      background: var(--muted);
+      border-bottom: 1px solid var(--border);
+      font-size: 0.875rem;
+    }
+
+    .code-block {
+      background: oklch(0.15 0.02 260);
+      color: oklch(0.9 0 0);
+      font-family: ui-monospace, monospace;
+      font-size: 0.75rem;
+      padding: 0.75rem;
+      overflow-x: auto;
+    }
+
+    .tab {
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+    }
+
+    .tab.active {
+      border-bottom-color: var(--primary);
+      font-weight: 500;
+    }
+
+    .quick-action {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      border-radius: 9999px;
+      background: var(--muted);
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all 150ms;
+    }
+
+    .quick-action:hover {
+      background: var(--accent);
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .animate-bounce { animation: bounce 0.6s infinite; }
+    .animate-pulse { animation: pulse 2s infinite; }
+    .animate-spin { animation: spin 1s linear infinite; }
+
+    .page-section {
+      margin-bottom: 4rem;
+      padding-bottom: 2rem;
+      border-bottom: 2px solid var(--border);
+    }
+
+    .page-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .page-subtitle {
+      color: var(--muted-foreground);
+      margin-bottom: 2rem;
+    }
+  </style>
+</head>
+<body class="min-h-screen p-8">
+  <!-- Theme Toggle -->
+  <div class="fixed top-4 right-4 z-50 flex gap-2">
+    <button onclick="document.body.classList.toggle('dark')" class="btn btn-outline">
+      Toggle Dark Mode
+    </button>
+    <a href="mobile-mockups.html" class="btn btn-secondary">View Mobile →</a>
+  </div>
+
+  <div class="max-w-[1400px] mx-auto">
+    <!-- Header -->
+    <header class="text-center py-8 mb-8">
+      <h1 class="text-4xl font-bold mb-2">CodeOpen Desktop Mockups</h1>
+      <p style="color: var(--muted-foreground)">High-fidelity mockups for all desktop views and user journeys</p>
+    </header>
+
+    <!-- ==================== 1. SETUP / CONNECTION ==================== -->
+    <section class="page-section">
+      <h2 class="page-title">1. Setup / Connection Screen</h2>
+      <p class="page-subtitle">First-time user or reconnection flow</p>
+
+      <div class="desktop-frame mx-auto">
+        <div class="flex items-center justify-center h-full" style="background: var(--background);">
+          <div class="text-center max-w-md px-8">
+            <!-- Logo -->
+            <div class="w-16 h-16 mx-auto mb-6 rounded-2xl flex items-center justify-center" style="background: var(--primary);">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--primary-foreground)" stroke-width="2">
+                <polyline points="16 18 22 12 16 6"></polyline>
+                <polyline points="8 6 2 12 8 18"></polyline>
+              </svg>
+            </div>
+            
+            <h1 class="text-2xl font-bold mb-2">Welcome to CodeOpen</h1>
+            <p class="mb-8" style="color: var(--muted-foreground);">Connect to your OpenCode server to get started</p>
+            
+            <div class="text-left space-y-4">
+              <div>
+                <label class="text-sm font-medium block mb-1.5">API URL</label>
+                <input type="text" class="input-field" placeholder="https://your-server.com/api" value="https://opencode.example.com">
+              </div>
+              
+              <div class="p-3 rounded-lg text-sm" style="background: var(--muted);">
+                <div class="flex items-center gap-2 mb-1">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                  </svg>
+                  <span style="color: var(--muted-foreground);">Tip</span>
+                </div>
+                <p style="color: var(--muted-foreground);">The API URL should point to your deployed OpenCode container management API.</p>
+              </div>
+              
+              <button class="btn btn-primary w-full" style="height: 2.75rem;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M5 12h14M12 5l7 7-7 7"></path>
+                </svg>
+                Connect
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 2. INTENT-FIRST HOME ==================== -->
+    <section class="page-section">
+      <h2 class="page-title">2. Intent-First Home (Generative UI)</h2>
+      <p class="page-subtitle">"What's on your mind?" - The new home experience</p>
+
+      <div class="desktop-frame mx-auto">
+        <div class="flex h-full">
+          <!-- Sidebar -->
+          <div class="sidebar flex flex-col">
+            <div class="p-4">
+              <div class="flex items-center gap-2 mb-6">
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: var(--primary);">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary-foreground)" stroke-width="2">
+                    <polyline points="16 18 22 12 16 6"></polyline>
+                    <polyline points="8 6 2 12 8 18"></polyline>
+                  </svg>
+                </div>
+                <span class="font-semibold">CodeOpen</span>
+              </div>
+
+              <div class="space-y-1">
+                <div class="nav-item active">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                  </svg>
+                  Home
+                </div>
+                <div class="nav-item">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"></path>
+                  </svg>
+                  Projects
+                </div>
+                <div class="nav-item">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                  </svg>
+                  Activity
+                  <span class="ml-auto w-5 h-5 rounded-full text-xs flex items-center justify-center" style="background: var(--destructive); color: white;">3</span>
+                </div>
+              </div>
+
+              <div class="section-divider"></div>
+
+              <div class="text-xs font-medium mb-2" style="color: var(--muted-foreground);">RECENT PROJECTS</div>
+              <div class="space-y-1">
+                <div class="nav-item">
+                  <span class="status-dot" style="background: var(--status-active);"></span>
+                  frontend
+                </div>
+                <div class="nav-item">
+                  <span class="status-dot" style="background: var(--status-active);"></span>
+                  backend-api
+                </div>
+                <div class="nav-item">
+                  <span class="status-dot" style="background: var(--status-idle);"></span>
+                  docs
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-auto p-4 border-t" style="border-color: var(--border);">
+              <div class="nav-item">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="3"></circle>
+                  <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"></path>
+                </svg>
+                Settings
+              </div>
+            </div>
+          </div>
+
+          <!-- Main Content -->
+          <div class="flex-1 flex flex-col">
+            <!-- Attention Banner -->
+            <div class="px-6 py-3" style="background: var(--surface-attention); border-bottom: 1px solid var(--border);">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <span class="w-2 h-2 rounded-full" style="background: var(--status-waiting);"></span>
+                  <span class="text-sm font-medium">3 items need your attention</span>
+                </div>
+                <button class="text-sm font-medium" style="color: var(--primary);">View all →</button>
+              </div>
+            </div>
+
+            <!-- Intent Area -->
+            <div class="flex-1 flex flex-col items-center justify-center px-8">
+              <div class="text-center max-w-2xl">
+                <h1 class="text-3xl font-light mb-2" style="color: var(--muted-foreground);">What's on your mind?</h1>
+                <p class="text-sm mb-8" style="color: var(--muted-foreground);">Type what you want to do, or choose a quick action below</p>
+
+                <!-- Intent Input -->
+                <div class="relative mb-8">
+                  <input 
+                    type="text" 
+                    class="input-field text-lg py-4 px-6 pr-12" 
+                    placeholder="Show my projects, start a session, check what needs attention..."
+                    style="height: 3.5rem; border-radius: 9999px;"
+                  >
+                  <button class="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center" style="background: var(--primary);">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary-foreground)" stroke-width="2">
+                      <path d="M5 12h14M12 5l7 7-7 7"></path>
+                    </svg>
+                  </button>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="flex flex-wrap justify-center gap-3 mb-12">
+                  <button class="quick-action">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"></path>
+                    </svg>
+                    Show Projects
+                  </button>
+                  <button class="quick-action">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    New Session
+                  </button>
+                  <button class="quick-action" style="background: var(--surface-attention);">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="12" y1="8" x2="12" y2="12"></line>
+                      <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    Needs Attention
+                    <span class="w-5 h-5 rounded-full text-xs flex items-center justify-center" style="background: var(--status-error); color: white;">3</span>
+                  </button>
+                  <button class="quick-action">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                    </svg>
+                    Recent Activity
+                  </button>
+                </div>
+
+                <!-- Active Sessions -->
+                <div class="text-left">
+                  <h3 class="text-sm font-medium mb-3" style="color: var(--muted-foreground);">ACTIVE RIGHT NOW</h3>
+                  <div class="grid grid-cols-2 gap-4">
+                    <div class="card p-4">
+                      <div class="flex items-center gap-3 mb-2">
+                        <span class="status-dot animate-pulse" style="background: var(--status-thinking);"></span>
+                        <span class="font-medium">frontend</span>
+                      </div>
+                      <p class="text-sm mb-2" style="color: var(--muted-foreground);">Implementing auth flow...</p>
+                      <div class="h-1 rounded-full overflow-hidden" style="background: var(--border);">
+                        <div class="h-full rounded-full" style="width: 65%; background: var(--status-thinking);"></div>
+                      </div>
+                    </div>
+                    <div class="card p-4">
+                      <div class="flex items-center gap-3 mb-2">
+                        <span class="status-dot" style="background: var(--status-waiting);"></span>
+                        <span class="font-medium">backend-api</span>
+                      </div>
+                      <p class="text-sm mb-2" style="color: var(--muted-foreground);">Waiting for your input...</p>
+                      <button class="btn btn-outline w-full" style="height: 2rem; font-size: 0.75rem;">Resume</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 3. PROJECTS LIST ==================== -->
+    <section class="page-section">
+      <h2 class="page-title">3. Projects List</h2>
+      <p class="page-subtitle">Grid view of all projects with status and actions</p>
+
+      <div class="desktop-frame mx-auto">
+        <div class="flex h-full">
+          <!-- Sidebar (same as home) -->
+          <div class="sidebar flex flex-col">
+            <div class="p-4">
+              <div class="flex items-center gap-2 mb-6">
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: var(--primary);">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary-foreground)" stroke-width="2">
+                    <polyline points="16 18 22 12 16 6"></polyline>
+                    <polyline points="8 6 2 12 8 18"></polyline>
+                  </svg>
+                </div>
+                <span class="font-semibold">CodeOpen</span>
+              </div>
+
+              <div class="space-y-1">
+                <div class="nav-item">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                  </svg>
+                  Home
+                </div>
+                <div class="nav-item active">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"></path>
+                  </svg>
+                  Projects
+                </div>
+                <div class="nav-item">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                  </svg>
+                  Activity
+                </div>
+              </div>
+
+              <div class="section-divider"></div>
+
+              <div class="text-xs font-medium mb-2" style="color: var(--muted-foreground);">RECENT PROJECTS</div>
+              <div class="space-y-1">
+                <div class="nav-item">
+                  <span class="status-dot" style="background: var(--status-active);"></span>
+                  frontend
+                </div>
+                <div class="nav-item">
+                  <span class="status-dot" style="background: var(--status-active);"></span>
+                  backend-api
+                </div>
+                <div class="nav-item">
+                  <span class="status-dot" style="background: var(--status-idle);"></span>
+                  docs
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-auto p-4 border-t" style="border-color: var(--border);">
+              <div class="nav-item">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="3"></circle>
+                  <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"></path>
+                </svg>
+                Settings
+              </div>
+            </div>
+          </div>
+
+          <!-- Main Content -->
+          <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Header -->
+            <div class="px-6 py-4 border-b flex items-center justify-between" style="border-color: var(--border);">
+              <div>
+                <h1 class="text-xl font-semibold">Projects</h1>
+                <p class="text-sm" style="color: var(--muted-foreground);">Manage your OpenCode containers</p>
+              </div>
+              <div class="flex items-center gap-3">
+                <div class="relative">
+                  <svg class="absolute left-3 top-1/2 -translate-y-1/2" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                  <input type="text" class="input-field pl-9" placeholder="Search projects..." style="width: 240px;">
+                </div>
+                <button class="btn btn-primary">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                  New Project
+                </button>
+              </div>
+            </div>
+
+            <!-- Projects Grid -->
+            <div class="flex-1 p-6 overflow-auto">
+              <div class="grid grid-cols-3 gap-4">
+                <!-- Project Card 1 - Running with session -->
+                <div class="card p-4 hover:shadow-md transition-shadow">
+                  <div class="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 class="font-semibold">frontend</h3>
+                      <p class="text-sm" style="color: var(--muted-foreground);">React web application</p>
+                    </div>
+                    <span class="badge" style="background: var(--status-active); color: white;">
+                      <span class="status-dot" style="background: white;"></span>
+                      Running
+                    </span>
+                  </div>
+                  <div class="mb-4">
+                    <div class="flex items-center gap-2 text-sm" style="color: var(--muted-foreground);">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"></path>
+                      </svg>
+                      3 active sessions
+                    </div>
+                    <div class="flex items-center gap-2 text-sm mt-1" style="color: var(--muted-foreground);">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                      </svg>
+                      Active 2 minutes ago
+                    </div>
+                  </div>
+                  <div class="flex gap-2">
+                    <button class="btn btn-primary flex-1">Open</button>
+                    <button class="btn btn-ghost" style="width: 2.25rem; padding: 0;">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="6" y="4" width="4" height="16"></rect>
+                        <rect x="14" y="4" width="4" height="16"></rect>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Project Card 2 - Running, thinking -->
+                <div class="card p-4 hover:shadow-md transition-shadow">
+                  <div class="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 class="font-semibold">backend-api</h3>
+                      <p class="text-sm" style="color: var(--muted-foreground);">Node.js REST API</p>
+                    </div>
+                    <span class="badge" style="background: var(--status-thinking); color: white;">
+                      <span class="status-dot animate-pulse" style="background: white;"></span>
+                      Thinking
+                    </span>
+                  </div>
+                  <div class="mb-4">
+                    <div class="flex items-center gap-2 text-sm" style="color: var(--muted-foreground);">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"></path>
+                      </svg>
+                      1 active session
+                    </div>
+                    <p class="text-xs mt-2" style="color: var(--muted-foreground);">Working on: Database migrations</p>
+                  </div>
+                  <div class="flex gap-2">
+                    <button class="btn btn-primary flex-1">Open</button>
+                    <button class="btn btn-ghost" style="width: 2.25rem; padding: 0;">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="6" y="4" width="4" height="16"></rect>
+                        <rect x="14" y="4" width="4" height="16"></rect>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Project Card 3 - Needs attention -->
+                <div class="card p-4 hover:shadow-md transition-shadow" style="border-left: 3px solid var(--status-waiting);">
+                  <div class="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 class="font-semibold">mobile-app</h3>
+                      <p class="text-sm" style="color: var(--muted-foreground);">React Native app</p>
+                    </div>
+                    <span class="badge" style="background: var(--status-waiting); color: black;">
+                      <span class="status-dot" style="background: black;"></span>
+                      Waiting
+                    </span>
+                  </div>
+                  <div class="mb-4 p-2 rounded" style="background: var(--surface-attention);">
+                    <p class="text-xs font-medium" style="color: var(--status-waiting);">⚠️ Permission required</p>
+                  </div>
+                  <div class="flex gap-2">
+                    <button class="btn btn-primary flex-1">Handle</button>
+                    <button class="btn btn-ghost" style="width: 2.25rem; padding: 0;">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="1"></circle>
+                        <circle cx="19" cy="12" r="1"></circle>
+                        <circle cx="5" cy="12" r="1"></circle>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Project Card 4 - Stopped -->
+                <div class="card p-4 hover:shadow-md transition-shadow">
+                  <div class="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 class="font-semibold">docs</h3>
+                      <p class="text-sm" style="color: var(--muted-foreground);">Documentation site</p>
+                    </div>
+                    <span class="badge" style="background: var(--secondary); color: var(--secondary-foreground);">
+                      <span class="status-dot" style="background: var(--status-idle);"></span>
+                      Stopped
+                    </span>
+                  </div>
+                  <div class="mb-4">
+                    <div class="flex items-center gap-2 text-sm" style="color: var(--muted-foreground);">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                      </svg>
+                      Last used 2 days ago
+                    </div>
+                  </div>
+                  <div class="flex gap-2">
+                    <button class="btn btn-outline flex-1">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                      </svg>
+                      Start
+                    </button>
+                    <button class="btn btn-ghost" style="width: 2.25rem; padding: 0;">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="1"></circle>
+                        <circle cx="19" cy="12" r="1"></circle>
+                        <circle cx="5" cy="12" r="1"></circle>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Project Card 5 - Error -->
+                <div class="card p-4 hover:shadow-md transition-shadow" style="border-left: 3px solid var(--status-error);">
+                  <div class="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 class="font-semibold">analytics</h3>
+                      <p class="text-sm" style="color: var(--muted-foreground);">Data pipeline</p>
+                    </div>
+                    <span class="badge" style="background: var(--status-error); color: white;">
+                      <span class="status-dot" style="background: white;"></span>
+                      Error
+                    </span>
+                  </div>
+                  <div class="mb-4 p-2 rounded" style="background: var(--surface-error);">
+                    <p class="text-xs" style="color: var(--status-error);">Build failed: npm install error</p>
+                  </div>
+                  <div class="flex gap-2">
+                    <button class="btn btn-destructive flex-1">View Error</button>
+                    <button class="btn btn-ghost" style="width: 2.25rem; padding: 0;">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- New Project Card -->
+                <div class="card p-4 border-dashed flex flex-col items-center justify-center cursor-pointer hover:bg-accent transition-colors" style="min-height: 180px;">
+                  <div class="w-12 h-12 rounded-full flex items-center justify-center mb-3" style="background: var(--muted);">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2">
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                  </div>
+                  <p class="font-medium">Create New Project</p>
+                  <p class="text-sm" style="color: var(--muted-foreground);">Add a new OpenCode container</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 4. PROJECT DETAIL WITH CHAT ==================== -->
+    <section class="page-section">
+      <h2 class="page-title">4. Project Detail - Chat Interface</h2>
+      <p class="page-subtitle">Main chat view with tool calls and session management</p>
+
+      <div class="desktop-frame mx-auto">
+        <div class="flex h-full">
+          <!-- Session Sidebar -->
+          <div class="w-64 border-r flex flex-col" style="border-color: var(--border); background: var(--card);">
+            <div class="p-4 border-b" style="border-color: var(--border);">
+              <div class="flex items-center gap-2 mb-1">
+                <button class="btn btn-ghost" style="width: 2rem; height: 2rem; padding: 0;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M15 18l-6-6 6-6"></path>
+                  </svg>
+                </button>
+                <h2 class="font-semibold">frontend</h2>
+                <span class="badge ml-auto" style="background: var(--status-active); color: white; font-size: 0.625rem; padding: 0.125rem 0.375rem;">Running</span>
+              </div>
+            </div>
+
+            <div class="p-3 border-b" style="border-color: var(--border);">
+              <button class="btn btn-primary w-full">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                New Session
+              </button>
+            </div>
+
+            <div class="flex-1 overflow-auto p-2">
+              <div class="text-xs font-medium px-2 py-1 mb-1" style="color: var(--muted-foreground);">SESSIONS</div>
+              
+              <!-- Active Session -->
+              <div class="p-3 rounded-lg mb-1" style="background: var(--accent);">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="status-dot animate-pulse" style="background: var(--status-thinking);"></span>
+                  <span class="text-sm font-medium truncate">Add authentication</span>
+                </div>
+                <p class="text-xs truncate" style="color: var(--muted-foreground);">Working on JWT implementation...</p>
+              </div>
+
+              <!-- Other Sessions -->
+              <div class="p-3 rounded-lg mb-1 cursor-pointer hover:bg-accent">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="status-dot" style="background: var(--status-active);"></span>
+                  <span class="text-sm font-medium truncate">Fix routing bug</span>
+                </div>
+                <p class="text-xs" style="color: var(--muted-foreground);">Completed · 1h ago</p>
+              </div>
+
+              <div class="p-3 rounded-lg mb-1 cursor-pointer hover:bg-accent">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="status-dot" style="background: var(--status-active);"></span>
+                  <span class="text-sm font-medium truncate">Setup project structure</span>
+                </div>
+                <p class="text-xs" style="color: var(--muted-foreground);">Completed · 3h ago</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Main Chat Area -->
+          <div class="flex-1 flex flex-col">
+            <!-- Chat Header / Tabs -->
+            <div class="px-4 border-b flex items-center justify-between" style="border-color: var(--border);">
+              <div class="flex">
+                <div class="tab active">Chat</div>
+                <div class="tab">Files</div>
+                <div class="tab">Logs</div>
+                <div class="tab">Settings</div>
+              </div>
+              <div class="flex items-center gap-2 py-2">
+                <select class="input-field" style="width: 180px; height: 2rem; font-size: 0.75rem;">
+                  <option>claude-sonnet-4</option>
+                  <option>claude-opus-4</option>
+                  <option>gpt-4o</option>
+                </select>
+                <button class="btn btn-ghost" style="width: 2rem; height: 2rem; padding: 0;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="1"></circle>
+                    <circle cx="19" cy="12" r="1"></circle>
+                    <circle cx="5" cy="12" r="1"></circle>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Messages Area -->
+            <div class="flex-1 overflow-auto p-6">
+              <!-- User Message -->
+              <div class="flex justify-end mb-6">
+                <div class="max-w-[70%] p-4 rounded-lg" style="background: var(--primary); color: var(--primary-foreground);">
+                  <p>Add user authentication with JWT tokens. Include login, logout, and protected route middleware.</p>
+                </div>
+              </div>
+
+              <!-- Assistant Message with Tool Calls -->
+              <div class="flex justify-start mb-6">
+                <div class="max-w-[80%]">
+                  <div class="p-4 rounded-lg mb-3" style="background: var(--muted);">
+                    <p class="mb-3">I'll implement JWT authentication for your application. Let me start by installing the required packages and setting up the auth infrastructure.</p>
+                  </div>
+
+                  <!-- Tool Call: bash -->
+                  <div class="tool-card mb-2">
+                    <div class="tool-header">
+                      <span class="status-dot" style="background: var(--status-active);"></span>
+                      <span class="font-medium font-mono">bash</span>
+                      <span class="text-xs" style="color: var(--muted-foreground);">completed</span>
+                      <button class="ml-auto text-xs" style="color: var(--muted-foreground);">▼</button>
+                    </div>
+                    <div class="code-block">
+                      <div style="color: var(--muted-foreground);">$ npm install jsonwebtoken bcryptjs</div>
+                      <div class="mt-2">added 23 packages in 2.4s</div>
+                    </div>
+                  </div>
+
+                  <!-- Tool Call: edit -->
+                  <div class="tool-card mb-2">
+                    <div class="tool-header">
+                      <span class="status-dot" style="background: var(--status-active);"></span>
+                      <span class="font-medium font-mono">edit</span>
+                      <span class="text-xs" style="color: var(--muted-foreground);">src/middleware/auth.ts</span>
+                      <button class="ml-auto text-xs" style="color: var(--muted-foreground);">▼</button>
+                    </div>
+                    <div class="p-3" style="background: var(--background);">
+                      <div class="flex items-center gap-4 text-xs mb-2">
+                        <span style="color: var(--status-active);">+24 lines</span>
+                        <span style="color: var(--status-error);">-0 lines</span>
+                      </div>
+                      <div class="code-block text-xs" style="max-height: 120px; overflow-y: auto;">
+<pre>import jwt from 'jsonwebtoken';
+import { Request, Response, NextFunction } from 'express';
+
+export const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  
+  if (!token) {
+    return res.status(401).json({ error: 'No token provided' });
+  }
+  
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+};</pre>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Tool Call: Running -->
+                  <div class="tool-card mb-2">
+                    <div class="tool-header">
+                      <span class="status-dot animate-pulse" style="background: var(--status-thinking);"></span>
+                      <span class="font-medium font-mono">edit</span>
+                      <span class="text-xs" style="color: var(--muted-foreground);">src/routes/auth.ts</span>
+                      <span class="ml-auto text-xs" style="color: var(--status-thinking);">running...</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Thinking Indicator -->
+              <div class="flex justify-start mb-6">
+                <div class="p-4 rounded-lg" style="background: var(--muted);">
+                  <div class="flex items-center gap-3">
+                    <div class="flex gap-1">
+                      <span class="w-2 h-2 rounded-full animate-bounce" style="background: var(--status-thinking); animation-delay: 0ms;"></span>
+                      <span class="w-2 h-2 rounded-full animate-bounce" style="background: var(--status-thinking); animation-delay: 150ms;"></span>
+                      <span class="w-2 h-2 rounded-full animate-bounce" style="background: var(--status-thinking); animation-delay: 300ms;"></span>
+                    </div>
+                    <span class="text-sm" style="color: var(--muted-foreground);">Creating login and logout endpoints...</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Permission Bar -->
+            <div class="px-4 py-3" style="background: var(--surface-attention); border-top: 1px solid var(--border);">
+              <div class="flex items-center gap-4">
+                <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: var(--status-waiting);">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                  </svg>
+                </div>
+                <div class="flex-1">
+                  <p class="font-medium text-sm">Permission Required</p>
+                  <p class="text-sm" style="color: var(--muted-foreground);">AI wants to edit <code class="px-1 py-0.5 rounded" style="background: var(--muted); font-size: 0.75rem;">src/routes/auth.ts</code></p>
+                </div>
+                <div class="flex gap-2">
+                  <button class="btn btn-outline">Reject</button>
+                  <button class="btn btn-secondary">Always Allow</button>
+                  <button class="btn btn-primary">Allow Once</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="p-4 border-t" style="border-color: var(--border);">
+              <div class="flex gap-3">
+                <div class="flex-1 relative">
+                  <textarea 
+                    class="input-field resize-none pr-24" 
+                    rows="2" 
+                    placeholder="Type a message... (/ for commands, @ for files)"
+                    style="padding-top: 0.75rem; padding-bottom: 0.75rem;"
+                  ></textarea>
+                  <div class="absolute right-3 bottom-3 flex gap-1">
+                    <button class="btn btn-ghost" style="width: 2rem; height: 2rem; padding: 0;" title="Attach file">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"></path>
+                      </svg>
+                    </button>
+                    <button class="btn btn-ghost" style="width: 2rem; height: 2rem; padding: 0; color: var(--destructive);" title="Cancel">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <button class="btn btn-primary self-end" style="height: 2.75rem;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                  </svg>
+                  Send
+                </button>
+              </div>
+              <p class="text-xs mt-2" style="color: var(--muted-foreground);">
+                Press <kbd class="px-1 py-0.5 rounded" style="background: var(--muted);">Enter</kbd> to send, 
+                <kbd class="px-1 py-0.5 rounded" style="background: var(--muted);">Shift+Enter</kbd> for new line · 
+                <kbd class="px-1 py-0.5 rounded" style="background: var(--muted);">/</kbd> commands · 
+                <kbd class="px-1 py-0.5 rounded" style="background: var(--muted);">@</kbd> files
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 5. FILES TAB ==================== -->
+    <section class="page-section">
+      <h2 class="page-title">5. Project Detail - Files Browser</h2>
+      <p class="page-subtitle">File tree with code preview</p>
+
+      <div class="desktop-frame mx-auto">
+        <div class="flex h-full">
+          <!-- Same session sidebar structure -->
+          <div class="w-64 border-r flex flex-col" style="border-color: var(--border); background: var(--card);">
+            <div class="p-4 border-b" style="border-color: var(--border);">
+              <div class="flex items-center gap-2 mb-1">
+                <button class="btn btn-ghost" style="width: 2rem; height: 2rem; padding: 0;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M15 18l-6-6 6-6"></path>
+                  </svg>
+                </button>
+                <h2 class="font-semibold">frontend</h2>
+                <span class="badge ml-auto" style="background: var(--status-active); color: white; font-size: 0.625rem; padding: 0.125rem 0.375rem;">Running</span>
+              </div>
+            </div>
+
+            <!-- File Tree -->
+            <div class="flex-1 overflow-auto p-2">
+              <div class="text-xs font-medium px-2 py-1 mb-1" style="color: var(--muted-foreground);">FILES</div>
+              
+              <!-- Search -->
+              <div class="relative mb-2 px-1">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" class="input-field pl-8 text-xs" placeholder="Search files..." style="height: 2rem;">
+              </div>
+
+              <!-- Tree -->
+              <div class="text-sm">
+                <div class="px-2 py-1 flex items-center gap-2 cursor-pointer hover:bg-accent rounded">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--status-waiting)" stroke="var(--status-waiting)" stroke-width="2">
+                    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"></path>
+                  </svg>
+                  <span>src</span>
+                </div>
+                <div class="pl-4">
+                  <div class="px-2 py-1 flex items-center gap-2 cursor-pointer hover:bg-accent rounded">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--status-waiting)" stroke="var(--status-waiting)" stroke-width="2">
+                      <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"></path>
+                    </svg>
+                    <span>components</span>
+                  </div>
+                  <div class="px-2 py-1 flex items-center gap-2 cursor-pointer hover:bg-accent rounded">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--status-waiting)" stroke="var(--status-waiting)" stroke-width="2">
+                      <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"></path>
+                    </svg>
+                    <span>middleware</span>
+                  </div>
+                  <div class="pl-4">
+                    <div class="px-2 py-1 flex items-center gap-2 cursor-pointer rounded" style="background: var(--accent);">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--status-thinking)" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                      </svg>
+                      <span>auth.ts</span>
+                    </div>
+                  </div>
+                  <div class="px-2 py-1 flex items-center gap-2 cursor-pointer hover:bg-accent rounded">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--status-waiting)" stroke="var(--status-waiting)" stroke-width="2">
+                      <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"></path>
+                    </svg>
+                    <span>routes</span>
+                  </div>
+                  <div class="px-2 py-1 flex items-center gap-2 cursor-pointer hover:bg-accent rounded">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2">
+                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                    </svg>
+                    <span>App.tsx</span>
+                  </div>
+                  <div class="px-2 py-1 flex items-center gap-2 cursor-pointer hover:bg-accent rounded">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2">
+                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                    </svg>
+                    <span>index.ts</span>
+                  </div>
+                </div>
+                <div class="px-2 py-1 flex items-center gap-2 cursor-pointer hover:bg-accent rounded">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                  </svg>
+                  <span>package.json</span>
+                </div>
+                <div class="px-2 py-1 flex items-center gap-2 cursor-pointer hover:bg-accent rounded">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                  </svg>
+                  <span>tsconfig.json</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Main Content -->
+          <div class="flex-1 flex flex-col">
+            <!-- Tabs -->
+            <div class="px-4 border-b flex items-center" style="border-color: var(--border);">
+              <div class="flex">
+                <div class="tab">Chat</div>
+                <div class="tab active">Files</div>
+                <div class="tab">Logs</div>
+                <div class="tab">Settings</div>
+              </div>
+            </div>
+
+            <!-- File Viewer -->
+            <div class="flex-1 flex flex-col overflow-hidden">
+              <!-- File Header -->
+              <div class="px-4 py-2 border-b flex items-center justify-between" style="border-color: var(--border); background: var(--muted);">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-mono">src/middleware/auth.ts</span>
+                  <span class="badge" style="background: var(--surface-success); color: var(--status-active); font-size: 0.625rem;">Modified</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button class="btn btn-ghost" style="height: 1.75rem; font-size: 0.75rem; padding: 0 0.5rem;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                      <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+                    </svg>
+                    Copy
+                  </button>
+                  <button class="btn btn-outline" style="height: 1.75rem; font-size: 0.75rem; padding: 0 0.5rem;">
+                    Ask about this file
+                  </button>
+                </div>
+              </div>
+
+              <!-- Code Content -->
+              <div class="flex-1 overflow-auto">
+                <div class="code-block h-full" style="background: oklch(0.13 0.02 260);">
+                  <pre style="font-size: 0.8125rem; line-height: 1.6;"><code><span style="color: #7c7c7c;"> 1</span>  <span style="color: #c586c0;">import</span> <span style="color: #9cdcfe;">jwt</span> <span style="color: #c586c0;">from</span> <span style="color: #ce9178;">'jsonwebtoken'</span>;
+<span style="color: #7c7c7c;"> 2</span>  <span style="color: #c586c0;">import</span> { <span style="color: #9cdcfe;">Request</span>, <span style="color: #9cdcfe;">Response</span>, <span style="color: #9cdcfe;">NextFunction</span> } <span style="color: #c586c0;">from</span> <span style="color: #ce9178;">'express'</span>;
+<span style="color: #7c7c7c;"> 3</span>
+<span style="color: #7c7c7c;"> 4</span>  <span style="color: #c586c0;">interface</span> <span style="color: #4ec9b0;">AuthRequest</span> <span style="color: #c586c0;">extends</span> <span style="color: #4ec9b0;">Request</span> {
+<span style="color: #7c7c7c;"> 5</span>    <span style="color: #9cdcfe;">user</span>?: <span style="color: #4ec9b0;">any</span>;
+<span style="color: #7c7c7c;"> 6</span>  }
+<span style="color: #7c7c7c;"> 7</span>
+<span style="color: #7c7c7c;"> 8</span>  <span style="color: #c586c0;">export</span> <span style="color: #c586c0;">const</span> <span style="color: #dcdcaa;">authMiddleware</span> = (
+<span style="color: #7c7c7c;"> 9</span>    <span style="color: #9cdcfe;">req</span>: <span style="color: #4ec9b0;">AuthRequest</span>,
+<span style="color: #7c7c7c;">10</span>    <span style="color: #9cdcfe;">res</span>: <span style="color: #4ec9b0;">Response</span>,
+<span style="color: #7c7c7c;">11</span>    <span style="color: #9cdcfe;">next</span>: <span style="color: #4ec9b0;">NextFunction</span>
+<span style="color: #7c7c7c;">12</span>  ) => {
+<span style="color: #7c7c7c;">13</span>    <span style="color: #c586c0;">const</span> <span style="color: #9cdcfe;">token</span> = <span style="color: #9cdcfe;">req</span>.<span style="color: #9cdcfe;">headers</span>.<span style="color: #9cdcfe;">authorization</span>?.<span style="color: #dcdcaa;">split</span>(<span style="color: #ce9178;">' '</span>)[<span style="color: #b5cea8;">1</span>];
+<span style="color: #7c7c7c;">14</span>
+<span style="color: #7c7c7c;">15</span>    <span style="color: #c586c0;">if</span> (!<span style="color: #9cdcfe;">token</span>) {
+<span style="color: #7c7c7c;">16</span>      <span style="color: #c586c0;">return</span> <span style="color: #9cdcfe;">res</span>.<span style="color: #dcdcaa;">status</span>(<span style="color: #b5cea8;">401</span>).<span style="color: #dcdcaa;">json</span>({ <span style="color: #9cdcfe;">error</span>: <span style="color: #ce9178;">'No token provided'</span> });
+<span style="color: #7c7c7c;">17</span>    }
+<span style="color: #7c7c7c;">18</span>
+<span style="color: #7c7c7c;">19</span>    <span style="color: #c586c0;">try</span> {
+<span style="color: #7c7c7c;">20</span>      <span style="color: #c586c0;">const</span> <span style="color: #9cdcfe;">decoded</span> = <span style="color: #9cdcfe;">jwt</span>.<span style="color: #dcdcaa;">verify</span>(<span style="color: #9cdcfe;">token</span>, <span style="color: #9cdcfe;">process</span>.<span style="color: #9cdcfe;">env</span>.<span style="color: #9cdcfe;">JWT_SECRET</span>!);
+<span style="color: #7c7c7c;">21</span>      <span style="color: #9cdcfe;">req</span>.<span style="color: #9cdcfe;">user</span> = <span style="color: #9cdcfe;">decoded</span>;
+<span style="color: #7c7c7c;">22</span>      <span style="color: #dcdcaa;">next</span>();
+<span style="color: #7c7c7c;">23</span>    } <span style="color: #c586c0;">catch</span> (<span style="color: #9cdcfe;">error</span>) {
+<span style="color: #7c7c7c;">24</span>      <span style="color: #c586c0;">return</span> <span style="color: #9cdcfe;">res</span>.<span style="color: #dcdcaa;">status</span>(<span style="color: #b5cea8;">401</span>).<span style="color: #dcdcaa;">json</span>({ <span style="color: #9cdcfe;">error</span>: <span style="color: #ce9178;">'Invalid token'</span> });
+<span style="color: #7c7c7c;">25</span>    }
+<span style="color: #7c7c7c;">26</span>  };</code></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 6. ACTIVITY FEED ==================== -->
+    <section class="page-section">
+      <h2 class="page-title">6. Activity Feed</h2>
+      <p class="page-subtitle">Timeline of all actions across projects</p>
+
+      <div class="desktop-frame mx-auto">
+        <div class="flex h-full">
+          <!-- Sidebar -->
+          <div class="sidebar flex flex-col">
+            <div class="p-4">
+              <div class="flex items-center gap-2 mb-6">
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: var(--primary);">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary-foreground)" stroke-width="2">
+                    <polyline points="16 18 22 12 16 6"></polyline>
+                    <polyline points="8 6 2 12 8 18"></polyline>
+                  </svg>
+                </div>
+                <span class="font-semibold">CodeOpen</span>
+              </div>
+
+              <div class="space-y-1">
+                <div class="nav-item">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                  </svg>
+                  Home
+                </div>
+                <div class="nav-item">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"></path>
+                  </svg>
+                  Projects
+                </div>
+                <div class="nav-item active">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                  </svg>
+                  Activity
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-auto p-4 border-t" style="border-color: var(--border);">
+              <div class="nav-item">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="3"></circle>
+                  <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"></path>
+                </svg>
+                Settings
+              </div>
+            </div>
+          </div>
+
+          <!-- Main Content -->
+          <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Header -->
+            <div class="px-6 py-4 border-b flex items-center justify-between" style="border-color: var(--border);">
+              <div>
+                <h1 class="text-xl font-semibold">Activity</h1>
+                <p class="text-sm" style="color: var(--muted-foreground);">Recent actions across all projects</p>
+              </div>
+              <div class="flex items-center gap-3">
+                <select class="input-field" style="width: 140px;">
+                  <option>All Projects</option>
+                  <option>frontend</option>
+                  <option>backend-api</option>
+                  <option>docs</option>
+                </select>
+                <select class="input-field" style="width: 140px;">
+                  <option>All Types</option>
+                  <option>AI Actions</option>
+                  <option>Permissions</option>
+                  <option>System</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Activity List -->
+            <div class="flex-1 overflow-auto p-6">
+              <!-- Today -->
+              <div class="mb-8">
+                <h3 class="text-sm font-semibold mb-4" style="color: var(--muted-foreground);">TODAY</h3>
+                
+                <div class="space-y-4">
+                  <!-- Activity Item -->
+                  <div class="flex gap-4">
+                    <div class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style="background: var(--status-thinking);">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                        <polyline points="16 18 22 12 16 6"></polyline>
+                        <polyline points="8 6 2 12 8 18"></polyline>
+                      </svg>
+                    </div>
+                    <div class="flex-1">
+                      <div class="flex items-center justify-between mb-1">
+                        <div class="flex items-center gap-2">
+                          <span class="font-medium">frontend</span>
+                          <span class="text-sm" style="color: var(--muted-foreground);">· Edited 3 files</span>
+                        </div>
+                        <span class="text-sm" style="color: var(--muted-foreground);">2 minutes ago</span>
+                      </div>
+                      <p class="text-sm" style="color: var(--muted-foreground);">Added JWT authentication middleware</p>
+                      <div class="flex gap-2 mt-2">
+                        <span class="badge" style="background: var(--muted);">src/middleware/auth.ts</span>
+                        <span class="badge" style="background: var(--muted);">src/routes/auth.ts</span>
+                        <span class="badge" style="background: var(--muted);">+1 more</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Permission Activity -->
+                  <div class="flex gap-4">
+                    <div class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style="background: var(--status-waiting);">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                      </svg>
+                    </div>
+                    <div class="flex-1">
+                      <div class="flex items-center justify-between mb-1">
+                        <div class="flex items-center gap-2">
+                          <span class="font-medium">backend-api</span>
+                          <span class="text-sm" style="color: var(--muted-foreground);">· Permission granted</span>
+                        </div>
+                        <span class="text-sm" style="color: var(--muted-foreground);">15 minutes ago</span>
+                      </div>
+                      <p class="text-sm" style="color: var(--muted-foreground);">Allowed edit to database schema</p>
+                    </div>
+                  </div>
+
+                  <!-- Error Activity -->
+                  <div class="flex gap-4">
+                    <div class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style="background: var(--status-error);">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="15" y1="9" x2="9" y2="15"></line>
+                        <line x1="9" y1="9" x2="15" y2="15"></line>
+                      </svg>
+                    </div>
+                    <div class="flex-1">
+                      <div class="flex items-center justify-between mb-1">
+                        <div class="flex items-center gap-2">
+                          <span class="font-medium">analytics</span>
+                          <span class="text-sm" style="color: var(--status-error);">· Build failed</span>
+                        </div>
+                        <span class="text-sm" style="color: var(--muted-foreground);">1 hour ago</span>
+                      </div>
+                      <p class="text-sm" style="color: var(--muted-foreground);">npm install failed: ENOENT</p>
+                      <button class="btn btn-outline mt-2" style="height: 1.75rem; font-size: 0.75rem;">View Details</button>
+                    </div>
+                  </div>
+
+                  <!-- Completed Session -->
+                  <div class="flex gap-4">
+                    <div class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style="background: var(--status-active);">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                      </svg>
+                    </div>
+                    <div class="flex-1">
+                      <div class="flex items-center justify-between mb-1">
+                        <div class="flex items-center gap-2">
+                          <span class="font-medium">frontend</span>
+                          <span class="text-sm" style="color: var(--muted-foreground);">· Session completed</span>
+                        </div>
+                        <span class="text-sm" style="color: var(--muted-foreground);">2 hours ago</span>
+                      </div>
+                      <p class="text-sm" style="color: var(--muted-foreground);">"Fix routing bug" - 8 messages, 5 files changed</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Yesterday -->
+              <div>
+                <h3 class="text-sm font-semibold mb-4" style="color: var(--muted-foreground);">YESTERDAY</h3>
+                
+                <div class="space-y-4">
+                  <div class="flex gap-4">
+                    <div class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style="background: var(--status-active);">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                        <path d="M22 11.08V12a10 10 0 11-5.93-9.14"></path>
+                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                      </svg>
+                    </div>
+                    <div class="flex-1">
+                      <div class="flex items-center justify-between mb-1">
+                        <div class="flex items-center gap-2">
+                          <span class="font-medium">backend-api</span>
+                          <span class="text-sm" style="color: var(--muted-foreground);">· Deployed to production</span>
+                        </div>
+                        <span class="text-sm" style="color: var(--muted-foreground);">23 hours ago</span>
+                      </div>
+                      <p class="text-sm" style="color: var(--muted-foreground);">v1.2.0 deployed successfully</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 7. SETTINGS ==================== -->
+    <section class="page-section">
+      <h2 class="page-title">7. Settings</h2>
+      <p class="page-subtitle">App configuration and preferences</p>
+
+      <div class="desktop-frame mx-auto">
+        <div class="flex h-full">
+          <!-- Sidebar -->
+          <div class="sidebar flex flex-col">
+            <div class="p-4">
+              <div class="flex items-center gap-2 mb-6">
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: var(--primary);">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary-foreground)" stroke-width="2">
+                    <polyline points="16 18 22 12 16 6"></polyline>
+                    <polyline points="8 6 2 12 8 18"></polyline>
+                  </svg>
+                </div>
+                <span class="font-semibold">CodeOpen</span>
+              </div>
+
+              <div class="space-y-1">
+                <div class="nav-item">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                  </svg>
+                  Home
+                </div>
+                <div class="nav-item">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"></path>
+                  </svg>
+                  Projects
+                </div>
+                <div class="nav-item">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                  </svg>
+                  Activity
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-auto p-4 border-t" style="border-color: var(--border);">
+              <div class="nav-item active">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="12" cy="12" r="3"></circle>
+                  <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"></path>
+                </svg>
+                Settings
+              </div>
+            </div>
+          </div>
+
+          <!-- Main Content -->
+          <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Header -->
+            <div class="px-6 py-4 border-b" style="border-color: var(--border);">
+              <h1 class="text-xl font-semibold">Settings</h1>
+              <p class="text-sm" style="color: var(--muted-foreground);">Manage your app preferences</p>
+            </div>
+
+            <!-- Settings Content -->
+            <div class="flex-1 overflow-auto">
+              <div class="max-w-2xl mx-auto p-6 space-y-8">
+                <!-- Connection -->
+                <div class="card p-6">
+                  <h3 class="font-semibold mb-1">Connection</h3>
+                  <p class="text-sm mb-4" style="color: var(--muted-foreground);">API server configuration</p>
+                  
+                  <div class="space-y-4">
+                    <div>
+                      <label class="text-sm font-medium block mb-1.5">API URL</label>
+                      <div class="flex gap-2">
+                        <input type="text" class="input-field flex-1" value="https://opencode.example.com">
+                        <button class="btn btn-outline">Test</button>
+                      </div>
+                    </div>
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <p class="text-sm font-medium">Connection Status</p>
+                        <p class="text-sm" style="color: var(--muted-foreground);">Last checked 2 minutes ago</p>
+                      </div>
+                      <span class="badge" style="background: var(--status-active); color: white;">Connected</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Default Model -->
+                <div class="card p-6">
+                  <h3 class="font-semibold mb-1">Default Model</h3>
+                  <p class="text-sm mb-4" style="color: var(--muted-foreground);">Choose your preferred AI model</p>
+                  
+                  <div class="space-y-4">
+                    <div>
+                      <label class="text-sm font-medium block mb-1.5">Provider</label>
+                      <select class="input-field">
+                        <option>Anthropic</option>
+                        <option>OpenAI</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="text-sm font-medium block mb-1.5">Model</label>
+                      <select class="input-field">
+                        <option>claude-sonnet-4</option>
+                        <option>claude-opus-4</option>
+                        <option>claude-haiku</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Appearance -->
+                <div class="card p-6">
+                  <h3 class="font-semibold mb-1">Appearance</h3>
+                  <p class="text-sm mb-4" style="color: var(--muted-foreground);">Customize the look and feel</p>
+                  
+                  <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <p class="text-sm font-medium">Theme</p>
+                        <p class="text-sm" style="color: var(--muted-foreground);">Choose light or dark mode</p>
+                      </div>
+                      <select class="input-field" style="width: 140px;">
+                        <option>System</option>
+                        <option>Light</option>
+                        <option>Dark</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- About -->
+                <div class="card p-6">
+                  <h3 class="font-semibold mb-1">About</h3>
+                  <p class="text-sm mb-4" style="color: var(--muted-foreground);">App information</p>
+                  
+                  <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                      <span style="color: var(--muted-foreground);">Version</span>
+                      <span>1.0.0</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span style="color: var(--muted-foreground);">Built with</span>
+                      <span>Tauri + SvelteKit</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="text-center py-8" style="color: var(--muted-foreground);">
+      <p>CodeOpen Desktop Mockups · December 2024</p>
+      <p class="text-sm mt-2">Toggle dark mode using the button in the top right corner</p>
+    </footer>
+  </div>
+</body>
+</html>

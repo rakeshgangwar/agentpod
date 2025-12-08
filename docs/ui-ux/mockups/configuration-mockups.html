@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeOpen - Configuration & Onboarding Mockups</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --status-active: oklch(0.7 0.15 145);
+      --status-thinking: oklch(0.75 0.15 85);
+      --status-waiting: oklch(0.7 0.15 250);
+      --status-error: oklch(0.65 0.2 25);
+      --status-idle: oklch(0.6 0.02 250);
+      --surface-attention: oklch(0.95 0.05 85);
+      --surface-success: oklch(0.95 0.05 145);
+      --surface-error: oklch(0.95 0.05 25);
+    }
+    .dark {
+      --bg: #09090b;
+      --card: #18181b;
+      --border: #27272a;
+      --text: #fafafa;
+      --muted: #a1a1aa;
+    }
+    .light {
+      --bg: #ffffff;
+      --card: #f4f4f5;
+      --border: #e4e4e7;
+      --text: #09090b;
+      --muted: #71717a;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+    }
+    .text-muted {
+      color: var(--muted);
+    }
+    .border-color {
+      border-color: var(--border);
+    }
+    .mockup-frame {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .mockup-header {
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .tier-card {
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tier-card.selected {
+      border-color: var(--status-active);
+      background: color-mix(in oklch, var(--status-active) 10%, transparent);
+    }
+    .tier-card:hover:not(.selected) {
+      border-color: var(--muted);
+    }
+    .provider-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .permission-row {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .radio-group {
+      display: flex;
+      gap: 16px;
+    }
+    .radio-option {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    .radio-dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid var(--muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .radio-dot.selected {
+      border-color: var(--status-active);
+    }
+    .radio-dot.selected::after {
+      content: '';
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--status-active);
+    }
+    .chat-bubble {
+      max-width: 85%;
+      padding: 12px 16px;
+      border-radius: 12px;
+      margin-bottom: 12px;
+    }
+    .chat-bubble.assistant {
+      background: var(--card);
+      border: 1px solid var(--border);
+      align-self: flex-start;
+    }
+    .chat-bubble.user {
+      background: var(--status-waiting);
+      color: white;
+      align-self: flex-end;
+      margin-left: auto;
+    }
+    .quick-option {
+      display: inline-block;
+      padding: 8px 16px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      margin: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .quick-option:hover {
+      background: var(--card);
+    }
+    .progress-step {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 0;
+    }
+    .step-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+    .step-icon.completed {
+      background: var(--status-active);
+      color: white;
+    }
+    .step-icon.running {
+      background: var(--status-thinking);
+      color: white;
+      animation: pulse 1.5s infinite;
+    }
+    .step-icon.pending {
+      background: var(--border);
+      color: var(--muted);
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .nav-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-tab {
+      padding: 12px 20px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      color: var(--muted);
+    }
+    .nav-tab.active {
+      color: var(--text);
+      border-bottom-color: var(--status-active);
+    }
+  </style>
+</head>
+<body class="dark p-8">
+  <!-- Theme Toggle -->
+  <div class="fixed top-4 right-4 z-50">
+    <button onclick="toggleTheme()" class="card px-4 py-2 rounded-lg text-sm">
+      Toggle Theme
+    </button>
+  </div>
+
+  <div class="max-w-6xl mx-auto space-y-12">
+    <header class="text-center mb-12">
+      <h1 class="text-3xl font-bold mb-2">Configuration & Onboarding Mockups</h1>
+      <p class="text-muted">CodeOpen - December 2024</p>
+    </header>
+
+    <!-- Section: Container Tier Selector -->
+    <section>
+      <h2 class="text-xl font-semibold mb-4">1. Container Tier Selector</h2>
+      <div class="mockup-frame p-6">
+        <h3 class="font-medium mb-4">Select Container Tier</h3>
+        <div class="grid grid-cols-3 gap-4 mb-4">
+          <!-- Lite -->
+          <div class="tier-card">
+            <div class="flex items-center gap-2 mb-2">
+              <div class="radio-dot"></div>
+              <span class="font-medium">Lite</span>
+            </div>
+            <div class="text-sm text-muted mb-2">1 CPU • 2GB • 20GB</div>
+            <div class="text-xs text-muted">Basic tasks, small repos</div>
+          </div>
+          <!-- Standard (Selected) -->
+          <div class="tier-card selected">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-2">
+                <div class="radio-dot selected"></div>
+                <span class="font-medium">Standard</span>
+              </div>
+              <span class="text-xs px-2 py-1 rounded" style="background: var(--status-active); color: white;">RECOMMENDED</span>
+            </div>
+            <div class="text-sm text-muted mb-2">2 CPU • 4GB • 30GB</div>
+            <div class="text-xs text-muted">Most projects, web dev</div>
+          </div>
+          <!-- Pro -->
+          <div class="tier-card">
+            <div class="flex items-center gap-2 mb-2">
+              <div class="radio-dot"></div>
+              <span class="font-medium">Pro</span>
+            </div>
+            <div class="text-sm text-muted mb-2">4 CPU • 8GB • 50GB</div>
+            <div class="text-xs text-muted">Large codebases, ML, building</div>
+          </div>
+        </div>
+        <!-- Desktop (Full Width) -->
+        <div class="tier-card">
+          <div class="flex items-center gap-2 mb-2">
+            <div class="radio-dot"></div>
+            <span class="font-medium">Desktop</span>
+          </div>
+          <div class="text-sm text-muted mb-1">8 CPU • 16GB • 75GB Storage</div>
+          <div class="text-xs text-muted">Full desktop with VNC • Browser testing • GUI apps</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section: LLM Provider Config -->
+    <section>
+      <h2 class="text-xl font-semibold mb-4">2. LLM Provider Configuration</h2>
+      <div class="mockup-frame">
+        <div class="mockup-header justify-between">
+          <span class="font-medium">LLM Providers</span>
+          <button class="px-3 py-1 rounded text-sm" style="background: var(--status-active); color: white;">+ Add</button>
+        </div>
+        <div class="p-4 space-y-3">
+          <!-- Anthropic (Configured, Default) -->
+          <div class="provider-card">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center text-orange-600 font-bold">A</div>
+                <div>
+                  <div class="font-medium">Anthropic</div>
+                  <div class="text-xs text-muted">Claude 3.5 Sonnet, Claude 3 Opus</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs px-2 py-1 rounded" style="background: var(--surface-success); color: var(--status-active);">✓ CONFIGURED</span>
+                <span class="text-xs px-2 py-1 rounded border-color border">DEFAULT</span>
+                <button class="p-2 rounded hover:bg-zinc-700">⚙️</button>
+                <button class="p-2 rounded hover:bg-zinc-700">✕</button>
+              </div>
+            </div>
+          </div>
+          <!-- OpenAI (Configured) -->
+          <div class="provider-card">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center text-green-600 font-bold">O</div>
+                <div>
+                  <div class="font-medium">OpenAI</div>
+                  <div class="text-xs text-muted">GPT-4o, GPT-4 Turbo, o1</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs px-2 py-1 rounded" style="background: var(--surface-success); color: var(--status-active);">✓ CONFIGURED</span>
+                <button class="p-2 rounded hover:bg-zinc-700">⚙️</button>
+                <button class="p-2 rounded hover:bg-zinc-700">✕</button>
+              </div>
+            </div>
+          </div>
+          <!-- Google (Not Configured) -->
+          <div class="provider-card opacity-70">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 font-bold">G</div>
+                <div>
+                  <div class="font-medium">Google</div>
+                  <div class="text-xs text-muted">Gemini Pro, Gemini Ultra</div>
+                </div>
+              </div>
+              <button class="px-3 py-1 rounded border border-color text-sm">Configure</button>
+            </div>
+          </div>
+          <button class="text-sm text-muted hover:text-white">Show all providers...</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section: Configure Provider Modal -->
+    <section>
+      <h2 class="text-xl font-semibold mb-4">3. Configure Provider Modal</h2>
+      <div class="mockup-frame max-w-md mx-auto">
+        <div class="mockup-header justify-between">
+          <span class="font-medium">Configure Anthropic</span>
+          <button class="text-muted hover:text-white">✕</button>
+        </div>
+        <div class="p-6">
+          <div class="flex justify-center mb-6">
+            <div class="w-16 h-16 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600 font-bold text-2xl">A</div>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm mb-2">API Key</label>
+            <div class="flex items-center gap-2">
+              <input type="password" value="sk-ant-api03-xxxxxxxxxxxx" class="flex-1 px-3 py-2 rounded-lg bg-zinc-900 border border-color" />
+              <button class="p-2 rounded border border-color">👁</button>
+            </div>
+            <p class="text-xs text-muted mt-2">Get your API key from console.anthropic.com</p>
+          </div>
+          <label class="flex items-center gap-2 mb-6">
+            <input type="checkbox" checked class="rounded" />
+            <span class="text-sm">Set as default provider</span>
+          </label>
+          <div class="flex gap-3">
+            <button class="flex-1 px-4 py-2 rounded-lg border border-color">Cancel</button>
+            <button class="flex-1 px-4 py-2 rounded-lg" style="background: var(--status-active); color: white;">Save</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section: Model Selector -->
+    <section>
+      <h2 class="text-xl font-semibold mb-4">4. Model Selector</h2>
+      <div class="mockup-frame max-w-md p-6">
+        <h3 class="font-medium mb-4">Model</h3>
+        <div class="mb-4">
+          <label class="block text-sm text-muted mb-2">Provider</label>
+          <select class="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-color">
+            <option>Anthropic</option>
+            <option>OpenAI</option>
+          </select>
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm text-muted mb-2">Model</label>
+          <select class="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-color">
+            <option>claude-sonnet-4-5</option>
+            <option>claude-3-5-sonnet</option>
+            <option>claude-3-opus</option>
+          </select>
+          <p class="text-xs text-muted mt-1">Recommended for most coding tasks</p>
+        </div>
+        <div class="p-3 rounded-lg bg-zinc-900 border border-color text-sm">
+          <div class="text-muted mb-1">200K context • $3/M input • $15/M output</div>
+          <div class="flex gap-3 text-xs">
+            <span style="color: var(--status-active);">✓ Tools</span>
+            <span style="color: var(--status-active);">✓ Streaming</span>
+            <span style="color: var(--status-active);">✓ Images</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section: Permissions Config -->
+    <section>
+      <h2 class="text-xl font-semibold mb-4">5. Permissions Configuration</h2>
+      <div class="mockup-frame">
+        <div class="mockup-header">
+          <span class="font-medium">Permissions</span>
+        </div>
+        <div class="p-4">
+          <p class="text-sm text-muted mb-4">Control what actions the AI can perform automatically.</p>
+          <div class="space-y-3">
+            <!-- Bash -->
+            <div class="permission-row">
+              <div class="flex justify-between items-start mb-3">
+                <div>
+                  <div class="font-medium">Bash Commands</div>
+                  <div class="text-xs text-muted">Execute shell commands in the terminal</div>
+                </div>
+              </div>
+              <div class="radio-group">
+                <label class="radio-option">
+                  <div class="radio-dot"></div>
+                  <span class="text-sm">Allow all</span>
+                </label>
+                <label class="radio-option">
+                  <div class="radio-dot selected"></div>
+                  <span class="text-sm">Ask each time</span>
+                </label>
+                <label class="radio-option">
+                  <div class="radio-dot"></div>
+                  <span class="text-sm">Deny</span>
+                </label>
+              </div>
+            </div>
+            <!-- File Editing -->
+            <div class="permission-row">
+              <div class="flex justify-between items-start mb-3">
+                <div>
+                  <div class="font-medium">File Editing</div>
+                  <div class="text-xs text-muted">Modify existing files in the project</div>
+                </div>
+              </div>
+              <div class="radio-group">
+                <label class="radio-option">
+                  <div class="radio-dot selected"></div>
+                  <span class="text-sm">Allow all</span>
+                </label>
+                <label class="radio-option">
+                  <div class="radio-dot"></div>
+                  <span class="text-sm">Ask each time</span>
+                </label>
+                <label class="radio-option">
+                  <div class="radio-dot"></div>
+                  <span class="text-sm">Deny</span>
+                </label>
+              </div>
+            </div>
+            <!-- File Writing -->
+            <div class="permission-row">
+              <div class="flex justify-between items-start mb-3">
+                <div>
+                  <div class="font-medium">File Writing</div>
+                  <div class="text-xs text-muted">Create new files in the project</div>
+                </div>
+              </div>
+              <div class="radio-group">
+                <label class="radio-option">
+                  <div class="radio-dot"></div>
+                  <span class="text-sm">Allow all</span>
+                </label>
+                <label class="radio-option">
+                  <div class="radio-dot selected"></div>
+                  <span class="text-sm">Ask each time</span>
+                </label>
+                <label class="radio-option">
+                  <div class="radio-dot"></div>
+                  <span class="text-sm">Deny</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section: Agent Configuration -->
+    <section>
+      <h2 class="text-xl font-semibold mb-4">6. Custom Agents</h2>
+      <div class="mockup-frame">
+        <div class="mockup-header justify-between">
+          <span class="font-medium">Custom Agents</span>
+          <button class="px-3 py-1 rounded text-sm" style="background: var(--status-active); color: white;">+ New</button>
+        </div>
+        <div class="p-4 space-y-3">
+          <!-- Agent Card -->
+          <div class="provider-card">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">🤖</div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="font-medium">code-reviewer</span>
+                    <span class="text-xs px-2 py-0.5 rounded bg-zinc-700">USER</span>
+                  </div>
+                  <div class="text-xs text-muted">Reviews code for style, bugs, and best practices</div>
+                </div>
+              </div>
+            </div>
+            <div class="text-xs text-muted mb-3">Model: claude-sonnet-4-5</div>
+            <div class="flex gap-2">
+              <button class="px-3 py-1 text-sm rounded border border-color">Edit</button>
+              <button class="px-3 py-1 text-sm rounded border border-color">Test</button>
+              <button class="px-3 py-1 text-sm rounded border border-color">⋮</button>
+            </div>
+          </div>
+          <!-- Another Agent -->
+          <div class="provider-card">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">🤖</div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="font-medium">test-writer</span>
+                    <span class="text-xs px-2 py-0.5 rounded bg-zinc-700">USER</span>
+                  </div>
+                  <div class="text-xs text-muted">Generates comprehensive test suites</div>
+                </div>
+              </div>
+            </div>
+            <div class="text-xs text-muted mb-3">Model: default</div>
+            <div class="flex gap-2">
+              <button class="px-3 py-1 text-sm rounded border border-color">Edit</button>
+              <button class="px-3 py-1 text-sm rounded border border-color">Test</button>
+              <button class="px-3 py-1 text-sm rounded border border-color">⋮</button>
+            </div>
+          </div>
+          <!-- Project Agent (Read-only) -->
+          <div class="provider-card opacity-70">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">🤖</div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="font-medium">docs-generator</span>
+                    <span class="text-xs px-2 py-0.5 rounded bg-green-800 text-green-200">PROJECT</span>
+                  </div>
+                  <div class="text-xs text-muted">Generates documentation from code</div>
+                </div>
+              </div>
+            </div>
+            <div class="text-xs text-muted mb-3">Model: default • (Project-managed)</div>
+            <div class="flex gap-2">
+              <button class="px-3 py-1 text-sm rounded border border-color">View</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section: MCP Server Config -->
+    <section>
+      <h2 class="text-xl font-semibold mb-4">7. MCP Servers</h2>
+      <div class="mockup-frame">
+        <div class="mockup-header justify-between">
+          <span class="font-medium">MCP Servers</span>
+          <button class="px-3 py-1 rounded text-sm" style="background: var(--status-active); color: white;">+ Add</button>
+        </div>
+        <div class="p-4 space-y-3">
+          <!-- Connected Server -->
+          <div class="provider-card">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-3">
+                <div class="w-3 h-3 rounded-full" style="background: var(--status-active);"></div>
+                <div>
+                  <div class="font-medium">filesystem</div>
+                  <div class="text-xs text-muted font-mono">stdio: npx @modelcontextprotocol/server-filesystem</div>
+                </div>
+              </div>
+              <span class="text-xs" style="color: var(--status-active);">CONNECTED</span>
+            </div>
+            <div class="text-xs text-muted mb-3">Tools: read_file, write_file, list_directory, search_files</div>
+            <div class="flex gap-2">
+              <button class="px-3 py-1 text-sm rounded border border-color">Configure</button>
+              <button class="px-3 py-1 text-sm rounded border border-color">Test</button>
+              <button class="px-3 py-1 text-sm rounded border border-color">✕</button>
+            </div>
+          </div>
+          <!-- Error Server -->
+          <div class="provider-card" style="border-color: var(--status-error);">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-3">
+                <div class="w-3 h-3 rounded-full" style="background: var(--status-error);"></div>
+                <div>
+                  <div class="font-medium">github</div>
+                  <div class="text-xs text-muted font-mono">stdio: npx @modelcontextprotocol/server-github</div>
+                </div>
+              </div>
+              <span class="text-xs" style="color: var(--status-error);">ERROR</span>
+            </div>
+            <div class="text-xs mb-3" style="color: var(--status-error);">Missing GITHUB_TOKEN environment variable</div>
+            <div class="flex gap-2">
+              <button class="px-3 py-1 text-sm rounded border border-color">Configure</button>
+              <button class="px-3 py-1 text-sm rounded border border-color">Retry</button>
+              <button class="px-3 py-1 text-sm rounded border border-color">✕</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section: Project Onboarding - Gathering Phase -->
+    <section>
+      <h2 class="text-xl font-semibold mb-4">8. Project Onboarding - Gathering Phase</h2>
+      <div class="mockup-frame max-w-2xl mx-auto">
+        <div class="mockup-header justify-between">
+          <span class="font-medium">New Project</span>
+          <button class="text-muted hover:text-white">✕</button>
+        </div>
+        <div class="p-6">
+          <div class="flex items-center gap-3 mb-6">
+            <div class="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center">🤖</div>
+            <span class="font-medium">Project Setup Assistant</span>
+          </div>
+          
+          <div class="flex flex-col gap-4 mb-6" style="max-height: 300px; overflow-y: auto;">
+            <!-- Assistant Message -->
+            <div class="chat-bubble assistant">
+              Hi! I'll help you set up your new project. Tell me about what you're building, and I'll recommend the best configuration.<br><br>
+              What kind of project are you starting?
+            </div>
+            
+            <!-- Quick Options -->
+            <div class="flex flex-wrap gap-2">
+              <span class="quick-option">Web App</span>
+              <span class="quick-option">API / Backend</span>
+              <span class="quick-option">CLI Tool</span>
+              <span class="quick-option">Library</span>
+              <span class="quick-option">Mobile App</span>
+              <span class="quick-option">Other</span>
+            </div>
+            
+            <!-- User Message -->
+            <div class="chat-bubble user">
+              I'm building a SaaS dashboard with React, TypeScript, and a Node.js backend. It'll have real-time updates and connect to PostgreSQL.
+            </div>
+            
+            <!-- Assistant Response -->
+            <div class="chat-bubble assistant">
+              Great! A full-stack React + Node.js SaaS application. Let me ask a few more questions:<br><br>
+              1. Will you be working solo or with a team?<br>
+              2. Do you have an existing repository, or starting fresh?<br>
+              3. Any specific frameworks? (Next.js, Express, Fastify, etc.)
+            </div>
+          </div>
+          
+          <!-- Input -->
+          <div class="flex gap-2">
+            <input type="text" placeholder="Type your response..." class="flex-1 px-4 py-3 rounded-lg bg-zinc-900 border border-color" />
+            <button class="px-4 py-2 rounded-lg" style="background: var(--status-active); color: white;">→</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section: Project Onboarding - Recommendation Phase -->
+    <section>
+      <h2 class="text-xl font-semibold mb-4">9. Project Onboarding - Recommendations</h2>
+      <div class="mockup-frame max-w-2xl mx-auto">
+        <div class="mockup-header justify-between">
+          <span class="font-medium">New Project</span>
+          <button class="text-muted hover:text-white">✕</button>
+        </div>
+        <div class="p-6">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center">🤖</div>
+            <span>Based on your project, here's my recommended setup:</span>
+          </div>
+          
+          <div class="space-y-4 mb-6">
+            <!-- Project Section -->
+            <div class="p-4 rounded-lg bg-zinc-900 border border-color">
+              <div class="flex justify-between items-center mb-2">
+                <span class="text-sm text-muted">PROJECT</span>
+                <button class="text-xs text-muted hover:text-white">Edit</button>
+              </div>
+              <div class="font-medium">saas-dashboard</div>
+              <div class="text-sm text-muted">Full-stack React + Node.js SaaS application</div>
+            </div>
+            
+            <!-- Container Section -->
+            <div class="p-4 rounded-lg bg-zinc-900 border border-color">
+              <div class="flex justify-between items-center mb-2">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm text-muted">CONTAINER</span>
+                  <span class="text-xs px-2 py-0.5 rounded" style="background: var(--status-active); color: white;">RECOMMENDED</span>
+                </div>
+                <button class="text-xs text-muted hover:text-white">Edit</button>
+              </div>
+              <div class="font-medium">Standard Tier</div>
+              <div class="text-sm text-muted">2 CPU, 4GB RAM, 30GB</div>
+              <div class="text-xs text-muted mt-1 italic">"Ideal for full-stack web development with build tools"</div>
+            </div>
+            
+            <!-- Environment Section -->
+            <div class="p-4 rounded-lg bg-zinc-900 border border-color">
+              <div class="flex justify-between items-center mb-2">
+                <span class="text-sm text-muted">ENVIRONMENT</span>
+                <button class="text-xs text-muted hover:text-white">Edit</button>
+              </div>
+              <div class="font-medium mb-2">Node.js 20 LTS</div>
+              <div class="flex flex-wrap gap-2">
+                <span class="text-xs px-2 py-1 rounded bg-zinc-700">☑ typescript</span>
+                <span class="text-xs px-2 py-1 rounded bg-zinc-700">☑ eslint</span>
+                <span class="text-xs px-2 py-1 rounded bg-zinc-700">☑ prettier</span>
+                <span class="text-xs px-2 py-1 rounded bg-zinc-700">☑ vitest</span>
+                <span class="text-xs px-2 py-1 rounded bg-zinc-700">☑ react</span>
+                <span class="text-xs px-2 py-1 rounded bg-zinc-700">☑ next</span>
+                <span class="text-xs px-2 py-1 rounded bg-zinc-700">☑ tailwindcss</span>
+                <span class="text-xs px-2 py-1 rounded bg-zinc-700">☑ prisma</span>
+                <button class="text-xs px-2 py-1 rounded border border-color">+ Add</button>
+              </div>
+            </div>
+            
+            <!-- Agents Section -->
+            <div class="p-4 rounded-lg bg-zinc-900 border border-color">
+              <div class="flex justify-between items-center mb-2">
+                <span class="text-sm text-muted">AGENTS</span>
+                <button class="text-xs text-muted hover:text-white">Edit</button>
+              </div>
+              <div class="space-y-2">
+                <div class="flex items-center gap-2">
+                  <input type="checkbox" checked />
+                  <span class="text-sm font-medium">react-expert</span>
+                  <span class="text-xs text-muted">- Specialized in React patterns, hooks, and component design</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input type="checkbox" checked />
+                  <span class="text-sm font-medium">typescript-strict</span>
+                  <span class="text-xs text-muted">- Enforces strict TypeScript practices</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input type="checkbox" checked />
+                  <span class="text-sm font-medium">api-designer</span>
+                  <span class="text-xs text-muted">- Helps design RESTful APIs with proper patterns</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Actions -->
+          <div class="flex gap-3">
+            <button class="px-4 py-2 rounded-lg border border-color">Back</button>
+            <button class="px-4 py-2 rounded-lg border border-color flex-1">Ask a Question</button>
+            <button class="px-4 py-2 rounded-lg" style="background: var(--status-active); color: white;">Create Project</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section: Project Onboarding - Creation Progress -->
+    <section>
+      <h2 class="text-xl font-semibold mb-4">10. Project Onboarding - Creation Progress</h2>
+      <div class="mockup-frame max-w-lg mx-auto">
+        <div class="mockup-header">
+          <span class="font-medium">Creating Project</span>
+        </div>
+        <div class="p-6">
+          <!-- Progress Bar -->
+          <div class="mb-6">
+            <div class="h-2 bg-zinc-700 rounded-full overflow-hidden mb-2">
+              <div class="h-full rounded-full" style="width: 75%; background: var(--status-active);"></div>
+            </div>
+            <div class="text-center text-sm text-muted">75%</div>
+          </div>
+          
+          <!-- Steps -->
+          <div class="space-y-2 mb-6">
+            <div class="progress-step">
+              <div class="step-icon completed">✓</div>
+              <span>Created Forgejo repository</span>
+            </div>
+            <div class="progress-step">
+              <div class="step-icon completed">✓</div>
+              <span>Provisioned container (Standard tier)</span>
+            </div>
+            <div class="progress-step">
+              <div class="step-icon completed">✓</div>
+              <span>Configured OpenCode settings</span>
+            </div>
+            <div class="progress-step">
+              <div class="step-icon running">⟳</div>
+              <div>
+                <div>Installing dependencies...</div>
+                <div class="text-xs text-muted font-mono">npm install typescript eslint prettier vitest</div>
+              </div>
+            </div>
+            <div class="progress-step">
+              <div class="step-icon pending">○</div>
+              <span class="text-muted">Setting up custom agents</span>
+            </div>
+            <div class="progress-step">
+              <div class="step-icon pending">○</div>
+              <span class="text-muted">Initializing project structure</span>
+            </div>
+          </div>
+          
+          <p class="text-sm text-muted text-center mb-4">
+            This may take a few minutes. You can close this dialog and we'll notify you when it's ready.
+          </p>
+          
+          <button class="w-full px-4 py-2 rounded-lg border border-color">Continue in Background</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section: Settings Page Layout -->
+    <section>
+      <h2 class="text-xl font-semibold mb-4">11. Settings Page - Reorganized</h2>
+      <div class="mockup-frame">
+        <div class="mockup-header">
+          <span class="font-medium">Settings</span>
+        </div>
+        <div class="flex">
+          <!-- Sidebar -->
+          <div class="w-48 border-r border-color p-4 space-y-1">
+            <div class="px-3 py-2 rounded-lg" style="background: var(--status-active); color: white;">App Settings</div>
+            <div class="px-3 py-2 rounded-lg text-muted hover:text-white cursor-pointer">LLM Providers</div>
+            <div class="px-3 py-2 rounded-lg text-muted hover:text-white cursor-pointer">OpenCode</div>
+            <div class="px-3 py-2 rounded-lg text-muted hover:text-white cursor-pointer">Agents</div>
+            <div class="px-3 py-2 rounded-lg text-muted hover:text-white cursor-pointer">Commands</div>
+            <div class="px-3 py-2 rounded-lg text-muted hover:text-white cursor-pointer">MCP Servers</div>
+            <div class="px-3 py-2 rounded-lg text-muted hover:text-white cursor-pointer">Connection</div>
+          </div>
+          <!-- Content -->
+          <div class="flex-1 p-6">
+            <h3 class="text-lg font-medium mb-4">App Settings</h3>
+            <div class="space-y-4 max-w-md">
+              <div>
+                <label class="block text-sm text-muted mb-2">Theme</label>
+                <select class="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-color">
+                  <option>System</option>
+                  <option>Light</option>
+                  <option>Dark</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm text-muted mb-2">Notifications</label>
+                <label class="flex items-center gap-2 mb-2">
+                  <input type="checkbox" checked />
+                  <span class="text-sm">In-app notifications</span>
+                </label>
+                <label class="flex items-center gap-2">
+                  <input type="checkbox" />
+                  <span class="text-sm">System notifications</span>
+                </label>
+              </div>
+              <div>
+                <label class="block text-sm text-muted mb-2">Auto-refresh</label>
+                <select class="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-color">
+                  <option>Every 30 seconds</option>
+                  <option>Every minute</option>
+                  <option>Every 5 minutes</option>
+                  <option>Disabled</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section: Project Settings Page -->
+    <section>
+      <h2 class="text-xl font-semibold mb-4">12. Project Settings Page</h2>
+      <div class="mockup-frame">
+        <div class="mockup-header">
+          <span class="font-medium">Project Settings: my-saas-app</span>
+        </div>
+        <div class="flex">
+          <!-- Sidebar -->
+          <div class="w-48 border-r border-color p-4 space-y-1">
+            <div class="px-3 py-2 rounded-lg" style="background: var(--status-active); color: white;">General</div>
+            <div class="px-3 py-2 rounded-lg text-muted hover:text-white cursor-pointer">Container</div>
+            <div class="px-3 py-2 rounded-lg text-muted hover:text-white cursor-pointer">LLM</div>
+            <div class="px-3 py-2 rounded-lg text-muted hover:text-white cursor-pointer">GitHub Sync</div>
+            <div class="px-3 py-2 rounded-lg text-muted hover:text-white cursor-pointer" style="color: var(--status-error);">Danger Zone</div>
+          </div>
+          <!-- Content -->
+          <div class="flex-1 p-6">
+            <h3 class="text-lg font-medium mb-4">General</h3>
+            <div class="space-y-4 max-w-md">
+              <div>
+                <label class="block text-sm text-muted mb-2">Project Name</label>
+                <input type="text" value="my-saas-app" class="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-color" />
+              </div>
+              <div>
+                <label class="block text-sm text-muted mb-2">Description</label>
+                <textarea class="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-color" rows="2">Full-stack SaaS dashboard with React and Node.js</textarea>
+              </div>
+              <div>
+                <label class="block text-sm text-muted mb-2">Container Status</label>
+                <div class="flex items-center gap-3 p-3 rounded-lg bg-zinc-900 border border-color">
+                  <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full" style="background: var(--status-active);"></div>
+                    <span>Running</span>
+                  </div>
+                  <button class="px-3 py-1 text-sm rounded border border-color">Stop</button>
+                  <button class="px-3 py-1 text-sm rounded border border-color">Restart</button>
+                </div>
+              </div>
+              <button class="px-4 py-2 rounded-lg" style="background: var(--status-active); color: white;">Save Changes</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section: Mobile Onboarding -->
+    <section>
+      <h2 class="text-xl font-semibold mb-4">13. Mobile - Project Onboarding</h2>
+      <div class="flex gap-6 justify-center flex-wrap">
+        <!-- Step 1: Project Type -->
+        <div class="mockup-frame w-80">
+          <div class="mockup-header">
+            <span>← New Project</span>
+          </div>
+          <div class="p-4">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-sm">🤖</div>
+              <span class="text-sm font-medium">Setup Assistant</span>
+            </div>
+            <div class="chat-bubble assistant text-sm mb-4">
+              What kind of project are you building?
+            </div>
+            <div class="space-y-2">
+              <button class="w-full p-3 text-left rounded-lg border border-color hover:bg-zinc-700">Web App</button>
+              <button class="w-full p-3 text-left rounded-lg border border-color hover:bg-zinc-700">API / Backend</button>
+              <button class="w-full p-3 text-left rounded-lg border border-color hover:bg-zinc-700">CLI Tool</button>
+              <button class="w-full p-3 text-left rounded-lg border border-color hover:bg-zinc-700">Library</button>
+              <button class="w-full p-3 text-left rounded-lg border border-color hover:bg-zinc-700">Something else...</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Step 2: Recommendations -->
+        <div class="mockup-frame w-80">
+          <div class="mockup-header">
+            <span>← New Project</span>
+          </div>
+          <div class="p-4">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-sm">🤖</div>
+              <span class="text-sm">Here's my recommendation:</span>
+            </div>
+            <div class="space-y-3">
+              <div class="p-3 rounded-lg bg-zinc-900 border border-color">
+                <div class="text-xs text-muted">CONTAINER</div>
+                <div class="text-sm font-medium">Standard • 2 CPU • 4GB</div>
+              </div>
+              <div class="p-3 rounded-lg bg-zinc-900 border border-color">
+                <div class="text-xs text-muted">ENVIRONMENT</div>
+                <div class="text-sm font-medium">Node.js 20</div>
+                <div class="text-xs text-muted mt-1">typescript, react, next, prisma</div>
+              </div>
+              <div class="p-3 rounded-lg bg-zinc-900 border border-color">
+                <div class="text-xs text-muted">AGENTS</div>
+                <div class="text-sm">react-expert, typescript-strict</div>
+              </div>
+            </div>
+            <div class="mt-4 flex gap-2">
+              <button class="flex-1 px-4 py-2 rounded-lg border border-color text-sm">Customize</button>
+              <button class="flex-1 px-4 py-2 rounded-lg text-sm" style="background: var(--status-active); color: white;">Create</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Step 3: Progress -->
+        <div class="mockup-frame w-80">
+          <div class="mockup-header">
+            <span>Creating Project</span>
+          </div>
+          <div class="p-4">
+            <div class="mb-4">
+              <div class="h-2 bg-zinc-700 rounded-full overflow-hidden mb-2">
+                <div class="h-full rounded-full" style="width: 60%; background: var(--status-active);"></div>
+              </div>
+              <div class="text-center text-sm text-muted">60%</div>
+            </div>
+            <div class="space-y-2 text-sm">
+              <div class="flex items-center gap-2">
+                <span style="color: var(--status-active);">✓</span>
+                <span>Repository created</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span style="color: var(--status-active);">✓</span>
+                <span>Container provisioned</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span style="color: var(--status-thinking);">⟳</span>
+                <span>Installing dependencies...</span>
+              </div>
+              <div class="flex items-center gap-2 text-muted">
+                <span>○</span>
+                <span>Setting up agents</span>
+              </div>
+            </div>
+            <button class="w-full mt-4 px-4 py-2 rounded-lg border border-color text-sm">Continue in Background</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    function toggleTheme() {
+      document.body.classList.toggle('dark');
+      document.body.classList.toggle('light');
+    }
+  </script>
+</body>
+</html>

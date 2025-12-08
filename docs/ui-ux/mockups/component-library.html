@@ -1,0 +1,1456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeOpen - Component Library</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --background: oklch(1 0 0);
+      --foreground: oklch(0.129 0.042 264.695);
+      --card: oklch(1 0 0);
+      --card-foreground: oklch(0.129 0.042 264.695);
+      --primary: oklch(0.208 0.042 265.755);
+      --primary-foreground: oklch(0.984 0.003 247.858);
+      --secondary: oklch(0.968 0.007 247.896);
+      --secondary-foreground: oklch(0.208 0.042 265.755);
+      --muted: oklch(0.968 0.007 247.896);
+      --muted-foreground: oklch(0.554 0.046 257.417);
+      --accent: oklch(0.968 0.007 247.896);
+      --accent-foreground: oklch(0.208 0.042 265.755);
+      --destructive: oklch(0.577 0.245 27.325);
+      --border: oklch(0.929 0.013 255.508);
+      --input: oklch(0.929 0.013 255.508);
+      --ring: oklch(0.704 0.04 256.788);
+      --radius: 0.625rem;
+      
+      --status-active: oklch(0.6 0.2 145);
+      --status-thinking: oklch(0.6 0.2 250);
+      --status-waiting: oklch(0.75 0.15 85);
+      --status-paused: oklch(0.7 0.15 50);
+      --status-error: oklch(0.6 0.25 25);
+      --status-idle: oklch(0.6 0.02 260);
+      
+      --surface-attention: oklch(0.97 0.03 85);
+      --surface-success: oklch(0.97 0.03 145);
+      --surface-error: oklch(0.97 0.03 25);
+    }
+
+    .dark {
+      --background: oklch(0.129 0.042 264.695);
+      --foreground: oklch(0.984 0.003 247.858);
+      --card: oklch(0.17 0.035 265);
+      --card-foreground: oklch(0.984 0.003 247.858);
+      --primary: oklch(0.929 0.013 255.508);
+      --primary-foreground: oklch(0.208 0.042 265.755);
+      --secondary: oklch(0.279 0.041 260.031);
+      --secondary-foreground: oklch(0.984 0.003 247.858);
+      --muted: oklch(0.279 0.041 260.031);
+      --muted-foreground: oklch(0.704 0.04 256.788);
+      --accent: oklch(0.279 0.041 260.031);
+      --accent-foreground: oklch(0.984 0.003 247.858);
+      --destructive: oklch(0.704 0.191 22.216);
+      --border: oklch(1 0 0 / 10%);
+      --input: oklch(1 0 0 / 15%);
+      --ring: oklch(0.551 0.027 264.364);
+      
+      --status-active: oklch(0.65 0.2 145);
+      --status-thinking: oklch(0.65 0.2 250);
+      --status-waiting: oklch(0.7 0.15 85);
+      --status-paused: oklch(0.65 0.15 50);
+      --status-error: oklch(0.65 0.25 25);
+      --status-idle: oklch(0.5 0.02 260);
+      
+      --surface-attention: oklch(0.25 0.04 85);
+      --surface-success: oklch(0.25 0.04 145);
+      --surface-error: oklch(0.25 0.04 25);
+    }
+
+    body {
+      background: var(--background);
+      color: var(--foreground);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    @keyframes typing {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 1; }
+    }
+
+    .animate-bounce { animation: bounce 0.6s infinite; }
+    .animate-pulse { animation: pulse 2s infinite; }
+    .animate-spin { animation: spin 1s linear infinite; }
+    .animate-typing { animation: typing 1.4s infinite; }
+    
+    .skeleton {
+      background: linear-gradient(90deg, var(--muted) 25%, var(--border) 50%, var(--muted) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+    }
+
+    .component-section {
+      margin-bottom: 4rem;
+      padding: 2rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--card);
+    }
+
+    .component-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .component-description {
+      color: var(--muted-foreground);
+      margin-bottom: 1.5rem;
+      font-size: 0.875rem;
+    }
+
+    .variant-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted-foreground);
+      margin-bottom: 0.5rem;
+      margin-top: 1.5rem;
+    }
+
+    .variant-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: calc(var(--radius) - 2px);
+      font-weight: 500;
+      font-size: 0.875rem;
+      padding: 0.5rem 1rem;
+      height: 2.25rem;
+      cursor: pointer;
+      transition: all 150ms;
+      gap: 0.5rem;
+      border: none;
+    }
+    
+    .btn-primary { background: var(--primary); color: var(--primary-foreground); }
+    .btn-secondary { background: var(--secondary); color: var(--secondary-foreground); }
+    .btn-destructive { background: var(--destructive); color: white; }
+    .btn-outline { background: transparent; color: var(--foreground); border: 1px solid var(--input); }
+    .btn-ghost { background: transparent; color: var(--foreground); }
+    .btn-sm { height: 2rem; font-size: 0.8125rem; padding: 0.375rem 0.75rem; }
+    .btn-lg { height: 2.75rem; font-size: 1rem; padding: 0.625rem 1.25rem; }
+    .btn-icon { width: 2.25rem; padding: 0; }
+    .btn-icon.btn-sm { width: 2rem; }
+
+    .input-field {
+      background: var(--background);
+      border: 1px solid var(--input);
+      border-radius: calc(var(--radius) - 2px);
+      padding: 0.5rem 0.75rem;
+      font-size: 0.875rem;
+      color: var(--foreground);
+      height: 2.25rem;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.125rem 0.625rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      border-radius: 9999px;
+      gap: 0.375rem;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .tool-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      max-width: 600px;
+    }
+
+    .tool-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      background: var(--muted);
+      border-bottom: 1px solid var(--border);
+      font-size: 0.875rem;
+    }
+
+    .code-block {
+      background: oklch(0.15 0.02 260);
+      color: oklch(0.9 0 0);
+      font-family: ui-monospace, monospace;
+      font-size: 0.75rem;
+      padding: 0.75rem;
+      overflow-x: auto;
+    }
+
+    .nav-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: calc(var(--radius) - 2px);
+      font-size: 0.875rem;
+      color: var(--foreground);
+      transition: background 150ms;
+    }
+
+    .nav-link:hover { background: var(--muted); }
+    .nav-link.active { background: var(--accent); font-weight: 500; }
+
+    /* Line number styling */
+    .line-number {
+      color: oklch(0.5 0 0);
+      user-select: none;
+      text-align: right;
+      padding-right: 1rem;
+      min-width: 2.5rem;
+    }
+
+    /* Diff styling */
+    .diff-add { background: oklch(0.3 0.1 145 / 30%); }
+    .diff-remove { background: oklch(0.3 0.1 25 / 30%); }
+    .diff-add-line { color: oklch(0.7 0.2 145); }
+    .diff-remove-line { color: oklch(0.7 0.2 25); }
+  </style>
+</head>
+<body class="min-h-screen p-8">
+  <!-- Theme Toggle -->
+  <div class="fixed top-4 right-4 z-50 flex gap-2">
+    <button onclick="document.body.classList.toggle('dark')" class="btn btn-outline">
+      Toggle Dark Mode
+    </button>
+    <a href="desktop-mockups.html" class="btn btn-secondary">View Pages</a>
+  </div>
+
+  <div class="max-w-6xl mx-auto">
+    <!-- Header -->
+    <header class="text-center py-8 mb-8">
+      <h1 class="text-4xl font-bold mb-2">CodeOpen Component Library</h1>
+      <p style="color: var(--muted-foreground)">Comprehensive component mockups for design review and implementation</p>
+    </header>
+
+    <!-- Table of Contents -->
+    <nav class="component-section mb-8">
+      <h2 class="component-title">Table of Contents</h2>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+        <a href="#status-indicators" class="nav-link">Status Indicators</a>
+        <a href="#buttons" class="nav-link">Buttons</a>
+        <a href="#inputs" class="nav-link">Form Inputs</a>
+        <a href="#cards" class="nav-link">Cards</a>
+        <a href="#badges" class="nav-link">Badges</a>
+        <a href="#tool-read" class="nav-link">Read File Tool</a>
+        <a href="#tool-edit" class="nav-link">Edit File Tool</a>
+        <a href="#tool-bash" class="nav-link">Bash Tool</a>
+        <a href="#tool-search" class="nav-link">Search Tools</a>
+        <a href="#loading-states" class="nav-link">Loading States</a>
+        <a href="#empty-states" class="nav-link">Empty States</a>
+        <a href="#error-states" class="nav-link">Error States</a>
+        <a href="#attention" class="nav-link">Attention Components</a>
+        <a href="#navigation" class="nav-link">Navigation</a>
+        <a href="#intent-input" class="nav-link">Intent Input</a>
+        <a href="#quick-actions" class="nav-link">Quick Actions</a>
+      </div>
+    </nav>
+
+    <!-- ==================== STATUS INDICATORS ==================== -->
+    <section id="status-indicators" class="component-section">
+      <h2 class="component-title">Status Indicators</h2>
+      <p class="component-description">Visual indicators for project and session states. Used consistently across all views.</p>
+
+      <p class="variant-label">Status Dots (8px)</p>
+      <div class="variant-group items-center">
+        <div class="flex items-center gap-2">
+          <span class="status-dot" style="background: var(--status-active);"></span>
+          <span class="text-sm">Active / Running</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="status-dot animate-pulse" style="background: var(--status-thinking);"></span>
+          <span class="text-sm">Thinking (animated)</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="status-dot" style="background: var(--status-waiting);"></span>
+          <span class="text-sm">Waiting</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="status-dot" style="background: var(--status-paused);"></span>
+          <span class="text-sm">Paused</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="status-dot" style="background: var(--status-error);"></span>
+          <span class="text-sm">Error</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="status-dot" style="background: var(--status-idle);"></span>
+          <span class="text-sm">Idle / Stopped</span>
+        </div>
+      </div>
+
+      <p class="variant-label">Status Badges</p>
+      <div class="variant-group">
+        <span class="badge" style="background: var(--status-active); color: white;">
+          <span class="w-1.5 h-1.5 rounded-full" style="background: white;"></span>
+          Running
+        </span>
+        <span class="badge" style="background: var(--status-thinking); color: white;">
+          <span class="w-1.5 h-1.5 rounded-full animate-pulse" style="background: white;"></span>
+          Thinking
+        </span>
+        <span class="badge" style="background: var(--status-waiting); color: black;">
+          <span class="w-1.5 h-1.5 rounded-full" style="background: black;"></span>
+          Waiting
+        </span>
+        <span class="badge" style="background: var(--status-paused); color: black;">
+          <span class="w-1.5 h-1.5 rounded-full" style="background: black;"></span>
+          Paused
+        </span>
+        <span class="badge" style="background: var(--status-error); color: white;">
+          <span class="w-1.5 h-1.5 rounded-full" style="background: white;"></span>
+          Error
+        </span>
+        <span class="badge" style="background: var(--secondary);">
+          <span class="w-1.5 h-1.5 rounded-full" style="background: var(--status-idle);"></span>
+          Stopped
+        </span>
+      </div>
+
+      <p class="variant-label">Progress Indicator</p>
+      <div class="max-w-md space-y-2">
+        <div class="h-1.5 rounded-full overflow-hidden" style="background: var(--border);">
+          <div class="h-full rounded-full" style="width: 65%; background: var(--status-thinking);"></div>
+        </div>
+        <div class="h-1.5 rounded-full overflow-hidden" style="background: var(--border);">
+          <div class="h-full rounded-full" style="width: 100%; background: var(--status-active);"></div>
+        </div>
+        <div class="h-1.5 rounded-full overflow-hidden" style="background: var(--border);">
+          <div class="h-full rounded-full" style="width: 30%; background: var(--status-error);"></div>
+        </div>
+      </div>
+
+      <p class="variant-label">Thinking Animation (Dots)</p>
+      <div class="p-4 rounded-lg inline-flex items-center gap-3" style="background: var(--muted);">
+        <div class="flex gap-1">
+          <span class="w-2 h-2 rounded-full animate-bounce" style="background: var(--status-thinking); animation-delay: 0ms;"></span>
+          <span class="w-2 h-2 rounded-full animate-bounce" style="background: var(--status-thinking); animation-delay: 150ms;"></span>
+          <span class="w-2 h-2 rounded-full animate-bounce" style="background: var(--status-thinking); animation-delay: 300ms;"></span>
+        </div>
+        <span class="text-sm" style="color: var(--muted-foreground);">Thinking...</span>
+      </div>
+
+      <p class="variant-label">Status Icons (Circle)</p>
+      <div class="variant-group">
+        <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background: var(--status-active);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </div>
+        <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background: var(--status-thinking);">
+          <svg class="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+            <circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle>
+            <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
+          </svg>
+        </div>
+        <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background: var(--status-waiting);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+        </div>
+        <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background: var(--status-error);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="15" y1="9" x2="9" y2="15"></line>
+            <line x1="9" y1="9" x2="15" y2="15"></line>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== BUTTONS ==================== -->
+    <section id="buttons" class="component-section">
+      <h2 class="component-title">Buttons</h2>
+      <p class="component-description">Interactive button components with various styles and states.</p>
+
+      <p class="variant-label">Variants</p>
+      <div class="variant-group">
+        <button class="btn btn-primary">Primary</button>
+        <button class="btn btn-secondary">Secondary</button>
+        <button class="btn btn-destructive">Destructive</button>
+        <button class="btn btn-outline">Outline</button>
+        <button class="btn btn-ghost">Ghost</button>
+      </div>
+
+      <p class="variant-label">Sizes</p>
+      <div class="variant-group items-end">
+        <button class="btn btn-primary btn-sm">Small</button>
+        <button class="btn btn-primary">Default</button>
+        <button class="btn btn-primary btn-lg">Large</button>
+      </div>
+
+      <p class="variant-label">With Icons</p>
+      <div class="variant-group">
+        <button class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          New Session
+        </button>
+        <button class="btn btn-outline">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+          Start
+        </button>
+        <button class="btn btn-ghost">
+          Settings
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 18l6-6-6-6"></path>
+          </svg>
+        </button>
+      </div>
+
+      <p class="variant-label">Icon-Only</p>
+      <div class="variant-group">
+        <button class="btn btn-primary btn-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </button>
+        <button class="btn btn-outline btn-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="1"></circle>
+            <circle cx="19" cy="12" r="1"></circle>
+            <circle cx="5" cy="12" r="1"></circle>
+          </svg>
+        </button>
+        <button class="btn btn-ghost btn-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <p class="variant-label">States</p>
+      <div class="variant-group">
+        <button class="btn btn-primary" disabled style="opacity: 0.5; cursor: not-allowed;">Disabled</button>
+        <button class="btn btn-primary" style="pointer-events: none;">
+          <svg class="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle>
+            <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
+          </svg>
+          Loading...
+        </button>
+      </div>
+    </section>
+
+    <!-- ==================== FORM INPUTS ==================== -->
+    <section id="inputs" class="component-section">
+      <h2 class="component-title">Form Inputs</h2>
+      <p class="component-description">Text inputs, selects, and other form controls.</p>
+
+      <p class="variant-label">Text Input</p>
+      <div class="space-y-4 max-w-md">
+        <div>
+          <label class="text-sm font-medium block mb-1.5">Default</label>
+          <input type="text" class="input-field w-full" placeholder="Enter text...">
+        </div>
+        <div>
+          <label class="text-sm font-medium block mb-1.5">With Value</label>
+          <input type="text" class="input-field w-full" value="https://opencode.example.com">
+        </div>
+        <div>
+          <label class="text-sm font-medium block mb-1.5">With Icon</label>
+          <div class="relative">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" class="input-field w-full pl-9" placeholder="Search...">
+          </div>
+        </div>
+        <div>
+          <label class="text-sm font-medium block mb-1.5">Error State</label>
+          <input type="text" class="input-field w-full" style="border-color: var(--status-error);" value="invalid-url">
+          <p class="text-xs mt-1" style="color: var(--status-error);">Please enter a valid URL</p>
+        </div>
+        <div>
+          <label class="text-sm font-medium block mb-1.5">Disabled</label>
+          <input type="text" class="input-field w-full" disabled placeholder="Disabled input" style="opacity: 0.5;">
+        </div>
+      </div>
+
+      <p class="variant-label">Textarea</p>
+      <div class="max-w-md">
+        <textarea class="input-field w-full resize-none" rows="3" placeholder="Type a message..." style="height: auto;"></textarea>
+      </div>
+
+      <p class="variant-label">Select</p>
+      <div class="max-w-md">
+        <select class="input-field w-full">
+          <option>claude-sonnet-4</option>
+          <option>claude-opus-4</option>
+          <option>gpt-4o</option>
+        </select>
+      </div>
+
+      <p class="variant-label">Large Intent Input</p>
+      <div class="max-w-xl">
+        <div class="relative">
+          <input 
+            type="text" 
+            class="input-field w-full text-lg py-4 px-6 pr-14" 
+            placeholder="Show my projects, start a session, check status..."
+            style="height: 3.5rem; border-radius: 9999px;"
+          >
+          <button class="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center" style="background: var(--primary);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary-foreground)" stroke-width="2">
+              <path d="M5 12h14M12 5l7 7-7 7"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== CARDS ==================== -->
+    <section id="cards" class="component-section">
+      <h2 class="component-title">Cards</h2>
+      <p class="component-description">Container components for grouping related content.</p>
+
+      <p class="variant-label">Basic Card</p>
+      <div class="card p-4 max-w-sm">
+        <h3 class="font-semibold mb-2">Card Title</h3>
+        <p class="text-sm" style="color: var(--muted-foreground);">Card description goes here with some example text.</p>
+      </div>
+
+      <p class="variant-label">Project Card</p>
+      <div class="card p-4 max-w-sm hover:shadow-md transition-shadow">
+        <div class="flex items-start justify-between mb-3">
+          <div>
+            <h3 class="font-semibold">frontend</h3>
+            <p class="text-sm" style="color: var(--muted-foreground);">React web application</p>
+          </div>
+          <span class="badge" style="background: var(--status-active); color: white;">
+            <span class="w-1.5 h-1.5 rounded-full" style="background: white;"></span>
+            Running
+          </span>
+        </div>
+        <div class="mb-4">
+          <div class="flex items-center gap-2 text-sm" style="color: var(--muted-foreground);">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"></path>
+            </svg>
+            3 active sessions
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <button class="btn btn-primary flex-1">Open</button>
+          <button class="btn btn-ghost btn-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="6" y="4" width="4" height="16"></rect>
+              <rect x="14" y="4" width="4" height="16"></rect>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <p class="variant-label">Card with Left Border (Attention)</p>
+      <div class="variant-group">
+        <div class="card p-4 max-w-xs" style="border-left: 3px solid var(--status-waiting);">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="status-dot" style="background: var(--status-waiting);"></span>
+            <span class="font-medium text-sm">Permission Required</span>
+          </div>
+          <p class="text-xs" style="color: var(--muted-foreground);">frontend - 2m ago</p>
+        </div>
+        <div class="card p-4 max-w-xs" style="border-left: 3px solid var(--status-error);">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="status-dot" style="background: var(--status-error);"></span>
+            <span class="font-medium text-sm">Build Failed</span>
+          </div>
+          <p class="text-xs" style="color: var(--muted-foreground);">analytics - 15m ago</p>
+        </div>
+      </div>
+
+      <p class="variant-label">Session Card</p>
+      <div class="max-w-xs">
+        <div class="card p-4 mb-2" style="background: var(--accent);">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="status-dot animate-pulse" style="background: var(--status-thinking);"></span>
+            <span class="font-medium text-sm">Add authentication</span>
+          </div>
+          <p class="text-xs" style="color: var(--muted-foreground);">Working on JWT implementation...</p>
+        </div>
+        <div class="card p-4">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="status-dot" style="background: var(--status-active);"></span>
+            <span class="font-medium text-sm">Fix routing bug</span>
+          </div>
+          <p class="text-xs" style="color: var(--muted-foreground);">Completed - 1h ago</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== BADGES ==================== -->
+    <section id="badges" class="component-section">
+      <h2 class="component-title">Badges</h2>
+      <p class="component-description">Small indicators for labels, counts, and metadata.</p>
+
+      <p class="variant-label">Default Badges</p>
+      <div class="variant-group">
+        <span class="badge" style="background: var(--secondary);">Default</span>
+        <span class="badge" style="background: var(--primary); color: var(--primary-foreground);">Primary</span>
+        <span class="badge" style="background: var(--destructive); color: white;">Destructive</span>
+        <span class="badge" style="background: var(--muted);">Muted</span>
+      </div>
+
+      <p class="variant-label">With Count</p>
+      <div class="variant-group">
+        <span class="badge" style="background: var(--destructive); color: white;">3</span>
+        <span class="badge" style="background: var(--status-active); color: white;">12</span>
+        <span class="badge" style="background: var(--muted);">99+</span>
+      </div>
+
+      <p class="variant-label">File Badges</p>
+      <div class="variant-group">
+        <span class="badge" style="background: var(--muted);">src/middleware/auth.ts</span>
+        <span class="badge" style="background: var(--muted);">package.json</span>
+        <span class="badge" style="background: var(--muted);">+3 more</span>
+      </div>
+
+      <p class="variant-label">Modified Badge</p>
+      <div class="variant-group">
+        <span class="badge" style="background: var(--surface-success); color: var(--status-active);">Modified</span>
+        <span class="badge" style="background: var(--surface-error); color: var(--status-error);">Deleted</span>
+        <span class="badge" style="background: var(--surface-attention); color: oklch(0.5 0.1 85);">New</span>
+      </div>
+    </section>
+
+    <!-- ==================== TOOL: READ FILE ==================== -->
+    <section id="tool-read" class="component-section">
+      <h2 class="component-title">Read File Tool</h2>
+      <p class="component-description">Displays file contents with syntax highlighting, line numbers, and actions.</p>
+
+      <p class="variant-label">Collapsed (Default)</p>
+      <div class="tool-card">
+        <div class="tool-header">
+          <span class="status-dot" style="background: var(--status-active);"></span>
+          <span class="font-medium font-mono">read</span>
+          <span class="text-xs" style="color: var(--muted-foreground);">src/middleware/auth.ts</span>
+          <span class="ml-auto text-xs" style="color: var(--muted-foreground);">24 lines</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6 9l6 6 6-6"></path>
+          </svg>
+        </div>
+      </div>
+
+      <p class="variant-label">Expanded with Content</p>
+      <div class="tool-card">
+        <div class="tool-header">
+          <span class="status-dot" style="background: var(--status-active);"></span>
+          <span class="font-medium font-mono">read</span>
+          <span class="text-xs" style="color: var(--muted-foreground);">src/middleware/auth.ts</span>
+          <div class="ml-auto flex items-center gap-2">
+            <button class="btn btn-ghost btn-sm" style="height: 1.5rem; padding: 0 0.5rem;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+              </svg>
+              Copy
+            </button>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 15l-6-6-6 6"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="code-block" style="max-height: 200px; overflow-y: auto;">
+<pre style="margin: 0;"><code><span class="line-number"> 1</span>  <span style="color: #c586c0;">import</span> jwt <span style="color: #c586c0;">from</span> <span style="color: #ce9178;">'jsonwebtoken'</span>;
+<span class="line-number"> 2</span>  <span style="color: #c586c0;">import</span> { Request, Response, NextFunction } <span style="color: #c586c0;">from</span> <span style="color: #ce9178;">'express'</span>;
+<span class="line-number"> 3</span>
+<span class="line-number"> 4</span>  <span style="color: #c586c0;">export const</span> <span style="color: #dcdcaa;">authMiddleware</span> = (req, res, next) => {
+<span class="line-number"> 5</span>    <span style="color: #c586c0;">const</span> token = req.headers.authorization?.split(<span style="color: #ce9178;">' '</span>)[1];
+<span class="line-number"> 6</span>    
+<span class="line-number"> 7</span>    <span style="color: #c586c0;">if</span> (!token) {
+<span class="line-number"> 8</span>      <span style="color: #c586c0;">return</span> res.status(401).json({ error: <span style="color: #ce9178;">'No token'</span> });
+<span class="line-number"> 9</span>    }
+<span class="line-number">10</span>    next();
+<span class="line-number">11</span>  };</code></pre>
+        </div>
+      </div>
+
+      <p class="variant-label">Running State</p>
+      <div class="tool-card">
+        <div class="tool-header">
+          <span class="status-dot animate-pulse" style="background: var(--status-thinking);"></span>
+          <span class="font-medium font-mono">read</span>
+          <span class="text-xs" style="color: var(--muted-foreground);">src/components/App.tsx</span>
+          <span class="ml-auto text-xs animate-typing" style="color: var(--status-thinking);">reading...</span>
+        </div>
+      </div>
+
+      <p class="variant-label">Error State</p>
+      <div class="tool-card">
+        <div class="tool-header" style="border-bottom-color: var(--status-error);">
+          <span class="status-dot" style="background: var(--status-error);"></span>
+          <span class="font-medium font-mono">read</span>
+          <span class="text-xs" style="color: var(--status-error);">File not found</span>
+        </div>
+        <div class="p-3" style="background: var(--surface-error);">
+          <p class="text-sm" style="color: var(--status-error);">Could not read file: src/missing.ts</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TOOL: EDIT FILE ==================== -->
+    <section id="tool-edit" class="component-section">
+      <h2 class="component-title">Edit File Tool</h2>
+      <p class="component-description">Shows file modifications with diff view (added/removed lines).</p>
+
+      <p class="variant-label">Inline Diff View</p>
+      <div class="tool-card">
+        <div class="tool-header">
+          <span class="status-dot" style="background: var(--status-active);"></span>
+          <span class="font-medium font-mono">edit</span>
+          <span class="text-xs" style="color: var(--muted-foreground);">src/middleware/auth.ts</span>
+          <div class="ml-auto flex items-center gap-3 text-xs">
+            <span class="diff-add-line">+12 lines</span>
+            <span class="diff-remove-line">-3 lines</span>
+          </div>
+        </div>
+        <div class="code-block" style="padding: 0;">
+          <div class="diff-remove px-3 py-0.5">
+<pre style="margin: 0;"><code><span class="line-number">5</span>  <span class="diff-remove-line">-</span> <span style="color: #ce9178;">'No token provided'</span></code></pre>
+          </div>
+          <div class="diff-add px-3 py-0.5">
+<pre style="margin: 0;"><code><span class="line-number">5</span>  <span class="diff-add-line">+</span> <span style="color: #ce9178;">'Authentication required'</span></code></pre>
+          </div>
+          <div class="px-3 py-0.5">
+<pre style="margin: 0;"><code><span class="line-number">6</span>    });</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <p class="variant-label">Split Diff View (Desktop)</p>
+      <div class="tool-card">
+        <div class="tool-header">
+          <span class="status-dot" style="background: var(--status-active);"></span>
+          <span class="font-medium font-mono">edit</span>
+          <span class="text-xs" style="color: var(--muted-foreground);">src/config.ts</span>
+          <div class="ml-auto flex items-center gap-2">
+            <button class="btn btn-ghost btn-sm" style="height: 1.5rem; padding: 0 0.5rem; font-size: 0.6875rem;">Inline</button>
+            <button class="btn btn-secondary btn-sm" style="height: 1.5rem; padding: 0 0.5rem; font-size: 0.6875rem;">Split</button>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 divide-x" style="border-color: var(--border);">
+          <div class="code-block" style="border-radius: 0;">
+            <div class="text-xs font-semibold mb-2" style="color: var(--status-error);">Before</div>
+<pre style="margin: 0;"><code><span style="color: #9cdcfe;">const</span> <span style="color: #4fc1ff;">port</span> = <span style="color: #b5cea8;">3000</span>;</code></pre>
+          </div>
+          <div class="code-block" style="border-radius: 0;">
+            <div class="text-xs font-semibold mb-2" style="color: var(--status-active);">After</div>
+<pre style="margin: 0;"><code><span style="color: #9cdcfe;">const</span> <span style="color: #4fc1ff;">port</span> = process.env.PORT || <span style="color: #b5cea8;">3000</span>;</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <p class="variant-label">Pending Permission</p>
+      <div class="tool-card" style="border-color: var(--status-waiting);">
+        <div class="tool-header" style="background: var(--surface-attention);">
+          <span class="status-dot" style="background: var(--status-waiting);"></span>
+          <span class="font-medium font-mono">edit</span>
+          <span class="text-xs" style="color: var(--muted-foreground);">Waiting for permission</span>
+        </div>
+        <div class="p-3">
+          <p class="text-sm mb-3" style="color: var(--muted-foreground);">AI wants to edit: <code class="px-1 py-0.5 rounded" style="background: var(--muted);">src/routes/auth.ts</code></p>
+          <div class="flex gap-2">
+            <button class="btn btn-outline btn-sm">Reject</button>
+            <button class="btn btn-secondary btn-sm">Always Allow</button>
+            <button class="btn btn-primary btn-sm">Allow Once</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TOOL: BASH ==================== -->
+    <section id="tool-bash" class="component-section">
+      <h2 class="component-title">Bash Tool</h2>
+      <p class="component-description">Terminal-style output for command execution with streaming support.</p>
+
+      <p class="variant-label">Completed Command</p>
+      <div class="tool-card">
+        <div class="tool-header">
+          <span class="status-dot" style="background: var(--status-active);"></span>
+          <span class="font-medium font-mono">bash</span>
+          <span class="text-xs" style="color: var(--muted-foreground);">Install packages</span>
+          <div class="ml-auto flex items-center gap-2">
+            <span class="badge" style="background: var(--status-active); color: white; font-size: 0.625rem; padding: 0 0.375rem;">exit 0</span>
+            <button class="btn btn-ghost btn-sm btn-icon" style="height: 1.5rem; width: 1.5rem;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="code-block">
+          <div style="color: var(--muted-foreground);">$ npm install jsonwebtoken bcryptjs</div>
+          <div class="mt-2">
+            <div style="color: oklch(0.7 0.15 145);">added 23 packages</div>
+            <div>audited 847 packages in 2.4s</div>
+            <div style="color: oklch(0.7 0.15 145);">found 0 vulnerabilities</div>
+          </div>
+        </div>
+      </div>
+
+      <p class="variant-label">Running with Streaming</p>
+      <div class="tool-card">
+        <div class="tool-header">
+          <span class="status-dot animate-pulse" style="background: var(--status-thinking);"></span>
+          <span class="font-medium font-mono">bash</span>
+          <span class="text-xs" style="color: var(--muted-foreground);">Running tests</span>
+          <span class="ml-auto text-xs animate-typing" style="color: var(--status-thinking);">running...</span>
+        </div>
+        <div class="code-block">
+          <div style="color: var(--muted-foreground);">$ npm test</div>
+          <div class="mt-2">
+            <div>PASS src/auth.test.ts</div>
+            <div>PASS src/middleware.test.ts</div>
+            <div class="animate-typing">Running: src/routes.test.ts...</div>
+          </div>
+        </div>
+      </div>
+
+      <p class="variant-label">Command Error</p>
+      <div class="tool-card">
+        <div class="tool-header" style="border-bottom-color: var(--status-error);">
+          <span class="status-dot" style="background: var(--status-error);"></span>
+          <span class="font-medium font-mono">bash</span>
+          <span class="text-xs" style="color: var(--status-error);">Command failed</span>
+          <span class="ml-auto badge" style="background: var(--status-error); color: white; font-size: 0.625rem; padding: 0 0.375rem;">exit 1</span>
+        </div>
+        <div class="code-block">
+          <div style="color: var(--muted-foreground);">$ npm run build</div>
+          <div class="mt-2" style="color: oklch(0.7 0.2 25);">
+            <div>Error: Cannot find module 'react'</div>
+            <div>npm ERR! code ELIFECYCLE</div>
+          </div>
+        </div>
+      </div>
+
+      <p class="variant-label">With ANSI Colors</p>
+      <div class="tool-card">
+        <div class="tool-header">
+          <span class="status-dot" style="background: var(--status-active);"></span>
+          <span class="font-medium font-mono">bash</span>
+          <span class="text-xs" style="color: var(--muted-foreground);">Git status</span>
+        </div>
+        <div class="code-block">
+          <div style="color: var(--muted-foreground);">$ git status</div>
+          <div class="mt-2">
+            <div>On branch <span style="color: oklch(0.7 0.15 145);">feature/auth</span></div>
+            <div>Changes not staged:</div>
+            <div style="color: oklch(0.7 0.2 25);">  modified: src/auth.ts</div>
+            <div style="color: oklch(0.7 0.15 145);">  new file: src/middleware.ts</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TOOL: SEARCH ==================== -->
+    <section id="tool-search" class="component-section">
+      <h2 class="component-title">Search Tools (Glob/Grep)</h2>
+      <p class="component-description">File search results with match counts and click-to-view actions.</p>
+
+      <p class="variant-label">Glob Results (File List)</p>
+      <div class="tool-card">
+        <div class="tool-header">
+          <span class="status-dot" style="background: var(--status-active);"></span>
+          <span class="font-medium font-mono">glob</span>
+          <span class="text-xs" style="color: var(--muted-foreground);">**/*.ts</span>
+          <span class="ml-auto badge" style="background: var(--muted);">12 files</span>
+        </div>
+        <div class="p-3 space-y-1">
+          <div class="flex items-center gap-2 p-2 rounded cursor-pointer hover:bg-accent text-sm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--status-thinking)" stroke-width="2">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+            </svg>
+            <span>src/index.ts</span>
+          </div>
+          <div class="flex items-center gap-2 p-2 rounded cursor-pointer hover:bg-accent text-sm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--status-thinking)" stroke-width="2">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+            </svg>
+            <span>src/middleware/auth.ts</span>
+          </div>
+          <div class="flex items-center gap-2 p-2 rounded cursor-pointer hover:bg-accent text-sm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--status-thinking)" stroke-width="2">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+            </svg>
+            <span>src/routes/api.ts</span>
+          </div>
+          <button class="text-xs w-full text-center py-2" style="color: var(--primary);">Show 9 more files</button>
+        </div>
+      </div>
+
+      <p class="variant-label">Grep Results (With Matches)</p>
+      <div class="tool-card">
+        <div class="tool-header">
+          <span class="status-dot" style="background: var(--status-active);"></span>
+          <span class="font-medium font-mono">grep</span>
+          <span class="text-xs font-mono" style="color: var(--muted-foreground);">TODO</span>
+          <span class="ml-auto badge" style="background: var(--muted);">5 matches</span>
+        </div>
+        <div class="p-3 space-y-2">
+          <div class="rounded overflow-hidden" style="border: 1px solid var(--border);">
+            <div class="flex items-center justify-between px-3 py-2" style="background: var(--muted);">
+              <span class="text-sm font-medium">src/auth.ts</span>
+              <span class="badge" style="background: var(--secondary); font-size: 0.625rem;">2 matches</span>
+            </div>
+            <div class="code-block text-xs">
+              <div><span class="line-number">23</span>  <span style="color: #6a9955;">// <mark style="background: oklch(0.7 0.2 85 / 40%); color: inherit;">TODO</mark>: Add rate limiting</span></div>
+              <div><span class="line-number">45</span>  <span style="color: #6a9955;">// <mark style="background: oklch(0.7 0.2 85 / 40%); color: inherit;">TODO</mark>: Implement refresh tokens</span></div>
+            </div>
+          </div>
+          <div class="rounded overflow-hidden" style="border: 1px solid var(--border);">
+            <div class="flex items-center justify-between px-3 py-2" style="background: var(--muted);">
+              <span class="text-sm font-medium">src/routes.ts</span>
+              <span class="badge" style="background: var(--secondary); font-size: 0.625rem;">3 matches</span>
+            </div>
+            <div class="code-block text-xs">
+              <div><span class="line-number">12</span>  <span style="color: #6a9955;">// <mark style="background: oklch(0.7 0.2 85 / 40%); color: inherit;">TODO</mark>: Add validation</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p class="variant-label">No Results</p>
+      <div class="tool-card">
+        <div class="tool-header">
+          <span class="status-dot" style="background: var(--status-idle);"></span>
+          <span class="font-medium font-mono">grep</span>
+          <span class="text-xs font-mono" style="color: var(--muted-foreground);">FIXME</span>
+          <span class="ml-auto badge" style="background: var(--muted);">0 matches</span>
+        </div>
+        <div class="p-6 text-center">
+          <p class="text-sm" style="color: var(--muted-foreground);">No matches found for "FIXME"</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== LOADING STATES ==================== -->
+    <section id="loading-states" class="component-section">
+      <h2 class="component-title">Loading States</h2>
+      <p class="component-description">Skeleton loaders and loading indicators for various components.</p>
+
+      <p class="variant-label">Project Card Skeleton</p>
+      <div class="card p-4 max-w-sm">
+        <div class="flex items-start justify-between mb-3">
+          <div class="space-y-2">
+            <div class="skeleton h-5 w-24 rounded"></div>
+            <div class="skeleton h-4 w-32 rounded"></div>
+          </div>
+          <div class="skeleton h-6 w-16 rounded-full"></div>
+        </div>
+        <div class="skeleton h-4 w-full rounded mb-4"></div>
+        <div class="skeleton h-9 w-full rounded"></div>
+      </div>
+
+      <p class="variant-label">Chat Message Skeleton</p>
+      <div class="space-y-4 max-w-md">
+        <div class="flex justify-end">
+          <div class="skeleton h-12 w-48 rounded-2xl"></div>
+        </div>
+        <div class="flex justify-start">
+          <div class="space-y-2">
+            <div class="skeleton h-16 w-64 rounded-2xl"></div>
+            <div class="skeleton h-20 w-56 rounded-lg"></div>
+          </div>
+        </div>
+      </div>
+
+      <p class="variant-label">File List Skeleton</p>
+      <div class="space-y-2 max-w-xs">
+        <div class="flex items-center gap-2 p-2">
+          <div class="skeleton w-4 h-4 rounded"></div>
+          <div class="skeleton h-4 flex-1 rounded"></div>
+        </div>
+        <div class="flex items-center gap-2 p-2">
+          <div class="skeleton w-4 h-4 rounded"></div>
+          <div class="skeleton h-4 flex-1 rounded"></div>
+        </div>
+        <div class="flex items-center gap-2 p-2">
+          <div class="skeleton w-4 h-4 rounded"></div>
+          <div class="skeleton h-4 w-3/4 rounded"></div>
+        </div>
+      </div>
+
+      <p class="variant-label">Spinner Variants</p>
+      <div class="variant-group items-center">
+        <div class="flex flex-col items-center gap-2">
+          <svg class="animate-spin" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2">
+            <circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle>
+            <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
+          </svg>
+          <span class="text-xs" style="color: var(--muted-foreground);">Default</span>
+        </div>
+        <div class="flex flex-col items-center gap-2">
+          <svg class="animate-spin" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--status-thinking)" stroke-width="2">
+            <circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle>
+            <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
+          </svg>
+          <span class="text-xs" style="color: var(--muted-foreground);">Large</span>
+        </div>
+        <div class="flex flex-col items-center gap-2">
+          <div class="flex gap-1">
+            <span class="w-2 h-2 rounded-full animate-bounce" style="background: var(--primary); animation-delay: 0ms;"></span>
+            <span class="w-2 h-2 rounded-full animate-bounce" style="background: var(--primary); animation-delay: 150ms;"></span>
+            <span class="w-2 h-2 rounded-full animate-bounce" style="background: var(--primary); animation-delay: 300ms;"></span>
+          </div>
+          <span class="text-xs" style="color: var(--muted-foreground);">Dots</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== EMPTY STATES ==================== -->
+    <section id="empty-states" class="component-section">
+      <h2 class="component-title">Empty States</h2>
+      <p class="component-description">Placeholder content when no data is available.</p>
+
+      <p class="variant-label">No Projects</p>
+      <div class="card p-8 text-center max-w-sm">
+        <div class="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center" style="background: var(--muted);">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="1.5">
+            <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"></path>
+          </svg>
+        </div>
+        <h3 class="font-semibold mb-2">No Projects Yet</h3>
+        <p class="text-sm mb-4" style="color: var(--muted-foreground);">Create your first project to get started</p>
+        <button class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          Create Project
+        </button>
+      </div>
+
+      <p class="variant-label">No Sessions</p>
+      <div class="card p-6 text-center max-w-xs">
+        <div class="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" style="background: var(--muted);">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="1.5">
+            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"></path>
+          </svg>
+        </div>
+        <h3 class="font-medium mb-1">No Sessions</h3>
+        <p class="text-sm mb-3" style="color: var(--muted-foreground);">Start a new session to chat with AI</p>
+        <button class="btn btn-primary btn-sm w-full">New Session</button>
+      </div>
+
+      <p class="variant-label">No Search Results</p>
+      <div class="card p-6 text-center max-w-xs">
+        <div class="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" style="background: var(--muted);">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="1.5">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+        </div>
+        <h3 class="font-medium mb-1">No Results Found</h3>
+        <p class="text-sm" style="color: var(--muted-foreground);">Try adjusting your search query</p>
+      </div>
+    </section>
+
+    <!-- ==================== ERROR STATES ==================== -->
+    <section id="error-states" class="component-section">
+      <h2 class="component-title">Error States</h2>
+      <p class="component-description">Error messages, connection failures, and recovery options.</p>
+
+      <p class="variant-label">Connection Error</p>
+      <div class="card p-8 text-center max-w-sm" style="border-color: var(--status-error);">
+        <div class="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center" style="background: var(--surface-error);">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--status-error)" stroke-width="1.5">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="15" y1="9" x2="9" y2="15"></line>
+            <line x1="9" y1="9" x2="15" y2="15"></line>
+          </svg>
+        </div>
+        <h3 class="font-semibold mb-2">Connection Failed</h3>
+        <p class="text-sm mb-4" style="color: var(--muted-foreground);">Unable to connect to the server. Please check the URL and try again.</p>
+        <div class="flex gap-2 justify-center">
+          <button class="btn btn-primary">Try Again</button>
+          <button class="btn btn-outline">Edit URL</button>
+        </div>
+      </div>
+
+      <p class="variant-label">Inline Error</p>
+      <div class="p-3 rounded-lg max-w-md" style="background: var(--surface-error); border: 1px solid var(--status-error);">
+        <div class="flex items-start gap-3">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--status-error)" stroke-width="2" class="flex-shrink-0 mt-0.5">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <div>
+            <p class="font-medium text-sm" style="color: var(--status-error);">Build Failed</p>
+            <p class="text-sm" style="color: var(--muted-foreground);">npm ERR! code ENOENT - File not found</p>
+          </div>
+        </div>
+      </div>
+
+      <p class="variant-label">Session Disconnected</p>
+      <div class="card p-4 max-w-md" style="border-color: var(--status-error);">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background: var(--surface-error);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--status-error)" stroke-width="2">
+              <line x1="1" y1="1" x2="23" y2="23"></line>
+              <path d="M16.72 11.06A10.94 10.94 0 0119 12.55"></path>
+              <path d="M5 12.55a10.94 10.94 0 015.17-2.39"></path>
+              <path d="M10.71 5.05A16 16 0 0122.58 9"></path>
+              <path d="M1.42 9a15.91 15.91 0 014.7-2.88"></path>
+              <path d="M8.53 16.11a6 6 0 016.95 0"></path>
+              <line x1="12" y1="20" x2="12.01" y2="20"></line>
+            </svg>
+          </div>
+          <div>
+            <p class="font-medium">Connection Lost</p>
+            <p class="text-sm" style="color: var(--muted-foreground);">Attempting to reconnect...</p>
+          </div>
+        </div>
+        <button class="btn btn-outline w-full btn-sm">Reconnect Now</button>
+      </div>
+    </section>
+
+    <!-- ==================== ATTENTION COMPONENTS ==================== -->
+    <section id="attention" class="component-section">
+      <h2 class="component-title">Attention Components</h2>
+      <p class="component-description">Banners, alerts, and items requiring user action.</p>
+
+      <p class="variant-label">Attention Banner (Full Width)</p>
+      <div class="rounded-lg overflow-hidden max-w-2xl" style="background: var(--surface-attention); border: 1px solid var(--border);">
+        <div class="px-4 py-3 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <span class="w-2 h-2 rounded-full" style="background: var(--status-waiting);"></span>
+            <span class="font-medium">3 items need your attention</span>
+          </div>
+          <button class="text-sm font-medium" style="color: var(--primary);">View all &rarr;</button>
+        </div>
+      </div>
+
+      <p class="variant-label">Attention Card</p>
+      <div class="variant-group">
+        <div class="p-3 rounded-lg max-w-xs" style="background: var(--surface-attention); border-left: 3px solid var(--status-waiting);">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="status-dot" style="background: var(--status-waiting);"></span>
+            <span class="font-medium text-sm">Permission Required</span>
+          </div>
+          <p class="text-xs" style="color: var(--muted-foreground);">Edit src/api.ts - frontend</p>
+          <p class="text-xs mt-1" style="color: var(--muted-foreground);">2 minutes ago</p>
+        </div>
+        <div class="p-3 rounded-lg max-w-xs" style="background: var(--surface-error); border-left: 3px solid var(--status-error);">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="status-dot" style="background: var(--status-error);"></span>
+            <span class="font-medium text-sm">Build Failed</span>
+          </div>
+          <p class="text-xs" style="color: var(--muted-foreground);">analytics - 15m ago</p>
+        </div>
+      </div>
+
+      <p class="variant-label">Permission Bar</p>
+      <div class="rounded-lg overflow-hidden max-w-2xl" style="background: var(--surface-attention); border: 1px solid var(--border);">
+        <div class="px-4 py-3 flex items-center gap-4">
+          <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style="background: var(--status-waiting);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            </svg>
+          </div>
+          <div class="flex-1">
+            <p class="font-medium text-sm">Permission Required</p>
+            <p class="text-sm" style="color: var(--muted-foreground);">AI wants to edit <code class="px-1 py-0.5 rounded" style="background: var(--muted); font-size: 0.75rem;">src/routes/auth.ts</code></p>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn btn-outline btn-sm">Reject</button>
+            <button class="btn btn-secondary btn-sm">Always Allow</button>
+            <button class="btn btn-primary btn-sm">Allow Once</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== NAVIGATION ==================== -->
+    <section id="navigation" class="component-section">
+      <h2 class="component-title">Navigation</h2>
+      <p class="component-description">Sidebar, tabs, and bottom navigation components.</p>
+
+      <p class="variant-label">Sidebar Navigation</p>
+      <div class="w-60 p-3 rounded-lg" style="background: var(--card); border: 1px solid var(--border);">
+        <div class="space-y-1">
+          <a href="#" class="nav-link active">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+            </svg>
+            Home
+          </a>
+          <a href="#" class="nav-link">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"></path>
+            </svg>
+            Projects
+          </a>
+          <a href="#" class="nav-link">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+            </svg>
+            Activity
+            <span class="ml-auto w-5 h-5 rounded-full text-xs flex items-center justify-center" style="background: var(--destructive); color: white;">3</span>
+          </a>
+        </div>
+      </div>
+
+      <p class="variant-label">Tabs</p>
+      <div class="flex border-b max-w-md" style="border-color: var(--border);">
+        <button class="px-4 py-2 text-sm border-b-2" style="border-color: var(--primary); font-weight: 500;">Chat</button>
+        <button class="px-4 py-2 text-sm border-b-2 border-transparent" style="color: var(--muted-foreground);">Files</button>
+        <button class="px-4 py-2 text-sm border-b-2 border-transparent" style="color: var(--muted-foreground);">Logs</button>
+        <button class="px-4 py-2 text-sm border-b-2 border-transparent" style="color: var(--muted-foreground);">Settings</button>
+      </div>
+
+      <p class="variant-label">Bottom Navigation (Mobile)</p>
+      <div class="max-w-xs rounded-lg overflow-hidden" style="border: 1px solid var(--border);">
+        <div class="flex justify-around py-2 px-1" style="background: var(--card); border-top: 1px solid var(--border);">
+          <button class="flex flex-col items-center gap-1 p-2" style="color: var(--primary);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+            </svg>
+            <span class="text-[10px]">Home</span>
+          </button>
+          <button class="flex flex-col items-center gap-1 p-2" style="color: var(--muted-foreground);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"></path>
+            </svg>
+            <span class="text-[10px]">Projects</span>
+          </button>
+          <button class="flex flex-col items-center gap-1 p-2 relative" style="color: var(--muted-foreground);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+            </svg>
+            <span class="absolute -top-0.5 right-1 w-4 h-4 rounded-full text-[9px] flex items-center justify-center" style="background: var(--destructive); color: white;">3</span>
+            <span class="text-[10px]">Activity</span>
+          </button>
+          <button class="flex flex-col items-center gap-1 p-2" style="color: var(--muted-foreground);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 00.33 1.82"></path>
+            </svg>
+            <span class="text-[10px]">Settings</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== INTENT INPUT ==================== -->
+    <section id="intent-input" class="component-section">
+      <h2 class="component-title">Intent Input</h2>
+      <p class="component-description">The primary input for the intent-first home experience.</p>
+
+      <p class="variant-label">Default State</p>
+      <div class="max-w-xl">
+        <p class="text-2xl font-light text-center mb-6" style="color: var(--muted-foreground);">What's on your mind?</p>
+        <div class="relative">
+          <input 
+            type="text" 
+            class="input-field w-full text-lg py-4 px-6 pr-14" 
+            placeholder="Show my projects, start a session, check status..."
+            style="height: 3.5rem; border-radius: 9999px;"
+          >
+          <button class="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center" style="background: var(--primary);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary-foreground)" stroke-width="2">
+              <path d="M5 12h14M12 5l7 7-7 7"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <p class="variant-label">With Value</p>
+      <div class="max-w-xl">
+        <div class="relative">
+          <input 
+            type="text" 
+            class="input-field w-full text-lg py-4 px-6 pr-14" 
+            value="Show my projects"
+            style="height: 3.5rem; border-radius: 9999px;"
+          >
+          <button class="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center" style="background: var(--primary);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary-foreground)" stroke-width="2">
+              <path d="M5 12h14M12 5l7 7-7 7"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <p class="variant-label">Processing State</p>
+      <div class="max-w-xl">
+        <div class="relative">
+          <input 
+            type="text" 
+            class="input-field w-full text-lg py-4 px-6 pr-14" 
+            value="Show my projects"
+            disabled
+            style="height: 3.5rem; border-radius: 9999px; opacity: 0.7;"
+          >
+          <div class="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center" style="background: var(--primary);">
+            <svg class="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary-foreground)" stroke-width="2">
+              <circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle>
+              <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <p class="variant-label">Mobile Variant</p>
+      <div class="max-w-xs">
+        <div class="relative">
+          <input 
+            type="text" 
+            class="input-field w-full py-3 px-4 pr-12" 
+            placeholder="Type or tap a quick action..."
+            style="height: 3rem; border-radius: 9999px;"
+          >
+          <button class="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center" style="background: var(--primary);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary-foreground)" stroke-width="2">
+              <path d="M5 12h14M12 5l7 7-7 7"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== QUICK ACTIONS ==================== -->
+    <section id="quick-actions" class="component-section">
+      <h2 class="component-title">Quick Actions</h2>
+      <p class="component-description">Action chips for common intents and shortcuts.</p>
+
+      <p class="variant-label">Desktop Quick Actions</p>
+      <div class="flex flex-wrap gap-3">
+        <button class="flex items-center gap-2 px-4 py-2 rounded-full transition-colors" style="background: var(--muted);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"></path>
+          </svg>
+          Show Projects
+        </button>
+        <button class="flex items-center gap-2 px-4 py-2 rounded-full transition-colors" style="background: var(--muted);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          New Session
+        </button>
+        <button class="flex items-center gap-2 px-4 py-2 rounded-full transition-colors" style="background: var(--surface-attention);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          Needs Attention
+          <span class="w-5 h-5 rounded-full text-xs flex items-center justify-center" style="background: var(--status-error); color: white;">3</span>
+        </button>
+        <button class="flex items-center gap-2 px-4 py-2 rounded-full transition-colors" style="background: var(--muted);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+          Recent Activity
+        </button>
+      </div>
+
+      <p class="variant-label">Mobile Quick Actions (Horizontal Scroll)</p>
+      <div class="max-w-xs overflow-x-auto pb-2" style="scrollbar-width: none;">
+        <div class="flex gap-2">
+          <button class="flex items-center gap-2 px-3 py-2 rounded-full whitespace-nowrap text-sm" style="background: var(--muted);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"></path>
+            </svg>
+            Projects
+          </button>
+          <button class="flex items-center gap-2 px-3 py-2 rounded-full whitespace-nowrap text-sm" style="background: var(--muted);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            New Session
+          </button>
+          <button class="flex items-center gap-2 px-3 py-2 rounded-full whitespace-nowrap text-sm" style="background: var(--muted);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+            </svg>
+            Activity
+          </button>
+        </div>
+      </div>
+
+      <p class="variant-label">Context-Aware Quick Actions</p>
+      <div class="flex flex-wrap gap-2 max-w-md">
+        <span class="text-xs uppercase tracking-wide" style="color: var(--muted-foreground); width: 100%;">Based on "frontend" project:</span>
+        <button class="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm" style="background: var(--muted);">Resume last session</button>
+        <button class="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm" style="background: var(--muted);">View recent changes</button>
+        <button class="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm" style="background: var(--muted);">Check build status</button>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="text-center py-8" style="color: var(--muted-foreground);">
+      <p>CodeOpen Component Library &middot; December 2024</p>
+      <p class="text-sm mt-2">Toggle dark mode using the button in the top right corner</p>
+      <div class="mt-4 flex justify-center gap-4">
+        <a href="desktop-mockups.html" class="text-sm" style="color: var(--primary);">Desktop Pages</a>
+        <a href="mobile-mockups.html" class="text-sm" style="color: var(--primary);">Mobile Pages</a>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>
