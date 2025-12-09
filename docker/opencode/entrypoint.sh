@@ -91,12 +91,52 @@ git config --global --add safe.directory /workspace
 # Display startup info
 echo "=== Configuration ==="
 echo "Workspace: /workspace"
-echo "Port: ${OPENCODE_PORT:-4096}"
+echo "OpenCode Port: ${OPENCODE_PORT:-4096}"
+echo "ACP Gateway Port: ${ACP_GATEWAY_PORT:-4097}"
 echo "Host: ${OPENCODE_HOST:-0.0.0.0}"
 echo "===================="
 
-# Move to workspace and start OpenCode server
+# Move to workspace
 cd /workspace
 
-echo "Starting OpenCode server..."
-exec opencode serve --port "${OPENCODE_PORT:-4096}" --hostname "${OPENCODE_HOST:-0.0.0.0}"
+# =============================================================================
+# Start ACP Gateway
+# =============================================================================
+echo "Starting ACP Gateway..."
+cd /opt/acp-gateway
+bun run src/index.ts &
+ACP_PID=$!
+cd /workspace
+
+# Wait for ACP Gateway to be ready
+echo "Waiting for ACP Gateway to start..."
+for i in {1..30}; do
+    if curl -sf "http://localhost:${ACP_GATEWAY_PORT:-4097}/health" > /dev/null 2>&1; then
+        echo "ACP Gateway is ready."
+        break
+    fi
+    sleep 1
+done
+
+# =============================================================================
+# Handle shutdown gracefully
+# =============================================================================
+cleanup() {
+    echo "Shutting down..."
+    if [ -n "$ACP_PID" ]; then
+        kill "$ACP_PID" 2>/dev/null || true
+    fi
+    exit 0
+}
+
+trap cleanup SIGTERM SIGINT
+
+# =============================================================================
+# Keep container running
+# The ACP Gateway handles all communication with agents
+# =============================================================================
+echo "Container ready. ACP Gateway running on port ${ACP_GATEWAY_PORT:-4097}"
+echo "Available agents: opencode, claude-code, gemini-cli, qwen-code, codex"
+
+# Wait for ACP Gateway process
+wait $ACP_PID

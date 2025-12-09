@@ -8,3 +8,10 @@ README*
 
 # Local test files
 test-*
+
+# Node modules (will be installed in Docker)
+**/node_modules
+
+# Lock files (use bun.lock)
+**/package-lock.json
+**/yarn.lock
