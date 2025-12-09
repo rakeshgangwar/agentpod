@@ -12,6 +12,7 @@ import { syncRoutes } from './routes/sync.ts';
 import { opencodeRoutes } from './routes/opencode.ts';
 import { userRoutes } from './routes/users.ts';
 import { containerTiersRouter } from './routes/container-tiers.ts';
+import { acpRoutes } from './routes/acp.ts';
 
 // Initialize database
 console.log('Initializing database...');
@@ -32,6 +33,7 @@ const app = new Hono()
   .use('/api/*', bearerAuth({ token: config.auth.token }))
   // API routes - Note: Order matters! More specific routes should come first
   // OpenCode proxy routes must come before generic project routes to avoid /:id catching everything
+  .route('/api/projects', acpRoutes) // ACP multi-agent routes under /api/projects/:id/acp/*
   .route('/api/projects', opencodeRoutes) // OpenCode proxy routes are under /api/projects/:id/opencode/*
   .route('/api/projects', syncRoutes) // Sync routes are under /api/projects/:id/sync
   .route('/api/projects', projectRoutes)
@@ -60,33 +62,27 @@ console.log(`
 ║  - POST /api/projects/:id/start    Start container            ║
 ║  - POST /api/projects/:id/stop     Stop container             ║
 ╠═══════════════════════════════════════════════════════════════╣
-║  OpenCode Proxy Endpoints (per project):                      ║
+║  ACP Multi-Agent Endpoints (per project):                     ║
+║  - GET  /api/projects/:id/acp/agents           List agents    ║
+║  - POST /api/projects/:id/acp/agents/:a/spawn  Spawn agent    ║
+║  - POST /api/projects/:id/acp/session          Create session ║
+║  - POST .../acp/session/:sid/prompt            Send prompt    ║
+║  - GET  /api/projects/:id/acp/events           SSE stream     ║
+╠═══════════════════════════════════════════════════════════════╣
+║  OpenCode Proxy Endpoints (legacy, per project):              ║
 ║  - GET  /api/projects/:id/opencode/session     List sessions  ║
 ║  - POST /api/projects/:id/opencode/session     Create session ║
 ║  - POST .../session/:sid/message               Send message   ║
 ║  - GET  /api/projects/:id/opencode/event       SSE stream     ║
-║  - GET  /api/projects/:id/opencode/file        List files     ║
 ╠═══════════════════════════════════════════════════════════════╣
 ║  User OpenCode Config Endpoints:                              ║
 ║  - GET  /api/users/:id/opencode/config      Full config       ║
 ║  - PUT  /api/users/:id/opencode/settings    Update settings   ║
-║  - PUT  /api/users/:id/opencode/agents-md   Update AGENTS.md  ║
-║  - GET  /api/users/:id/opencode/files       List files        ║
-║  - PUT  /api/users/:id/opencode/files/:t/:n Upsert file       ║
 ╠═══════════════════════════════════════════════════════════════╣
-║  Sync Endpoints (per project):                                ║
-║  - GET  /api/projects/:id/sync/status       Get sync status   ║
-║  - POST /api/projects/:id/sync              Trigger sync      ║
-║  - POST /api/projects/:id/sync/commit-config Commit config    ║
-╠═══════════════════════════════════════════════════════════════╣
-║  Provider Endpoints:                                          ║
+║  Provider & Container Tier Endpoints:                         ║
 ║  - GET  /api/providers             List providers             ║
 ║  - POST /api/providers/:id/configure  Set credentials         ║
-╠═══════════════════════════════════════════════════════════════╣
-║  Container Tier Endpoints:                                    ║
 ║  - GET  /api/container-tiers         List all tiers           ║
-║  - GET  /api/container-tiers/default Get default tier         ║
-║  - GET  /api/container-tiers/:id     Get tier by ID           ║
 ╚═══════════════════════════════════════════════════════════════╝
 `);
 

@@ -369,4 +369,83 @@ export const migrations: Migration[] = [
       console.warn('Rollback not supported - code_server_url column will remain');
     },
   },
+  
+  // Migration 9: Add ACP multi-agent tables
+  // Supports multi-agent orchestration via ACP Gateway
+  {
+    version: 9,
+    name: 'add_acp_multi_agent_tables',
+    up: () => {
+      // Add default_agent_id to projects
+      const projectTableInfo = db.query("PRAGMA table_info(projects)").all() as Array<{ name: string }>;
+      if (!projectTableInfo.some(col => col.name === 'default_agent_id')) {
+        db.exec("ALTER TABLE projects ADD COLUMN default_agent_id TEXT DEFAULT 'opencode'");
+      }
+      
+      // Create agent_auth_tokens table for storing encrypted OAuth tokens
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS agent_auth_tokens (
+          id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+          user_id TEXT NOT NULL,
+          agent_id TEXT NOT NULL,
+          access_token_encrypted TEXT,
+          refresh_token_encrypted TEXT,
+          token_type TEXT DEFAULT 'Bearer',
+          expires_at TEXT,
+          scopes TEXT,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now')),
+          UNIQUE(user_id, agent_id)
+        )
+      `);
+      
+      // Create agent_sessions table for persisting ACP sessions
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS agent_sessions (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          agent_id TEXT NOT NULL,
+          acp_session_id TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'idle', 'processing', 'ended', 'error')),
+          working_directory TEXT NOT NULL DEFAULT '/workspace',
+          message_count INTEGER DEFAULT 0,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now')),
+          ended_at TEXT,
+          FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        )
+      `);
+      
+      // Create agent_session_messages table for message history
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS agent_session_messages (
+          id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+          session_id TEXT NOT NULL,
+          role TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'system', 'tool')),
+          content TEXT NOT NULL,
+          tool_name TEXT,
+          tool_input TEXT,
+          tool_result TEXT,
+          is_partial INTEGER DEFAULT 0,
+          created_at TEXT DEFAULT (datetime('now')),
+          FOREIGN KEY (session_id) REFERENCES agent_sessions(id) ON DELETE CASCADE
+        )
+      `);
+      
+      // Create indexes
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_agent_auth_tokens_user_agent ON agent_auth_tokens(user_id, agent_id);
+        CREATE INDEX IF NOT EXISTS idx_agent_sessions_project ON agent_sessions(project_id);
+        CREATE INDEX IF NOT EXISTS idx_agent_sessions_status ON agent_sessions(status);
+        CREATE INDEX IF NOT EXISTS idx_agent_session_messages_session ON agent_session_messages(session_id);
+      `);
+    },
+    down: () => {
+      db.exec('DROP TABLE IF EXISTS agent_session_messages');
+      db.exec('DROP TABLE IF EXISTS agent_sessions');
+      db.exec('DROP TABLE IF EXISTS agent_auth_tokens');
+      // Note: default_agent_id column will remain on projects
+      console.warn('Rollback: ACP tables dropped, but default_agent_id column will remain on projects');
+    },
+  },
 ];
