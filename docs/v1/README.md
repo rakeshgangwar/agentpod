@@ -1,4 +1,6 @@
-# Implementation Guide
+# Implementation Guide (v1 - Legacy)
+
+> **Note**: This is the v1 implementation guide. For the latest development plans including ACP multi-agent integration, see [**docs/v2**](../v2/README.md).
 
 This folder contains detailed implementation plans for each phase of the Portable Command Center project.
 
@@ -8,12 +10,28 @@ This folder contains detailed implementation plans for each phase of the Portabl
 |-------|------|----------|--------|
 | 1 | [Infrastructure Setup](./phase-1-infrastructure/) | 1-2 days | ✅ Complete |
 | 2 | [Management API](./phase-2-management-api/) | 3-5 days | ✅ Complete |
-| 3 | [Mobile App Foundation](./phase-3-mobile-foundation/) | 3-5 days | 🔲 Pending |
-| 4 | [Mobile App Core Features](./phase-4-mobile-core/) | 5-7 days | 🔲 Pending |
-| 5 | [Mobile App Advanced](./phase-5-mobile-advanced/) | 5-7 days | 🔲 Pending |
+| 3 | [Mobile App Foundation](./phase-3-mobile-foundation/) | 3-5 days | ✅ Complete |
+| 4 | [Mobile App Core Features](./phase-4-mobile-core/) | 5-7 days | ✅ ~90% Complete |
+| 5 | [Mobile App Advanced](./phase-5-mobile-advanced/) | 5-7 days | ⚡ ~60% Complete |
 | 6 | [Polish & Optimization](./phase-6-polish/) | 3-5 days | 🔲 Pending |
 
 **Total Estimated Duration:** 3-5 weeks
+
+## Next Steps: v2
+
+The v2 implementation focuses on **ACP (Agent Client Protocol) integration** to support multiple AI agents:
+
+- **OpenCode** (current, default)
+- **Claude Code** (Anthropic)
+- **Gemini CLI** (Google)
+- **Qwen Code** (Alibaba)
+- **And more...**
+
+See [docs/v2](../v2/README.md) for details.
+
+## Deferred Tasks
+
+Tasks that were deferred or incomplete from v1 have been consolidated in [docs/v2/deferred-v1-tasks](../v2/deferred-v1-tasks/README.md).
 
 ## Phase Dependency Graph
 
