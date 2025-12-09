@@ -35,10 +35,11 @@ The [Agent Client Protocol (ACP)](https://agentclientprotocol.com) is an open st
 
 | Phase | Name | Description | Status |
 |-------|------|-------------|--------|
-| 1 | [ACP Gateway](./phase-1-acp-gateway/) | Container-side ACP client service | 🔲 Pending |
-| 2 | [Management API](./phase-2-management-api/) | API routes for ACP proxying | 🔲 Pending |
+| 1 | [ACP Gateway](./phase-1-acp-gateway/) | Container-side ACP client service | ✅ Complete |
+| 2 | [Management API](./phase-2-management-api/) | API routes for ACP proxying | ✅ Complete |
 | 3 | [Frontend](./phase-3-frontend/) | Agent selection UI & chat adapter | 🔲 Pending |
 | 4 | [Migration](./phase-4-migration/) | Migrate OpenCode SDK to ACP | 🔲 Pending |
+| 5 | [Modular Containers](./modular-containers.md) | Resource tiers, flavors, and add-ons | 🔄 In Progress |
 
 ## Key Documents
 
@@ -46,10 +47,9 @@ The [Agent Client Protocol (ACP)](https://agentclientprotocol.com) is an open st
 |----------|-------------|
 | [Architecture](./architecture.md) | System architecture and data flow |
 | [ACP Protocol](./acp-protocol.md) | ACP protocol overview and implementation |
-| [API Specification](./api-specification.md) | ACP Gateway and Management API endpoints |
+| [Modular Containers](./modular-containers.md) | Container tiers, flavors, and add-ons |
 | [Authentication](./authentication.md) | Agent authentication flows |
 | [Session Persistence](./session-persistence.md) | Session storage and recovery |
-| [Agent Configuration](./agent-configuration.md) | Agent registry and configuration |
 
 ## Deferred Tasks from v1
 
