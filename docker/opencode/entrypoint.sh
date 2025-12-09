@@ -42,7 +42,7 @@ else
     cat > "$CONFIG_FILE" << 'EOF'
 {
   "$schema": "https://opencode.ai/config.json",
-  "permissions": {
+  "permission": {
     "bash": "ask",
     "edit": "grant",
     "read": "grant",
@@ -56,7 +56,7 @@ else
   }
 }
 EOF
-    echo "Default permissions configured (bash, write, webfetch, mcp require approval)"
+    echo "Default permission configured (bash, write, webfetch, mcp require approval)"
 fi
 
 # =============================================================================

@@ -16,6 +16,7 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
+    "@agentclientprotocol/sdk": "^0.8.0",
     "hono": "^4.6.0",
     "nanoid": "^5.0.0",
     "zod": "^3.23.0"

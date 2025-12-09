@@ -97,11 +97,11 @@ export function ensureDbInitialized(): void {
   
   // Import dynamically to avoid circular imports
   const { initDatabase } = require('../src/db/index');
-  const { runMigrations } = require('../src/db/migrations');
+  const { runMigrations, migrations } = require('../src/db/migrations');
   
   try {
     initDatabase();
-    runMigrations();
+    runMigrations(migrations);
     dbInitialized = true;
   } catch (e) {
     // Ignore if already initialized

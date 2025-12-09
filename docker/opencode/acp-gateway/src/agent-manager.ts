@@ -1,22 +1,21 @@
 /**
  * Agent Manager
  * 
- * Manages the lifecycle of AI coding agents, including spawning, stopping,
- * and tracking their connection status.
+ * Manages the lifecycle of AI coding agents using the official ACP SDK.
  */
 
-import type { AgentId, AgentConnection, AgentStatus, AgentConfig } from './types.ts';
-import { AcpClient } from './acp-client.ts';
+import type { AgentId, AgentConnection, SessionNotification } from './types.ts';
+import { AcpClient, type AcpClientEventHandlers } from './acp-client.ts';
 import { agentRegistry } from './agent-registry.ts';
-import { FileHandler } from './file-handler.ts';
 import { sessionManager } from './session-manager.ts';
 import { eventEmitter } from './event-emitter.ts';
 import { authHandler } from './auth-handler.ts';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 
 interface AgentInstance {
   connection: AgentConnection;
   client: AcpClient;
-  fileHandler: FileHandler;
 }
 
 /**
@@ -57,7 +56,6 @@ export class AgentManager {
     const connection: AgentConnection = {
       id: agentId,
       status: 'starting',
-      process: null,
       startedAt: null,
       lastActivity: null,
       error: null,
@@ -66,9 +64,6 @@ export class AgentManager {
 
     // Emit status update
     eventEmitter.emitAgentStatus(agentId, 'starting');
-
-    // Create file handler
-    const fileHandler = new FileHandler(workDir);
 
     // Check if auth token is available for agents requiring auth
     let authEnv: Record<string, string> = {};
@@ -92,156 +87,97 @@ export class AgentManager {
       }
     }
 
-    // Create ACP client
-    const client = new AcpClient(config, {
-      workingDirectory: workDir,
-      env: { ...env, ...authEnv },
-      
-      // Event handlers
-      onSessionUpdate: (notification) => {
-        console.log(`[AgentManager:${agentId}] Session update:`, notification.type);
+    // Create event handlers
+    const handlers: AcpClientEventHandlers = {
+      onSessionUpdate: (notification: SessionNotification) => {
+        console.log(`[AgentManager:${agentId}] Session update:`, notification.update);
         
-        // Update session
+        // Find the local session by ACP session ID
         const session = sessionManager.getSessionByAcpId(notification.sessionId);
         if (session) {
-          sessionManager.updateSession(session.id, {
-            status: notification.type === 'error' ? 'idle' : 'processing',
-          });
-          
-          // Emit to frontend
-          eventEmitter.emitSessionUpdate(
-            session.id,
-            notification.type,
-            notification.content,
-            notification.isPartial,
-            notification.toolName,
-            notification.toolInput,
-            notification.toolResult
-          );
+          // Emit to frontend via SSE
+          eventEmitter.emit('session_update', notification, session.id, agentId);
         }
       },
-      
-      onSessionEndTurn: (notification) => {
-        console.log(`[AgentManager:${agentId}] Session end turn:`, notification.reason);
+
+      onPermissionRequest: async (params) => {
+        console.log(`[AgentManager:${agentId}] Permission request:`, params.toolCall.title);
         
-        const session = sessionManager.getSessionByAcpId(notification.sessionId);
-        if (session) {
-          sessionManager.setStatus(session.id, 'idle');
-          eventEmitter.emitSessionEndTurn(session.id, notification.reason, notification.error);
+        // For now, auto-approve with first option
+        // TODO: Emit to frontend for user decision
+        return {
+          outcome: {
+            outcome: 'selected' as const,
+            optionId: params.options[0]?.optionId || '',
+          },
+        };
+      },
+
+      onReadTextFile: async (params) => {
+        console.log(`[AgentManager:${agentId}] Read file:`, params.path);
+        try {
+          const filePath = path.isAbsolute(params.path) 
+            ? params.path 
+            : path.join(workDir, params.path);
+          const content = await fs.readFile(filePath, 'utf-8');
+          return { content };
+        } catch (error) {
+          throw new Error(`Failed to read file: ${(error as Error).message}`);
         }
       },
-      
-      onAuthRequired: (notification) => {
-        console.log(`[AgentManager:${agentId}] Auth required`);
-        
-        connection.status = 'auth_required';
-        authHandler.handleAuthRequired(
-          agentId,
-          notification.authUrl,
-          notification.deviceCode,
-          notification.userCode,
-          notification.expiresIn
-        );
+
+      onWriteTextFile: async (params) => {
+        console.log(`[AgentManager:${agentId}] Write file:`, params.path);
+        try {
+          const filePath = path.isAbsolute(params.path) 
+            ? params.path 
+            : path.join(workDir, params.path);
+          await fs.writeFile(filePath, params.content, 'utf-8');
+          return {};
+        } catch (error) {
+          throw new Error(`Failed to write file: ${(error as Error).message}`);
+        }
       },
-      
-      onError: (error) => {
+
+      onError: (error: Error) => {
         console.error(`[AgentManager:${agentId}] Error:`, error);
         connection.error = error.message;
         eventEmitter.emitAgentStatus(agentId, 'error', error.message);
       },
-      
-      onClose: (code) => {
-        console.log(`[AgentManager:${agentId}] Process closed with code: ${code}`);
+
+      onClose: () => {
+        console.log(`[AgentManager:${agentId}] Connection closed`);
         connection.status = 'stopped';
-        connection.process = null;
         eventEmitter.emitAgentStatus(agentId, 'stopped');
       },
-      
-      // File system handlers
-      onFsRead: async (params) => {
-        return fileHandler.readTextFile(params);
-      },
-      
-      onFsWrite: async (params) => {
-        await fileHandler.writeTextFile(params);
-      },
-      
-      onFsList: async (params) => {
-        return fileHandler.listDirectory(params);
-      },
-      
-      // Permission handler (auto-approve for now, frontend can override)
-      onPermissionRequest: async (params) => {
-        console.log(`[AgentManager:${agentId}] Permission request:`, params.permission);
-        
-        // Emit permission request to frontend
-        const session = sessionManager.getSessionByAcpId(params.sessionId);
-        if (session) {
-          eventEmitter.emitPermissionRequest(
-            session.id,
-            `perm_${Date.now()}`,
-            params.permission,
-            params.description,
-            params.path,
-            params.command
-          );
-        }
-        
-        // Auto-approve for now (can be made interactive later)
-        return { granted: true };
-      },
-      
-      // Terminal handler
-      onTerminalRun: async (params) => {
-        console.log(`[AgentManager:${agentId}] Terminal run:`, params.command);
-        
-        const proc = Bun.spawn(['sh', '-c', params.command], {
-          cwd: params.cwd || workDir,
-          stdout: 'pipe',
-          stderr: 'pipe',
-        });
-        
-        const exitCode = await proc.exited;
-        const stdout = await new Response(proc.stdout).text();
-        const stderr = await new Response(proc.stderr).text();
-        
-        return { exitCode, stdout, stderr };
-      },
-    });
+    };
+
+    // Create ACP client using official SDK
+    const client = new AcpClient(config, workDir, handlers);
 
     // Store instance
     const instance: AgentInstance = {
       connection,
       client,
-      fileHandler,
     };
     this.agents.set(agentId, instance);
 
     try {
-      // Spawn the process
-      await client.spawn();
+      // Spawn and initialize the agent
+      const initResult = await client.spawn({ ...env, ...authEnv });
       
       connection.status = 'running';
       connection.startedAt = new Date();
       connection.lastActivity = new Date();
       
-      // Initialize ACP connection
-      await client.initialize();
-      
-      // If auth is required, try to authenticate
-      if (config.requiresAuth) {
-        const token = authHandler.getToken(agentId);
-        if (token) {
-          const authResult = await client.authenticate(token);
-          if (!authResult.authenticated) {
-            connection.status = 'auth_required';
-          }
-        } else {
-          // Trigger auth flow
-          const authResult = await client.authenticate();
-          if (!authResult.authenticated) {
-            connection.status = 'auth_required';
-          }
+      console.log(`[AgentManager] Agent ${agentId} initialized:`, initResult.agentInfo);
+
+      // Check if authentication is required
+      if (initResult.authMethods && initResult.authMethods.length > 0) {
+        console.log(`[AgentManager:${agentId}] Auth methods available:`, initResult.authMethods);
+        // For now, mark as auth required if no token available
+        if (config.requiresAuth && !authHandler.isAuthenticated(agentId)) {
+          connection.status = 'auth_required';
         }
       }
       

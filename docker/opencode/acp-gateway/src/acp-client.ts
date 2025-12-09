@@ -1,127 +1,112 @@
 /**
  * ACP Client
  * 
- * Handles JSON-RPC 2.0 communication with ACP-compliant agents over stdio.
- * Manages subprocess spawning, message framing, and bidirectional communication.
+ * Uses the official @agentclientprotocol/sdk to communicate with ACP-compliant agents.
  */
 
-import type { Subprocess } from 'bun';
-import type {
-  AgentConfig,
-  AgentId,
-  JsonRpcRequest,
-  JsonRpcResponse,
-  JsonRpcNotification,
-  AcpInitializeParams,
-  AcpInitializeResult,
-  AcpAuthenticateParams,
-  AcpAuthenticateResult,
-  AcpSessionNewParams,
-  AcpSessionNewResult,
-  AcpSessionPromptParams,
-  AcpSessionCancelParams,
-  SessionUpdateNotification,
-  SessionEndTurnNotification,
-  AuthRequiredNotification,
-  FsReadTextFileParams,
-  FsReadTextFileResult,
-  FsWriteTextFileParams,
-  FsListDirectoryParams,
-  FsListDirectoryResult,
-  SessionRequestPermissionParams,
-  TerminalRunParams,
-  TerminalRunResult,
-} from './types.ts';
+import { spawn, type Subprocess } from 'bun';
+import { Writable, Readable } from 'node:stream';
+import * as acp from '@agentclientprotocol/sdk';
 
-// Event handler types
-type SessionUpdateHandler = (notification: SessionUpdateNotification) => void;
-type SessionEndTurnHandler = (notification: SessionEndTurnNotification) => void;
-type AuthRequiredHandler = (notification: AuthRequiredNotification) => void;
-type ErrorHandler = (error: Error) => void;
-type CloseHandler = (code: number | null) => void;
+import type { AgentConfig, AgentId } from './types.ts';
 
-// Client request handler types (requests FROM agent)
-type FsReadHandler = (params: FsReadTextFileParams) => Promise<FsReadTextFileResult>;
-type FsWriteHandler = (params: FsWriteTextFileParams) => Promise<void>;
-type FsListHandler = (params: FsListDirectoryParams) => Promise<FsListDirectoryResult>;
-type PermissionHandler = (params: SessionRequestPermissionParams) => Promise<{ granted: boolean }>;
-type TerminalHandler = (params: TerminalRunParams) => Promise<TerminalRunResult>;
+// Re-export types from the official SDK for use in other files
+export type {
+  InitializeResponse,
+  NewSessionResponse,
+  PromptResponse,
+  SessionNotification,
+  ContentBlock,
+} from '@agentclientprotocol/sdk';
 
-interface AcpClientOptions {
-  workingDirectory: string;
-  env?: Record<string, string>;
-  onSessionUpdate?: SessionUpdateHandler;
-  onSessionEndTurn?: SessionEndTurnHandler;
-  onAuthRequired?: AuthRequiredHandler;
-  onError?: ErrorHandler;
-  onClose?: CloseHandler;
-  // Client capability handlers
-  onFsRead?: FsReadHandler;
-  onFsWrite?: FsWriteHandler;
-  onFsList?: FsListHandler;
-  onPermissionRequest?: PermissionHandler;
-  onTerminalRun?: TerminalHandler;
+/**
+ * Event handlers for session updates
+ */
+export interface AcpClientEventHandlers {
+  onSessionUpdate?: (params: acp.SessionNotification) => void;
+  onPermissionRequest?: (params: acp.RequestPermissionRequest) => Promise<acp.RequestPermissionResponse>;
+  onReadTextFile?: (params: acp.ReadTextFileRequest) => Promise<acp.ReadTextFileResponse>;
+  onWriteTextFile?: (params: acp.WriteTextFileRequest) => Promise<acp.WriteTextFileResponse>;
+  onError?: (error: Error) => void;
+  onClose?: () => void;
 }
 
-interface PendingRequest {
-  resolve: (result: unknown) => void;
-  reject: (error: Error) => void;
-  method: string;
-  timeout: ReturnType<typeof setTimeout>;
-}
+/**
+ * Client handler implementation for the ACP SDK
+ */
+class ClientHandler implements acp.Client {
+  constructor(private handlers: AcpClientEventHandlers) {}
 
-const REQUEST_TIMEOUT = 300000; // 5 minutes for long operations
+  async requestPermission(params: acp.RequestPermissionRequest): Promise<acp.RequestPermissionResponse> {
+    if (this.handlers.onPermissionRequest) {
+      return this.handlers.onPermissionRequest(params);
+    }
+    // Auto-approve if no handler (for now)
+    return {
+      outcome: {
+        outcome: 'selected',
+        optionId: params.options[0]?.optionId || '',
+      },
+    };
+  }
+
+  async sessionUpdate(params: acp.SessionNotification): Promise<void> {
+    this.handlers.onSessionUpdate?.(params);
+  }
+
+  async readTextFile(params: acp.ReadTextFileRequest): Promise<acp.ReadTextFileResponse> {
+    if (this.handlers.onReadTextFile) {
+      return this.handlers.onReadTextFile(params);
+    }
+    throw new Error('File read not supported');
+  }
+
+  async writeTextFile(params: acp.WriteTextFileRequest): Promise<acp.WriteTextFileResponse> {
+    if (this.handlers.onWriteTextFile) {
+      return this.handlers.onWriteTextFile(params);
+    }
+    throw new Error('File write not supported');
+  }
+}
 
 /**
  * ACP Client for communicating with an agent subprocess.
+ * Uses the official @agentclientprotocol/sdk.
  */
 export class AcpClient {
   private agentConfig: AgentConfig;
-  private options: AcpClientOptions;
+  private workingDirectory: string;
+  private handlers: AcpClientEventHandlers;
   private process: Subprocess | null = null;
-  private pendingRequests: Map<string | number, PendingRequest> = new Map();
-  private requestId = 0;
-  private buffer = '';
-  private initialized = false;
-  private authenticated = false;
+  private connection: acp.ClientSideConnection | null = null;
+  private _initialized = false;
 
-  constructor(agentConfig: AgentConfig, options: AcpClientOptions) {
+  constructor(
+    agentConfig: AgentConfig,
+    workingDirectory: string,
+    handlers: AcpClientEventHandlers = {}
+  ) {
     this.agentConfig = agentConfig;
-    this.options = options;
+    this.workingDirectory = workingDirectory;
+    this.handlers = handlers;
   }
 
-  /**
-   * Get the agent ID.
-   */
   get agentId(): AgentId {
     return this.agentConfig.id;
   }
 
-  /**
-   * Check if the client is connected to the agent process.
-   */
   get isConnected(): boolean {
-    return this.process !== null;
+    return this.process !== null && this.connection !== null;
   }
 
-  /**
-   * Check if the client is initialized.
-   */
   get isInitialized(): boolean {
-    return this.initialized;
+    return this._initialized;
   }
 
   /**
-   * Check if authenticated (for agents requiring auth).
+   * Spawn the agent subprocess and establish ACP connection.
    */
-  get isAuthenticated(): boolean {
-    return !this.agentConfig.requiresAuth || this.authenticated;
-  }
-
-  /**
-   * Spawn the agent subprocess and set up communication.
-   */
-  async spawn(): Promise<void> {
+  async spawn(env?: Record<string, string>): Promise<acp.InitializeResponse> {
     if (this.process) {
       throw new Error('Agent process already running');
     }
@@ -131,401 +116,155 @@ export class AcpClient {
     console.log(`[AcpClient:${this.agentId}] Spawning: ${command} ${args.join(' ')}`);
 
     // Merge environment variables
-    const env = {
+    const processEnv = {
       ...process.env,
       ...envVars,
-      ...this.options.env,
-      // Ensure working directory is set
-      PWD: this.options.workingDirectory,
+      ...env,
+      PWD: this.workingDirectory,
     };
 
-    this.process = Bun.spawn([command, ...args], {
-      cwd: this.options.workingDirectory,
-      env,
+    // Spawn the agent subprocess
+    this.process = spawn([command, ...args], {
+      cwd: this.workingDirectory,
+      env: processEnv,
       stdin: 'pipe',
       stdout: 'pipe',
-      stderr: 'pipe',
+      stderr: 'inherit', // Pass stderr through for debugging
     });
 
-    // Set up stdout reader for JSON-RPC messages
-    this.readStdout();
+    console.log(`[AcpClient:${this.agentId}] Process spawned with PID: ${this.process.pid}`);
 
-    // Set up stderr reader for logging
-    this.readStderr();
+    // Create Node.js compatible streams from Bun's streams
+    const stdinWritable = this.process.stdin as unknown as NodeJS.WritableStream;
+    const stdoutReadable = this.process.stdout as unknown as NodeJS.ReadableStream;
+
+    // Create the ACP stream using the SDK's ndJsonStream helper
+    const input = Writable.toWeb(stdinWritable as unknown as Writable);
+    const output = Readable.toWeb(stdoutReadable as unknown as Readable);
+    const stream = acp.ndJsonStream(input, output);
+
+    // Create the client handler
+    const clientHandler = new ClientHandler(this.handlers);
+
+    // Create the ACP connection
+    this.connection = new acp.ClientSideConnection(
+      (_agent) => clientHandler,
+      stream
+    );
+
+    // Handle connection close
+    this.connection.closed.then(() => {
+      console.log(`[AcpClient:${this.agentId}] Connection closed`);
+      this.handlers.onClose?.();
+    });
 
     // Monitor process exit
     this.process.exited.then((code) => {
       console.log(`[AcpClient:${this.agentId}] Process exited with code: ${code}`);
       this.process = null;
-      this.initialized = false;
-      this.options.onClose?.(code);
+      this._initialized = false;
     });
 
-    console.log(`[AcpClient:${this.agentId}] Process spawned with PID: ${this.process.pid}`);
-  }
-
-  /**
-   * Read and process stdout (JSON-RPC messages).
-   */
-  private async readStdout(): Promise<void> {
-    const stdout = this.process?.stdout;
-    if (!stdout || typeof stdout === 'number') return;
-
-    const reader = (stdout as ReadableStream<Uint8Array>).getReader();
-    const decoder = new TextDecoder();
-
+    // Initialize the connection
     try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const text = decoder.decode(value, { stream: true });
-        this.buffer += text;
-        this.processBuffer();
-      }
-    } catch (error) {
-      if (this.process) {
-        console.error(`[AcpClient:${this.agentId}] Stdout read error:`, error);
-        this.options.onError?.(error as Error);
-      }
-    }
-  }
-
-  /**
-   * Read stderr for logging and errors.
-   */
-  private async readStderr(): Promise<void> {
-    const stderr = this.process?.stderr;
-    if (!stderr || typeof stderr === 'number') return;
-
-    const reader = (stderr as ReadableStream<Uint8Array>).getReader();
-    const decoder = new TextDecoder();
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const text = decoder.decode(value, { stream: true });
-        // Log stderr but don't treat as fatal error
-        console.log(`[AcpClient:${this.agentId}:stderr] ${text.trim()}`);
-      }
-    } catch (error) {
-      if (this.process) {
-        console.error(`[AcpClient:${this.agentId}] Stderr read error:`, error);
-      }
-    }
-  }
-
-  /**
-   * Process the message buffer for complete JSON-RPC messages.
-   * Messages are newline-delimited JSON.
-   */
-  private processBuffer(): void {
-    const lines = this.buffer.split('\n');
-    
-    // Keep the last incomplete line in the buffer
-    this.buffer = lines.pop() || '';
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-
-      try {
-        const message = JSON.parse(trimmed);
-        this.handleMessage(message);
-      } catch (error) {
-        console.error(`[AcpClient:${this.agentId}] Failed to parse message:`, trimmed, error);
-      }
-    }
-  }
-
-  /**
-   * Handle an incoming JSON-RPC message.
-   */
-  private handleMessage(message: JsonRpcResponse | JsonRpcNotification | JsonRpcRequest): void {
-    // Check if it's a response (has id and no method)
-    if ('id' in message && !('method' in message)) {
-      this.handleResponse(message as JsonRpcResponse);
-      return;
-    }
-
-    // Check if it's a request from the agent (has id and method)
-    if ('id' in message && 'method' in message) {
-      this.handleAgentRequest(message as JsonRpcRequest);
-      return;
-    }
-
-    // Otherwise it's a notification
-    if ('method' in message) {
-      this.handleNotification(message as JsonRpcNotification);
-    }
-  }
-
-  /**
-   * Handle a response to a request we sent.
-   */
-  private handleResponse(response: JsonRpcResponse): void {
-    const pending = this.pendingRequests.get(response.id);
-    if (!pending) {
-      console.warn(`[AcpClient:${this.agentId}] Received response for unknown request:`, response.id);
-      return;
-    }
-
-    clearTimeout(pending.timeout);
-    this.pendingRequests.delete(response.id);
-
-    if (response.error) {
-      pending.reject(new Error(`${response.error.message} (code: ${response.error.code})`));
-    } else {
-      pending.resolve(response.result);
-    }
-  }
-
-  /**
-   * Handle a request FROM the agent (client capabilities).
-   */
-  private async handleAgentRequest(request: JsonRpcRequest): Promise<void> {
-    console.log(`[AcpClient:${this.agentId}] Agent request: ${request.method}`);
-
-    try {
-      let result: unknown;
-
-      switch (request.method) {
-        case 'fs/read_text_file':
-          if (this.options.onFsRead) {
-            result = await this.options.onFsRead(request.params as FsReadTextFileParams);
-          } else {
-            throw new Error('File read not supported');
-          }
-          break;
-
-        case 'fs/write_text_file':
-          if (this.options.onFsWrite) {
-            await this.options.onFsWrite(request.params as FsWriteTextFileParams);
-            result = {};
-          } else {
-            throw new Error('File write not supported');
-          }
-          break;
-
-        case 'fs/list_directory':
-          if (this.options.onFsList) {
-            result = await this.options.onFsList(request.params as FsListDirectoryParams);
-          } else {
-            throw new Error('Directory listing not supported');
-          }
-          break;
-
-        case 'session/request_permission':
-          if (this.options.onPermissionRequest) {
-            result = await this.options.onPermissionRequest(request.params as SessionRequestPermissionParams);
-          } else {
-            // Auto-grant if no handler
-            result = { granted: true };
-          }
-          break;
-
-        case 'terminal/run':
-          if (this.options.onTerminalRun) {
-            result = await this.options.onTerminalRun(request.params as TerminalRunParams);
-          } else {
-            throw new Error('Terminal execution not supported');
-          }
-          break;
-
-        default:
-          throw new Error(`Unknown method: ${request.method}`);
-      }
-
-      this.sendResponse(request.id, result);
-    } catch (error) {
-      this.sendErrorResponse(request.id, -32603, (error as Error).message);
-    }
-  }
-
-  /**
-   * Handle a notification from the agent.
-   */
-  private handleNotification(notification: JsonRpcNotification): void {
-    console.log(`[AcpClient:${this.agentId}] Notification: ${notification.method}`);
-
-    switch (notification.method) {
-      case 'session/update':
-        this.options.onSessionUpdate?.(notification.params as SessionUpdateNotification);
-        break;
-
-      case 'session/end_turn':
-        this.options.onSessionEndTurn?.(notification.params as SessionEndTurnNotification);
-        break;
-
-      case 'auth/required':
-        this.options.onAuthRequired?.(notification.params as AuthRequiredNotification);
-        break;
-
-      default:
-        console.log(`[AcpClient:${this.agentId}] Unknown notification:`, notification.method);
-    }
-  }
-
-  /**
-   * Send a JSON-RPC request to the agent.
-   */
-  private async sendRequest<T>(method: string, params?: unknown): Promise<T> {
-    if (!this.process?.stdin) {
-      throw new Error('Agent process not running');
-    }
-
-    const id = ++this.requestId;
-    const request: JsonRpcRequest = {
-      jsonrpc: '2.0',
-      id,
-      method,
-      params,
-    };
-
-    return new Promise<T>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        this.pendingRequests.delete(id);
-        reject(new Error(`Request timeout: ${method}`));
-      }, REQUEST_TIMEOUT);
-
-      this.pendingRequests.set(id, {
-        resolve: resolve as (result: unknown) => void,
-        reject,
-        method,
-        timeout,
+      const initResult = await this.connection.initialize({
+        protocolVersion: acp.PROTOCOL_VERSION,
+        clientCapabilities: {
+          fs: {
+            readTextFile: !!this.handlers.onReadTextFile,
+            writeTextFile: !!this.handlers.onWriteTextFile,
+          },
+          terminal: true,
+        },
+        clientInfo: {
+          name: 'acp-gateway',
+          title: 'ACP Gateway',
+          version: '0.1.0',
+        },
       });
 
-      const message = JSON.stringify(request) + '\n';
-      const stdin = this.process!.stdin as import('bun').FileSink;
-      stdin.write(message);
-      
-      console.log(`[AcpClient:${this.agentId}] Sent request: ${method} (id: ${id})`);
-    });
-  }
+      this._initialized = true;
+      console.log(`[AcpClient:${this.agentId}] Initialized with protocol v${initResult.protocolVersion}`);
+      console.log(`[AcpClient:${this.agentId}] Agent info:`, initResult.agentInfo);
 
-  /**
-   * Send a JSON-RPC notification to the agent.
-   */
-  private sendNotification(method: string, params?: unknown): void {
-    if (!this.process?.stdin) {
-      throw new Error('Agent process not running');
+      return initResult;
+    } catch (error) {
+      console.error(`[AcpClient:${this.agentId}] Initialization failed:`, error);
+      this.kill();
+      throw error;
     }
-
-    const notification: JsonRpcNotification = {
-      jsonrpc: '2.0',
-      method,
-      params,
-    };
-
-    const message = JSON.stringify(notification) + '\n';
-    const stdin = this.process.stdin as import('bun').FileSink;
-    stdin.write(message);
-
-    console.log(`[AcpClient:${this.agentId}] Sent notification: ${method}`);
-  }
-
-  /**
-   * Send a response to an agent request.
-   */
-  private sendResponse(id: string | number, result: unknown): void {
-    if (!this.process?.stdin) return;
-
-    const response: JsonRpcResponse = {
-      jsonrpc: '2.0',
-      id,
-      result,
-    };
-
-    const message = JSON.stringify(response) + '\n';
-    const stdin = this.process.stdin as import('bun').FileSink;
-    stdin.write(message);
-  }
-
-  /**
-   * Send an error response to an agent request.
-   */
-  private sendErrorResponse(id: string | number, code: number, message: string): void {
-    if (!this.process?.stdin) return;
-
-    const response: JsonRpcResponse = {
-      jsonrpc: '2.0',
-      id,
-      error: { code, message },
-    };
-
-    const msg = JSON.stringify(response) + '\n';
-    const stdin = this.process.stdin as import('bun').FileSink;
-    stdin.write(msg);
-  }
-
-  // ==========================================================================
-  // ACP Protocol Methods
-  // ==========================================================================
-
-  /**
-   * Initialize the ACP connection.
-   */
-  async initialize(): Promise<AcpInitializeResult> {
-    const params: AcpInitializeParams = {
-      clientInfo: {
-        name: 'ACP Gateway',
-        version: '0.1.0',
-      },
-      capabilities: {
-        textDocuments: true,
-        tools: true,
-      },
-      workingDirectory: this.options.workingDirectory,
-    };
-
-    const result = await this.sendRequest<AcpInitializeResult>('initialize', params);
-    this.initialized = true;
-    
-    console.log(`[AcpClient:${this.agentId}] Initialized with server:`, result.serverInfo);
-    return result;
-  }
-
-  /**
-   * Authenticate with the agent (for agents requiring auth).
-   */
-  async authenticate(token?: string): Promise<AcpAuthenticateResult> {
-    const params: AcpAuthenticateParams = { token };
-    const result = await this.sendRequest<AcpAuthenticateResult>('authenticate', params);
-    
-    if (result.authenticated) {
-      this.authenticated = true;
-      console.log(`[AcpClient:${this.agentId}] Authenticated successfully`);
-    } else {
-      console.log(`[AcpClient:${this.agentId}] Auth required, URL:`, result.authUrl);
-    }
-    
-    return result;
   }
 
   /**
    * Create a new session.
    */
-  async sessionNew(sessionId?: string): Promise<AcpSessionNewResult> {
-    const params: AcpSessionNewParams = { sessionId };
-    return this.sendRequest<AcpSessionNewResult>('session/new', params);
+  async newSession(cwd?: string, mcpServers?: acp.McpServer[]): Promise<acp.NewSessionResponse> {
+    if (!this.connection) {
+      throw new Error('Not connected');
+    }
+
+    return this.connection.newSession({
+      cwd: cwd || this.workingDirectory,
+      mcpServers: mcpServers || [],
+    });
   }
 
   /**
-   * Send a prompt to an active session.
+   * Send a prompt to a session.
    */
-  async sessionPrompt(sessionId: string, prompt: string): Promise<void> {
-    const params: AcpSessionPromptParams = { sessionId, prompt };
-    await this.sendRequest<void>('session/prompt', params);
+  async prompt(sessionId: string, prompt: acp.ContentBlock[]): Promise<acp.PromptResponse> {
+    if (!this.connection) {
+      throw new Error('Not connected');
+    }
+
+    return this.connection.prompt({
+      sessionId,
+      prompt,
+    });
   }
 
   /**
-   * Cancel an active operation.
+   * Send a text prompt (convenience method).
    */
-  async sessionCancel(sessionId: string): Promise<void> {
-    const params: AcpSessionCancelParams = { sessionId };
-    await this.sendRequest<void>('session/cancel', params);
+  async promptText(sessionId: string, text: string): Promise<acp.PromptResponse> {
+    return this.prompt(sessionId, [{ type: 'text', text }]);
+  }
+
+  /**
+   * Cancel an ongoing prompt.
+   */
+  async cancel(sessionId: string): Promise<void> {
+    if (!this.connection) {
+      throw new Error('Not connected');
+    }
+
+    return this.connection.cancel({ sessionId });
+  }
+
+  /**
+   * Load an existing session (if supported by agent).
+   */
+  async loadSession(sessionId: string, cwd?: string, mcpServers?: acp.McpServer[]): Promise<acp.LoadSessionResponse> {
+    if (!this.connection) {
+      throw new Error('Not connected');
+    }
+
+    return this.connection.loadSession({
+      sessionId,
+      cwd: cwd || this.workingDirectory,
+      mcpServers: mcpServers || [],
+    });
+  }
+
+  /**
+   * Authenticate with the agent (if required).
+   */
+  async authenticate(methodId: string): Promise<acp.AuthenticateResponse> {
+    if (!this.connection) {
+      throw new Error('Not connected');
+    }
+
+    return this.connection.authenticate({ methodId });
   }
 
   /**
@@ -534,25 +273,11 @@ export class AcpClient {
   async shutdown(): Promise<void> {
     if (!this.process) return;
 
-    try {
-      await this.sendRequest<void>('shutdown');
-    } catch (error) {
-      console.warn(`[AcpClient:${this.agentId}] Shutdown request failed:`, error);
-    }
+    // Give it a moment to finish any pending work
+    await new Promise(resolve => setTimeout(resolve, 500));
 
-    // Give it a moment to exit gracefully
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // Force kill if still running
-    if (this.process) {
-      this.process.kill();
-      this.process = null;
-    }
-
-    this.initialized = false;
-    this.authenticated = false;
-    
-    console.log(`[AcpClient:${this.agentId}] Shutdown complete`);
+    // Kill the process
+    this.kill();
   }
 
   /**
@@ -563,14 +288,7 @@ export class AcpClient {
       this.process.kill();
       this.process = null;
     }
-    this.initialized = false;
-    this.authenticated = false;
-
-    // Reject all pending requests
-    for (const [id, pending] of this.pendingRequests) {
-      clearTimeout(pending.timeout);
-      pending.reject(new Error('Agent process killed'));
-    }
-    this.pendingRequests.clear();
+    this.connection = null;
+    this._initialized = false;
   }
 }

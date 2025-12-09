@@ -367,7 +367,7 @@ export function getLastSessionMessage(sessionId: string): SessionMessage | null 
   const row = db.query(`
     SELECT * FROM agent_session_messages 
     WHERE session_id = $sessionId 
-    ORDER BY created_at DESC LIMIT 1
+    ORDER BY rowid DESC LIMIT 1
   `).get({ $sessionId: sessionId }) as SessionMessageRow | null;
   
   return row ? rowToSessionMessage(row) : null;

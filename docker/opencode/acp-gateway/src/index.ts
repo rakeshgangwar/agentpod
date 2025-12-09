@@ -257,7 +257,7 @@ app.post('/session', async (c) => {
     }
 
     // Create ACP session
-    const acpResult = await client.sessionNew();
+    const acpResult = await client.newSession(workingDirectory || WORKING_DIRECTORY);
 
     // Create local session record
     const session = sessionManager.createSession(
@@ -364,7 +364,7 @@ app.post('/session/:id/prompt', async (c) => {
     sessionManager.incrementMessageCount(sessionId);
 
     // Send prompt to agent
-    await client.sessionPrompt(session.acpSessionId, prompt);
+    await client.promptText(session.acpSessionId, prompt);
 
     return c.json<ApiResponse>({
       success: true,
@@ -393,7 +393,7 @@ app.post('/session/:id/cancel', async (c) => {
   try {
     const client = agentManager.getClient(session.agentId);
     if (client) {
-      await client.sessionCancel(session.acpSessionId);
+      await client.cancel(session.acpSessionId);
     }
 
     sessionManager.setStatus(sessionId, 'idle');
