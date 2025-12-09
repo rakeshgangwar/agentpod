@@ -12,6 +12,9 @@ import { syncRoutes } from './routes/sync.ts';
 import { opencodeRoutes } from './routes/opencode.ts';
 import { userRoutes } from './routes/users.ts';
 import { containerTiersRouter } from './routes/container-tiers.ts';
+import { resourceTiersRouter } from './routes/resource-tiers.ts';
+import { flavorsRouter } from './routes/flavors.ts';
+import { addonsRouter } from './routes/addons.ts';
 import { acpRoutes } from './routes/acp.ts';
 
 // Initialize database
@@ -39,7 +42,10 @@ const app = new Hono()
   .route('/api/projects', projectRoutes)
   .route('/api/providers', providerRoutes)
   .route('/api/users', userRoutes) // User OpenCode config routes
-  .route('/api/container-tiers', containerTiersRouter); // Container tier definitions
+  .route('/api/container-tiers', containerTiersRouter) // Legacy container tier definitions
+  .route('/api/resource-tiers', resourceTiersRouter) // Modular: Resource tiers (CPU, memory, storage)
+  .route('/api/flavors', flavorsRouter) // Modular: Container flavors (language images)
+  .route('/api/addons', addonsRouter); // Modular: Container add-ons (GUI, GPU, etc.)
 
 // Export type for Hono Client (type-safe RPC from mobile app)
 export type AppType = typeof app;
@@ -79,7 +85,16 @@ console.log(`
 ║  - GET  /api/users/:id/opencode/config      Full config       ║
 ║  - PUT  /api/users/:id/opencode/settings    Update settings   ║
 ╠═══════════════════════════════════════════════════════════════╣
-║  Provider & Container Tier Endpoints:                         ║
+║  Modular Container Configuration (NEW):                       ║
+║  - GET  /api/resource-tiers          List resource tiers      ║
+║  - GET  /api/resource-tiers/:id      Get tier details         ║
+║  - GET  /api/flavors                 List container flavors   ║
+║  - GET  /api/flavors/:id/image       Get flavor image name    ║
+║  - GET  /api/addons                  List container add-ons   ║
+║  - GET  /api/addons/categories       List addon categories    ║
+║  - POST /api/addons/calculate        Calculate addon totals   ║
+╠═══════════════════════════════════════════════════════════════╣
+║  Provider & Container Tier Endpoints (legacy):                ║
 ║  - GET  /api/providers             List providers             ║
 ║  - POST /api/providers/:id/configure  Set credentials         ║
 ║  - GET  /api/container-tiers         List all tiers           ║

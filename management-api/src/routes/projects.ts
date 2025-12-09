@@ -35,7 +35,12 @@ const createProjectSchema = z.object({
   githubUrl: z.string().url().optional(),
   llmProviderId: z.string().optional(),
   llmModelId: z.string().optional(),
+  // Legacy field - kept for backwards compatibility
   containerTierId: z.string().optional(), // 'lite', 'standard', 'pro', 'desktop'
+  // New modular container configuration
+  resourceTierId: z.string().optional(),  // 'starter', 'builder', 'creator', 'power'
+  flavorId: z.string().optional(),        // 'js', 'python', 'go', 'rust', 'fullstack', 'polyglot'
+  addonIds: z.array(z.string()).optional(), // ['gui', 'code-server', 'databases', 'cloud', 'gpu']
 });
 
 const updateProjectSchema = z.object({
@@ -121,7 +126,12 @@ export const projectRoutes = new Hono()
         githubUrl: body.githubUrl,
         llmProviderId: body.llmProviderId,
         llmModelId: body.llmModelId,
+        // Legacy field
         containerTierId: body.containerTierId,
+        // New modular container configuration
+        resourceTierId: body.resourceTierId,
+        flavorId: body.flavorId,
+        addonIds: body.addonIds,
       });
       
       return c.json({ project }, 201);

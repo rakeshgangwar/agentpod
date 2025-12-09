@@ -1,0 +1,69 @@
+# =============================================================================
+# CodeOpen Rust Flavor
+# Rust development environment
+# =============================================================================
+# Size: ~1.1GB (on top of base)
+# Languages: Rust
+# =============================================================================
+
+ARG BASE_IMAGE=codeopen-base:latest
+FROM ${BASE_IMAGE}
+
+LABEL maintainer="CodeOpen Team"
+LABEL description="Rust development environment"
+LABEL flavor="rust"
+
+USER root
+
+# =============================================================================
+# Rust Build Dependencies
+# =============================================================================
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# =============================================================================
+# Rust Installation (via rustup)
+# =============================================================================
+USER developer
+
+# Install rustup and stable toolchain
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+
+# Set up environment
+ENV CARGO_HOME="/home/developer/.cargo"
+ENV RUSTUP_HOME="/home/developer/.rustup"
+ENV PATH="${CARGO_HOME}/bin:${PATH}"
+
+# =============================================================================
+# Rust Components & Tools
+# =============================================================================
+RUN . "$CARGO_HOME/env" && \
+    rustup component add \
+        clippy \
+        rustfmt \
+        rust-analyzer && \
+    cargo install \
+        cargo-watch \
+        cargo-edit \
+        cargo-audit \
+        cargo-outdated \
+        cargo-nextest \
+        bacon \
+        just \
+        tokio-console
+
+# =============================================================================
+# Update shell configuration
+# =============================================================================
+RUN echo 'source "$HOME/.cargo/env"' >> /home/developer/.bashrc
+
+# =============================================================================
+# Flavor metadata
+# =============================================================================
+ENV CODEOPEN_FLAVOR="rust"
+ENV CODEOPEN_LANGUAGES="rust"
+
+WORKDIR /home/developer/workspace

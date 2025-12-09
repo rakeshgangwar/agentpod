@@ -1,0 +1,12 @@
+#!/bin/bash
+# OpenCode Desktop - Openbox Autostart Script
+# This runs when Openbox starts
+
+# Set background color (dark gray)
+xsetroot -solid "#2d2d2d" &
+
+# Start tint2 panel
+tint2 &
+
+# Set cursor
+xsetroot -cursor_name left_ptr &

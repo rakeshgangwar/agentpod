@@ -26,10 +26,14 @@ import {
   getTierById, 
   getDefaultTier, 
   getImageNameForTier,
-  getResourceLimitsForTier,
+  getResourceLimitsForTier as getLegacyResourceLimits,
   getExposedPortsForTier,
-  type ContainerTier,
 } from '../models/container-tier.ts';
+import { 
+  resolveImage, 
+  generateProjectUrls,
+  type ResolveImageOptions,
+} from './image-resolver.ts';
 import { createLogger } from '../utils/logger.ts';
 import { ProjectCreationError, ProjectNotFoundError } from '../utils/errors.ts';
 
@@ -204,8 +208,14 @@ export interface CreateProjectOptions {
   llmProviderId?: string;
   /** Use specific LLM model ID */
   llmModelId?: string;
-  /** Container tier ID (defaults to 'lite') */
+  /** Container tier ID (DEPRECATED - use resourceTierId, flavorId, addonIds) */
   containerTierId?: string;
+  /** Resource tier ID - 'starter', 'builder', 'creator', 'power' */
+  resourceTierId?: string;
+  /** Container flavor ID - 'js', 'python', 'go', 'rust', 'fullstack', 'polyglot' */
+  flavorId?: string;
+  /** Array of addon IDs - ['gui', 'code-server', 'databases', 'cloud', 'gpu'] */
+  addonIds?: string[];
 }
 
 export interface ProjectWithStatus extends Project {
@@ -219,30 +229,127 @@ export interface ProjectWithStatus extends Project {
 
 /**
  * Create a new project with Forgejo repo and Coolify container
- * Now uses Docker Image deployment from Forgejo Container Registry
+ * Supports both legacy containerTierId and new modular configuration (resourceTierId, flavorId, addonIds)
  */
 export async function createNewProject(options: CreateProjectOptions): Promise<Project> {
-  const { name, description, githubUrl, llmProviderId, llmModelId, containerTierId } = options;
+  const { 
+    name, 
+    description, 
+    githubUrl, 
+    llmProviderId, 
+    llmModelId, 
+    // Legacy
+    containerTierId,
+    // New modular configuration
+    resourceTierId,
+    flavorId,
+    addonIds,
+  } = options;
   
-  log.info('Creating new project', { name, githubUrl, containerTierId });
+  log.info('Creating new project', { name, githubUrl, containerTierId, resourceTierId, flavorId, addonIds });
   
   const slug = generateUniqueSlug(name);
   const owner = config.forgejo.owner;
   
-  // Get container tier (defaults to 'lite' or the default tier)
-  const tier = containerTierId 
-    ? getTierById(containerTierId) 
-    : getDefaultTier();
+  // Determine if using new modular configuration or legacy tier
+  const useModularConfig = resourceTierId || flavorId || (addonIds && addonIds.length > 0);
   
-  if (!tier) {
-    throw new ProjectCreationError(`Container tier '${containerTierId || 'default'}' not found`);
+  let imageName: string;
+  let imageTag: string;
+  let exposedPorts: string;
+  let resourceLimits: { limits_memory: string; limits_memory_reservation: string; limits_cpus: string };
+  let fqdnUrl: string | null = null;
+  let vncUrl: string | null = null;
+  let codeServerUrl: string | null = null;
+  let domainsConfig: string | undefined;
+  let resolvedResourceTierId = resourceTierId;
+  let resolvedFlavorId = flavorId;
+  let resolvedAddonIds = addonIds ?? [];
+  
+  if (useModularConfig) {
+    // New modular container configuration
+    log.info('Using modular container configuration', { resourceTierId, flavorId, addonIds });
+    
+    const imageResolution = resolveImage({
+      resourceTierId,
+      flavorId,
+      addonIds,
+    });
+    
+    if (imageResolution.warnings.length > 0) {
+      log.warn('Image resolution warnings', { warnings: imageResolution.warnings });
+    }
+    
+    imageName = imageResolution.imageName;
+    imageTag = imageResolution.imageTag;
+    exposedPorts = imageResolution.portsExposes;
+    resourceLimits = imageResolution.resourceLimits;
+    resolvedResourceTierId = imageResolution.resourceTier.id;
+    resolvedFlavorId = imageResolution.flavor.id;
+    resolvedAddonIds = imageResolution.addons.map(a => a.id);
+    
+    // Generate URLs based on addons
+    const urls = generateProjectUrls(slug, imageResolution.addons);
+    fqdnUrl = urls.fqdnUrl;
+    vncUrl = urls.vncUrl;
+    codeServerUrl = urls.codeServerUrl;
+    domainsConfig = urls.domainsConfig ?? undefined;
+    
+    log.info('Modular image resolved', { 
+      imageRef: imageResolution.imageRef,
+      resourceTier: imageResolution.resourceTier.id,
+      flavor: imageResolution.flavor.id,
+      addons: resolvedAddonIds,
+    });
+  } else {
+    // Legacy container tier configuration
+    log.info('Using legacy container tier configuration', { containerTierId });
+    
+    const tier = containerTierId 
+      ? getTierById(containerTierId) 
+      : getDefaultTier();
+    
+    if (!tier) {
+      throw new ProjectCreationError(`Container tier '${containerTierId || 'default'}' not found`);
+    }
+    
+    log.info('Using container tier', { 
+      tierId: tier.id, 
+      tierName: tier.name, 
+      imageType: tier.image_type 
+    });
+    
+    imageName = getImageNameForTier(tier, config.registry.url, config.registry.owner);
+    imageTag = config.registry.version;
+    exposedPorts = getExposedPortsForTier(tier);
+    resourceLimits = getLegacyResourceLimits(tier);
+    
+    // Map legacy tier to new modular fields for storage
+    // lite->starter, standard->builder, pro->creator, desktop->power+gui
+    const tierMapping: Record<string, { resourceTier: string; addons: string[] }> = {
+      'lite': { resourceTier: 'starter', addons: ['code-server'] },
+      'standard': { resourceTier: 'builder', addons: ['code-server'] },
+      'pro': { resourceTier: 'creator', addons: ['code-server'] },
+      'desktop': { resourceTier: 'power', addons: ['gui', 'code-server'] },
+    };
+    const mapping = tierMapping[tier.id] ?? { resourceTier: 'starter', addons: ['code-server'] };
+    resolvedResourceTierId = mapping.resourceTier;
+    resolvedFlavorId = 'fullstack'; // Default to fullstack for legacy
+    resolvedAddonIds = mapping.addons;
+    
+    // Generate FQDNs for legacy tier
+    if (config.opencode.wildcardDomain) {
+      fqdnUrl = `https://opencode-${slug}.${config.opencode.wildcardDomain}`;
+      codeServerUrl = `https://code-${slug}.${config.opencode.wildcardDomain}`;
+      
+      if (tier.has_desktop_access) {
+        vncUrl = `https://vnc-${slug}.${config.opencode.wildcardDomain}`;
+        domainsConfig = `${fqdnUrl}:4096,${codeServerUrl}:8080,${vncUrl}:6080`;
+      } else {
+        domainsConfig = `${fqdnUrl}:4096,${codeServerUrl}:8080`;
+      }
+    }
   }
-  
-  log.info('Using container tier', { 
-    tierId: tier.id, 
-    tierName: tier.name, 
-    imageType: tier.image_type 
-  });
   
   let forgejoRepo;
   let coolifyApp;
@@ -252,16 +359,14 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
     log.info('Step 1: Creating Forgejo repository', { slug });
     
     if (githubUrl) {
-      // Mirror from GitHub
       forgejoRepo = await forgejo.createMirror({
         cloneAddr: githubUrl,
         repoName: slug,
-        mirror: false, // One-time import, not continuous mirror
+        mirror: false,
         private: false,
         description: description ?? `Imported from ${githubUrl}`,
       });
     } else {
-      // Create empty repo
       forgejoRepo = await forgejo.createRepo({
         name: slug,
         description: description ?? '',
@@ -277,43 +382,9 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
     });
     
     // Step 2: Container port - use fixed port 4096
-    // Each container is isolated, so no port conflicts. Traefik routes by domain.
     const containerPort = 4096;
     
-    // Step 3: Generate FQDNs for the container
-    // All tiers get: OpenCode API + Code Server
-    // Desktop tier additionally gets: VNC domain
-    let fqdnUrl: string | null = null;
-    let vncUrl: string | null = null;
-    let codeServerUrl: string | null = null;
-    let domainsConfig: string | undefined;
-    
-    if (config.opencode.wildcardDomain) {
-      // Main OpenCode API domain (always created)
-      fqdnUrl = `https://opencode-${slug}.${config.opencode.wildcardDomain}`;
-      // Code Server domain (always created - VS Code in browser)
-      codeServerUrl = `https://code-${slug}.${config.opencode.wildcardDomain}`;
-      
-      // For desktop tier, add separate VNC domain
-      if (tier.has_desktop_access) {
-        vncUrl = `https://vnc-${slug}.${config.opencode.wildcardDomain}`;
-        // Coolify format: comma-separated domains with port suffix
-        // e.g., "https://opencode-myproject.domain.com:4096,https://code-myproject.domain.com:8080,https://vnc-myproject.domain.com:6080"
-        domainsConfig = `${fqdnUrl}:4096,${codeServerUrl}:8080,${vncUrl}:6080`;
-      } else {
-        // CLI tier: OpenCode + Code Server
-        domainsConfig = `${fqdnUrl}:4096,${codeServerUrl}:8080`;
-      }
-    }
-    
-    // Step 4: Create Coolify application using Docker Image from Forgejo Registry
-    // This uses our pre-built images (opencode-cli or opencode-desktop based on tier)
-    const imageName = getImageNameForTier(tier, config.registry.url, config.registry.owner);
-    const imageTag = config.registry.version;
-    // Use tier-specific exposed ports: CLI = 4096, Desktop = 4096,6080 (OpenCode + noVNC)
-    const exposedPorts = getExposedPortsForTier(tier);
-    const resourceLimits = getResourceLimitsForTier(tier);
-    
+    // Step 3: Create Coolify application
     log.info('Step 2: Creating Coolify application (Docker Image)', { 
       slug, 
       fqdnUrl,
@@ -322,7 +393,6 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       domainsConfig,
       imageName,
       imageTag,
-      tier: tier.id,
     });
     
     coolifyApp = await coolify.createDockerImageApp({
@@ -333,21 +403,19 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       imageTag: imageTag,
       portsExposes: exposedPorts,
       name: `opencode-${slug}`,
-      description: `OpenCode container for ${name} (${tier.name} tier)`,
+      description: `OpenCode container for ${name}`,
       domains: domainsConfig,
-      instantDeploy: false, // We'll set env vars first, then deploy
+      instantDeploy: false,
     });
     
     log.info('Coolify application created', { uuid: coolifyApp.uuid });
     
-    // Step 4a: Update application settings with resource limits and health check
+    // Step 4: Update application settings with resource limits
     log.info('Step 2b: Updating Coolify application settings with resource limits');
     await coolify.updateApplication(coolifyApp.uuid, {
       ports_exposes: exposedPorts,
       domains: domainsConfig,
-      // Disable Coolify healthcheck for now - container has its own HEALTHCHECK
       health_check_enabled: false,
-      // Apply resource limits from tier
       ...resourceLimits,
     });
     
@@ -360,19 +428,13 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
     // Step 5: Set environment variables
     log.info('Step 3: Setting environment variables');
     
-    // Transform the clone URL to use the public HTTPS URL (accessible from containers)
-    // Forgejo returns URLs with internal port (e.g., :3000), but containers need the public HTTPS URL
     let publicCloneUrl = forgejoRepo.clone_url;
-    
-    // If publicUrl is different from url, do a direct replacement
     if (config.forgejo.publicUrl !== config.forgejo.url) {
       publicCloneUrl = forgejoRepo.clone_url.replace(
         new RegExp(`^${config.forgejo.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`),
         config.forgejo.publicUrl
       );
     } else {
-      // Fallback: if no publicUrl configured, try to remove port from HTTPS URLs
-      // e.g., https://forgejo.superchotu.com:3000/... -> https://forgejo.superchotu.com/...
       publicCloneUrl = forgejoRepo.clone_url.replace(
         /^(https:\/\/[^/:]+):\d+(\/.*)/,
         '$1$2'
@@ -385,34 +447,25 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
     });
     
     const envVars: Record<string, string> = {
-      // OpenCode server configuration - MUST match ports_exposes
       OPENCODE_PORT: String(containerPort),
       OPENCODE_HOST: '0.0.0.0',
-      // Forgejo repo URL for OpenCode to clone at startup (using public URL)
       FORGEJO_REPO_URL: publicCloneUrl,
-      // Forgejo credentials for git push (so OpenCode can commit changes back)
       FORGEJO_USER: config.forgejo.owner,
       FORGEJO_TOKEN: config.forgejo.token,
-      // Git config
       GIT_USER_EMAIL: 'opencode@portable-command-center.local',
       GIT_USER_NAME: 'OpenCode',
-      // Project info
       PROJECT_NAME: name,
-      // User config (for fetching OpenCode configuration from Management API)
       MANAGEMENT_API_URL: config.publicUrl,
       USER_ID: config.defaultUserId,
       AUTH_TOKEN: config.auth.token,
     };
     
-    // Add LLM credentials
     const llmEnvVars = await getProviderEnvVars(llmProviderId);
     Object.assign(envVars, llmEnvVars);
     
     await coolify.setEnvVars(coolifyApp.uuid, envVars);
     
-    log.info('Environment variables set', { 
-      vars: Object.keys(envVars) 
-    });
+    log.info('Environment variables set', { vars: Object.keys(envVars) });
     
     // Step 6: Save to database
     log.info('Step 4: Saving project to database');
@@ -429,8 +482,11 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       fqdnUrl: fqdnUrl ?? undefined,
       vncUrl: vncUrl ?? undefined,
       codeServerUrl: codeServerUrl ?? undefined,
-      containerTierId: tier.id,
+      containerTierId: containerTierId ?? 'lite',
       containerVersion: config.registry.version,
+      resourceTierId: resolvedResourceTierId,
+      flavorId: resolvedFlavorId,
+      addonIds: resolvedAddonIds,
       githubRepoUrl: githubUrl,
       githubSyncEnabled: !!githubUrl,
       githubSyncDirection: 'push',
@@ -440,7 +496,6 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
     
     const project = dbCreateProject(projectInput);
     
-    // Update status to stopped (created but not running)
     updateProjectStatus(project.id, 'stopped');
     
     log.info('Project created successfully', { projectId: project.id });
@@ -450,7 +505,6 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
   } catch (error) {
     log.error('Project creation failed', { name, error });
     
-    // Cleanup on failure
     try {
       if (coolifyApp?.uuid) {
         log.info('Cleaning up: Deleting Coolify app');

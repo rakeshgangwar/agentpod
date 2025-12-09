@@ -1,11 +1,12 @@
 #!/bin/bash
 # =============================================================================
-# Push OpenCode Container Images to Forgejo Registry
+# Push CodeOpen Container Images to Forgejo Registry
 # =============================================================================
-# Usage: ./push.sh [image_type]
+# Usage: ./push.sh [type] [name]
 # 
 # Arguments:
-#   image_type  - 'cli', 'desktop', or 'all' (default: all)
+#   type  - 'base', 'flavor', 'addon', or 'all' (default: all)
+#   name  - Specific flavor or addon name (required for flavor/addon types)
 #
 # Environment Variables:
 #   FORGEJO_REGISTRY - Registry URL (default: forgejo.superchotu.com)
@@ -17,74 +18,109 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DOCKER_DIR="$(dirname "$SCRIPT_DIR")"
-VERSION_FILE="$DOCKER_DIR/VERSION"
-
-# Load configuration
-source "$SCRIPT_DIR/config.sh" 2>/dev/null || true
-
-# Configuration
-REGISTRY="${FORGEJO_REGISTRY:-forgejo.superchotu.com}"
-OWNER="${FORGEJO_OWNER:-rakeshgangwar}"
-VERSION=$(cat "$VERSION_FILE" 2>/dev/null || echo "0.0.1")
+source "$SCRIPT_DIR/config.sh"
 
 # Parse arguments
-IMAGE_TYPE="${1:-all}"
+TYPE="${1:-all}"
+NAME="${2:-}"
 
 echo "=============================================="
-echo "  OpenCode Container Push"
+echo "  CodeOpen Container Push"
 echo "=============================================="
-echo "  Version:  $VERSION"
-echo "  Registry: $REGISTRY/$OWNER"
-echo "  Type:     $IMAGE_TYPE"
+echo "  Version:  $CONTAINER_VERSION"
+echo "  Registry: $REGISTRY_URL"
+echo "  Type:     $TYPE"
+[ -n "$NAME" ] && echo "  Name:     $NAME"
 echo "=============================================="
 echo ""
 
-# Push CLI image
-push_cli() {
-    echo "Pushing opencode-cli..."
+push_image() {
+    local IMAGE_NAME="$1"
     
-    local IMAGE_NAME="$REGISTRY/$OWNER/opencode-cli"
-    
-    docker push "$IMAGE_NAME:$VERSION"
+    echo "Pushing $IMAGE_NAME..."
+    docker push "$IMAGE_NAME:$CONTAINER_VERSION"
     docker push "$IMAGE_NAME:latest"
-    
-    echo ""
-    echo "Pushed: $IMAGE_NAME:$VERSION"
-    echo "Pushed: $IMAGE_NAME:latest"
+    echo "  Pushed: $IMAGE_NAME:$CONTAINER_VERSION"
+    echo "  Pushed: $IMAGE_NAME:latest"
     echo ""
 }
 
-# Push Desktop image
-push_desktop() {
-    echo "Pushing opencode-desktop..."
+push_base() {
+    push_image "${REGISTRY_URL}/codeopen-base"
+}
+
+push_flavor() {
+    local flavor="$1"
     
-    local IMAGE_NAME="$REGISTRY/$OWNER/opencode-desktop"
+    if [ -z "$flavor" ]; then
+        echo "Error: Flavor name required"
+        echo "Available flavors: ${FLAVORS[*]}"
+        exit 1
+    fi
     
-    docker push "$IMAGE_NAME:$VERSION"
-    docker push "$IMAGE_NAME:latest"
+    if [[ ! " ${FLAVORS[*]} " =~ " ${flavor} " ]]; then
+        echo "Error: Unknown flavor '$flavor'"
+        echo "Available flavors: ${FLAVORS[*]}"
+        exit 1
+    fi
     
+    push_image "${REGISTRY_URL}/codeopen-${flavor}"
+}
+
+push_addon() {
+    local addon="$1"
+    local base_flavor="${2:-$DEFAULT_FLAVOR}"
+    
+    if [ -z "$addon" ]; then
+        echo "Error: Add-on name required"
+        echo "Available addons: ${ADDONS[*]}"
+        exit 1
+    fi
+    
+    if [[ ! " ${ADDONS[*]} " =~ " ${addon} " ]]; then
+        echo "Error: Unknown addon '$addon'"
+        echo "Available addons: ${ADDONS[*]}"
+        exit 1
+    fi
+    
+    push_image "${REGISTRY_URL}/codeopen-${base_flavor}-${addon}"
+}
+
+push_all() {
+    echo "Pushing all images..."
     echo ""
-    echo "Pushed: $IMAGE_NAME:$VERSION"
-    echo "Pushed: $IMAGE_NAME:latest"
-    echo ""
+    
+    # Push base
+    push_base
+    
+    # Push all flavors
+    for flavor in "${FLAVORS[@]}"; do
+        push_flavor "$flavor"
+    done
+    
+    # Push all addons (with fullstack base)
+    for addon in "${ADDONS[@]}"; do
+        push_addon "$addon" "$DEFAULT_FLAVOR"
+    done
 }
 
 # Main execution
-case $IMAGE_TYPE in
-    cli)
-        push_cli
+case $TYPE in
+    base)
+        push_base
         ;;
-    desktop)
-        push_desktop
+    flavor)
+        push_flavor "$NAME"
+        ;;
+    addon)
+        push_addon "$NAME"
         ;;
     all)
-        push_cli
-        push_desktop
+        push_all
         ;;
     *)
-        echo "Error: Unknown image type '$IMAGE_TYPE'"
-        echo "Usage: ./push.sh [cli|desktop|all]"
+        echo "Error: Unknown type '$TYPE'"
+        echo "Usage: ./push.sh [base|flavor|addon|all] [name]"
         exit 1
         ;;
 esac
@@ -92,8 +128,4 @@ esac
 echo "=============================================="
 echo "  Push Complete!"
 echo "=============================================="
-echo ""
-echo "Images are now available at:"
-echo "  - $REGISTRY/$OWNER/opencode-cli:$VERSION"
-echo "  - $REGISTRY/$OWNER/opencode-desktop:$VERSION"
 echo ""
