@@ -213,6 +213,29 @@ configure_git() {
 }
 
 # =============================================================================
+# Start OpenCode Server
+# =============================================================================
+start_opencode_server() {
+    echo "Starting OpenCode server on port ${OPENCODE_PORT:-4096}..."
+    cd "$WORKSPACE"
+    opencode serve --port "${OPENCODE_PORT:-4096}" --hostname "${OPENCODE_HOST:-0.0.0.0}" &
+    OPENCODE_PID=$!
+    
+    # Wait for OpenCode to be ready
+    echo "Waiting for OpenCode server to start..."
+    for i in {1..30}; do
+        if curl -sf "http://localhost:${OPENCODE_PORT:-4096}/session" > /dev/null 2>&1; then
+            echo "  OpenCode server is ready."
+            return 0
+        fi
+        sleep 1
+    done
+    
+    echo "  Warning: OpenCode server health check timed out."
+    return 0
+}
+
+# =============================================================================
 # Start ACP Gateway
 # =============================================================================
 start_acp_gateway() {
@@ -248,9 +271,10 @@ show_startup_info() {
     echo "  Workspace: $WORKSPACE"
     echo ""
     echo "  Services:"
+    echo "    - OpenCode Server: http://localhost:${OPENCODE_PORT:-4096}"
     echo "    - ACP Gateway: http://localhost:${ACP_GATEWAY_PORT:-4097}"
     echo ""
-    echo "  Available Agents:"
+    echo "  Available Agents (via ACP Gateway):"
     echo "    - OpenCode (default)"
     echo "    - Claude Code"
     echo "    - Gemini CLI"
@@ -270,6 +294,9 @@ show_startup_info() {
 # =============================================================================
 cleanup() {
     echo "Shutting down..."
+    if [ -n "$OPENCODE_PID" ]; then
+        kill "$OPENCODE_PID" 2>/dev/null || true
+    fi
     if [ -n "$ACP_PID" ]; then
         kill "$ACP_PID" 2>/dev/null || true
     fi
@@ -308,9 +335,16 @@ show_startup_info
 # Change to workspace directory
 cd "$WORKSPACE"
 
-# Start ACP Gateway
+# Start OpenCode server (port 4096)
+start_opencode_server
+
+# Start ACP Gateway (port 4097)
 start_acp_gateway
 
-# Keep container running
-echo "Container ready. Waiting for ACP Gateway process..."
-wait $ACP_PID
+# Keep container running - wait for both processes
+echo "Container ready. Services running:"
+echo "  - OpenCode server: http://localhost:${OPENCODE_PORT:-4096}"
+echo "  - ACP Gateway: http://localhost:${ACP_GATEWAY_PORT:-4097}"
+
+# Wait for either process to exit
+wait -n $OPENCODE_PID $ACP_PID 2>/dev/null || wait $ACP_PID
