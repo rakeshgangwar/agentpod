@@ -305,11 +305,11 @@ export const coolify = {
     health_check_timeout?: number;   // seconds before check times out
     health_check_retries?: number;   // number of retries before unhealthy
     health_check_start_period?: number; // seconds to wait before first check
-    // Resource limits
-    limits_memory?: string;           // e.g., '2Gi', '4Gi'
-    limits_memory_swap?: string;      // e.g., '4Gi'
+    // Resource limits (Docker Compose format - use lowercase 'g' not 'Gi')
+    limits_memory?: string;           // e.g., '2g', '4g'
+    limits_memory_swap?: string;      // e.g., '4g'
     limits_memory_swappiness?: number; // 0-100
-    limits_memory_reservation?: string; // e.g., '1Gi'
+    limits_memory_reservation?: string; // e.g., '1g'
     limits_cpus?: string;             // e.g., '1', '2', '4'
     limits_cpuset?: string;           // e.g., '0,1' or '0-3'
     limits_cpu_shares?: number;       // relative weight

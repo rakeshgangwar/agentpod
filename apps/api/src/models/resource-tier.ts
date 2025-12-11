@@ -106,6 +106,7 @@ export function getDefaultResourceTier(): ResourceTier | null {
 
 /**
  * Get Docker resource limits for a tier (for Coolify API)
+ * Note: Docker Compose expects lowercase 'g' suffix (e.g., '2g'), not 'Gi' (Kubernetes notation)
  */
 export function getResourceLimits(tier: ResourceTier): {
   limits_memory: string;
@@ -113,8 +114,8 @@ export function getResourceLimits(tier: ResourceTier): {
   limits_cpus: string;
 } {
   return {
-    limits_memory: `${tier.memoryGb}Gi`,
-    limits_memory_reservation: `${Math.floor(tier.memoryGb * 0.75)}Gi`,
+    limits_memory: `${tier.memoryGb}g`,
+    limits_memory_reservation: `${Math.floor(tier.memoryGb * 0.75)}g`,
     limits_cpus: String(tier.cpuCores),
   };
 }
