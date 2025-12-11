@@ -8,7 +8,8 @@
 # Login redirects go through this service's /oauth2/start endpoint.
 # =============================================================================
 
-FROM quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
+# Use Alpine-based image which has shell and wget for healthchecks
+FROM quay.io/oauth2-proxy/oauth2-proxy:v7.6.0-alpine
 
 # Copy configuration
 COPY oauth2-proxy.cfg /etc/oauth2-proxy/oauth2-proxy.cfg
@@ -16,10 +17,9 @@ COPY oauth2-proxy.cfg /etc/oauth2-proxy/oauth2-proxy.cfg
 # Expose the oauth2-proxy port
 EXPOSE 4180
 
-# Note: No HEALTHCHECK defined here because the oauth2-proxy image is distroless
-# (no shell, wget, or curl). Configure healthcheck in Coolify UI instead:
-#   - Disable custom healthcheck, OR
-#   - Use Coolify's HTTP healthcheck to GET http://localhost:4180/ping
+# Health check using wget (available in Alpine)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD wget -q --spider http://localhost:4180/ping || exit 1
 
 # Run oauth2-proxy with config file
 ENTRYPOINT ["oauth2-proxy", "--config=/etc/oauth2-proxy/oauth2-proxy.cfg"]
