@@ -249,10 +249,11 @@ export function generateProjectUrls(
   
   const domains: string[] = [];
   
-  // Coolify requires FQDN format with protocol prefix: https://domain:port
+  // Coolify domain format: https://domain (port mapping is handled separately via portsExposes)
+  // Standard HTTPS traffic (443) is proxied to the container's exposed port (80)
   
-  // Main domain on port 80 - nginx handles routing with authentication
-  domains.push(`${mainDomain}:80`);
+  // Main domain - nginx on port 80 handles routing with authentication
+  domains.push(mainDomain);
   
   // Check for code-server addon - separate subdomain, direct access on port 8080
   const hasCodeServer = addons.some(a => a.id === 'code-server');

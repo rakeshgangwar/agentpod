@@ -393,8 +393,9 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
         fqdnUrl = `https://${slug}.${config.opencode.wildcardDomain}`;
         
         // Build domains config based on resolved addons
-        // Main domain on port 80 - nginx handles all routing with oauth2-proxy auth
-        const domains: string[] = [`https://${slug}.${config.opencode.wildcardDomain}:80`];
+        // Main domain - nginx on port 80 handles all routing with oauth2-proxy auth
+        // Don't include :80 in domain - Coolify maps HTTPS (443) to container port via portsExposes
+        const domains: string[] = [`https://${slug}.${config.opencode.wildcardDomain}`];
         
         // Addons get separate subdomains with direct port access
         if (resolvedAddonIds.includes('code-server')) {
@@ -415,9 +416,9 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       
       if (tier.has_desktop_access) {
         vncUrl = `https://vnc-${slug}.${config.opencode.wildcardDomain}`;
-        domainsConfig = `${fqdnUrl}:80,${codeServerUrl}:8080,${vncUrl}:6080`;
+        domainsConfig = `${fqdnUrl},${codeServerUrl}:8080,${vncUrl}:6080`;
       } else {
-        domainsConfig = `${fqdnUrl}:80,${codeServerUrl}:8080`;
+        domainsConfig = `${fqdnUrl},${codeServerUrl}:8080`;
       }
     }
     
