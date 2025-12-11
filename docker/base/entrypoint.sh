@@ -23,12 +23,7 @@ echo "=============================================="
 # ACP_GATEWAY_PORT      - Port for ACP Gateway (default: 4097)
 # ADDON_IDS             - Comma-separated list of addon IDs to install
 # WILDCARD_DOMAIN       - Domain for URL generation (default: superchotu.com)
-#
-# Keycloak/OAuth2 (required for authentication):
-# OAUTH2_PROXY_CLIENT_ID      - Keycloak client ID
-# OAUTH2_PROXY_CLIENT_SECRET  - Keycloak client secret
-# OAUTH2_PROXY_COOKIE_SECRET  - Random secret for cookie encryption (32 bytes)
-# OAUTH2_PROXY_OIDC_ISSUER_URL - Keycloak realm URL
+# SSO_URL               - Central SSO URL (default: https://sso.superchotu.com)
 # =============================================================================
 
 HOME_DIR="/home/developer"
@@ -316,41 +311,6 @@ start_homepage() {
 }
 
 # =============================================================================
-# Start oauth2-proxy
-# =============================================================================
-start_oauth2_proxy() {
-    echo "Starting oauth2-proxy on port ${OAUTH2_PROXY_PORT:-4180}..."
-    
-    # Check for required environment variables
-    if [ -z "$OAUTH2_PROXY_CLIENT_SECRET" ]; then
-        echo "  ERROR: OAUTH2_PROXY_CLIENT_SECRET is required!"
-        echo "  Skipping oauth2-proxy startup. Authentication will not work."
-        return 1
-    fi
-    
-    if [ -z "$OAUTH2_PROXY_COOKIE_SECRET" ]; then
-        echo "  Warning: OAUTH2_PROXY_COOKIE_SECRET not set. Generating random secret."
-        export OAUTH2_PROXY_COOKIE_SECRET=$(openssl rand -base64 32 | tr -- '+/' '-_')
-    fi
-    
-    # Start oauth2-proxy with config file
-    oauth2-proxy --config=/etc/oauth2-proxy/oauth2-proxy.cfg &
-    OAUTH2_PROXY_PID=$!
-    
-    # Wait for oauth2-proxy to be ready
-    for i in {1..15}; do
-        if curl -sf "http://localhost:${OAUTH2_PROXY_PORT:-4180}/ping" > /dev/null 2>&1; then
-            echo "  oauth2-proxy is ready."
-            return 0
-        fi
-        sleep 1
-    done
-    
-    echo "  Warning: oauth2-proxy health check timed out."
-    return 0
-}
-
-# =============================================================================
 # Start nginx
 # =============================================================================
 start_nginx() {
@@ -462,17 +422,18 @@ show_startup_info() {
     echo "  User:      developer"
     echo "  Workspace: $WORKSPACE"
     echo ""
-    echo "  URLs (with Keycloak SSO):"
+    echo "  URLs (with Centralized SSO at ${SSO_URL:-https://sso.superchotu.com}):"
     echo "    - Homepage:    $BASE_URL/"
     echo "    - OpenCode:    $BASE_URL/opencode/"
     echo "    - ACP Gateway: $BASE_URL/acp/"
+    echo "    - Code Server: $BASE_URL/code/"
+    echo "    - VNC Desktop: $BASE_URL/vnc/"
     if [ -n "$CODE_SERVER_PID" ]; then
-        echo "    - Code Server: $CODE_URL/"
+        echo "    - Code Server (direct): $CODE_URL/"
     fi
     echo ""
     echo "  Internal Services:"
     echo "    - nginx:        http://localhost:${NGINX_PORT:-80}"
-    echo "    - oauth2-proxy: http://localhost:${OAUTH2_PROXY_PORT:-4180}"
     echo "    - Homepage:     http://localhost:${HOMEPAGE_PORT:-3000}"
     echo "    - OpenCode:     http://localhost:${OPENCODE_PORT:-4096}"
     echo "    - ACP Gateway:  http://localhost:${ACP_GATEWAY_PORT:-4097}"
@@ -491,7 +452,6 @@ show_startup_info() {
 cleanup() {
     echo "Shutting down..."
     [ -n "$NGINX_PID" ] && sudo kill "$NGINX_PID" 2>/dev/null || true
-    [ -n "$OAUTH2_PROXY_PID" ] && kill "$OAUTH2_PROXY_PID" 2>/dev/null || true
     [ -n "$HOMEPAGE_PID" ] && kill "$HOMEPAGE_PID" 2>/dev/null || true
     [ -n "$CODE_SERVER_PID" ] && kill "$CODE_SERVER_PID" 2>/dev/null || true
     [ -n "$OPENCODE_PID" ] && kill "$OPENCODE_PID" 2>/dev/null || true
@@ -537,12 +497,15 @@ cd "$WORKSPACE"
 # =============================================================================
 # Start services in order:
 # 1. Internal services first (OpenCode, ACP Gateway, Homepage)
-# 2. oauth2-proxy (depends on Keycloak being reachable)
-# 3. nginx (main entry point, depends on oauth2-proxy)
-# 4. Addon services (code-server on port 8080)
+# 2. nginx (main entry point, authenticates via central SSO at sso.superchotu.com)
+# 3. Addon services (code-server on port 8080)
+#
+# Note: Authentication is now handled by centralized SSO at sso.superchotu.com
+# nginx calls out to SSO to validate sessions, no local oauth2-proxy needed
 # =============================================================================
 
 echo "Starting internal services..."
+echo "  SSO URL: ${SSO_URL:-https://sso.superchotu.com}"
 
 # Start OpenCode server (port 4096)
 start_opencode_server
@@ -553,10 +516,7 @@ start_acp_gateway
 # Start Homepage (port 3000)
 start_homepage
 
-# Start oauth2-proxy (port 4180)
-start_oauth2_proxy
-
-# Start nginx (port 80 - main entry point)
+# Start nginx (port 80 - main entry point, auth via central SSO)
 start_nginx
 
 # Start addon services (e.g., code-server on port 8080)

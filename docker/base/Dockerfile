@@ -2,10 +2,10 @@
 # AgentPod Base Image
 # Foundation layer for all AgentPod container flavors
 # =============================================================================
-# Version: 0.2.0
+# Version: 0.3.0
 # Contains: Ubuntu 24.04, Node.js 22, Bun, OpenCode CLI, ACP Gateway, 
-#           Homepage, nginx, oauth2-proxy, Core Tools
-# Features: Keycloak SSO authentication, path-based routing
+#           Homepage, nginx, Core Tools
+# Features: Centralized SSO authentication via sso.superchotu.com, path-based routing
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -125,20 +125,6 @@ ENV PATH="${BUN_INSTALL}/bin:${PATH}"
 RUN npm install -g opencode-ai
 
 # =============================================================================
-# oauth2-proxy (for Keycloak SSO authentication) - with retry for GitHub rate limits
-# =============================================================================
-RUN ARCH=$(dpkg --print-architecture) && \
-    OAUTH2_VERSION="7.6.0" && \
-    for i in 1 2 3; do \
-        curl -fsSL "https://github.com/oauth2-proxy/oauth2-proxy/releases/download/v${OAUTH2_VERSION}/oauth2-proxy-v${OAUTH2_VERSION}.linux-${ARCH}.tar.gz" -o oauth2-proxy.tar.gz && break || sleep 5; \
-    done && \
-    tar -xzf oauth2-proxy.tar.gz && \
-    mv "oauth2-proxy-v${OAUTH2_VERSION}.linux-${ARCH}/oauth2-proxy" /usr/local/bin/ && \
-    chmod +x /usr/local/bin/oauth2-proxy && \
-    rm -rf oauth2-proxy.tar.gz "oauth2-proxy-v${OAUTH2_VERSION}.linux-${ARCH}" && \
-    oauth2-proxy --version
-
-# =============================================================================
 # Modern CLI Tools (install from apt where available for reliability)
 # =============================================================================
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -179,13 +165,6 @@ RUN mkdir -p /var/log/nginx && \
     chown $USERNAME:$USERNAME /run/nginx.pid
 
 # =============================================================================
-# Copy oauth2-proxy configuration
-# =============================================================================
-COPY oauth2-proxy/oauth2-proxy.cfg /etc/oauth2-proxy/oauth2-proxy.cfg
-RUN mkdir -p /etc/oauth2-proxy && \
-    chown -R $USERNAME:$USERNAME /etc/oauth2-proxy
-
-# =============================================================================
 # Copy scripts
 # =============================================================================
 COPY scripts/ /opt/agentpod/scripts/
@@ -217,7 +196,6 @@ ENV OPENCODE_PORT=4096
 ENV OPENCODE_HOST=0.0.0.0
 ENV ACP_GATEWAY_PORT=4097
 ENV HOMEPAGE_PORT=3000
-ENV OAUTH2_PROXY_PORT=4180
 
 # nginx exposes port 80 as the main entry point
 ENV NGINX_PORT=80
@@ -226,12 +204,8 @@ ENV NGINX_PORT=80
 ENV OPENCODE_CONFIG_DIR=/home/developer/.config/opencode-custom
 ENV TERM=xterm-256color
 
-# Keycloak configuration (should be overridden via environment)
-ENV OAUTH2_PROXY_PROVIDER=keycloak-oidc
-ENV OAUTH2_PROXY_OIDC_ISSUER_URL=https://auth.superchotu.com/realms/agentpod
-ENV OAUTH2_PROXY_CLIENT_ID=agentpod-container
-# OAUTH2_PROXY_CLIENT_SECRET must be set via environment
-# OAUTH2_PROXY_COOKIE_SECRET must be set via environment
+# Centralized SSO URL (authentication handled by sso.superchotu.com)
+ENV SSO_URL=https://sso.superchotu.com
 
 # =============================================================================
 # Copy entrypoint script

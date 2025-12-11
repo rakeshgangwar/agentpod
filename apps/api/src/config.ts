@@ -67,6 +67,12 @@ export const config = {
     wildcardDomain: getEnv('OPENCODE_WILDCARD_DOMAIN', ''),
   },
   
+  // Centralized SSO Service
+  sso: {
+    // URL of the central SSO service (oauth2-proxy at sso.superchotu.com)
+    url: getEnv('SSO_URL', 'https://sso.superchotu.com'),
+  },
+  
   // Container Registry (Forgejo Package Registry)
   registry: {
     // Registry URL (without protocol, used for docker pull)

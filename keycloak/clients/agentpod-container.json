@@ -1,14 +1,15 @@
 {
   "clientId": "agentpod-container",
   "name": "AgentPod Container Auth",
-  "description": "OAuth2 authentication for AgentPod development containers via oauth2-proxy",
+  "description": "OAuth2 authentication for AgentPod containers via centralized SSO at sso.superchotu.com",
   "enabled": true,
   "alwaysDisplayInConsole": false,
   "clientAuthenticatorType": "client-secret",
   "redirectUris": [
-    "https://*.superchotu.com/oauth2/callback"
+    "https://sso.superchotu.com/oauth2/callback"
   ],
   "webOrigins": [
+    "https://sso.superchotu.com",
     "https://*.superchotu.com"
   ],
   "notBefore": 0,
@@ -27,7 +28,7 @@
     "client.secret.creation.time": "0",
     "backchannel.logout.session.required": "true",
     "backchannel.logout.revoke.offline.tokens": "false",
-    "post.logout.redirect.uris": "https://*.superchotu.com/*",
+    "post.logout.redirect.uris": "https://sso.superchotu.com/*",
     "pkce.code.challenge.method": "S256",
     "display.on.consent.screen": "false",
     "login_theme": ""

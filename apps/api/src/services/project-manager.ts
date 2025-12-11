@@ -36,7 +36,6 @@ import {
 } from './image-resolver.ts';
 import { createLogger } from '../utils/logger.ts';
 import { ProjectCreationError, ProjectNotFoundError } from '../utils/errors.ts';
-import { keycloak } from './keycloak.ts';
 
 const log = createLogger('project-manager');
 
@@ -488,9 +487,6 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       public: publicCloneUrl,
     });
     
-    // Get Keycloak configuration for container auth
-    const keycloakConfig = keycloak.getContainerAuthConfig();
-    
     const envVars: Record<string, string> = {
       // OpenCode configuration (internal port, nginx routes to this)
       OPENCODE_PORT: '4096',
@@ -516,11 +512,8 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       // Addon configuration - comma-separated list of addon IDs
       ADDON_IDS: resolvedAddonIds.join(','),
       
-      // Keycloak/OAuth2 authentication for container
-      OAUTH2_PROXY_CLIENT_ID: keycloakConfig.clientId,
-      OAUTH2_PROXY_CLIENT_SECRET: keycloakConfig.clientSecret,
-      OAUTH2_PROXY_COOKIE_SECRET: keycloakConfig.cookieSecret,
-      OAUTH2_PROXY_OIDC_ISSUER_URL: keycloakConfig.issuerUrl,
+      // Centralized SSO URL - container's nginx calls this for auth
+      SSO_URL: config.sso.url,
     };
     
     // Add LLM credentials
