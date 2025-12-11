@@ -125,11 +125,13 @@ ENV PATH="${BUN_INSTALL}/bin:${PATH}"
 RUN npm install -g opencode-ai
 
 # =============================================================================
-# oauth2-proxy (for Keycloak SSO authentication)
+# oauth2-proxy (for Keycloak SSO authentication) - with retry for GitHub rate limits
 # =============================================================================
 RUN ARCH=$(dpkg --print-architecture) && \
     OAUTH2_VERSION="7.6.0" && \
-    curl -fsSL "https://github.com/oauth2-proxy/oauth2-proxy/releases/download/v${OAUTH2_VERSION}/oauth2-proxy-v${OAUTH2_VERSION}.linux-${ARCH}.tar.gz" -o oauth2-proxy.tar.gz && \
+    for i in 1 2 3; do \
+        curl -fsSL "https://github.com/oauth2-proxy/oauth2-proxy/releases/download/v${OAUTH2_VERSION}/oauth2-proxy-v${OAUTH2_VERSION}.linux-${ARCH}.tar.gz" -o oauth2-proxy.tar.gz && break || sleep 5; \
+    done && \
     tar -xzf oauth2-proxy.tar.gz && \
     mv "oauth2-proxy-v${OAUTH2_VERSION}.linux-${ARCH}/oauth2-proxy" /usr/local/bin/ && \
     chmod +x /usr/local/bin/oauth2-proxy && \
@@ -137,34 +139,23 @@ RUN ARCH=$(dpkg --print-architecture) && \
     oauth2-proxy --version
 
 # =============================================================================
-# Modern CLI Tools
+# Modern CLI Tools (install from apt where available for reliability)
 # =============================================================================
-# ripgrep (fast grep alternative)
-RUN apt-get update && apt-get install -y --no-install-recommends ripgrep && \
-    rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ripgrep \
+    fd-find \
+    bat \
+    fzf \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -s $(which fdfind) /usr/local/bin/fd \
+    && ln -s $(which batcat) /usr/local/bin/bat
 
-# fd (fast find alternative) - architecture aware
-RUN ARCH=$(dpkg --print-architecture) && \
-    curl -fsSL "https://github.com/sharkdp/fd/releases/download/v10.1.0/fd_10.1.0_${ARCH}.deb" -o fd.deb && \
-    dpkg -i fd.deb && \
-    rm -f fd.deb
-
-# bat (cat with syntax highlighting) - architecture aware
-RUN ARCH=$(dpkg --print-architecture) && \
-    curl -fsSL "https://github.com/sharkdp/bat/releases/download/v0.24.0/bat_0.24.0_${ARCH}.deb" -o bat.deb && \
-    dpkg -i bat.deb && \
-    rm -f bat.deb
-
-# fzf (fuzzy finder)
-RUN git clone --depth 1 https://github.com/junegunn/fzf.git /opt/fzf && \
-    /opt/fzf/install --bin && \
-    ln -s /opt/fzf/bin/fzf /usr/local/bin/fzf && \
-    rm -rf /opt/fzf/.git
-
-# yq (YAML processor) - architecture aware
+# yq (YAML processor) - not in apt, download from GitHub with retry
 RUN ARCH=$(dpkg --print-architecture) && \
     if [ "$ARCH" = "arm64" ]; then YQ_ARCH="arm64"; else YQ_ARCH="amd64"; fi && \
-    curl -fsSL "https://github.com/mikefarah/yq/releases/download/v4.44.1/yq_linux_${YQ_ARCH}" -o /usr/local/bin/yq && \
+    for i in 1 2 3; do \
+        curl -fsSL "https://github.com/mikefarah/yq/releases/download/v4.44.1/yq_linux_${YQ_ARCH}" -o /usr/local/bin/yq && break || sleep 5; \
+    done && \
     chmod +x /usr/local/bin/yq
 
 # =============================================================================
