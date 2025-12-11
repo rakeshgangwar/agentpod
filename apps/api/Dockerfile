@@ -21,7 +21,7 @@ COPY apps/api/package.json apps/api/bun.lock* ./apps/api/
 
 # Install dependencies for the API only (production)
 WORKDIR /app/apps/api
-RUN bun install --frozen-lockfile --production
+RUN bun install --production
 
 # Copy workspace packages source (needed for types)
 WORKDIR /app
