@@ -2,7 +2,7 @@
 //!
 //! Commands for CRUD operations and container control for projects.
 
-use crate::models::{AppError, ContainerTier, CreateProjectInput, DeployResponse, Project};
+use crate::models::{AppError, ContainerTier, ContainerFlavor, ContainerAddon, ResourceTier, CreateProjectInput, DeployResponse, Project};
 use crate::services::ApiClient;
 
 /// Helper to get an authenticated API client
@@ -106,4 +106,58 @@ pub async fn list_container_tiers() -> Result<Vec<ContainerTier>, AppError> {
 pub async fn get_default_container_tier() -> Result<ContainerTier, AppError> {
     let client = get_client()?;
     client.get_default_container_tier().await
+}
+
+// =============================================================================
+// Resource Tier Commands (Modular Container System)
+// =============================================================================
+
+/// List all available resource tiers
+#[tauri::command]
+pub async fn list_resource_tiers() -> Result<Vec<ResourceTier>, AppError> {
+    let client = get_client()?;
+    client.list_resource_tiers().await
+}
+
+/// Get the default resource tier
+#[tauri::command]
+pub async fn get_default_resource_tier() -> Result<ResourceTier, AppError> {
+    let client = get_client()?;
+    client.get_default_resource_tier().await
+}
+
+// =============================================================================
+// Container Flavor Commands
+// =============================================================================
+
+/// List all available container flavors
+#[tauri::command]
+pub async fn list_container_flavors() -> Result<Vec<ContainerFlavor>, AppError> {
+    let client = get_client()?;
+    client.list_container_flavors().await
+}
+
+/// Get the default container flavor
+#[tauri::command]
+pub async fn get_default_container_flavor() -> Result<ContainerFlavor, AppError> {
+    let client = get_client()?;
+    client.get_default_container_flavor().await
+}
+
+// =============================================================================
+// Container Addon Commands
+// =============================================================================
+
+/// List all available container addons
+#[tauri::command]
+pub async fn list_container_addons() -> Result<Vec<ContainerAddon>, AppError> {
+    let client = get_client()?;
+    client.list_container_addons().await
+}
+
+/// List non-GPU addons only
+#[tauri::command]
+pub async fn list_non_gpu_addons() -> Result<Vec<ContainerAddon>, AppError> {
+    let client = get_client()?;
+    client.list_non_gpu_addons().await
 }

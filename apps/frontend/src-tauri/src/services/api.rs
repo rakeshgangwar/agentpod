@@ -4,6 +4,8 @@
 
 use crate::models::{
     AppError, AppInfo, ConnectionConfig, ContainerTier, ContainerTiersResponse, 
+    ContainerFlavor, ContainerFlavorsResponse, ContainerAddon, ContainerAddonsResponse,
+    ResourceTier, ResourceTiersResponse,
     CreateProjectInput, DeployResponse, ErrorResponse, FileContent, FileNode, 
     HealthResponse, Message, OpenCodeHealth, Project, ProjectResponse, 
     ProjectsResponse, SendMessageInput, Session, SuccessResponse,
@@ -268,6 +270,70 @@ impl ApiClient {
         let request = self.add_auth(self.client.get(&url));
         let response = request.send().await?;
         self.handle_response(response).await
+    }
+
+    // =========================================================================
+    // Resource Tiers (Modular Container System)
+    // =========================================================================
+
+    /// List all available resource tiers
+    pub async fn list_resource_tiers(&self) -> Result<Vec<ResourceTier>, AppError> {
+        let url = format!("{}/api/resource-tiers", self.base_url);
+        let request = self.add_auth(self.client.get(&url));
+        let response = request.send().await?;
+        let result: ResourceTiersResponse = self.handle_response(response).await?;
+        Ok(result.tiers)
+    }
+
+    /// Get the default resource tier
+    pub async fn get_default_resource_tier(&self) -> Result<ResourceTier, AppError> {
+        let url = format!("{}/api/resource-tiers/default", self.base_url);
+        let request = self.add_auth(self.client.get(&url));
+        let response = request.send().await?;
+        self.handle_response(response).await
+    }
+
+    // =========================================================================
+    // Container Flavors
+    // =========================================================================
+
+    /// List all available container flavors
+    pub async fn list_container_flavors(&self) -> Result<Vec<ContainerFlavor>, AppError> {
+        let url = format!("{}/api/flavors", self.base_url);
+        let request = self.add_auth(self.client.get(&url));
+        let response = request.send().await?;
+        let result: ContainerFlavorsResponse = self.handle_response(response).await?;
+        Ok(result.flavors)
+    }
+
+    /// Get the default container flavor
+    pub async fn get_default_container_flavor(&self) -> Result<ContainerFlavor, AppError> {
+        let url = format!("{}/api/flavors/default", self.base_url);
+        let request = self.add_auth(self.client.get(&url));
+        let response = request.send().await?;
+        self.handle_response(response).await
+    }
+
+    // =========================================================================
+    // Container Addons
+    // =========================================================================
+
+    /// List all available container addons
+    pub async fn list_container_addons(&self) -> Result<Vec<ContainerAddon>, AppError> {
+        let url = format!("{}/api/addons", self.base_url);
+        let request = self.add_auth(self.client.get(&url));
+        let response = request.send().await?;
+        let result: ContainerAddonsResponse = self.handle_response(response).await?;
+        Ok(result.addons)
+    }
+
+    /// Get non-GPU addons only
+    pub async fn list_non_gpu_addons(&self) -> Result<Vec<ContainerAddon>, AppError> {
+        let url = format!("{}/api/addons/non-gpu", self.base_url);
+        let request = self.add_auth(self.client.get(&url));
+        let response = request.send().await?;
+        let result: ContainerAddonsResponse = self.handle_response(response).await?;
+        Ok(result.addons)
     }
 
     // =========================================================================

@@ -15,8 +15,14 @@ use commands::{
     list_projects, get_project, create_project, delete_project,
     start_project, stop_project, restart_project,
     get_project_logs, deploy_project,
-    // Container tier commands
+    // Container tier commands (legacy)
     list_container_tiers, get_default_container_tier,
+    // Resource tier commands (modular containers)
+    list_resource_tiers, get_default_resource_tier,
+    // Container flavor commands
+    list_container_flavors, get_default_container_flavor,
+    // Container addon commands
+    list_container_addons, list_non_gpu_addons,
     // Settings commands
     get_settings, save_settings, list_providers, get_default_provider,
     export_settings, import_settings,
@@ -75,9 +81,18 @@ pub fn run() {
             restart_project,
             get_project_logs,
             deploy_project,
-            // Container tier commands
+            // Container tier commands (legacy)
             list_container_tiers,
             get_default_container_tier,
+            // Resource tier commands (modular containers)
+            list_resource_tiers,
+            get_default_resource_tier,
+            // Container flavor commands
+            list_container_flavors,
+            get_default_container_flavor,
+            // Container addon commands
+            list_container_addons,
+            list_non_gpu_addons,
             // Settings commands
             get_settings,
             save_settings,

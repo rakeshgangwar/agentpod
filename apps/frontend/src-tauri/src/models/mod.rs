@@ -187,3 +187,84 @@ pub struct ContainerTier {
 pub struct ContainerTiersResponse {
     pub tiers: Vec<ContainerTier>,
 }
+
+// =============================================================================
+// Resource Tiers (Modular Container System)
+// =============================================================================
+
+/// Resource tier resources
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResourceTierResources {
+    pub cpu_cores: f64,
+    pub memory_gb: f64,
+    pub storage_gb: f64,
+}
+
+/// Resource tier (CPU, memory, storage)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResourceTier {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub resources: ResourceTierResources,
+    pub price_monthly: f64,
+    pub is_default: bool,
+    pub sort_order: i32,
+}
+
+/// Resource tiers list response from API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceTiersResponse {
+    pub tiers: Vec<ResourceTier>,
+}
+
+// =============================================================================
+// Container Flavors (Language/Framework)
+// =============================================================================
+
+/// Container flavor (language/framework)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContainerFlavor {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub languages: Vec<String>,
+    pub image_size_mb: i32,
+    pub is_default: bool,
+    pub sort_order: i32,
+}
+
+/// Container flavors list response from API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContainerFlavorsResponse {
+    pub flavors: Vec<ContainerFlavor>,
+}
+
+// =============================================================================
+// Container Addons
+// =============================================================================
+
+/// Container addon
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContainerAddon {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub category: String,
+    pub image_size_mb: i32,
+    pub port: Option<i32>,
+    pub requires_gpu: bool,
+    pub requires_flavor: Option<String>,
+    pub price_monthly: f64,
+    pub sort_order: i32,
+}
+
+/// Container addons list response from API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContainerAddonsResponse {
+    pub addons: Vec<ContainerAddon>,
+}
