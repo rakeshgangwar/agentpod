@@ -110,8 +110,11 @@ RUN npm install -g pnpm
 # Bun Runtime (for ACP Gateway and Homepage)
 # =============================================================================
 ENV BUN_INSTALL="/usr/local/bun"
-RUN curl -fsSL https://bun.sh/install | bash && \
-    mv /root/.bun/* /usr/local/bun/ || true
+RUN mkdir -p /usr/local/bun/bin && \
+    curl -fsSL https://bun.sh/install | bash && \
+    cp -r /root/.bun/bin/* /usr/local/bun/bin/ && \
+    rm -rf /root/.bun && \
+    chmod +x /usr/local/bun/bin/bun
 ENV PATH="${BUN_INSTALL}/bin:${PATH}"
 
 # =============================================================================

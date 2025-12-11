@@ -15,6 +15,21 @@ import { coolify } from './coolify.ts';
 import { getProjectById, updateProject, type Project } from '../models/project.ts';
 import { createLogger } from '../utils/logger.ts';
 
+/**
+ * Custom fetch that bypasses SSL verification for container-to-container communication.
+ * This is needed because containers use Traefik/Let's Encrypt certs that may have chain issues
+ * when accessed from within the same infrastructure.
+ * 
+ * Uses Bun-specific TLS options to disable certificate verification.
+ */
+const insecureFetch = (request: Request): Promise<Response> => {
+  return fetch(request, {
+    tls: {
+      rejectUnauthorized: false,
+    },
+  });
+};
+
 const log = createLogger('opencode');
 
 // =============================================================================
@@ -124,6 +139,8 @@ async function getClient(projectId: string) {
   const client = createOpencodeClient({
     baseUrl: `${baseUrl}/opencode`,
     throwOnError: true,
+    // Use custom fetch with SSL verification disabled for container-to-container communication
+    fetch: insecureFetch,
   });
   
   clientCache.set(projectId, client);

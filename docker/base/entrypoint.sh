@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Ensure PATH includes bun and other tool locations
+export PATH="/usr/local/bun/bin:/usr/local/bin:$PATH"
+
 echo "=============================================="
 echo "  AgentPod Container v${CONTAINER_VERSION:-0.4.0}"
 echo "=============================================="
