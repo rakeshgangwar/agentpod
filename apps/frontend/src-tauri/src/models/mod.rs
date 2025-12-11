@@ -85,8 +85,18 @@ pub struct CreateProjectInput {
     pub llm_provider_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub llm_model_id: Option<String>,
+    /// Legacy container tier ID (deprecated, use modular fields below)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub container_tier_id: Option<String>,
+    /// Resource tier ID (CPU/memory/storage): 'starter', 'builder', 'creator', 'power'
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resource_tier_id: Option<String>,
+    /// Container flavor ID (language environment): 'js', 'python', 'rust', 'fullstack'
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub flavor_id: Option<String>,
+    /// Container addon IDs: ['gui', 'code-server', 'databases', 'cloud', 'gpu']
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub addon_ids: Option<Vec<String>>,
 }
 
 /// Connection configuration stored securely

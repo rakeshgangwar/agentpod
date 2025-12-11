@@ -33,6 +33,9 @@ pub async fn create_project(
     llm_provider_id: Option<String>,
     llm_model_id: Option<String>,
     container_tier_id: Option<String>,
+    resource_tier_id: Option<String>,
+    flavor_id: Option<String>,
+    addon_ids: Option<Vec<String>>,
 ) -> Result<Project, AppError> {
     let client = get_client()?;
     
@@ -43,6 +46,9 @@ pub async fn create_project(
         llm_provider_id,
         llm_model_id,
         container_tier_id,
+        resource_tier_id,
+        flavor_id,
+        addon_ids,
     };
     
     client.create_project(input).await
