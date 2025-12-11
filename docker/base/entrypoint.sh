@@ -295,8 +295,9 @@ start_addon_services() {
             code-server)
                 if command -v code-server &> /dev/null; then
                     echo "Starting code-server on port 8080..."
-                    # Explicitly pass bind-addr to ensure correct port (config file may not be read)
-                    code-server --bind-addr 0.0.0.0:8080 --auth none --disable-telemetry &
+                    # Override PORT env var and explicitly pass bind-addr to ensure port 8080
+                    # code-server respects PORT env var which may conflict with OPENCODE_PORT
+                    PORT=8080 code-server --bind-addr 0.0.0.0:8080 --auth none --disable-telemetry &
                     CODE_SERVER_PID=$!
                 fi
                 ;;
