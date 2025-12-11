@@ -77,6 +77,8 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-reco
     tmux \
     # Web server (for reverse proxy)
     nginx \
+    # For envsubst (to substitute env vars in nginx config)
+    gettext-base \
     && rm -rf /var/lib/apt/lists/*
 
 # Generate locales

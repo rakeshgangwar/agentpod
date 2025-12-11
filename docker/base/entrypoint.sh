@@ -316,6 +316,15 @@ start_homepage() {
 start_nginx() {
     echo "Starting nginx on port ${NGINX_PORT:-80}..."
     
+    # Process nginx config with envsubst to substitute environment variables
+    # This allows CONTAINER_API_TOKEN to be used in the nginx config
+    if [ -n "$CONTAINER_API_TOKEN" ]; then
+        echo "  Processing nginx config with CONTAINER_API_TOKEN..."
+        sudo sh -c "envsubst '\$CONTAINER_API_TOKEN' < /etc/nginx/nginx.conf > /etc/nginx/nginx.conf.tmp && mv /etc/nginx/nginx.conf.tmp /etc/nginx/nginx.conf"
+    else
+        echo "  Warning: CONTAINER_API_TOKEN not set. API endpoints will require SSO."
+    fi
+    
     # nginx needs to run as root to bind to port 80
     sudo nginx -g 'daemon off;' &
     NGINX_PID=$!
