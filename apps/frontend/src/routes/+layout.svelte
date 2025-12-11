@@ -1,19 +1,45 @@
 <script lang="ts">
   import "../app.css";
   import { onMount } from "svelte";
-  import { connection, initConnection } from "$lib/stores/connection.svelte";
+  import { goto } from "$app/navigation";
+  import { initConnection } from "$lib/stores/connection.svelte";
+  import { auth, initAuth } from "$lib/stores/auth.svelte";
   import { initSettings } from "$lib/stores/settings.svelte";
   import { Toaster } from "$lib/components/ui/sonner";
 
   let { children } = $props();
   let isInitializing = $state(true);
+  let currentPath = $state("/");
+
+  // Public routes that don't require authentication
+  const publicRoutes = ["/login"];
 
   onMount(async () => {
+    // Get current path
+    currentPath = window.location.pathname;
+    
     // Initialize settings first (for theme)
     await initSettings();
+    // Initialize auth
+    await initAuth();
     // Then connection
     await initConnection();
     isInitializing = false;
+  });
+
+  // Auth guard - redirect to login if not authenticated
+  $effect(() => {
+    if (!isInitializing && auth.isInitialized) {
+      // Update current path on navigation
+      if (typeof window !== "undefined") {
+        currentPath = window.location.pathname;
+      }
+      const isPublicRoute = publicRoutes.some(route => currentPath.startsWith(route));
+      
+      if (!auth.isAuthenticated && !isPublicRoute) {
+        goto("/login");
+      }
+    }
   });
 </script>
 

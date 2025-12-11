@@ -136,7 +136,7 @@ pub async fn cancel_oauth_flow(provider_id: String, state_id: String) -> Result<
     // DELETE request - we'll need to add a delete method to ApiClient
     let url = format!("{}{}", client.base_url(), path);
     let request = client.client().delete(&url);
-    let request = client.add_auth_header(request);
+    let request = client.add_auth_header(request).await;
     let response = request.send().await
         .map_err(|e| AppError::NetworkError(e.to_string()))?;
     
@@ -157,7 +157,7 @@ pub async fn remove_provider_credentials(provider_id: String) -> Result<(), AppE
     // DELETE request
     let url = format!("{}{}", client.base_url(), path);
     let request = client.client().delete(&url);
-    let request = client.add_auth_header(request);
+    let request = client.add_auth_header(request).await;
     let response = request.send().await
         .map_err(|e| AppError::NetworkError(e.to_string()))?;
     
@@ -341,7 +341,7 @@ pub async fn delete_user_opencode_file(
     // DELETE request
     let url = format!("{}{}", client.base_url(), path);
     let request = client.client().delete(&url);
-    let request = client.add_auth_header(request);
+    let request = client.add_auth_header(request).await;
     let response = request.send().await
         .map_err(|e| AppError::NetworkError(e.to_string()))?;
     

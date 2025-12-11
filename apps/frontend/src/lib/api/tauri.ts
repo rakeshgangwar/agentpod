@@ -1289,3 +1289,100 @@ export async function deleteUserOpencodeFile(
 ): Promise<void> {
   return invoke("delete_user_opencode_file", { userId, fileType, name });
 }
+
+// =============================================================================
+// Auth Types (Keycloak OAuth)
+// =============================================================================
+
+/** User information from Keycloak */
+export interface AuthUser {
+  sub: string;
+  email?: string;
+  emailVerified?: boolean;
+  name?: string;
+  preferredUsername?: string;
+}
+
+/** Authentication status */
+export interface AuthStatus {
+  authenticated: boolean;
+  user: AuthUser | null;
+  expiresAt: number | null;
+}
+
+// =============================================================================
+// Auth Commands (Keycloak OAuth)
+// =============================================================================
+
+/**
+ * Start the OAuth login flow
+ * Returns the authorization URL that should be opened in a browser
+ */
+export async function authStartLogin(): Promise<string> {
+  return invoke<string>("auth_start_login");
+}
+
+/**
+ * Complete the OAuth flow with the callback URL
+ * Parses the callback URL, exchanges code for tokens, and stores auth data
+ */
+export async function authCompleteLogin(callbackUrl: string): Promise<AuthStatus> {
+  return invoke<AuthStatus>("auth_complete_login", { callbackUrl });
+}
+
+/**
+ * Get the current authentication status
+ */
+export async function authGetStatus(): Promise<AuthStatus> {
+  return invoke<AuthStatus>("auth_get_status");
+}
+
+/**
+ * Logout the current user
+ * Revokes tokens with Keycloak and clears local auth data
+ */
+export async function authLogout(): Promise<void> {
+  return invoke("auth_logout");
+}
+
+/**
+ * Get current user info
+ */
+export async function authGetUser(): Promise<AuthUser | null> {
+  return invoke<AuthUser | null>("auth_get_user");
+}
+
+/**
+ * Get a valid access token (refreshes if needed)
+ * Useful for making authenticated API calls
+ */
+export async function authGetToken(): Promise<string> {
+  return invoke<string>("auth_get_token");
+}
+
+/**
+ * Refresh the access token
+ * Forces a token refresh even if the current token is still valid
+ */
+export async function authRefreshToken(): Promise<AuthStatus> {
+  return invoke<AuthStatus>("auth_refresh_token");
+}
+
+/**
+ * Check if user is authenticated
+ */
+export async function authIsAuthenticated(): Promise<boolean> {
+  return invoke<boolean>("auth_is_authenticated");
+}
+
+/**
+ * Listen for OAuth callback events
+ * The OAuth plugin emits these when the redirect is received
+ */
+export async function onOAuthCallback(
+  callback: (url: string) => void
+): Promise<UnlistenFn> {
+  return listen<string>("oauth-callback", (event) => {
+    callback(event.payload);
+  });
+}

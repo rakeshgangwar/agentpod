@@ -1,10 +1,10 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
-import { bearerAuth } from 'hono/bearer-auth';
 import { config } from './config.ts';
 import { initDatabase } from './db/index.ts';
 import { runMigrations, migrations } from './db/migrations.ts';
+import { authMiddleware } from './middleware/auth.ts';
 import { healthRoutes } from './routes/health.ts';
 import { projectRoutes } from './routes/projects.ts';
 import { providerRoutes } from './routes/providers.ts';
@@ -31,8 +31,8 @@ const app = new Hono()
   .use('*', cors())
   // Health routes are public (no auth required)
   .route('/', healthRoutes)
-  // Protected API routes require authentication
-  .use('/api/*', bearerAuth({ token: config.auth.token }))
+  // Protected API routes require authentication (Keycloak OAuth or API key)
+  .use('/api/*', authMiddleware)
   // API routes - Note: Order matters! More specific routes should come first
   // OpenCode proxy routes must come before generic project routes to avoid /:id catching everything
   .route('/api/projects', opencodeRoutes) // OpenCode proxy routes are under /api/projects/:id/opencode/*

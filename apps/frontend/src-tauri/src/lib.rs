@@ -9,6 +9,9 @@ pub mod models;
 pub mod services;
 
 use commands::{
+    // Auth commands (Keycloak OAuth)
+    auth_start_login, auth_complete_login, auth_get_status, auth_logout,
+    auth_get_user, auth_get_token, auth_refresh_token, auth_is_authenticated,
     // Connection commands
     connect, disconnect, get_connection_status, test_connection,
     // Project commands
@@ -65,7 +68,17 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_os::init())
+        .plugin(tauri_plugin_oauth::init())
         .invoke_handler(tauri::generate_handler![
+            // Auth commands (Keycloak OAuth)
+            auth_start_login,
+            auth_complete_login,
+            auth_get_status,
+            auth_logout,
+            auth_get_user,
+            auth_get_token,
+            auth_refresh_token,
+            auth_is_authenticated,
             // Connection commands
             connect,
             disconnect,

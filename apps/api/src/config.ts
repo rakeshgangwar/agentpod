@@ -87,6 +87,20 @@ export const config = {
   
   // Default user ID (until we have proper authentication)
   defaultUserId: getEnv('DEFAULT_USER_ID', 'default-user'),
+  
+  // Keycloak Configuration (for service account and container auth)
+  keycloak: {
+    // Keycloak realm URL (OIDC issuer)
+    realmUrl: getEnv('KEYCLOAK_REALM_URL', 'https://auth.superchotu.com/realms/agentpod'),
+    // Service account client for API-to-container calls
+    apiClientId: getEnv('KEYCLOAK_API_CLIENT_ID', 'agentpod-api'),
+    apiClientSecret: getEnv('KEYCLOAK_API_CLIENT_SECRET', ''),
+    // Container client for oauth2-proxy
+    containerClientId: getEnv('KEYCLOAK_CONTAINER_CLIENT_ID', 'agentpod-container'),
+    containerClientSecret: getEnv('KEYCLOAK_CONTAINER_CLIENT_SECRET', ''),
+    // Cookie secret for oauth2-proxy (32-byte base64)
+    cookieSecret: getEnv('KEYCLOAK_COOKIE_SECRET', ''),
+  },
 } as const;
 
 export type Config = typeof config;

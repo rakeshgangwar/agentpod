@@ -2,7 +2,7 @@
 set -e
 
 echo "=============================================="
-echo "  CodeOpen Base Container v${CONTAINER_VERSION:-0.1.0}"
+echo "  AgentPod Container v${CONTAINER_VERSION:-0.2.0}"
 echo "=============================================="
 
 # =============================================================================
@@ -11,7 +11,8 @@ echo "=============================================="
 # MANAGEMENT_API_URL    - URL of the Management API
 # AUTH_TOKEN            - Bearer token for Management API authentication
 # USER_ID               - User identifier for fetching config
-# PROJECT_SLUG          - Project slug for workspace
+# PROJECT_NAME          - Project display name
+# PROJECT_SLUG          - Project slug for URLs
 # FORGEJO_REPO_URL      - Git repository URL
 # FORGEJO_USER          - Git username for auth
 # FORGEJO_TOKEN         - Git token for auth
@@ -21,6 +22,13 @@ echo "=============================================="
 # OPENCODE_HOST         - Host for OpenCode server (default: 0.0.0.0)
 # ACP_GATEWAY_PORT      - Port for ACP Gateway (default: 4097)
 # ADDON_IDS             - Comma-separated list of addon IDs to install
+# WILDCARD_DOMAIN       - Domain for URL generation (default: superchotu.com)
+#
+# Keycloak/OAuth2 (required for authentication):
+# OAUTH2_PROXY_CLIENT_ID      - Keycloak client ID
+# OAUTH2_PROXY_CLIENT_SECRET  - Keycloak client secret
+# OAUTH2_PROXY_COOKIE_SECRET  - Random secret for cookie encryption (32 bytes)
+# OAUTH2_PROXY_OIDC_ISSUER_URL - Keycloak realm URL
 # =============================================================================
 
 HOME_DIR="/home/developer"
@@ -30,8 +38,8 @@ OPENCODE_CUSTOM_CONFIG_DIR="${HOME_DIR}/.config/opencode-custom"
 OPENCODE_DATA_DIR="${HOME_DIR}/.local/share/opencode"
 
 # Source common functions if available
-if [ -f /opt/codeopen/scripts/common-setup.sh ]; then
-    source /opt/codeopen/scripts/common-setup.sh
+if [ -f /opt/agentpod/scripts/common-setup.sh ]; then
+    source /opt/agentpod/scripts/common-setup.sh
 fi
 
 # =============================================================================
@@ -279,7 +287,94 @@ EOF
 }
 
 # =============================================================================
-# Start Addon Services
+# Start Homepage Service
+# =============================================================================
+start_homepage() {
+    echo "Starting Homepage service on port ${HOMEPAGE_PORT:-3000}..."
+    cd /opt/homepage
+    
+    # Export environment for homepage
+    export PROJECT_NAME="${PROJECT_NAME:-AgentPod Project}"
+    export PROJECT_SLUG="${PROJECT_SLUG:-project}"
+    export WILDCARD_DOMAIN="${WILDCARD_DOMAIN:-superchotu.com}"
+    
+    bun run src/index.ts &
+    HOMEPAGE_PID=$!
+    cd "$WORKSPACE"
+    
+    # Wait for Homepage to be ready
+    for i in {1..15}; do
+        if curl -sf "http://localhost:${HOMEPAGE_PORT:-3000}/health" > /dev/null 2>&1; then
+            echo "  Homepage is ready."
+            return 0
+        fi
+        sleep 1
+    done
+    
+    echo "  Warning: Homepage health check timed out."
+    return 0
+}
+
+# =============================================================================
+# Start oauth2-proxy
+# =============================================================================
+start_oauth2_proxy() {
+    echo "Starting oauth2-proxy on port ${OAUTH2_PROXY_PORT:-4180}..."
+    
+    # Check for required environment variables
+    if [ -z "$OAUTH2_PROXY_CLIENT_SECRET" ]; then
+        echo "  ERROR: OAUTH2_PROXY_CLIENT_SECRET is required!"
+        echo "  Skipping oauth2-proxy startup. Authentication will not work."
+        return 1
+    fi
+    
+    if [ -z "$OAUTH2_PROXY_COOKIE_SECRET" ]; then
+        echo "  Warning: OAUTH2_PROXY_COOKIE_SECRET not set. Generating random secret."
+        export OAUTH2_PROXY_COOKIE_SECRET=$(openssl rand -base64 32 | tr -- '+/' '-_')
+    fi
+    
+    # Start oauth2-proxy with config file
+    oauth2-proxy --config=/etc/oauth2-proxy/oauth2-proxy.cfg &
+    OAUTH2_PROXY_PID=$!
+    
+    # Wait for oauth2-proxy to be ready
+    for i in {1..15}; do
+        if curl -sf "http://localhost:${OAUTH2_PROXY_PORT:-4180}/ping" > /dev/null 2>&1; then
+            echo "  oauth2-proxy is ready."
+            return 0
+        fi
+        sleep 1
+    done
+    
+    echo "  Warning: oauth2-proxy health check timed out."
+    return 0
+}
+
+# =============================================================================
+# Start nginx
+# =============================================================================
+start_nginx() {
+    echo "Starting nginx on port ${NGINX_PORT:-80}..."
+    
+    # nginx needs to run as root to bind to port 80
+    sudo nginx -g 'daemon off;' &
+    NGINX_PID=$!
+    
+    # Wait for nginx to be ready
+    for i in {1..15}; do
+        if curl -sf "http://localhost:${NGINX_PORT:-80}/health" > /dev/null 2>&1; then
+            echo "  nginx is ready."
+            return 0
+        fi
+        sleep 1
+    done
+    
+    echo "  Warning: nginx health check timed out."
+    return 0
+}
+
+# =============================================================================
+# Start Addon Services (Code Server on port 8080 for hybrid mode)
 # =============================================================================
 start_addon_services() {
     if [ -z "$ADDON_IDS" ]; then
@@ -294,7 +389,7 @@ start_addon_services() {
         case "$addon" in
             code-server)
                 if command -v code-server &> /dev/null; then
-                    echo "Starting code-server on port 8080..."
+                    echo "Starting code-server on port 8080 (hybrid mode - separate subdomain)..."
                     # Override PORT env var and explicitly pass bind-addr to ensure port 8080
                     # code-server respects PORT env var which may conflict with OPENCODE_PORT
                     PORT=8080 code-server --bind-addr 0.0.0.0:8080 --auth none --disable-telemetry &
@@ -356,23 +451,31 @@ start_acp_gateway() {
 # Display Startup Information
 # =============================================================================
 show_startup_info() {
+    local BASE_URL="https://${PROJECT_SLUG:-project}.${WILDCARD_DOMAIN:-superchotu.com}"
+    local CODE_URL="https://code-${PROJECT_SLUG:-project}.${WILDCARD_DOMAIN:-superchotu.com}"
+    
     echo ""
     echo "=============================================="
     echo "  Environment Ready"
     echo "=============================================="
+    echo "  Project:   ${PROJECT_NAME:-AgentPod Project}"
     echo "  User:      developer"
     echo "  Workspace: $WORKSPACE"
     echo ""
-    echo "  Services:"
-    echo "    - OpenCode Server: http://localhost:${OPENCODE_PORT:-4096}"
-    echo "    - ACP Gateway: http://localhost:${ACP_GATEWAY_PORT:-4097}"
+    echo "  URLs (with Keycloak SSO):"
+    echo "    - Homepage:    $BASE_URL/"
+    echo "    - OpenCode:    $BASE_URL/opencode/"
+    echo "    - ACP Gateway: $BASE_URL/acp/"
+    if [ -n "$CODE_SERVER_PID" ]; then
+        echo "    - Code Server: $CODE_URL/"
+    fi
     echo ""
-    echo "  Available Agents (via ACP Gateway):"
-    echo "    - OpenCode (default)"
-    echo "    - Claude Code"
-    echo "    - Gemini CLI"
-    echo "    - Qwen Code"
-    echo "    - Codex"
+    echo "  Internal Services:"
+    echo "    - nginx:        http://localhost:${NGINX_PORT:-80}"
+    echo "    - oauth2-proxy: http://localhost:${OAUTH2_PROXY_PORT:-4180}"
+    echo "    - Homepage:     http://localhost:${HOMEPAGE_PORT:-3000}"
+    echo "    - OpenCode:     http://localhost:${OPENCODE_PORT:-4096}"
+    echo "    - ACP Gateway:  http://localhost:${ACP_GATEWAY_PORT:-4097}"
     echo ""
     echo "  Tools installed:"
     echo "    - Node.js $(node --version 2>/dev/null || echo 'N/A')"
@@ -387,15 +490,12 @@ show_startup_info() {
 # =============================================================================
 cleanup() {
     echo "Shutting down..."
-    if [ -n "$CODE_SERVER_PID" ]; then
-        kill "$CODE_SERVER_PID" 2>/dev/null || true
-    fi
-    if [ -n "$OPENCODE_PID" ]; then
-        kill "$OPENCODE_PID" 2>/dev/null || true
-    fi
-    if [ -n "$ACP_PID" ]; then
-        kill "$ACP_PID" 2>/dev/null || true
-    fi
+    [ -n "$NGINX_PID" ] && sudo kill "$NGINX_PID" 2>/dev/null || true
+    [ -n "$OAUTH2_PROXY_PID" ] && kill "$OAUTH2_PROXY_PID" 2>/dev/null || true
+    [ -n "$HOMEPAGE_PID" ] && kill "$HOMEPAGE_PID" 2>/dev/null || true
+    [ -n "$CODE_SERVER_PID" ] && kill "$CODE_SERVER_PID" 2>/dev/null || true
+    [ -n "$OPENCODE_PID" ] && kill "$OPENCODE_PID" 2>/dev/null || true
+    [ -n "$ACP_PID" ] && kill "$ACP_PID" 2>/dev/null || true
     exit 0
 }
 
@@ -428,14 +528,21 @@ configure_git
 # Install addons (based on ADDON_IDS env var)
 install_addons
 
-# Show startup info
+# Show startup info early
 show_startup_info
 
 # Change to workspace directory
 cd "$WORKSPACE"
 
-# Start addon services (e.g., code-server)
-start_addon_services
+# =============================================================================
+# Start services in order:
+# 1. Internal services first (OpenCode, ACP Gateway, Homepage)
+# 2. oauth2-proxy (depends on Keycloak being reachable)
+# 3. nginx (main entry point, depends on oauth2-proxy)
+# 4. Addon services (code-server on port 8080)
+# =============================================================================
+
+echo "Starting internal services..."
 
 # Start OpenCode server (port 4096)
 start_opencode_server
@@ -443,13 +550,25 @@ start_opencode_server
 # Start ACP Gateway (port 4097)
 start_acp_gateway
 
-# Keep container running - wait for both processes
-echo "Container ready. Services running:"
-echo "  - OpenCode server: http://localhost:${OPENCODE_PORT:-4096}"
-echo "  - ACP Gateway: http://localhost:${ACP_GATEWAY_PORT:-4097}"
-if [ -n "$CODE_SERVER_PID" ]; then
-    echo "  - Code Server: http://localhost:8080"
-fi
+# Start Homepage (port 3000)
+start_homepage
 
-# Wait for either process to exit
-wait -n $OPENCODE_PID $ACP_PID 2>/dev/null || wait $ACP_PID
+# Start oauth2-proxy (port 4180)
+start_oauth2_proxy
+
+# Start nginx (port 80 - main entry point)
+start_nginx
+
+# Start addon services (e.g., code-server on port 8080)
+start_addon_services
+
+# =============================================================================
+# Keep container running
+# =============================================================================
+echo ""
+echo "All services started. Container is ready."
+echo "  Main entry point: http://localhost:${NGINX_PORT:-80}"
+echo ""
+
+# Wait for nginx to exit (main process)
+wait $NGINX_PID 2>/dev/null || wait

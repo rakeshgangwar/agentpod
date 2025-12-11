@@ -2,18 +2,26 @@
   import { goto } from "$app/navigation";
   import { confirm } from "@tauri-apps/plugin-dialog";
   import { connection } from "$lib/stores/connection.svelte";
+  import { auth, logout } from "$lib/stores/auth.svelte";
   import { projects, fetchProjects, startProject, stopProject, deleteProject } from "$lib/stores/projects.svelte";
   import { Button } from "$lib/components/ui/button";
   import * as Card from "$lib/components/ui/card";
   import { Badge } from "$lib/components/ui/badge";
   import { Skeleton } from "$lib/components/ui/skeleton";
+  import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+  import { Avatar, AvatarFallback } from "$lib/components/ui/avatar";
 
   // Redirect if not connected
   $effect(() => {
     if (!connection.isConnected) {
-      goto("/setup");
+      goto("/login");
     }
   });
+
+  async function handleLogout() {
+    await logout();
+    goto("/login");
+  }
 
   // Load projects when connected
   $effect(() => {
@@ -52,13 +60,42 @@
           {connection.apiUrl}
         </p>
       </div>
-      <div class="flex gap-2">
+      <div class="flex items-center gap-2">
         <Button onclick={() => goto("/projects/new")}>
           New Project
         </Button>
         <Button variant="ghost" onclick={() => goto("/settings")}>
           Settings
         </Button>
+        
+        <!-- User Menu -->
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger>
+            <Button variant="ghost" size="icon" class="rounded-full">
+              <Avatar class="h-8 w-8">
+                <AvatarFallback class="text-xs">{auth.initials}</AvatarFallback>
+              </Avatar>
+            </Button>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Content align="end" class="w-56">
+            <DropdownMenu.Label>
+              <div class="flex flex-col space-y-1">
+                <p class="text-sm font-medium leading-none">{auth.displayName}</p>
+                {#if auth.user?.email}
+                  <p class="text-xs leading-none text-muted-foreground">{auth.user.email}</p>
+                {/if}
+              </div>
+            </DropdownMenu.Label>
+            <DropdownMenu.Separator />
+            <DropdownMenu.Item onclick={() => goto("/settings")}>
+              Settings
+            </DropdownMenu.Item>
+            <DropdownMenu.Separator />
+            <DropdownMenu.Item onclick={handleLogout} class="text-destructive focus:text-destructive">
+              Log out
+            </DropdownMenu.Item>
+          </DropdownMenu.Content>
+        </DropdownMenu.Root>
       </div>
     </div>
 

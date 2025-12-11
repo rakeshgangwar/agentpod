@@ -36,6 +36,7 @@ import {
 } from './image-resolver.ts';
 import { createLogger } from '../utils/logger.ts';
 import { ProjectCreationError, ProjectNotFoundError } from '../utils/errors.ts';
+import { keycloak } from './keycloak.ts';
 
 const log = createLogger('project-manager');
 
@@ -485,20 +486,39 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       public: publicCloneUrl,
     });
     
+    // Get Keycloak configuration for container auth
+    const keycloakConfig = keycloak.getContainerAuthConfig();
+    
     const envVars: Record<string, string> = {
+      // OpenCode configuration
       OPENCODE_PORT: String(containerPort),
       OPENCODE_HOST: '0.0.0.0',
+      
+      // Repository configuration
       FORGEJO_REPO_URL: publicCloneUrl,
       FORGEJO_USER: config.forgejo.owner,
       FORGEJO_TOKEN: config.forgejo.token,
       GIT_USER_EMAIL: 'opencode@portable-command-center.local',
       GIT_USER_NAME: 'OpenCode',
+      
+      // Project information
       PROJECT_NAME: name,
+      PROJECT_SLUG: slug,
+      WILDCARD_DOMAIN: config.opencode.wildcardDomain,
+      
+      // Management API callback
       MANAGEMENT_API_URL: config.publicUrl,
       USER_ID: config.defaultUserId,
       AUTH_TOKEN: config.auth.token,
+      
       // Addon configuration - comma-separated list of addon IDs
       ADDON_IDS: resolvedAddonIds.join(','),
+      
+      // Keycloak/OAuth2 authentication for container
+      OAUTH2_PROXY_CLIENT_ID: keycloakConfig.clientId,
+      OAUTH2_PROXY_CLIENT_SECRET: keycloakConfig.clientSecret,
+      OAUTH2_PROXY_COOKIE_SECRET: keycloakConfig.cookieSecret,
+      OAUTH2_PROXY_OIDC_ISSUER_URL: keycloakConfig.issuerUrl,
     };
     
     // Add LLM credentials
