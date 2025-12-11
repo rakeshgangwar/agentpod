@@ -145,15 +145,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends ripgrep && \
 
 # fd (fast find alternative) - architecture aware
 RUN ARCH=$(dpkg --print-architecture) && \
-    curl -LO "https://github.com/sharkdp/fd/releases/download/v10.1.0/fd_10.1.0_${ARCH}.deb" && \
-    dpkg -i "fd_10.1.0_${ARCH}.deb" && \
-    rm -f "fd_10.1.0_${ARCH}.deb"
+    curl -fsSL "https://github.com/sharkdp/fd/releases/download/v10.1.0/fd_10.1.0_${ARCH}.deb" -o fd.deb && \
+    dpkg -i fd.deb && \
+    rm -f fd.deb
 
 # bat (cat with syntax highlighting) - architecture aware
 RUN ARCH=$(dpkg --print-architecture) && \
-    curl -LO "https://github.com/sharkdp/bat/releases/download/v0.24.0/bat_0.24.0_${ARCH}.deb" && \
-    dpkg -i "bat_0.24.0_${ARCH}.deb" && \
-    rm -f "bat_0.24.0_${ARCH}.deb"
+    curl -fsSL "https://github.com/sharkdp/bat/releases/download/v0.24.0/bat_0.24.0_${ARCH}.deb" -o bat.deb && \
+    dpkg -i bat.deb && \
+    rm -f bat.deb
 
 # fzf (fuzzy finder)
 RUN git clone --depth 1 https://github.com/junegunn/fzf.git /opt/fzf && \
@@ -164,7 +164,7 @@ RUN git clone --depth 1 https://github.com/junegunn/fzf.git /opt/fzf && \
 # yq (YAML processor) - architecture aware
 RUN ARCH=$(dpkg --print-architecture) && \
     if [ "$ARCH" = "arm64" ]; then YQ_ARCH="arm64"; else YQ_ARCH="amd64"; fi && \
-    curl -L -o /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/v4.44.1/yq_linux_${YQ_ARCH}" && \
+    curl -fsSL "https://github.com/mikefarah/yq/releases/download/v4.44.1/yq_linux_${YQ_ARCH}" -o /usr/local/bin/yq && \
     chmod +x /usr/local/bin/yq
 
 # =============================================================================
