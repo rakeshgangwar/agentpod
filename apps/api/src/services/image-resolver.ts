@@ -47,6 +47,8 @@ export interface ImageResolution {
   exposedPorts: number[];
   portsExposes: string;
   requiresGpu: boolean;
+  addonCommands: string;
+  addonEnvVars: Record<string, string>;
   warnings: string[];
 }
 
@@ -134,6 +136,10 @@ export function resolveImage(options: ResolveImageOptions = {}): ImageResolution
   // Check if GPU is required
   const requiresGpu = addons.some(addon => addon.requiresGpu);
   
+  // Generate addon commands and env vars for runtime installation
+  const addonCommands = generateAddonCommands(addons);
+  const addonEnvVars = generateAddonEnvVars(addons);
+  
   return {
     imageName,
     imageTag,
@@ -145,6 +151,8 @@ export function resolveImage(options: ResolveImageOptions = {}): ImageResolution
     exposedPorts,
     portsExposes,
     requiresGpu,
+    addonCommands,
+    addonEnvVars,
     warnings,
   };
 }
@@ -259,25 +267,22 @@ export function generateProjectUrls(
 // =============================================================================
 
 /**
- * Build the Docker image name from flavor and addons
- * Pattern: codeopen-{flavor}[-addon1][-addon2]:{version}
+ * Build the Docker image name from flavor
+ * Pattern: codeopen-{flavor}:{version}
+ * 
+ * Note: Addons are NOT part of the image name. They are applied at runtime
+ * via Coolify's pre-deploy commands or init scripts.
  */
 function buildImageName(
   flavor: ContainerFlavor,
-  addons: ContainerAddon[]
+  _addons: ContainerAddon[]
 ): { imageName: string; imageTag: string; imageRef: string } {
   const registry = config.registry.url;
   const owner = config.registry.owner;
   const version = config.registry.version;
   
-  // Build image name
-  let imageName = `codeopen-${flavor.id}`;
-  
-  // Add addon suffixes (sorted for consistency)
-  const addonIds = addons.map(a => a.id).sort();
-  for (const addonId of addonIds) {
-    imageName += `-${addonId}`;
-  }
+  // Build image name from flavor only
+  const imageName = `codeopen-${flavor.id}`;
   
   const fullImageName = `${registry}/${owner}/${imageName}`;
   const imageRef = `${fullImageName}:${version}`;
@@ -301,4 +306,116 @@ export function estimateImageSize(
   const addonsSize = addons.reduce((total, addon) => total + (addon.imageSizeMb || 0), 0);
   
   return baseSize + flavorSize + addonsSize;
+}
+
+/**
+ * Generate addon installation commands for Coolify's custom start command.
+ * These commands are executed at container startup to install addon features.
+ * 
+ * @param addons - List of addons to install
+ * @returns Shell commands to run at container startup
+ */
+export function generateAddonCommands(addons: ContainerAddon[]): string {
+  if (addons.length === 0) {
+    return '';
+  }
+  
+  const commands: string[] = [];
+  
+  for (const addon of addons) {
+    switch (addon.id) {
+      case 'code-server':
+        commands.push(
+          '# Install code-server',
+          'curl -fsSL https://code-server.dev/install.sh | sh -s -- --method=standalone --prefix=/usr/local',
+          'mkdir -p ~/.config/code-server',
+          'echo "bind-addr: 0.0.0.0:8080" > ~/.config/code-server/config.yaml',
+          'echo "auth: none" >> ~/.config/code-server/config.yaml',
+          'code-server --disable-telemetry &'
+        );
+        break;
+        
+      case 'gui':
+        commands.push(
+          '# Install GUI/VNC (KasmVNC)',
+          'apt-get update && apt-get install -y --no-install-recommends \\',
+          '  xfce4 xfce4-terminal dbus-x11 \\',
+          '  && rm -rf /var/lib/apt/lists/*',
+          'if command -v kasmvncserver &> /dev/null; then',
+          '  kasmvncserver :1 -geometry 1920x1080 -depth 24 &',
+          'fi'
+        );
+        break;
+        
+      case 'databases':
+        commands.push(
+          '# Install database clients',
+          'apt-get update && apt-get install -y --no-install-recommends \\',
+          '  postgresql-client redis-tools sqlite3 \\',
+          '  && rm -rf /var/lib/apt/lists/*'
+        );
+        break;
+        
+      case 'cloud':
+        commands.push(
+          '# Install cloud CLI tools',
+          'curl -fsSL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o /tmp/awscliv2.zip',
+          'unzip -q /tmp/awscliv2.zip -d /tmp && /tmp/aws/install && rm -rf /tmp/aws*',
+          'curl -fsSL https://sdk.cloud.google.com | bash -s -- --disable-prompts',
+          'curl -sL https://aka.ms/InstallAzureCLIDeb | bash'
+        );
+        break;
+        
+      case 'gpu':
+        commands.push(
+          '# GPU addon - requires NVIDIA runtime',
+          'echo "GPU addon enabled - ensure container runs with --gpus all"'
+        );
+        break;
+    }
+  }
+  
+  if (commands.length === 0) {
+    return '';
+  }
+  
+  // Join with newlines and wrap in a script block
+  return commands.join('\n');
+}
+
+/**
+ * Generate environment variables for addons
+ */
+export function generateAddonEnvVars(addons: ContainerAddon[]): Record<string, string> {
+  const envVars: Record<string, string> = {};
+  
+  for (const addon of addons) {
+    switch (addon.id) {
+      case 'code-server':
+        envVars['CODE_SERVER_ENABLED'] = 'true';
+        envVars['CODE_SERVER_PORT'] = '8080';
+        break;
+        
+      case 'gui':
+        envVars['GUI_ENABLED'] = 'true';
+        envVars['VNC_PORT'] = '6080';
+        envVars['DISPLAY'] = ':1';
+        break;
+        
+      case 'databases':
+        envVars['DATABASE_TOOLS_ENABLED'] = 'true';
+        break;
+        
+      case 'cloud':
+        envVars['CLOUD_CLI_ENABLED'] = 'true';
+        break;
+        
+      case 'gpu':
+        envVars['GPU_ENABLED'] = 'true';
+        envVars['NVIDIA_VISIBLE_DEVICES'] = 'all';
+        break;
+    }
+  }
+  
+  return envVars;
 }
