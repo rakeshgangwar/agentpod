@@ -492,8 +492,8 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
     const keycloakConfig = keycloak.getContainerAuthConfig();
     
     const envVars: Record<string, string> = {
-      // OpenCode configuration
-      OPENCODE_PORT: String(containerPort),
+      // OpenCode configuration (internal port, nginx routes to this)
+      OPENCODE_PORT: '4096',
       OPENCODE_HOST: '0.0.0.0',
       
       // Repository configuration
