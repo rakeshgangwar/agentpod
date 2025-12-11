@@ -294,46 +294,19 @@ export const opencode = {
 
   /**
    * List files in a directory
-   * 
-   * Note: The SDK's file.read() with a path returns file content, but
-   * the OpenCode server's GET /file?path=X endpoint returns directory
-   * listings when path is a directory. We make a direct HTTP call here.
    */
   async listFiles(projectId: string, path: string = '/'): Promise<Array<{
     name: string;
     path: string;
-    absolute?: string;
+    absolute: string;
     type: 'file' | 'directory';
     ignored: boolean;
-    children?: unknown[];
   }>> {
-    const { project } = await getClient(projectId);
-    const baseUrl = await getOpenCodeUrl(project);
-    
-    // Make direct HTTP call to the file list endpoint
-    const url = new URL('/file', baseUrl);
-    url.searchParams.set('path', path);
-    
-    const response = await fetch(url.toString(), {
-      method: 'GET',
-      headers: { 'Accept': 'application/json' },
+    const { client } = await getClient(projectId);
+    const result = await client.file.list({
+      query: { path },
     });
-    
-    if (!response.ok) {
-      throw new OpenCodeProxyError(
-        `Failed to list files: ${response.statusText}`,
-        response.status
-      );
-    }
-    
-    return response.json() as Promise<Array<{
-      name: string;
-      path: string;
-      absolute?: string;
-      type: 'file' | 'directory';
-      ignored: boolean;
-      children?: unknown[];
-    }>>;
+    return result.data ?? [];
   },
 
   // ---------------------------------------------------------------------------
@@ -372,37 +345,14 @@ export const opencode = {
     name: string;
     models: Array<{ id: string; name: string }>;
   }>> {
-    const { project } = await getClient(projectId);
-    const baseUrl = await getOpenCodeUrl(project);
+    const { client } = await getClient(projectId);
+    const result = await client.config.providers();
     
-    // Make direct HTTP call to the /config/providers endpoint
-    const url = new URL('/config/providers', baseUrl);
+    const providers = result.data?.providers ?? [];
     
-    const response = await fetch(url.toString(), {
-      method: 'GET',
-      headers: { 'Accept': 'application/json' },
-    });
-    
-    if (!response.ok) {
-      throw new OpenCodeProxyError(
-        `Failed to get providers: ${response.statusText}`,
-        response.status
-      );
-    }
-    
-    // OpenCode returns: { providers: [{ id, name, source, models: { modelId: { id, name, ... }, ... } }] }
-    // We transform to: [{ id, name, models: [{ id, name }, ...] }]
-    // We filter out providers with source="env" (auto-detected from environment)
-    const data = await response.json() as { 
-      providers: Array<{
-        id: string;
-        name: string;
-        source?: string;
-        models: Record<string, { id: string; name: string }>;
-      }>;
-    };
-    
-    return data.providers
+    // Filter out providers with source="env" (auto-detected from environment)
+    // Transform models from object to array for easier consumption
+    return providers
       .filter(provider => provider.source !== 'env')
       .map(provider => ({
         id: provider.id,
@@ -432,12 +382,7 @@ export const opencode = {
     permissionId: string,
     response: 'once' | 'always' | 'reject'
   ): Promise<boolean> {
-    const { project } = await getClient(projectId);
-    const baseUrl = await getOpenCodeUrl(project);
-    
-    // Make direct HTTP call to the permissions endpoint
-    // POST /session/{sessionId}/permissions/{permissionId}
-    const url = new URL(`/session/${sessionId}/permissions/${permissionId}`, baseUrl);
+    const { client } = await getClient(projectId);
     
     log.info('Responding to permission request', { 
       projectId, 
@@ -446,30 +391,10 @@ export const opencode = {
       response 
     });
     
-    const httpResponse = await fetch(url.toString(), {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({ response }),
+    const result = await client.postSessionIdPermissionsPermissionId({
+      path: { id: sessionId, permissionID: permissionId },
+      body: { response },
     });
-    
-    if (!httpResponse.ok) {
-      const errorText = await httpResponse.text().catch(() => 'Unknown error');
-      log.error('Failed to respond to permission', { 
-        projectId, 
-        sessionId, 
-        permissionId, 
-        status: httpResponse.status,
-        error: errorText 
-      });
-      throw new OpenCodeProxyError(
-        `Failed to respond to permission: ${httpResponse.statusText}`,
-        httpResponse.status,
-        errorText
-      );
-    }
     
     log.info('Permission response sent successfully', { 
       projectId, 
@@ -478,7 +403,7 @@ export const opencode = {
       response 
     });
     
-    return true;
+    return result.data ?? true;
   },
 
   // ---------------------------------------------------------------------------

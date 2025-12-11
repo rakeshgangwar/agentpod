@@ -74,3 +74,4 @@ Use the checkboxes in each phase's `tasks.md` to track progress. When a phase is
 ## Architecture Documents
 
 - [OpenCode Configuration Architecture](./opencode-config-architecture.md) - Comprehensive guide for managing OpenCode configurations (permissions, agents, commands, tools, plugins)
+- [OpenCode SDK Analysis](./opencode-sdk-analysis.md) - Detailed analysis of SDK coverage, unimplemented features, and implementation roadmap
