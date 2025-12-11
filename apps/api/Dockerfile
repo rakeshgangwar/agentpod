@@ -13,20 +13,21 @@ FROM oven/bun:1.1-alpine AS builder
 
 WORKDIR /app
 
-# Copy workspace package files first for layer caching
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# Copy root package.json and create bun-compatible workspace config
+COPY package.json ./
+# Add workspaces field for bun (pnpm uses pnpm-workspace.yaml, bun uses package.json)
+RUN bun -e "const pkg = JSON.parse(await Bun.file('package.json').text()); pkg.workspaces = ['packages/*', 'apps/*']; await Bun.write('package.json', JSON.stringify(pkg, null, 2));"
+
+# Copy workspace package.json files for dependency resolution
 COPY packages/types/package.json ./packages/types/
-COPY packages/tsconfig/package.json ./packages/tsconfig/
-COPY apps/api/package.json apps/api/bun.lock* ./apps/api/
-
-# Install dependencies for the API only (production)
-WORKDIR /app/apps/api
-RUN bun install --production
-
-# Copy workspace packages source (needed for types)
-WORKDIR /app
-COPY packages/types/ ./packages/types/
 COPY packages/tsconfig/ ./packages/tsconfig/
+COPY apps/api/package.json ./apps/api/
+
+# Install dependencies from root (enables workspace resolution)
+RUN bun install --filter @agentpod/api
+
+# Copy workspace packages source
+COPY packages/types/ ./packages/types/
 
 # Copy API source code
 COPY apps/api/src/ ./apps/api/src/
@@ -43,19 +44,20 @@ WORKDIR /app
 RUN addgroup -g 1001 -S appgroup && \
     adduser -u 1001 -S appuser -G appgroup
 
-# Copy dependencies from builder
-COPY --from=builder /app/apps/api/node_modules ./node_modules
-COPY --from=builder /app/apps/api/package.json ./
-
-# Copy source code
-COPY --from=builder /app/apps/api/src ./src
-COPY --from=builder /app/apps/api/tsconfig.json ./
+# Copy the monorepo structure needed for workspace resolution
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages ./packages
+COPY --from=builder /app/apps/api ./apps/api
 
 # Create data directory for SQLite
 RUN mkdir -p /app/data && chown -R appuser:appgroup /app/data
 
 # Switch to non-root user
 USER appuser
+
+# Set working directory to API
+WORKDIR /app/apps/api
 
 # Environment variables (can be overridden at runtime)
 ENV NODE_ENV=production

@@ -17,12 +17,12 @@
     "clean": "rm -rf dist"
   },
   "devDependencies": {
-    "@agentpod/tsconfig": "workspace:*",
-    "@agentpod/types": "workspace:*",
     "@types/bun": "latest",
     "typescript": "^5.0.0"
   },
   "dependencies": {
+    "@agentpod/tsconfig": "workspace:*",
+    "@agentpod/types": "workspace:*",
     "@hono/zod-validator": "^0.4.0",
     "@opencode-ai/sdk": "^1.0.144",
     "hono": "^4.6.0",
