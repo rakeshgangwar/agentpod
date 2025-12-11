@@ -4,10 +4,12 @@
 # Builds base image and flavor images only.
 # Addon layers are applied at container creation time via Coolify, not pre-built.
 # 
-# Total images: 7 (1 base + 6 flavors)
+# Total images: 5 (1 base + 4 enabled flavors)
 #   - codeopen-base
-#   - codeopen-js, codeopen-python, codeopen-go, codeopen-rust
-#   - codeopen-fullstack, codeopen-polyglot
+#   - codeopen-js, codeopen-python, codeopen-rust, codeopen-fullstack
+#
+# Disabled flavors (to be enabled later):
+#   - codeopen-go, codeopen-polyglot
 # =============================================================================
 
 name: Build Container Images
@@ -43,10 +45,8 @@ on:
           - all
           - js
           - python
-          - go
           - rust
           - fullstack
-          - polyglot
 
 env:
   REGISTRY: forgejo.superchotu.com
@@ -112,7 +112,7 @@ jobs:
       fail-fast: false
       max-parallel: 2
       matrix:
-        flavor: [js, python, go, rust, fullstack, polyglot]
+        flavor: [js, python, rust, fullstack]
     steps:
       - name: Check if should build this flavor
         id: should-build
@@ -184,14 +184,16 @@ jobs:
           echo "- Base: ${{ needs.build-base.result }}"
           echo "- Flavors: ${{ needs.build-flavors.result }}"
           echo ""
-          echo "### Images Built (7 total)"
+          echo "### Images Built (5 total)"
           echo "- codeopen-base"
           echo "- codeopen-js"
           echo "- codeopen-python"
-          echo "- codeopen-go"
           echo "- codeopen-rust"
           echo "- codeopen-fullstack"
-          echo "- codeopen-polyglot"
+          echo ""
+          echo "### Disabled Flavors"
+          echo "- codeopen-go (coming soon)"
+          echo "- codeopen-polyglot (coming soon)"
           echo ""
           echo "### Note"
           echo "Addon features (gui, code-server, databases, cloud, gpu) are applied"

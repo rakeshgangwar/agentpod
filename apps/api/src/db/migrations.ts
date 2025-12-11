@@ -505,4 +505,28 @@ export const migrations: Migration[] = [
       console.warn('Rollback: modular container tables dropped, but project columns will remain');
     },
   },
+  
+  // Migration 11: Add enabled column to container_flavors
+  // Allows disabling flavors without removing them from the database
+  {
+    version: 11,
+    name: 'add_enabled_to_container_flavors',
+    up: () => {
+      const tableInfo = db.query("PRAGMA table_info(container_flavors)").all() as Array<{ name: string }>;
+      const columnExists = tableInfo.some(col => col.name === 'enabled');
+      if (!columnExists) {
+        db.exec('ALTER TABLE container_flavors ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1');
+      }
+      
+      // Disable go and polyglot flavors for now
+      db.exec(`
+        UPDATE container_flavors SET enabled = 0 WHERE id IN ('go', 'polyglot')
+      `);
+    },
+    down: () => {
+      // SQLite doesn't support DROP COLUMN
+      // Just re-enable all flavors
+      db.exec('UPDATE container_flavors SET enabled = 1');
+    },
+  },
 ];

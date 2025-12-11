@@ -16,6 +16,7 @@ export interface ContainerFlavor {
   languages: string[];           // Supported languages
   imageSizeMb: number | null;    // Approximate image size in MB
   isDefault: boolean;            // Default flavor for new projects
+  enabled: boolean;              // Whether the flavor is available for selection
   sortOrder: number;             // Display order
   createdAt: string;
   updatedAt: string;
@@ -29,6 +30,7 @@ interface ContainerFlavorRow {
   languages: string;             // JSON array string
   image_size_mb: number | null;
   is_default: number;
+  enabled: number;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -53,6 +55,7 @@ function rowToContainerFlavor(row: ContainerFlavorRow): ContainerFlavor {
     languages,
     imageSizeMb: row.image_size_mb,
     isDefault: row.is_default === 1,
+    enabled: row.enabled === 1,
     sortOrder: row.sort_order,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -64,9 +67,22 @@ function rowToContainerFlavor(row: ContainerFlavorRow): ContainerFlavor {
 // =============================================================================
 
 /**
- * Get all container flavors, ordered by sort_order
+ * Get all enabled container flavors, ordered by sort_order
  */
 export function getAllFlavors(): ContainerFlavor[] {
+  const rows = db.query(`
+    SELECT * FROM container_flavors 
+    WHERE enabled = 1
+    ORDER BY sort_order ASC
+  `).all() as ContainerFlavorRow[];
+  
+  return rows.map(rowToContainerFlavor);
+}
+
+/**
+ * Get all container flavors including disabled ones
+ */
+export function getAllFlavorsIncludingDisabled(): ContainerFlavor[] {
   const rows = db.query(`
     SELECT * FROM container_flavors 
     ORDER BY sort_order ASC
