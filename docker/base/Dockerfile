@@ -2,7 +2,7 @@
 # AgentPod Base Image
 # Foundation layer for all AgentPod container flavors
 # =============================================================================
-# Version: 0.3.0
+# Version: 0.3.1
 # Contains: Ubuntu 24.04, Node.js 22, Bun, OpenCode CLI, ACP Gateway, 
 #           Homepage, nginx, Core Tools
 # Features: Centralized SSO authentication via sso.superchotu.com, path-based routing
@@ -22,7 +22,17 @@ COPY acp-gateway/ ./
 RUN bun run typecheck
 
 # -----------------------------------------------------------------------------
-# Stage 2: Build Homepage
+# Stage 2: Build Auth Validator
+# -----------------------------------------------------------------------------
+FROM oven/bun:1 AS auth-validator-builder
+
+WORKDIR /build/auth-validator
+COPY auth-validator/package.json ./
+RUN bun install
+COPY auth-validator/ ./
+
+# -----------------------------------------------------------------------------
+# Stage 3: Build Homepage
 # -----------------------------------------------------------------------------
 FROM oven/bun:1 AS homepage-builder
 
@@ -32,7 +42,7 @@ RUN bun install --frozen-lockfile || bun install
 COPY homepage/ ./
 
 # -----------------------------------------------------------------------------
-# Stage 3: Base Image
+# Stage 4: Base Image
 # -----------------------------------------------------------------------------
 FROM ubuntu:24.04
 
@@ -152,6 +162,11 @@ RUN ARCH=$(dpkg --print-architecture) && \
 COPY --from=acp-builder /build/acp-gateway /opt/acp-gateway
 
 # =============================================================================
+# Copy Auth Validator from builder
+# =============================================================================
+COPY --from=auth-validator-builder /build/auth-validator /opt/auth-validator
+
+# =============================================================================
 # Copy Homepage from builder
 # =============================================================================
 COPY --from=homepage-builder /build/homepage /opt/homepage
@@ -197,6 +212,7 @@ RUN echo 'export PATH="/usr/local/bun/bin:$PATH"' >> $HOME/.bashrc && \
 ENV OPENCODE_PORT=4096
 ENV OPENCODE_HOST=0.0.0.0
 ENV ACP_GATEWAY_PORT=4097
+ENV AUTH_VALIDATOR_PORT=4098
 ENV HOMEPAGE_PORT=3000
 
 # nginx exposes port 80 as the main entry point
