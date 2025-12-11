@@ -497,6 +497,8 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       MANAGEMENT_API_URL: config.publicUrl,
       USER_ID: config.defaultUserId,
       AUTH_TOKEN: config.auth.token,
+      // Addon configuration - comma-separated list of addon IDs
+      ADDON_IDS: resolvedAddonIds.join(','),
     };
     
     // Add LLM credentials

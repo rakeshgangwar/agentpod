@@ -20,6 +20,7 @@ echo "=============================================="
 # OPENCODE_PORT         - Port for OpenCode server (default: 4096)
 # OPENCODE_HOST         - Host for OpenCode server (default: 0.0.0.0)
 # ACP_GATEWAY_PORT      - Port for ACP Gateway (default: 4097)
+# ADDON_IDS             - Comma-separated list of addon IDs to install
 # =============================================================================
 
 HOME_DIR="/home/developer"
@@ -213,6 +214,96 @@ configure_git() {
 }
 
 # =============================================================================
+# Install Addons
+# =============================================================================
+install_addons() {
+    if [ -z "$ADDON_IDS" ]; then
+        echo "No addons to install."
+        return 0
+    fi
+    
+    echo "Installing addons: $ADDON_IDS"
+    
+    # Split comma-separated list
+    IFS=',' read -ra ADDONS <<< "$ADDON_IDS"
+    
+    for addon in "${ADDONS[@]}"; do
+        addon=$(echo "$addon" | xargs)  # Trim whitespace
+        echo "  Installing addon: $addon"
+        
+        case "$addon" in
+            code-server)
+                echo "    Installing code-server..."
+                curl -fsSL https://code-server.dev/install.sh | sh -s -- --method=standalone --prefix=/usr/local 2>/dev/null || {
+                    echo "    Warning: Failed to install code-server"
+                    continue
+                }
+                mkdir -p ~/.config/code-server
+                cat > ~/.config/code-server/config.yaml << 'EOF'
+bind-addr: 0.0.0.0:8080
+auth: none
+cert: false
+EOF
+                echo "    code-server installed successfully"
+                ;;
+                
+            gui)
+                echo "    GUI addon requires pre-built image layer (not runtime installation)"
+                ;;
+                
+            databases)
+                echo "    Installing database clients..."
+                sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends \
+                    postgresql-client redis-tools sqlite3 2>/dev/null || {
+                    echo "    Warning: Failed to install database clients"
+                    continue
+                }
+                echo "    Database clients installed successfully"
+                ;;
+                
+            cloud)
+                echo "    Cloud CLI addon requires pre-built image layer (not runtime installation)"
+                ;;
+                
+            gpu)
+                echo "    GPU addon - no installation required (uses NVIDIA runtime)"
+                ;;
+                
+            *)
+                echo "    Unknown addon: $addon"
+                ;;
+        esac
+    done
+    
+    echo "Addon installation complete."
+}
+
+# =============================================================================
+# Start Addon Services
+# =============================================================================
+start_addon_services() {
+    if [ -z "$ADDON_IDS" ]; then
+        return 0
+    fi
+    
+    IFS=',' read -ra ADDONS <<< "$ADDON_IDS"
+    
+    for addon in "${ADDONS[@]}"; do
+        addon=$(echo "$addon" | xargs)
+        
+        case "$addon" in
+            code-server)
+                if command -v code-server &> /dev/null; then
+                    echo "Starting code-server on port 8080..."
+                    code-server --disable-telemetry &
+                    CODE_SERVER_PID=$!
+                fi
+                ;;
+        esac
+    done
+}
+
+# =============================================================================
 # Start OpenCode Server
 # =============================================================================
 start_opencode_server() {
@@ -294,6 +385,9 @@ show_startup_info() {
 # =============================================================================
 cleanup() {
     echo "Shutting down..."
+    if [ -n "$CODE_SERVER_PID" ]; then
+        kill "$CODE_SERVER_PID" 2>/dev/null || true
+    fi
     if [ -n "$OPENCODE_PID" ]; then
         kill "$OPENCODE_PID" 2>/dev/null || true
     fi
@@ -329,11 +423,17 @@ setup_auth
 # Configure git
 configure_git
 
+# Install addons (based on ADDON_IDS env var)
+install_addons
+
 # Show startup info
 show_startup_info
 
 # Change to workspace directory
 cd "$WORKSPACE"
+
+# Start addon services (e.g., code-server)
+start_addon_services
 
 # Start OpenCode server (port 4096)
 start_opencode_server
@@ -345,6 +445,9 @@ start_acp_gateway
 echo "Container ready. Services running:"
 echo "  - OpenCode server: http://localhost:${OPENCODE_PORT:-4096}"
 echo "  - ACP Gateway: http://localhost:${ACP_GATEWAY_PORT:-4097}"
+if [ -n "$CODE_SERVER_PID" ]; then
+    echo "  - Code Server: http://localhost:8080"
+fi
 
 # Wait for either process to exit
 wait -n $OPENCODE_PID $ACP_PID 2>/dev/null || wait $ACP_PID
