@@ -80,7 +80,7 @@ export const config = {
     // Registry owner/namespace
     owner: getEnv('OPENCODE_REGISTRY_OWNER', 'rakeshgangwar'),
     // Current container version to deploy
-    version: getEnv('OPENCODE_CONTAINER_VERSION', '0.3.1'),
+    version: getEnv('OPENCODE_CONTAINER_VERSION', '0.4.0'),
   },
 
   // Database

@@ -101,22 +101,6 @@ async function getOpenCodeUrl(project: Project): Promise<string> {
 }
 
 /**
- * Generate a container API token for a project
- * This token is used to authenticate server-to-server API calls
- * Token is derived from project slug and API secret for consistency
- */
-function generateContainerToken(projectSlug: string): string {
-  // Create a deterministic token from project slug and API token
-  // This ensures the same token is used when creating the container and when calling it
-  const crypto = require('crypto');
-  return crypto
-    .createHmac('sha256', config.auth.token)
-    .update(projectSlug)
-    .digest('hex')
-    .substring(0, 32);
-}
-
-/**
  * Get or create an SDK client for a project
  */
 async function getClient(projectId: string) {
@@ -133,17 +117,13 @@ async function getClient(projectId: string) {
     return { client: clientCache.get(projectId)!, project };
   }
 
-  // Create new client with container token for authentication
+  // Create new client
   const baseUrl = await getOpenCodeUrl(project);
-  const containerToken = generateContainerToken(project.slug);
   log.debug('Creating OpenCode SDK client', { projectId, baseUrl });
   
   const client = createOpencodeClient({
     baseUrl: `${baseUrl}/opencode`,
     throwOnError: true,
-    headers: {
-      'X-Container-Token': containerToken,
-    },
   });
   
   clientCache.set(projectId, client);

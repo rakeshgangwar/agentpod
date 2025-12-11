@@ -36,20 +36,8 @@ import {
 } from './image-resolver.ts';
 import { createLogger } from '../utils/logger.ts';
 import { ProjectCreationError, ProjectNotFoundError } from '../utils/errors.ts';
-import { createHmac } from 'crypto';
 
 const log = createLogger('project-manager');
-
-/**
- * Generate a deterministic API token for a container
- * Used for server-to-server authentication between Management API and containers
- */
-function generateContainerApiToken(projectSlug: string): string {
-  return createHmac('sha256', config.auth.token)
-    .update(projectSlug)
-    .digest('hex')
-    .substring(0, 32);
-}
 
 // =============================================================================
 // OpenCode Dockerfile (embedded to avoid git URL issues with Coolify)
@@ -499,11 +487,7 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       public: publicCloneUrl,
     });
     
-    // Generate container API token for server-to-server authentication
-    // This token is used by Management API to call container's /opencode/ and /acp/ endpoints
-    const containerApiToken = generateContainerApiToken(slug);
-    
-    const envVars: Record<string, string> = {
+      const envVars: Record<string, string> = {
       // OpenCode configuration (internal port, nginx routes to this)
       OPENCODE_PORT: '4096',
       OPENCODE_HOST: '0.0.0.0',
@@ -527,12 +511,6 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       
       // Addon configuration - comma-separated list of addon IDs
       ADDON_IDS: resolvedAddonIds.join(','),
-      
-      // Centralized SSO URL - container's nginx calls this for auth
-      SSO_URL: config.sso.url,
-      
-      // Container API token - used by Management API to call container endpoints
-      CONTAINER_API_TOKEN: containerApiToken,
     };
     
     // Add LLM credentials

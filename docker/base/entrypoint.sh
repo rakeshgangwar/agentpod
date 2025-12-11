@@ -2,7 +2,7 @@
 set -e
 
 echo "=============================================="
-echo "  AgentPod Container v${CONTAINER_VERSION:-0.3.1}"
+echo "  AgentPod Container v${CONTAINER_VERSION:-0.4.0}"
 echo "=============================================="
 
 # =============================================================================
@@ -21,11 +21,8 @@ echo "=============================================="
 # OPENCODE_PORT         - Port for OpenCode server (default: 4096)
 # OPENCODE_HOST         - Host for OpenCode server (default: 0.0.0.0)
 # ACP_GATEWAY_PORT      - Port for ACP Gateway (default: 4097)
-# AUTH_VALIDATOR_PORT   - Port for Auth Validator (default: 4098)
-# CONTAINER_API_TOKEN   - Token for API authentication (set by Management API)
 # ADDON_IDS             - Comma-separated list of addon IDs to install
 # WILDCARD_DOMAIN       - Domain for URL generation (default: superchotu.com)
-# SSO_URL               - Central SSO URL (default: https://sso.superchotu.com)
 # =============================================================================
 
 HOME_DIR="/home/developer"
@@ -318,12 +315,6 @@ start_homepage() {
 start_nginx() {
     echo "Starting nginx on port ${NGINX_PORT:-80}..."
     
-    if [ -z "$CONTAINER_API_TOKEN" ]; then
-        echo "  Warning: CONTAINER_API_TOKEN not set. API endpoints will require SSO only."
-    else
-        echo "  Token auth enabled for API endpoints."
-    fi
-    
     # nginx needs to run as root to bind to port 80
     sudo nginx -g 'daemon off;' &
     NGINX_PID=$!
@@ -416,30 +407,6 @@ start_acp_gateway() {
 }
 
 # =============================================================================
-# Start Auth Validator
-# =============================================================================
-start_auth_validator() {
-    echo "Starting Auth Validator on port ${AUTH_VALIDATOR_PORT:-4098}..."
-    cd /opt/auth-validator
-    bun run src/index.ts &
-    AUTH_VALIDATOR_PID=$!
-    cd "$WORKSPACE"
-    
-    # Wait for Auth Validator to be ready
-    echo "Waiting for Auth Validator to start..."
-    for i in {1..15}; do
-        if curl -sf "http://localhost:${AUTH_VALIDATOR_PORT:-4098}/health" > /dev/null 2>&1; then
-            echo "  Auth Validator is ready."
-            return 0
-        fi
-        sleep 1
-    done
-    
-    echo "  Warning: Auth Validator health check timed out."
-    return 0
-}
-
-# =============================================================================
 # Display Startup Information
 # =============================================================================
 show_startup_info() {
@@ -454,7 +421,7 @@ show_startup_info() {
     echo "  User:      developer"
     echo "  Workspace: $WORKSPACE"
     echo ""
-    echo "  URLs (with Centralized SSO at ${SSO_URL:-https://sso.superchotu.com}):"
+    echo "  URLs:"
     echo "    - Homepage:    $BASE_URL/"
     echo "    - OpenCode:    $BASE_URL/opencode/"
     echo "    - ACP Gateway: $BASE_URL/acp/"
@@ -465,11 +432,10 @@ show_startup_info() {
     fi
     echo ""
     echo "  Internal Services:"
-    echo "    - nginx:        http://localhost:${NGINX_PORT:-80}"
-    echo "    - Homepage:     http://localhost:${HOMEPAGE_PORT:-3000}"
-    echo "    - OpenCode:       http://localhost:${OPENCODE_PORT:-4096}"
-    echo "    - ACP Gateway:    http://localhost:${ACP_GATEWAY_PORT:-4097}"
-    echo "    - Auth Validator: http://localhost:${AUTH_VALIDATOR_PORT:-4098}"
+    echo "    - nginx:       http://localhost:${NGINX_PORT:-80}"
+    echo "    - Homepage:    http://localhost:${HOMEPAGE_PORT:-3000}"
+    echo "    - OpenCode:    http://localhost:${OPENCODE_PORT:-4096}"
+    echo "    - ACP Gateway: http://localhost:${ACP_GATEWAY_PORT:-4097}"
     echo ""
     echo "  Tools installed:"
     echo "    - Node.js $(node --version 2>/dev/null || echo 'N/A')"
@@ -489,7 +455,6 @@ cleanup() {
     [ -n "$CODE_SERVER_PID" ] && kill "$CODE_SERVER_PID" 2>/dev/null || true
     [ -n "$OPENCODE_PID" ] && kill "$OPENCODE_PID" 2>/dev/null || true
     [ -n "$ACP_PID" ] && kill "$ACP_PID" 2>/dev/null || true
-    [ -n "$AUTH_VALIDATOR_PID" ] && kill "$AUTH_VALIDATOR_PID" 2>/dev/null || true
     exit 0
 }
 
@@ -531,15 +496,11 @@ cd "$WORKSPACE"
 # =============================================================================
 # Start services in order:
 # 1. Internal services first (OpenCode, ACP Gateway, Homepage)
-# 2. nginx (main entry point, authenticates via central SSO at sso.superchotu.com)
+# 2. nginx (main entry point - simple reverse proxy)
 # 3. Addon services (code-server on port 8080)
-#
-# Note: Authentication is now handled by centralized SSO at sso.superchotu.com
-# nginx calls out to SSO to validate sessions, no local oauth2-proxy needed
 # =============================================================================
 
 echo "Starting internal services..."
-echo "  SSO URL: ${SSO_URL:-https://sso.superchotu.com}"
 
 # Start OpenCode server (port 4096)
 start_opencode_server
@@ -547,13 +508,10 @@ start_opencode_server
 # Start ACP Gateway (port 4097)
 start_acp_gateway
 
-# Start Auth Validator (port 4098 - for nginx auth_request)
-start_auth_validator
-
 # Start Homepage (port 3000)
 start_homepage
 
-# Start nginx (port 80 - main entry point, auth via central SSO)
+# Start nginx (port 80 - main entry point)
 start_nginx
 
 # Start addon services (e.g., code-server on port 8080)
