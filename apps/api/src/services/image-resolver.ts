@@ -70,7 +70,9 @@ export interface ProjectUrls {
 // =============================================================================
 
 // Base ports always exposed
-const BASE_PORTS = [4096, 4097]; // OpenCode + ACP Gateway
+// Port 80: nginx reverse proxy with oauth2-proxy authentication
+// Internal services (4096, 4097, 3000) are accessed through nginx
+const BASE_PORTS = [80];
 
 // =============================================================================
 // Image Resolution
@@ -211,6 +213,13 @@ export function validateContainerConfig(options: ResolveImageOptions): Validatio
 
 /**
  * Generate project URLs based on addons
+ * 
+ * Architecture:
+ * - All traffic goes through nginx on port 80 (with oauth2-proxy authentication)
+ * - nginx routes /opencode/* to internal port 4096
+ * - nginx routes /acp/* to internal port 4097
+ * - nginx routes / to homepage on port 3000
+ * - Code Server and VNC get separate subdomains (direct access, handled by their own auth)
  */
 export function generateProjectUrls(
   projectSlug: string,
@@ -227,9 +236,12 @@ export function generateProjectUrls(
     };
   }
   
+  // Main domain - all services accessed via nginx on port 80
+  const mainDomain = `https://${projectSlug}.${wildcardDomain}`;
+  
   // Build URLs based on installed addons
   const urls: ProjectUrls = {
-    opencode: `https://${projectSlug}.${wildcardDomain}`,
+    opencode: mainDomain, // Access via https://slug.domain/ (nginx routes to services)
     codeServer: null,
     vnc: null,
     domainsConfig: '',
@@ -239,20 +251,17 @@ export function generateProjectUrls(
   
   // Coolify requires FQDN format with protocol prefix: https://domain:port
   
-  // Base OpenCode domain (port 4096)
-  domains.push(`https://${projectSlug}.${wildcardDomain}:4096`);
+  // Main domain on port 80 - nginx handles routing with authentication
+  domains.push(`${mainDomain}:80`);
   
-  // ACP Gateway domain (port 4097)
-  domains.push(`https://acp-${projectSlug}.${wildcardDomain}:4097`);
-  
-  // Check for code-server addon
+  // Check for code-server addon - separate subdomain, direct access on port 8080
   const hasCodeServer = addons.some(a => a.id === 'code-server');
   if (hasCodeServer) {
     urls.codeServer = `https://code-${projectSlug}.${wildcardDomain}`;
     domains.push(`https://code-${projectSlug}.${wildcardDomain}:8080`);
   }
   
-  // Check for GUI addon
+  // Check for GUI addon - separate subdomain, direct access on port 6080
   const hasGui = addons.some(a => a.id === 'gui');
   if (hasGui) {
     urls.vnc = `https://vnc-${projectSlug}.${wildcardDomain}`;

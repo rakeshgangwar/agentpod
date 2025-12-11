@@ -375,11 +375,13 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
       fullName: forgejoRepo.full_name 
     });
     
-    // Step 2: Container port - use fixed port 4096
-    // Each container is isolated, so no port conflicts. Traefik routes by domain.
-    const containerPort = 4096;
+    // Step 2: Container port - use port 80 (nginx with oauth2-proxy)
+    // nginx handles routing to internal services (OpenCode 4096, ACP 4097, Homepage 3000)
+    const containerPort = 80;
     
     // Step 3: Generate FQDNs for the container based on addons
+    // Main domain goes through nginx on port 80 with authentication
+    // Addons (code-server, gui) get separate subdomains with direct access
     let fqdnUrl: string | null = null;
     let vncUrl: string | null = null;
     let codeServerUrl: string | null = null;
@@ -387,15 +389,14 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
     
     if (useModularSystem) {
       // Use image-resolver's URL generation for modular system
-      // The addons are already resolved, so we just need to build URLs
       if (config.opencode.wildcardDomain) {
         fqdnUrl = `https://${slug}.${config.opencode.wildcardDomain}`;
         
         // Build domains config based on resolved addons
-        // Coolify requires FQDN format with protocol prefix: https://domain:port
-        const domains: string[] = [`https://${slug}.${config.opencode.wildcardDomain}:4096`];
-        domains.push(`https://acp-${slug}.${config.opencode.wildcardDomain}:4097`);
+        // Main domain on port 80 - nginx handles all routing with oauth2-proxy auth
+        const domains: string[] = [`https://${slug}.${config.opencode.wildcardDomain}:80`];
         
+        // Addons get separate subdomains with direct port access
         if (resolvedAddonIds.includes('code-server')) {
           codeServerUrl = `https://code-${slug}.${config.opencode.wildcardDomain}`;
           domains.push(`https://code-${slug}.${config.opencode.wildcardDomain}:8080`);
@@ -408,15 +409,15 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
         domainsConfig = domains.join(',');
       }
     } else if (tier && config.opencode.wildcardDomain) {
-      // Legacy tier-based URL generation
-      fqdnUrl = `https://opencode-${slug}.${config.opencode.wildcardDomain}`;
+      // Legacy tier-based URL generation - also use port 80 for main domain
+      fqdnUrl = `https://${slug}.${config.opencode.wildcardDomain}`;
       codeServerUrl = `https://code-${slug}.${config.opencode.wildcardDomain}`;
       
       if (tier.has_desktop_access) {
         vncUrl = `https://vnc-${slug}.${config.opencode.wildcardDomain}`;
-        domainsConfig = `${fqdnUrl}:4096,${codeServerUrl}:8080,${vncUrl}:6080`;
+        domainsConfig = `${fqdnUrl}:80,${codeServerUrl}:8080,${vncUrl}:6080`;
       } else {
-        domainsConfig = `${fqdnUrl}:4096,${codeServerUrl}:8080`;
+        domainsConfig = `${fqdnUrl}:80,${codeServerUrl}:8080`;
       }
     }
     

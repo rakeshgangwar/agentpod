@@ -147,14 +147,15 @@ export function getResourceLimitsForTier(tier: ContainerTier): {
 
 /**
  * Get exposed ports for a tier
- * All tiers expose: OpenCode (4096) + Code Server (8080)
- * Desktop tier additionally exposes: noVNC (6080)
+ * All tiers expose: nginx (80) which routes to internal services
+ * Code Server addon: 8080 (separate subdomain)
+ * Desktop tier additionally exposes: noVNC (6080) (separate subdomain)
  */
 export function getExposedPortsForTier(tier: ContainerTier): string {
   if (tier.has_desktop_access) {
-    // OpenCode + Code Server + noVNC
-    return '4096,8080,6080';
+    // nginx + Code Server + noVNC
+    return '80,8080,6080';
   }
-  // OpenCode + Code Server
-  return '4096,8080';
+  // nginx + Code Server
+  return '80,8080';
 }
