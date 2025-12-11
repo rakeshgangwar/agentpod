@@ -8,7 +8,9 @@
   import * as Card from "$lib/components/ui/card";
   import * as Tabs from "$lib/components/ui/tabs";
   import LlmProviderSelector from "$lib/components/llm-provider-selector.svelte";
-  import TierSelector from "$lib/components/tier-selector.svelte";
+  import ResourceTierSelector from "$lib/components/resource-tier-selector.svelte";
+  import FlavorSelector from "$lib/components/flavor-selector.svelte";
+  import AddonSelector from "$lib/components/addon-selector.svelte";
 
   // Redirect if not connected
   $effect(() => {
@@ -33,8 +35,10 @@
   let selectedProvider = $state("");
   let showAllProviders = $state(false);
   
-  // Container tier selection
-  let selectedTierId = $state("");
+  // Modular container configuration
+  let selectedResourceTierId = $state("");
+  let selectedFlavorId = $state("");
+  let selectedAddonIds = $state<string[]>([]);
   
   // Submission state
   let isSubmitting = $state(false);
@@ -85,7 +89,9 @@
           description: projectDescription.trim() || undefined,
           llmProviderId: selectedProvider || undefined,
           llmModelId: selectedModel || undefined,
-          containerTierId: selectedTierId || undefined,
+          resourceTierId: selectedResourceTierId || undefined,
+          flavorId: selectedFlavorId || undefined,
+          addonIds: selectedAddonIds.length > 0 ? selectedAddonIds : undefined,
         });
         
         if (project) {
@@ -110,7 +116,9 @@
           githubUrl: githubUrl.trim(),
           llmProviderId: selectedProvider || undefined,
           llmModelId: selectedModel || undefined,
-          containerTierId: selectedTierId || undefined,
+          resourceTierId: selectedResourceTierId || undefined,
+          flavorId: selectedFlavorId || undefined,
+          addonIds: selectedAddonIds.length > 0 ? selectedAddonIds : undefined,
         });
         
         if (project) {
@@ -233,10 +241,26 @@
                   />
                 </div>
                 
-                <!-- Container tier selector -->
+                <!-- Resource Tier selector -->
                 <div class="space-y-2 border-t pt-4">
-                  <TierSelector
-                    bind:selectedTierId
+                  <ResourceTierSelector
+                    bind:selectedTierId={selectedResourceTierId}
+                    disabled={isSubmitting}
+                  />
+                </div>
+                
+                <!-- Flavor selector -->
+                <div class="space-y-2 border-t pt-4">
+                  <FlavorSelector
+                    bind:selectedFlavorId
+                    disabled={isSubmitting}
+                  />
+                </div>
+                
+                <!-- Addon selector -->
+                <div class="space-y-2 border-t pt-4">
+                  <AddonSelector
+                    bind:selectedAddonIds
                     disabled={isSubmitting}
                   />
                 </div>
@@ -291,10 +315,26 @@
                   />
                 </div>
                 
-                <!-- Container tier selector -->
+                <!-- Resource Tier selector -->
                 <div class="space-y-2 border-t pt-4">
-                  <TierSelector
-                    bind:selectedTierId
+                  <ResourceTierSelector
+                    bind:selectedTierId={selectedResourceTierId}
+                    disabled={isSubmitting}
+                  />
+                </div>
+                
+                <!-- Flavor selector -->
+                <div class="space-y-2 border-t pt-4">
+                  <FlavorSelector
+                    bind:selectedFlavorId
+                    disabled={isSubmitting}
+                  />
+                </div>
+                
+                <!-- Addon selector -->
+                <div class="space-y-2 border-t pt-4">
+                  <AddonSelector
+                    bind:selectedAddonIds
                     disabled={isSubmitting}
                   />
                 </div>

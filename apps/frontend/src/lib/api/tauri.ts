@@ -68,11 +68,16 @@ export interface CreateProjectInput {
   githubUrl?: string;
   llmProviderId?: string;
   llmModelId?: string;
+  // Legacy container tier (deprecated)
   containerTierId?: string;
+  // Modular container configuration (recommended)
+  resourceTierId?: string;
+  flavorId?: string;
+  addonIds?: string[];
 }
 
 // =============================================================================
-// Container Tier Types
+// Container Tier Types (Legacy)
 // =============================================================================
 
 export interface TierResources {
@@ -95,6 +100,74 @@ export interface ContainerTier {
   features: TierFeatures;
   isDefault: boolean;
   sortOrder: number;
+}
+
+// =============================================================================
+// Modular Container Types
+// =============================================================================
+
+/** Resource tier - defines CPU, memory, and storage limits */
+export interface ResourceTier {
+  id: string;
+  name: string;
+  description: string | null;
+  resources: {
+    cpuCores: number;
+    memoryGb: number;
+    storageGb: number;
+  };
+  priceMonthly: number;
+  isDefault: boolean;
+  sortOrder: number;
+}
+
+/** Container flavor - language/framework-specific image */
+export interface ContainerFlavor {
+  id: string;
+  name: string;
+  description: string | null;
+  languages: string[];
+  imageSizeMb: number | null;
+  isDefault: boolean;
+  sortOrder: number;
+}
+
+/** Addon category for grouping */
+export type AddonCategory = "interface" | "compute" | "storage" | "devops";
+
+/** Container addon - optional feature that can be added to containers */
+export interface ContainerAddon {
+  id: string;
+  name: string;
+  description: string | null;
+  category: AddonCategory;
+  imageSizeMb: number | null;
+  port: number | null;
+  requiresGpu: boolean;
+  requiresFlavor: string | null;
+  priceMonthly: number;
+  sortOrder: number;
+}
+
+/** Addon validation request */
+export interface ValidateAddonsRequest {
+  flavorId?: string;
+  addonIds: string[];
+  hasGpu?: boolean;
+}
+
+/** Addon validation response */
+export interface ValidateAddonsResponse {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+  details?: {
+    flavorId: string;
+    flavorName: string;
+    addonIds: string[];
+    totalAddonPrice: number;
+    exposedPorts: number[];
+  };
 }
 
 // =============================================================================
@@ -158,7 +231,12 @@ export async function createProject(input: CreateProjectInput): Promise<Project>
     githubUrl: input.githubUrl ?? null,
     llmProviderId: input.llmProviderId ?? null,
     llmModelId: input.llmModelId ?? null,
+    // Legacy field
     containerTierId: input.containerTierId ?? null,
+    // Modular container fields
+    resourceTierId: input.resourceTierId ?? null,
+    flavorId: input.flavorId ?? null,
+    addonIds: input.addonIds ?? null,
   };
   
   return invoke<Project>("create_project", params);
@@ -232,6 +310,63 @@ export async function listContainerTiers(): Promise<ContainerTier[]> {
  */
 export async function getDefaultContainerTier(): Promise<ContainerTier | null> {
   return invoke<ContainerTier | null>("get_default_container_tier");
+}
+
+// =============================================================================
+// Modular Container Commands
+// =============================================================================
+
+/**
+ * List all available resource tiers
+ */
+export async function listResourceTiers(): Promise<ResourceTier[]> {
+  return invoke<ResourceTier[]>("list_resource_tiers");
+}
+
+/**
+ * Get the default resource tier
+ */
+export async function getDefaultResourceTier(): Promise<ResourceTier | null> {
+  return invoke<ResourceTier | null>("get_default_resource_tier");
+}
+
+/**
+ * List all available container flavors
+ */
+export async function listContainerFlavors(): Promise<ContainerFlavor[]> {
+  return invoke<ContainerFlavor[]>("list_container_flavors");
+}
+
+/**
+ * Get the default container flavor
+ */
+export async function getDefaultContainerFlavor(): Promise<ContainerFlavor | null> {
+  return invoke<ContainerFlavor | null>("get_default_container_flavor");
+}
+
+/**
+ * List all available container addons
+ */
+export async function listContainerAddons(): Promise<ContainerAddon[]> {
+  return invoke<ContainerAddon[]>("list_container_addons");
+}
+
+/**
+ * List container addons by category
+ */
+export async function listContainerAddonsByCategory(category: AddonCategory): Promise<ContainerAddon[]> {
+  return invoke<ContainerAddon[]>("list_container_addons_by_category", { category });
+}
+
+/**
+ * Validate addon configuration
+ */
+export async function validateAddons(request: ValidateAddonsRequest): Promise<ValidateAddonsResponse> {
+  return invoke<ValidateAddonsResponse>("validate_addons", { 
+    flavorId: request.flavorId,
+    addonIds: request.addonIds,
+    hasGpu: request.hasGpu,
+  });
 }
 
 // =============================================================================

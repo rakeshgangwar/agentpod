@@ -27,10 +27,15 @@ export interface Project {
   vncUrl: string | null;   // VNC/Desktop URL for desktop tier containers
   codeServerUrl: string | null;  // Code Server URL (VS Code in browser)
   
-  // Container configuration
-  containerTierId: string;           // References container_tiers(id)
+  // Container configuration (legacy)
+  containerTierId: string;           // References container_tiers(id) - DEPRECATED
   containerVersion: string;          // Current container image version
   containerUpdateAvailable: boolean; // Flag for available updates
+  
+  // Modular container configuration (new)
+  resourceTierId: string;            // References resource_tiers(id): 'starter', 'builder', 'creator', 'power'
+  flavorId: string;                  // References container_flavors(id): 'js', 'python', 'fullstack', etc.
+  addonIds: string[];                // References container_addons(id)[]: ['gui', 'code-server', 'databases']
   
   // GitHub sync
   githubRepoUrl: string | null;
@@ -65,6 +70,10 @@ export interface CreateProjectInput {
   codeServerUrl?: string;
   containerTierId?: string;
   containerVersion?: string;
+  // Modular container configuration
+  resourceTierId?: string;
+  flavorId?: string;
+  addonIds?: string[];
   githubRepoUrl?: string;
   githubSyncEnabled?: boolean;
   githubSyncDirection?: SyncDirection;
@@ -78,6 +87,12 @@ export interface UpdateProjectInput {
   status?: ProjectStatus;
   errorMessage?: string;
   fqdnUrl?: string;
+  vncUrl?: string;
+  codeServerUrl?: string;
+  // Modular container configuration
+  resourceTierId?: string;
+  flavorId?: string;
+  addonIds?: string[];
   githubSyncEnabled?: boolean;
   githubSyncDirection?: SyncDirection;
   lastSyncAt?: string;
@@ -106,6 +121,10 @@ interface ProjectRow {
   container_tier_id: string;
   container_version: string;
   container_update_available: number;
+  // Modular container fields
+  resource_tier_id: string | null;
+  flavor_id: string | null;
+  addon_ids: string | null;  // JSON array string
   github_repo_url: string | null;
   github_sync_enabled: number;
   github_sync_direction: string;
@@ -119,6 +138,16 @@ interface ProjectRow {
 }
 
 function rowToProject(row: ProjectRow): Project {
+  // Parse addon_ids from JSON string
+  let addonIds: string[] = [];
+  if (row.addon_ids) {
+    try {
+      addonIds = JSON.parse(row.addon_ids);
+    } catch {
+      addonIds = [];
+    }
+  }
+
   return {
     id: row.id,
     name: row.name,
@@ -136,6 +165,9 @@ function rowToProject(row: ProjectRow): Project {
     containerTierId: row.container_tier_id ?? 'lite',
     containerVersion: row.container_version ?? '0.0.1',
     containerUpdateAvailable: row.container_update_available === 1,
+    resourceTierId: row.resource_tier_id ?? 'starter',
+    flavorId: row.flavor_id ?? 'fullstack',
+    addonIds,
     githubRepoUrl: row.github_repo_url,
     githubSyncEnabled: row.github_sync_enabled === 1,
     githubSyncDirection: row.github_sync_direction as SyncDirection,
@@ -166,6 +198,7 @@ export function createProject(input: CreateProjectInput): Project {
       forgejo_repo_url, forgejo_repo_id, forgejo_owner,
       coolify_app_uuid, coolify_server_uuid, container_port, fqdn_url, vnc_url, code_server_url,
       container_tier_id, container_version,
+      resource_tier_id, flavor_id, addon_ids,
       github_repo_url, github_sync_enabled, github_sync_direction,
       llm_provider, llm_model, status
     ) VALUES (
@@ -173,6 +206,7 @@ export function createProject(input: CreateProjectInput): Project {
       $forgejoRepoUrl, $forgejoRepoId, $forgejoOwner,
       $coolifyAppUuid, $coolifyServerUuid, $containerPort, $fqdnUrl, $vncUrl, $codeServerUrl,
       $containerTierId, $containerVersion,
+      $resourceTierId, $flavorId, $addonIds,
       $githubRepoUrl, $githubSyncEnabled, $githubSyncDirection,
       $llmProvider, $llmModel, $status
     )
@@ -194,6 +228,9 @@ export function createProject(input: CreateProjectInput): Project {
     $codeServerUrl: input.codeServerUrl ?? null,
     $containerTierId: input.containerTierId ?? 'lite',
     $containerVersion: input.containerVersion ?? '0.0.1',
+    $resourceTierId: input.resourceTierId ?? 'starter',
+    $flavorId: input.flavorId ?? 'fullstack',
+    $addonIds: JSON.stringify(input.addonIds ?? ['code-server']),
     $githubRepoUrl: input.githubRepoUrl ?? null,
     $githubSyncEnabled: input.githubSyncEnabled ? 1 : 0,
     $githubSyncDirection: input.githubSyncDirection ?? 'push',
@@ -255,6 +292,26 @@ export function updateProject(id: string, input: UpdateProjectInput): Project | 
   if (input.fqdnUrl !== undefined) {
     updates.push('fqdn_url = $fqdnUrl');
     params.$fqdnUrl = input.fqdnUrl;
+  }
+  if (input.vncUrl !== undefined) {
+    updates.push('vnc_url = $vncUrl');
+    params.$vncUrl = input.vncUrl;
+  }
+  if (input.codeServerUrl !== undefined) {
+    updates.push('code_server_url = $codeServerUrl');
+    params.$codeServerUrl = input.codeServerUrl;
+  }
+  if (input.resourceTierId !== undefined) {
+    updates.push('resource_tier_id = $resourceTierId');
+    params.$resourceTierId = input.resourceTierId;
+  }
+  if (input.flavorId !== undefined) {
+    updates.push('flavor_id = $flavorId');
+    params.$flavorId = input.flavorId;
+  }
+  if (input.addonIds !== undefined) {
+    updates.push('addon_ids = $addonIds');
+    params.$addonIds = JSON.stringify(input.addonIds);
   }
   if (input.githubSyncEnabled !== undefined) {
     updates.push('github_sync_enabled = $githubSyncEnabled');

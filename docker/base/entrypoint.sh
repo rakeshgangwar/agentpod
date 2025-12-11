@@ -2,8 +2,7 @@
 set -e
 
 echo "=============================================="
-echo "  OpenCode Desktop Container v${CONTAINER_VERSION:-0.0.2}"
-echo "  (KasmVNC Edition)"
+echo "  CodeOpen Base Container v${CONTAINER_VERSION:-0.1.0}"
 echo "=============================================="
 
 # =============================================================================
@@ -20,10 +19,7 @@ echo "=============================================="
 # OPENCODE_CONFIG_JSON  - Pre-built opencode.json content (optional, fallback)
 # OPENCODE_PORT         - Port for OpenCode server (default: 4096)
 # OPENCODE_HOST         - Host for OpenCode server (default: 0.0.0.0)
-# DISPLAY_NUM           - X display number (default: 1)
-# WIDTH                 - Screen width (default: 1280)
-# HEIGHT                - Screen height (default: 800)
-# KASMVNC_PORT          - KasmVNC web port (default: 6080)
+# ACP_GATEWAY_PORT      - Port for ACP Gateway (default: 4097)
 # =============================================================================
 
 HOME_DIR="/home/developer"
@@ -32,12 +28,10 @@ OPENCODE_CONFIG_DIR="${HOME_DIR}/.config/opencode"
 OPENCODE_CUSTOM_CONFIG_DIR="${HOME_DIR}/.config/opencode-custom"
 OPENCODE_DATA_DIR="${HOME_DIR}/.local/share/opencode"
 
-# Display settings
-DISPLAY_NUM="${DISPLAY_NUM:-1}"
-WIDTH="${WIDTH:-1280}"
-HEIGHT="${HEIGHT:-800}"
-DISPLAY=":${DISPLAY_NUM}"
-export DISPLAY
+# Source common functions if available
+if [ -f /opt/codeopen/scripts/common-setup.sh ]; then
+    source /opt/codeopen/scripts/common-setup.sh
+fi
 
 # =============================================================================
 # Fetch User Configuration from Management API
@@ -75,7 +69,6 @@ fetch_user_config() {
     echo "  Configuration fetched successfully."
     
     # Extract and write AGENTS.md (global instructions)
-    # API returns 'agents_md' (snake_case)
     AGENTS_CONTENT=$(echo "$RESPONSE" | jq -r '.agents_md // empty')
     if [ -n "$AGENTS_CONTENT" ] && [ "$AGENTS_CONTENT" != "null" ]; then
         echo "  Writing AGENTS.md to $OPENCODE_CONFIG_DIR/AGENTS.md"
@@ -91,11 +84,9 @@ fetch_user_config() {
         echo "$SETTINGS" > "$OPENCODE_CONFIG_DIR/opencode.json"
     fi
     
-    # Extract and write custom config files (agents, commands, tools, plugins)
-    # API returns 'files' array with {type, name, extension, content}
+    # Extract and write custom config files
     mkdir -p "$OPENCODE_CUSTOM_CONFIG_DIR"/{agent,command,tool,plugin}
     
-    # Process each file type
     for FILE_TYPE in agent command tool plugin; do
         echo "$RESPONSE" | jq -c ".files[]? | select(.type==\"$FILE_TYPE\")" 2>/dev/null | while IFS= read -r file_json; do
             if [ -n "$file_json" ]; then
@@ -112,9 +103,7 @@ fetch_user_config() {
         done
     done
     
-    # Set OPENCODE_CONFIG_DIR env var for OpenCode to find custom configs
     export OPENCODE_CONFIG_DIR="$OPENCODE_CUSTOM_CONFIG_DIR"
-    
     return 0
 }
 
@@ -143,7 +132,6 @@ setup_fallback_config() {
     else
         echo "  Creating default opencode.json with permissions"
         mkdir -p "$WORKSPACE"
-        # Use OpenCode 1.0 format: 'permission' (singular) with 'allow'/'deny'/'ask' values
         cat > "$WORKSPACE/opencode.json" << 'EOF'
 {
   "$schema": "https://opencode.ai/config.json",
@@ -162,8 +150,6 @@ EOF
 # Setup Auth from Environment
 # =============================================================================
 setup_auth() {
-    # Always write auth.json from OPENCODE_AUTH_JSON if provided
-    # This contains LLM provider credentials injected by the Management API
     if [ -n "$OPENCODE_AUTH_JSON" ]; then
         echo "  Writing auth.json from OPENCODE_AUTH_JSON"
         mkdir -p "$OPENCODE_DATA_DIR"
@@ -189,7 +175,6 @@ clone_repository() {
         return 0
     fi
     
-    # If workspace exists but is not a git repo, clean it up
     if [ -d "$WORKSPACE" ] && [ "$(ls -A $WORKSPACE 2>/dev/null)" ]; then
         echo "Workspace exists but is not a git repository. Cleaning up..."
         rm -rf "$WORKSPACE"
@@ -227,35 +212,28 @@ configure_git() {
     git config --global credential.helper 'cache --timeout=86400'
 }
 
-
-
 # =============================================================================
-# Initialize KasmVNC
+# Start ACP Gateway
 # =============================================================================
-setup_kasmvnc() {
-    echo "Setting up KasmVNC..."
+start_acp_gateway() {
+    echo "Starting ACP Gateway on port ${ACP_GATEWAY_PORT:-4097}..."
+    cd /opt/acp-gateway
+    bun run src/index.ts &
+    ACP_PID=$!
+    cd "$WORKSPACE"
     
-    VNC_DIR="${HOME_DIR}/.vnc"
-    mkdir -pm700 "$VNC_DIR"
-    
-    # Ensure .de-was-selected exists (prevents DE selection prompt)
-    touch "$VNC_DIR/.de-was-selected"
-    
-    # Update kasmvnc.yaml with current resolution settings
-    if [ -f "$VNC_DIR/kasmvnc.yaml" ]; then
-        # Use yq to update resolution if available, otherwise use sed
-        if command -v yq &> /dev/null; then
-            yq -i ".desktop.resolution.width = ${WIDTH}" "$VNC_DIR/kasmvnc.yaml"
-            yq -i ".desktop.resolution.height = ${HEIGHT}" "$VNC_DIR/kasmvnc.yaml"
-            yq -i ".network.websocket_port = ${KASMVNC_PORT:-6080}" "$VNC_DIR/kasmvnc.yaml"
+    # Wait for ACP Gateway to be ready
+    echo "Waiting for ACP Gateway to start..."
+    for i in {1..30}; do
+        if curl -sf "http://localhost:${ACP_GATEWAY_PORT:-4097}/health" > /dev/null 2>&1; then
+            echo "  ACP Gateway is ready."
+            return 0
         fi
-    fi
+        sleep 1
+    done
     
-    # Create KasmVNC password file (required even with -disableBasicAuth)
-    # Using a simple password since auth is disabled anyway
-    echo -e "kasmvnc\nkasmvnc\n" | vncpasswd -u developer -ow 2>/dev/null || true
-    
-    echo "  KasmVNC configured."
+    echo "  Warning: ACP Gateway health check timed out."
+    return 0
 }
 
 # =============================================================================
@@ -264,51 +242,65 @@ setup_kasmvnc() {
 show_startup_info() {
     echo ""
     echo "=============================================="
-    echo "  Desktop Environment Ready (KasmVNC)"
+    echo "  Environment Ready"
     echo "=============================================="
-    echo "  User:        developer"
-    echo "  Workspace:   $WORKSPACE"
+    echo "  User:      developer"
+    echo "  Workspace: $WORKSPACE"
     echo ""
     echo "  Services:"
-    echo "    - OpenCode:    http://localhost:${OPENCODE_PORT:-4096}"
-    echo "    - Code Server: http://localhost:${CODE_SERVER_PORT:-8080}"
-    echo "    - Desktop:     http://localhost:${KASMVNC_PORT:-6080}"
+    echo "    - ACP Gateway: http://localhost:${ACP_GATEWAY_PORT:-4097}"
     echo ""
-    echo "  Resolution:  ${WIDTH}x${HEIGHT}"
+    echo "  Available Agents:"
+    echo "    - OpenCode (default)"
+    echo "    - Claude Code"
+    echo "    - Gemini CLI"
+    echo "    - Qwen Code"
+    echo "    - Codex"
     echo ""
     echo "  Tools installed:"
     echo "    - Node.js $(node --version 2>/dev/null || echo 'N/A')"
-    echo "    - Python $(python --version 2>/dev/null | awk '{print $2}' || echo 'N/A')"
+    echo "    - Bun $(bun --version 2>/dev/null || echo 'N/A')"
+    echo "    - Git $(git --version 2>/dev/null | awk '{print $3}' || echo 'N/A')"
     echo "=============================================="
     echo ""
 }
 
 # =============================================================================
+# Handle shutdown gracefully
+# =============================================================================
+cleanup() {
+    echo "Shutting down..."
+    if [ -n "$ACP_PID" ]; then
+        kill "$ACP_PID" 2>/dev/null || true
+    fi
+    exit 0
+}
+
+trap cleanup SIGTERM SIGINT
+
+# =============================================================================
 # Main Execution
 # =============================================================================
 
-# Ensure directories exist
+# Ensure config directories exist
 mkdir -p "$OPENCODE_CONFIG_DIR"
 mkdir -p "$OPENCODE_CUSTOM_CONFIG_DIR"
 mkdir -p "$OPENCODE_DATA_DIR"
 
-# Clone repository first (this creates/manages the workspace)
+# Clone repository first
 clone_repository
 
-# Ensure workspace exists (for empty project case)
+# Ensure workspace exists
 mkdir -p "$WORKSPACE"
 
 # Try to fetch config from Management API, fall back to env vars
 fetch_user_config || setup_fallback_config
 
-# Always setup auth from OPENCODE_AUTH_JSON (LLM credentials)
+# Always setup auth from OPENCODE_AUTH_JSON
 setup_auth
 
 # Configure git
 configure_git
-
-# Setup KasmVNC
-setup_kasmvnc
 
 # Show startup info
 show_startup_info
@@ -316,31 +308,9 @@ show_startup_info
 # Change to workspace directory
 cd "$WORKSPACE"
 
-# Export environment variables for supervisor (KasmVNC)
-export WIDTH="${WIDTH:-1280}"
-export HEIGHT="${HEIGHT:-800}"
-export DISPLAY_NUM="${DISPLAY_NUM:-1}"
-export KASMVNC_PORT="${KASMVNC_PORT:-6080}"
+# Start ACP Gateway
+start_acp_gateway
 
-# Start KasmVNC via supervisor
-echo "Starting desktop services (KasmVNC)..."
-/usr/bin/supervisord -c /etc/supervisor/conf.d/desktop.conf
-
-# Wait for KasmVNC to be ready
-sleep 3
-
-# Start code-server in background
-# Note: code-server respects PORT env var, so we must override it explicitly
-CODE_SERVER_PORT="${CODE_SERVER_PORT:-8080}"
-CODE_SERVER_AUTH="${CODE_SERVER_AUTH:-none}"
-echo "Starting code-server in background on port ${CODE_SERVER_PORT}..."
-PORT="${CODE_SERVER_PORT}" code-server \
-    --bind-addr "0.0.0.0:${CODE_SERVER_PORT}" \
-    --auth "${CODE_SERVER_AUTH}" \
-    --disable-telemetry \
-    "$WORKSPACE" \
-    > /tmp/code-server.log 2>&1 &
-
-# Start OpenCode server in foreground (keeps container running)
-echo "Starting OpenCode server..."
-exec opencode serve --port "${OPENCODE_PORT:-4096}" --hostname "${OPENCODE_HOST:-0.0.0.0}"
+# Keep container running
+echo "Container ready. Waiting for ACP Gateway process..."
+wait $ACP_PID

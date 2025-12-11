@@ -18,20 +18,40 @@ export interface Project {
   sync_direction: SyncDirection;
   created_at: string;
   updated_at: string;
+  
+  // Modular container configuration
+  resource_tier_id?: string;
+  flavor_id?: string;
+  addon_ids?: string[];
+  
+  // Legacy field (deprecated, use resource_tier_id instead)
+  container_tier_id?: string;
 }
 
 /** Input for creating a new project */
 export interface CreateProjectInput {
   name: string;
-  tier_id: string;
   git_url?: string;
   sync_direction?: SyncDirection;
+  
+  // Modular container configuration (recommended)
+  resource_tier_id?: string;
+  flavor_id?: string;
+  addon_ids?: string[];
+  
+  // Legacy field (deprecated, use modular fields instead)
+  tier_id?: string;
 }
 
 /** Input for updating an existing project */
 export interface UpdateProjectInput {
   name?: string;
   sync_direction?: SyncDirection;
+  
+  // Modular container configuration updates
+  resource_tier_id?: string;
+  flavor_id?: string;
+  addon_ids?: string[];
 }
 
 /** Deploy response from the API */

@@ -12,6 +12,9 @@ import { syncRoutes } from './routes/sync.ts';
 import { opencodeRoutes } from './routes/opencode.ts';
 import { userRoutes } from './routes/users.ts';
 import { containerTiersRouter } from './routes/container-tiers.ts';
+import { resourceTiersRouter } from './routes/resource-tiers.ts';
+import { flavorsRouter } from './routes/flavors.ts';
+import { addonsRouter } from './routes/addons.ts';
 
 // Initialize database
 console.log('Initializing database...');
@@ -37,7 +40,10 @@ const app = new Hono()
   .route('/api/projects', projectRoutes)
   .route('/api/providers', providerRoutes)
   .route('/api/users', userRoutes) // User OpenCode config routes
-  .route('/api/container-tiers', containerTiersRouter); // Container tier definitions
+  .route('/api/container-tiers', containerTiersRouter) // Container tier definitions (legacy)
+  .route('/api/resource-tiers', resourceTiersRouter) // Resource tiers (CPU, memory, storage)
+  .route('/api/flavors', flavorsRouter) // Container flavors (language environments)
+  .route('/api/addons', addonsRouter); // Container addons (optional features)
 
 // Export type for Hono Client (type-safe RPC from mobile app)
 export type AppType = typeof app;
@@ -83,10 +89,19 @@ console.log(`
 ║  - GET  /api/providers             List providers             ║
 ║  - POST /api/providers/:id/configure  Set credentials         ║
 ╠═══════════════════════════════════════════════════════════════╣
-║  Container Tier Endpoints:                                    ║
+║  Container Tier Endpoints (Legacy):                           ║
 ║  - GET  /api/container-tiers         List all tiers           ║
 ║  - GET  /api/container-tiers/default Get default tier         ║
 ║  - GET  /api/container-tiers/:id     Get tier by ID           ║
+╠═══════════════════════════════════════════════════════════════╣
+║  Modular Container Endpoints:                                 ║
+║  - GET  /api/resource-tiers          List resource tiers      ║
+║  - GET  /api/resource-tiers/default  Get default tier         ║
+║  - GET  /api/flavors                 List language flavors    ║
+║  - GET  /api/flavors/default         Get default flavor       ║
+║  - GET  /api/addons                  List all addons          ║
+║  - GET  /api/addons/by-category/:c   Get addons by category   ║
+║  - POST /api/addons/validate         Validate addon config    ║
 ╚═══════════════════════════════════════════════════════════════╝
 `);
 

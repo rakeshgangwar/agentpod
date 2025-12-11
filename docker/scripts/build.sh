@@ -1,120 +1,138 @@
 #!/bin/bash
 # =============================================================================
-# Build OpenCode Container Images
+# Build All CodeOpen Container Images
 # =============================================================================
-# Usage: ./build.sh [image_type] [--no-cache]
-# 
-# Arguments:
-#   image_type  - 'cli', 'desktop', or 'all' (default: all)
-#   --no-cache  - Build without Docker cache
+# Usage: ./build.sh [--no-cache] [--push] [--flavors <f1,f2>] [--addons <a1,a2>]
 #
-# Environment Variables:
-#   FORGEJO_REGISTRY - Registry URL (default: forgejo.superchotu.com)
-#   FORGEJO_OWNER    - Registry owner/namespace (default: rakeshgangwar)
+# Arguments:
+#   --no-cache  - Build without Docker cache
+#   --push      - Push to registry after build
+#   --flavors   - Comma-separated list of flavors to build (default: all)
+#   --addons    - Comma-separated list of addons to build (default: all)
+#   --skip-base - Skip building base image
 # =============================================================================
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DOCKER_DIR="$(dirname "$SCRIPT_DIR")"
-VERSION_FILE="$DOCKER_DIR/VERSION"
-
-# Load configuration
-source "$SCRIPT_DIR/config.sh" 2>/dev/null || true
-
-# Configuration
-REGISTRY="${FORGEJO_REGISTRY:-forgejo.superchotu.com}"
-OWNER="${FORGEJO_OWNER:-rakeshgangwar}"
-VERSION=$(cat "$VERSION_FILE" 2>/dev/null || echo "0.0.1")
-PLATFORM="${BUILD_PLATFORM:-linux/amd64}"
+source "$SCRIPT_DIR/config.sh"
 
 # Parse arguments
-IMAGE_TYPE="${1:-all}"
 NO_CACHE=""
+PUSH=""
+BUILD_FLAVORS=""
+BUILD_ADDONS=""
+SKIP_BASE=""
 
-for arg in "$@"; do
-    case $arg in
+while [[ $# -gt 0 ]]; do
+    case $1 in
         --no-cache)
             NO_CACHE="--no-cache"
+            shift
+            ;;
+        --push)
+            PUSH="--push"
+            shift
+            ;;
+        --flavors)
+            BUILD_FLAVORS="$2"
+            shift 2
+            ;;
+        --addons)
+            BUILD_ADDONS="$2"
+            shift 2
+            ;;
+        --skip-base)
+            SKIP_BASE="yes"
+            shift
+            ;;
+        *)
+            shift
             ;;
     esac
 done
 
+# Convert comma-separated lists to arrays
+if [ -n "$BUILD_FLAVORS" ]; then
+    IFS=',' read -ra SELECTED_FLAVORS <<< "$BUILD_FLAVORS"
+else
+    SELECTED_FLAVORS=("${FLAVORS[@]}")
+fi
+
+if [ -n "$BUILD_ADDONS" ]; then
+    IFS=',' read -ra SELECTED_ADDONS <<< "$BUILD_ADDONS"
+else
+    SELECTED_ADDONS=("${ADDONS[@]}")
+fi
+
 echo "=============================================="
-echo "  OpenCode Container Build"
+echo "  CodeOpen Container Build System"
 echo "=============================================="
-echo "  Version:  $VERSION"
-echo "  Registry: $REGISTRY/$OWNER"
-echo "  Type:     $IMAGE_TYPE"
-echo "  Platform: $PLATFORM"
+echo "  Version:  $CONTAINER_VERSION"
+echo "  Registry: $REGISTRY_URL"
+echo "  Platform: $BUILD_PLATFORM"
 echo "  Cache:    ${NO_CACHE:-enabled}"
+echo ""
+echo "  Build Targets:"
+echo "    Base:    ${SKIP_BASE:-yes}"
+echo "    Flavors: ${SELECTED_FLAVORS[*]}"
+echo "    Addons:  ${SELECTED_ADDONS[*]}"
 echo "=============================================="
 echo ""
 
-# Build CLI image
-build_cli() {
-    echo "Building opencode-cli..."
-    
-    local IMAGE_NAME="$REGISTRY/$OWNER/opencode-cli"
-    local CONTEXT="$DOCKER_DIR/opencode-cli"
-    
-    docker build $NO_CACHE \
-        --platform "$PLATFORM" \
-        -t "$IMAGE_NAME:$VERSION" \
-        -t "$IMAGE_NAME:latest" \
-        --build-arg CONTAINER_VERSION="$VERSION" \
-        -f "$CONTEXT/Dockerfile" \
-        "$CONTEXT"
-    
-    echo ""
-    echo "Built: $IMAGE_NAME:$VERSION"
-    echo "Built: $IMAGE_NAME:latest"
-    echo ""
-}
+# Track build status
+BUILD_SUCCESS=0
+BUILD_FAILED=0
 
-# Build Desktop image
-build_desktop() {
-    echo "Building opencode-desktop..."
-    
-    local IMAGE_NAME="$REGISTRY/$OWNER/opencode-desktop"
-    local CONTEXT="$DOCKER_DIR/opencode-desktop"
-    
-    docker build $NO_CACHE \
-        --platform "$PLATFORM" \
-        -t "$IMAGE_NAME:$VERSION" \
-        -t "$IMAGE_NAME:latest" \
-        --build-arg CONTAINER_VERSION="$VERSION" \
-        -f "$CONTEXT/Dockerfile" \
-        "$CONTEXT"
-    
-    echo ""
-    echo "Built: $IMAGE_NAME:$VERSION"
-    echo "Built: $IMAGE_NAME:latest"
-    echo ""
-}
-
-# Main execution
-case $IMAGE_TYPE in
-    cli)
-        build_cli
-        ;;
-    desktop)
-        build_desktop
-        ;;
-    all)
-        build_cli
-        build_desktop
-        ;;
-    *)
-        echo "Error: Unknown image type '$IMAGE_TYPE'"
-        echo "Usage: ./build.sh [cli|desktop|all] [--no-cache]"
+# Build base image
+if [ -z "$SKIP_BASE" ]; then
+    echo "----------------------------------------"
+    echo "  Building Base Image"
+    echo "----------------------------------------"
+    if "$SCRIPT_DIR/build-base.sh" $NO_CACHE $PUSH; then
+        ((BUILD_SUCCESS++))
+    else
+        ((BUILD_FAILED++))
+        echo "ERROR: Base image build failed!"
         exit 1
-        ;;
-esac
+    fi
+fi
 
+# Build flavors
+for flavor in "${SELECTED_FLAVORS[@]}"; do
+    echo "----------------------------------------"
+    echo "  Building Flavor: $flavor"
+    echo "----------------------------------------"
+    if "$SCRIPT_DIR/build-flavor.sh" "$flavor" $NO_CACHE $PUSH; then
+        ((BUILD_SUCCESS++))
+    else
+        ((BUILD_FAILED++))
+        echo "WARNING: Flavor '$flavor' build failed!"
+    fi
+done
+
+# Build addons (using fullstack as base by default)
+for addon in "${SELECTED_ADDONS[@]}"; do
+    echo "----------------------------------------"
+    echo "  Building Add-on: $addon"
+    echo "----------------------------------------"
+    if "$SCRIPT_DIR/build-addon.sh" "$addon" $NO_CACHE $PUSH; then
+        ((BUILD_SUCCESS++))
+    else
+        ((BUILD_FAILED++))
+        echo "WARNING: Add-on '$addon' build failed!"
+    fi
+done
+
+echo ""
 echo "=============================================="
 echo "  Build Complete!"
 echo "=============================================="
+echo "  Successful: $BUILD_SUCCESS"
+echo "  Failed:     $BUILD_FAILED"
+echo "=============================================="
 echo ""
-echo "To push images, run: ./push.sh $IMAGE_TYPE"
-echo ""
+
+if [ $BUILD_FAILED -gt 0 ]; then
+    exit 1
+fi

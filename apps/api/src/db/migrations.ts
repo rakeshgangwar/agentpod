@@ -369,4 +369,140 @@ export const migrations: Migration[] = [
       console.warn('Rollback not supported - code_server_url column will remain');
     },
   },
+  
+  // Migration 10: Add modular containers support
+  // Replaces monolithic container-tier system with resource tiers, flavors, and addons
+  {
+    version: 10,
+    name: 'add_modular_containers',
+    up: () => {
+      // Create resource_tiers table
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS resource_tiers (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          description TEXT,
+          cpu_cores INTEGER NOT NULL,
+          memory_gb INTEGER NOT NULL,
+          storage_gb INTEGER NOT NULL,
+          price_monthly REAL NOT NULL DEFAULT 0,
+          is_default INTEGER NOT NULL DEFAULT 0,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `);
+      
+      // Create container_flavors table
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS container_flavors (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          description TEXT,
+          languages TEXT NOT NULL DEFAULT '[]',
+          image_size_mb INTEGER,
+          is_default INTEGER NOT NULL DEFAULT 0,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `);
+      
+      // Create container_addons table
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS container_addons (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          description TEXT,
+          category TEXT NOT NULL,
+          image_size_mb INTEGER,
+          port INTEGER,
+          requires_gpu INTEGER NOT NULL DEFAULT 0,
+          requires_flavor TEXT,
+          price_monthly REAL NOT NULL DEFAULT 0,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `);
+      
+      // Seed resource tiers
+      db.exec(`
+        INSERT OR IGNORE INTO resource_tiers (id, name, description, cpu_cores, memory_gb, storage_gb, price_monthly, is_default, sort_order) VALUES
+        ('starter', 'Starter', 'Perfect for learning and small projects', 1, 2, 20, 0, 1, 1),
+        ('builder', 'Builder', 'For active development and medium projects', 2, 4, 30, 10, 0, 2),
+        ('creator', 'Creator', 'For professional development and larger projects', 4, 8, 50, 25, 0, 3),
+        ('power', 'Power', 'Maximum resources for demanding workloads', 8, 16, 100, 50, 0, 4)
+      `);
+      
+      // Seed container flavors
+      db.exec(`
+        INSERT OR IGNORE INTO container_flavors (id, name, description, languages, image_size_mb, is_default, sort_order) VALUES
+        ('js', 'JavaScript', 'JavaScript and TypeScript development', '["javascript","typescript"]', 800, 0, 1),
+        ('python', 'Python', 'Python development with data science tools', '["python"]', 1200, 0, 2),
+        ('go', 'Go', 'Go development environment', '["go"]', 900, 0, 3),
+        ('rust', 'Rust', 'Rust development environment', '["rust"]', 1100, 0, 4),
+        ('fullstack', 'Fullstack', 'JavaScript + Python for full-stack development', '["javascript","typescript","python"]', 1800, 1, 5),
+        ('polyglot', 'Polyglot', 'All languages for maximum flexibility', '["javascript","typescript","python","go","rust"]', 3000, 0, 6)
+      `);
+      
+      // Seed container addons
+      db.exec(`
+        INSERT OR IGNORE INTO container_addons (id, name, description, category, image_size_mb, port, requires_gpu, price_monthly, sort_order) VALUES
+        ('gui', 'Desktop GUI', 'Full desktop environment via KasmVNC', 'interface', 800, 6080, 0, 5, 1),
+        ('code-server', 'VS Code', 'VS Code in browser via code-server', 'interface', 300, 8080, 0, 0, 2),
+        ('databases', 'Databases', 'PostgreSQL, Redis, and DuckDB', 'storage', 400, NULL, 0, 5, 3),
+        ('cloud', 'Cloud Tools', 'AWS CLI, gcloud, Terraform, kubectl', 'devops', 600, NULL, 0, 0, 4),
+        ('gpu', 'GPU Support', 'NVIDIA CUDA toolkit for ML/AI workloads', 'compute', 500, NULL, 1, 20, 5)
+      `);
+      
+      // Add new columns to projects table
+      const tableInfo = db.query("PRAGMA table_info(projects)").all() as Array<{ name: string }>;
+      
+      if (!tableInfo.some(col => col.name === 'resource_tier_id')) {
+        db.exec("ALTER TABLE projects ADD COLUMN resource_tier_id TEXT DEFAULT 'starter'");
+      }
+      
+      if (!tableInfo.some(col => col.name === 'flavor_id')) {
+        db.exec("ALTER TABLE projects ADD COLUMN flavor_id TEXT DEFAULT 'fullstack'");
+      }
+      
+      if (!tableInfo.some(col => col.name === 'addon_ids')) {
+        db.exec("ALTER TABLE projects ADD COLUMN addon_ids TEXT DEFAULT '[]'");
+      }
+      
+      // Create indexes
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_resource_tiers_default ON resource_tiers(is_default);
+        CREATE INDEX IF NOT EXISTS idx_container_flavors_default ON container_flavors(is_default);
+        CREATE INDEX IF NOT EXISTS idx_container_addons_category ON container_addons(category);
+      `);
+      
+      // Migrate existing projects from containerTierId to new fields
+      // Map old tiers to new resource tiers + flavors
+      db.exec(`
+        UPDATE projects SET 
+          resource_tier_id = CASE container_tier_id
+            WHEN 'lite' THEN 'starter'
+            WHEN 'standard' THEN 'builder'
+            WHEN 'pro' THEN 'creator'
+            WHEN 'desktop' THEN 'creator'
+            ELSE 'starter'
+          END,
+          flavor_id = 'fullstack',
+          addon_ids = CASE container_tier_id
+            WHEN 'desktop' THEN '["gui","code-server"]'
+            ELSE '["code-server"]'
+          END
+        WHERE resource_tier_id IS NULL OR resource_tier_id = 'starter'
+      `);
+    },
+    down: () => {
+      db.exec('DROP TABLE IF EXISTS resource_tiers');
+      db.exec('DROP TABLE IF EXISTS container_flavors');
+      db.exec('DROP TABLE IF EXISTS container_addons');
+      // Note: SQLite doesn't support DROP COLUMN easily, columns will remain
+      console.warn('Rollback: modular container tables dropped, but project columns will remain');
+    },
+  },
 ];

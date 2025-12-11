@@ -1,12 +1,28 @@
 # =============================================================================
-# OpenCode CLI Container
-# A comprehensive development environment for AI-assisted coding
+# CodeOpen Base Image
+# Foundation layer for all CodeOpen container flavors
 # =============================================================================
-# Version: 0.0.1
-# Base: Ubuntu 24.04 LTS
-# License: MIT
+# Version: 0.1.0
+# Contains: Ubuntu 24.04, Node.js 22, Bun, OpenCode CLI, ACP Gateway, Core Tools
+# Size: ~500MB
 # =============================================================================
 
+# -----------------------------------------------------------------------------
+# Stage 1: Build ACP Gateway
+# -----------------------------------------------------------------------------
+FROM oven/bun:1 AS acp-builder
+
+WORKDIR /build/acp-gateway
+COPY acp-gateway/package.json acp-gateway/bun.lock* ./
+RUN bun install --frozen-lockfile
+COPY acp-gateway/ ./
+
+# Verify TypeScript compiles correctly
+RUN bun run typecheck
+
+# -----------------------------------------------------------------------------
+# Stage 2: Base Image
+# -----------------------------------------------------------------------------
 FROM ubuntu:24.04
 
 # Prevent interactive prompts during package installation
@@ -14,9 +30,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV DEBIAN_PRIORITY=high
 
 # =============================================================================
-# System Packages
+# System Packages (minimal set for base)
 # =============================================================================
-RUN apt-get update && apt-get -y upgrade && apt-get install -y \
+RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-recommends \
     # Essential utilities
     sudo \
     curl \
@@ -24,60 +40,29 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y \
     ca-certificates \
     gnupg \
     lsb-release \
-    software-properties-common \
-    apt-transport-https \
     locales \
     tzdata \
     # Version control
     git \
     git-lfs \
-    # Editors
-    vim \
+    # Editors (minimal)
+    vim-tiny \
     nano \
-    # Build essentials
-    build-essential \
-    cmake \
-    make \
-    pkg-config \
-    autoconf \
-    automake \
-    libtool \
-    # SSL/Crypto libraries
-    libssl-dev \
-    libffi-dev \
     # Compression
     zip \
     unzip \
-    p7zip-full \
     xz-utils \
     # Network tools
-    net-tools \
-    netcat-openbsd \
-    dnsutils \
-    iputils-ping \
     openssh-client \
     # Process management
-    htop \
     procps \
-
     # File utilities
     tree \
     file \
     less \
-    # JSON/YAML processing
+    # JSON processing
     jq \
-    # Python build dependencies
-    zlib1g-dev \
-    libbz2-dev \
-    libreadline-dev \
-    libsqlite3-dev \
-    libncursesw5-dev \
-    libxml2-dev \
-    libxmlsec1-dev \
-    liblzma-dev \
-    tk-dev \
     # Shell
-    zsh \
     tmux \
     && rm -rf /var/lib/apt/lists/*
 
@@ -106,87 +91,67 @@ RUN useradd -m -s /bin/bash -d $HOME $USERNAME && \
 # Node.js 22 LTS
 # =============================================================================
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
-    apt-get install -y nodejs && \
+    apt-get install -y --no-install-recommends nodejs && \
+    npm cache clean --force && \
     rm -rf /var/lib/apt/lists/*
 
 # Install pnpm globally
 RUN npm install -g pnpm
 
 # =============================================================================
-# Python 3.12 (using deadsnakes PPA for latest)
+# Bun Runtime (for ACP Gateway)
 # =============================================================================
-RUN add-apt-repository ppa:deadsnakes/ppa -y && \
-    apt-get update && \
-    apt-get install -y python3.12 python3.12-venv python3.12-dev python3-pip && \
-    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 && \
-    update-alternatives --install /usr/bin/python python /usr/bin/python3.12 1 && \
-    rm -rf /var/lib/apt/lists/*
+ENV BUN_INSTALL="/usr/local/bun"
+RUN curl -fsSL https://bun.sh/install | bash && \
+    mv /root/.bun/* /usr/local/bun/ || true
+ENV PATH="${BUN_INSTALL}/bin:${PATH}"
 
 # =============================================================================
-# Go (latest stable)
-# =============================================================================
-ENV GO_VERSION=1.22.4
-RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -C /usr/local -xzf -
-ENV PATH="/usr/local/go/bin:${PATH}"
-ENV GOPATH="${HOME}/go"
-ENV PATH="${GOPATH}/bin:${PATH}"
-
-# =============================================================================
-# Rust (via rustup)
-# =============================================================================
-USER $USERNAME
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-ENV PATH="${HOME}/.cargo/bin:${PATH}"
-USER root
-
-# =============================================================================
-# Modern CLI tools
-# =============================================================================
-# ripgrep (fast grep alternative)
-RUN curl -LO https://github.com/BurntSushi/ripgrep/releases/download/14.1.0/ripgrep_14.1.0-1_amd64.deb && \
-    dpkg -i ripgrep_14.1.0-1_amd64.deb && \
-    rm ripgrep_14.1.0-1_amd64.deb
-
-# fd (fast find alternative)
-RUN curl -LO https://github.com/sharkdp/fd/releases/download/v10.1.0/fd_10.1.0_amd64.deb && \
-    dpkg -i fd_10.1.0_amd64.deb && \
-    rm fd_10.1.0_amd64.deb
-
-# bat (cat with syntax highlighting)
-RUN curl -LO https://github.com/sharkdp/bat/releases/download/v0.24.0/bat_0.24.0_amd64.deb && \
-    dpkg -i bat_0.24.0_amd64.deb && \
-    rm bat_0.24.0_amd64.deb
-
-# fzf (fuzzy finder)
-RUN git clone --depth 1 https://github.com/junegunn/fzf.git /opt/fzf && \
-    /opt/fzf/install --bin && \
-    ln -s /opt/fzf/bin/fzf /usr/local/bin/fzf
-
-# yq (YAML processor, like jq for YAML)
-RUN curl -LO https://github.com/mikefarah/yq/releases/download/v4.44.1/yq_linux_amd64 && \
-    chmod +x yq_linux_amd64 && \
-    mv yq_linux_amd64 /usr/local/bin/yq
-
-# GitHub CLI
-RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && \
-    chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg && \
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
-    apt-get update && \
-    apt-get install -y gh && \
-    rm -rf /var/lib/apt/lists/*
-
-# httpie (modern HTTP client)
-RUN pip install httpie --break-system-packages
-
-# =============================================================================
-# OpenCode
+# OpenCode CLI
 # =============================================================================
 RUN npm install -g opencode-ai
 
 # =============================================================================
-# Code Server (VS Code in browser)
+# Modern CLI Tools
 # =============================================================================
-RUN curl -fsSL https://code-server.dev/install.sh | sh
+# ripgrep (fast grep alternative)
+RUN apt-get update && apt-get install -y --no-install-recommends ripgrep && \
+    rm -rf /var/lib/apt/lists/*
+
+# fd (fast find alternative) - architecture aware
+RUN ARCH=$(dpkg --print-architecture) && \
+    curl -LO "https://github.com/sharkdp/fd/releases/download/v10.1.0/fd_10.1.0_${ARCH}.deb" && \
+    dpkg -i "fd_10.1.0_${ARCH}.deb" && \
+    rm -f "fd_10.1.0_${ARCH}.deb"
+
+# bat (cat with syntax highlighting) - architecture aware
+RUN ARCH=$(dpkg --print-architecture) && \
+    curl -LO "https://github.com/sharkdp/bat/releases/download/v0.24.0/bat_0.24.0_${ARCH}.deb" && \
+    dpkg -i "bat_0.24.0_${ARCH}.deb" && \
+    rm -f "bat_0.24.0_${ARCH}.deb"
+
+# fzf (fuzzy finder)
+RUN git clone --depth 1 https://github.com/junegunn/fzf.git /opt/fzf && \
+    /opt/fzf/install --bin && \
+    ln -s /opt/fzf/bin/fzf /usr/local/bin/fzf && \
+    rm -rf /opt/fzf/.git
+
+# yq (YAML processor) - architecture aware
+RUN ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "arm64" ]; then YQ_ARCH="arm64"; else YQ_ARCH="amd64"; fi && \
+    curl -L -o /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/v4.44.1/yq_linux_${YQ_ARCH}" && \
+    chmod +x /usr/local/bin/yq
+
+# =============================================================================
+# Copy ACP Gateway from builder
+# =============================================================================
+COPY --from=acp-builder /build/acp-gateway /opt/acp-gateway
+
+# =============================================================================
+# Copy scripts
+# =============================================================================
+COPY scripts/ /opt/codeopen/scripts/
+RUN chmod +x /opt/codeopen/scripts/*.sh 2>/dev/null || true
 
 # =============================================================================
 # Configuration directories
@@ -195,17 +160,14 @@ USER $USERNAME
 WORKDIR $HOME
 
 # Create OpenCode config directories
-# - .cache/opencode: for dynamically downloaded provider packages
 RUN mkdir -p $HOME/.config/opencode && \
     mkdir -p $HOME/.config/opencode-custom && \
     mkdir -p $HOME/.local/share/opencode && \
-    mkdir -p $HOME/.cache/opencode
-
-# Create workspace
-RUN mkdir -p $WORKSPACE
+    mkdir -p $HOME/.cache/opencode && \
+    mkdir -p $WORKSPACE
 
 # Set up shell configuration
-RUN echo 'export PATH="$HOME/.cargo/bin:$HOME/go/bin:/usr/local/go/bin:$PATH"' >> $HOME/.bashrc && \
+RUN echo 'export PATH="/usr/local/bun/bin:$PATH"' >> $HOME/.bashrc && \
     echo 'export EDITOR=vim' >> $HOME/.bashrc && \
     echo '[ -f /opt/fzf/shell/key-bindings.bash ] && source /opt/fzf/shell/key-bindings.bash' >> $HOME/.bashrc
 
@@ -214,39 +176,33 @@ RUN echo 'export PATH="$HOME/.cargo/bin:$HOME/go/bin:/usr/local/go/bin:$PATH"' >
 # =============================================================================
 ENV OPENCODE_PORT=4096
 ENV OPENCODE_HOST=0.0.0.0
+ENV ACP_GATEWAY_PORT=4097
 ENV OPENCODE_CONFIG_DIR=/home/developer/.config/opencode-custom
 ENV TERM=xterm-256color
-
-# Code Server configuration
-ENV CODE_SERVER_PORT=8080
-ENV CODE_SERVER_AUTH=none
 
 # =============================================================================
 # Copy entrypoint script
 # =============================================================================
 USER root
 COPY entrypoint.sh /entrypoint.sh
-COPY scripts/ /scripts/
-RUN chmod +x /entrypoint.sh && \
-    chmod +x /scripts/*.sh 2>/dev/null || true
+RUN chmod +x /entrypoint.sh
 
-# Create healthcheck script for reliable healthcheck execution
-# Uses curl with fallback to wget, both should be available
+# Create healthcheck script
 RUN echo '#!/bin/sh' > /healthcheck.sh && \
-    echo 'PORT="${OPENCODE_PORT:-4096}"' >> /healthcheck.sh && \
-    echo 'curl -sf "http://localhost:${PORT}/app" > /dev/null 2>&1 || wget -q --spider "http://localhost:${PORT}/app" > /dev/null 2>&1' >> /healthcheck.sh && \
+    echo 'curl -sf "http://localhost:${ACP_GATEWAY_PORT:-4097}/health" > /dev/null 2>&1' >> /healthcheck.sh && \
     chmod +x /healthcheck.sh
 
 # =============================================================================
-# Expose ports and set user
+# Expose ports
 # =============================================================================
-EXPOSE 4096 8080
+# 4096: OpenCode Server
+# 4097: ACP Gateway
+EXPOSE 4096 4097
 
 USER $USERNAME
 WORKDIR $WORKSPACE
 
-# Health check - use script for reliable execution with runtime ENV
-# Increased start-period to 60s and retries to 5 for OpenCode server startup
+# Health check - verify ACP Gateway is running
 HEALTHCHECK --interval=15s --timeout=10s --start-period=60s --retries=5 \
     CMD /healthcheck.sh
 
