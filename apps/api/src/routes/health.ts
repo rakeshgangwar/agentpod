@@ -10,7 +10,7 @@ export const healthRoutes = new Hono()
   .get('/api/info', (c) => {
     return c.json({
       name: 'Management API',
-      version: '0.1.0',
+      version: '0.3.0',
       description: 'Portable Command Center - Project & Container Orchestration',
       status: 'running',
     });

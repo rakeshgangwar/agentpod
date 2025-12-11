@@ -297,7 +297,7 @@ export const migrations: Migration[] = [
       }
       
       if (!tableInfo.some(col => col.name === 'container_version')) {
-        db.exec("ALTER TABLE projects ADD COLUMN container_version TEXT DEFAULT '0.0.1'");
+        db.exec("ALTER TABLE projects ADD COLUMN container_version TEXT DEFAULT '0.3.0'");
       }
       
       if (!tableInfo.some(col => col.name === 'container_update_available')) {
