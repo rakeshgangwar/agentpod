@@ -1,6 +1,9 @@
 # =============================================================================
 # Management API Dockerfile
 # Multi-stage build for smaller production image
+# 
+# Build context: monorepo root (/)
+# Dockerfile location: /apps/api/Dockerfile
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -10,18 +13,24 @@ FROM oven/bun:1.1-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
-COPY package.json bun.lock* ./
+# Copy workspace package files first for layer caching
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages/types/package.json ./packages/types/
+COPY packages/tsconfig/package.json ./packages/tsconfig/
+COPY apps/api/package.json apps/api/bun.lock* ./apps/api/
 
-# Install dependencies
+# Install dependencies for the API only (production)
+WORKDIR /app/apps/api
 RUN bun install --frozen-lockfile --production
 
-# Copy source code
-COPY src/ ./src/
-COPY tsconfig.json ./
+# Copy workspace packages source (needed for types)
+WORKDIR /app
+COPY packages/types/ ./packages/types/
+COPY packages/tsconfig/ ./packages/tsconfig/
 
-# Type check (optional, can be removed for faster builds)
-# RUN bun run typecheck
+# Copy API source code
+COPY apps/api/src/ ./apps/api/src/
+COPY apps/api/tsconfig.json ./apps/api/
 
 # -----------------------------------------------------------------------------
 # Stage 2: Production
@@ -35,12 +44,12 @@ RUN addgroup -g 1001 -S appgroup && \
     adduser -u 1001 -S appuser -G appgroup
 
 # Copy dependencies from builder
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./
+COPY --from=builder /app/apps/api/node_modules ./node_modules
+COPY --from=builder /app/apps/api/package.json ./
 
 # Copy source code
-COPY --from=builder /app/src ./src
-COPY --from=builder /app/tsconfig.json ./
+COPY --from=builder /app/apps/api/src ./src
+COPY --from=builder /app/apps/api/tsconfig.json ./
 
 # Create data directory for SQLite
 RUN mkdir -p /app/data && chown -R appuser:appgroup /app/data
