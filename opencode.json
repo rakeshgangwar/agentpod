@@ -1,9 +1,9 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  
+
   "model": "anthropic/claude-opus-4-5-20251101",
   "small_model": "anthropic/claude-sonnet-4-5-20250929",
-  
+
   "mcp": {
     "context7": {
       "type": "remote",
@@ -12,9 +12,13 @@
     "gh_grep": {
       "type": "remote",
       "url": "https://mcp.grep.app"
+    },
+    "cloudflare": {
+      "type": "remote",
+      "url": "https://docs.mcp.cloudflare.com/mcp"
     }
   },
-  
+
   "agent": {
     "ux-design": {
       "description": "UX design specialist for adaptive cross-platform experiences and agentic AI interfaces",
@@ -71,7 +75,7 @@
       }
     }
   },
-  
+
   "command": {
     "ux-audit": {
       "template": "{file:.opencode/command/ux-audit.md}",
@@ -109,13 +113,13 @@
       "agent": "ux-design"
     }
   },
-  
+
   "mode": {
     "plan": {
       "model": "anthropic/claude-haiku-4-20250514"
     }
   },
-  
+
   "tui": {
     "scroll_speed": 3,
     "scroll_acceleration": {
