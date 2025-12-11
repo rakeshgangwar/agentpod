@@ -391,16 +391,17 @@ export async function createNewProject(options: CreateProjectOptions): Promise<P
         fqdnUrl = `https://${slug}.${config.opencode.wildcardDomain}`;
         
         // Build domains config based on resolved addons
-        const domains: string[] = [`${slug}.${config.opencode.wildcardDomain}:4096`];
-        domains.push(`acp-${slug}.${config.opencode.wildcardDomain}:4097`);
+        // Coolify requires FQDN format with protocol prefix: https://domain:port
+        const domains: string[] = [`https://${slug}.${config.opencode.wildcardDomain}:4096`];
+        domains.push(`https://acp-${slug}.${config.opencode.wildcardDomain}:4097`);
         
         if (resolvedAddonIds.includes('code-server')) {
           codeServerUrl = `https://code-${slug}.${config.opencode.wildcardDomain}`;
-          domains.push(`code-${slug}.${config.opencode.wildcardDomain}:8080`);
+          domains.push(`https://code-${slug}.${config.opencode.wildcardDomain}:8080`);
         }
         if (resolvedAddonIds.includes('gui')) {
           vncUrl = `https://vnc-${slug}.${config.opencode.wildcardDomain}`;
-          domains.push(`vnc-${slug}.${config.opencode.wildcardDomain}:6080`);
+          domains.push(`https://vnc-${slug}.${config.opencode.wildcardDomain}:6080`);
         }
         
         domainsConfig = domains.join(',');

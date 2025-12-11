@@ -237,24 +237,26 @@ export function generateProjectUrls(
   
   const domains: string[] = [];
   
+  // Coolify requires FQDN format with protocol prefix: https://domain:port
+  
   // Base OpenCode domain (port 4096)
-  domains.push(`${projectSlug}.${wildcardDomain}:4096`);
+  domains.push(`https://${projectSlug}.${wildcardDomain}:4096`);
   
   // ACP Gateway domain (port 4097)
-  domains.push(`acp-${projectSlug}.${wildcardDomain}:4097`);
+  domains.push(`https://acp-${projectSlug}.${wildcardDomain}:4097`);
   
   // Check for code-server addon
   const hasCodeServer = addons.some(a => a.id === 'code-server');
   if (hasCodeServer) {
     urls.codeServer = `https://code-${projectSlug}.${wildcardDomain}`;
-    domains.push(`code-${projectSlug}.${wildcardDomain}:8080`);
+    domains.push(`https://code-${projectSlug}.${wildcardDomain}:8080`);
   }
   
   // Check for GUI addon
   const hasGui = addons.some(a => a.id === 'gui');
   if (hasGui) {
     urls.vnc = `https://vnc-${projectSlug}.${wildcardDomain}`;
-    domains.push(`vnc-${projectSlug}.${wildcardDomain}:6080`);
+    domains.push(`https://vnc-${projectSlug}.${wildcardDomain}:6080`);
   }
   
   urls.domainsConfig = domains.join(',');
