@@ -129,11 +129,11 @@ RUN npm install -g opencode-ai
 # =============================================================================
 RUN ARCH=$(dpkg --print-architecture) && \
     OAUTH2_VERSION="7.6.0" && \
-    curl -LO "https://github.com/oauth2-proxy/oauth2-proxy/releases/download/v${OAUTH2_VERSION}/oauth2-proxy-v${OAUTH2_VERSION}.linux-${ARCH}.tar.gz" && \
-    tar -xzf "oauth2-proxy-v${OAUTH2_VERSION}.linux-${ARCH}.tar.gz" && \
+    curl -fsSL "https://github.com/oauth2-proxy/oauth2-proxy/releases/download/v${OAUTH2_VERSION}/oauth2-proxy-v${OAUTH2_VERSION}.linux-${ARCH}.tar.gz" -o oauth2-proxy.tar.gz && \
+    tar -xzf oauth2-proxy.tar.gz && \
     mv "oauth2-proxy-v${OAUTH2_VERSION}.linux-${ARCH}/oauth2-proxy" /usr/local/bin/ && \
     chmod +x /usr/local/bin/oauth2-proxy && \
-    rm -rf "oauth2-proxy-v${OAUTH2_VERSION}.linux-${ARCH}"* && \
+    rm -rf oauth2-proxy.tar.gz "oauth2-proxy-v${OAUTH2_VERSION}.linux-${ARCH}" && \
     oauth2-proxy --version
 
 # =============================================================================
