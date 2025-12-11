@@ -18,11 +18,15 @@ USER root
 # =============================================================================
 # Rust Build Dependencies
 # =============================================================================
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    pkg-config \
-    libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Use retry logic and --fix-missing to handle transient mirror issues
+RUN for i in 1 2 3; do \
+        apt-get update && \
+        apt-get install -y --no-install-recommends --fix-missing \
+            build-essential \
+            pkg-config \
+            libssl-dev \
+        && break || sleep 5; \
+    done && rm -rf /var/lib/apt/lists/*
 
 # =============================================================================
 # Rust Installation (via rustup)

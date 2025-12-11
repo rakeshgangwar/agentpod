@@ -18,35 +18,41 @@ USER root
 # =============================================================================
 # Python Build Dependencies
 # =============================================================================
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    software-properties-common \
-    zlib1g-dev \
-    libbz2-dev \
-    libreadline-dev \
-    libsqlite3-dev \
-    libncursesw5-dev \
-    libxml2-dev \
-    libxmlsec1-dev \
-    liblzma-dev \
-    libffi-dev \
-    tk-dev \
-    # PostgreSQL client (common in full-stack)
-    postgresql-client \
-    && rm -rf /var/lib/apt/lists/*
+# Use retry logic and --fix-missing to handle transient mirror issues
+RUN for i in 1 2 3; do \
+        apt-get update && \
+        apt-get install -y --no-install-recommends --fix-missing \
+            software-properties-common \
+            zlib1g-dev \
+            libbz2-dev \
+            libreadline-dev \
+            libsqlite3-dev \
+            libncursesw5-dev \
+            libxml2-dev \
+            libxmlsec1-dev \
+            liblzma-dev \
+            libffi-dev \
+            tk-dev \
+            postgresql-client \
+        && break || sleep 5; \
+    done && rm -rf /var/lib/apt/lists/*
 
 # =============================================================================
 # Python 3.12
 # =============================================================================
 RUN add-apt-repository ppa:deadsnakes/ppa -y && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-        python3.12 \
-        python3.12-venv \
-        python3.12-dev \
-        python3-pip \
-    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 \
-    && update-alternatives --install /usr/bin/python python /usr/bin/python3.12 1 \
-    && rm -rf /var/lib/apt/lists/*
+    for i in 1 2 3; do \
+        apt-get update && \
+        apt-get install -y --no-install-recommends --fix-missing \
+            python3.12 \
+            python3.12-venv \
+            python3.12-dev \
+            python3-pip \
+        && break || sleep 5; \
+    done && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 && \
+    update-alternatives --install /usr/bin/python python /usr/bin/python3.12 1 && \
+    rm -rf /var/lib/apt/lists/*
 
 # =============================================================================
 # Python Tools

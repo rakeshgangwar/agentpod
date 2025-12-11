@@ -43,41 +43,36 @@ ENV DEBIAN_PRIORITY=high
 # =============================================================================
 # System Packages (minimal set for base)
 # =============================================================================
-RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-recommends \
-    # Essential utilities
-    sudo \
-    curl \
-    wget \
-    ca-certificates \
-    gnupg \
-    lsb-release \
-    locales \
-    tzdata \
-    # Version control
-    git \
-    git-lfs \
-    # Editors (minimal)
-    vim-tiny \
-    nano \
-    # Compression
-    zip \
-    unzip \
-    xz-utils \
-    # Network tools
-    openssh-client \
-    # Process management
-    procps \
-    # File utilities
-    tree \
-    file \
-    less \
-    # JSON processing
-    jq \
-    # Shell
-    tmux \
-    # Web server (for reverse proxy)
-    nginx \
-    && rm -rf /var/lib/apt/lists/*
+# Use retry logic and --fix-missing to handle transient mirror issues
+RUN for i in 1 2 3; do \
+        apt-get update && \
+        apt-get -y upgrade && \
+        apt-get install -y --no-install-recommends --fix-missing \
+            sudo \
+            curl \
+            wget \
+            ca-certificates \
+            gnupg \
+            lsb-release \
+            locales \
+            tzdata \
+            git \
+            git-lfs \
+            vim-tiny \
+            nano \
+            zip \
+            unzip \
+            xz-utils \
+            openssh-client \
+            procps \
+            tree \
+            file \
+            less \
+            jq \
+            tmux \
+            nginx \
+        && break || sleep 5; \
+    done && rm -rf /var/lib/apt/lists/*
 
 # Generate locales
 RUN locale-gen en_US.UTF-8
@@ -127,12 +122,15 @@ RUN npm install -g opencode-ai
 # =============================================================================
 # Modern CLI Tools (install from apt where available for reliability)
 # =============================================================================
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ripgrep \
-    fd-find \
-    bat \
-    fzf \
-    && rm -rf /var/lib/apt/lists/* \
+RUN for i in 1 2 3; do \
+        apt-get update && \
+        apt-get install -y --no-install-recommends --fix-missing \
+            ripgrep \
+            fd-find \
+            bat \
+            fzf \
+        && break || sleep 5; \
+    done && rm -rf /var/lib/apt/lists/* \
     && ln -s $(which fdfind) /usr/local/bin/fd \
     && ln -s $(which batcat) /usr/local/bin/bat
 
