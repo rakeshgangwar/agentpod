@@ -1,91 +1,123 @@
 <script lang="ts">
   import { page } from "$app/stores";
-  import { getProject, fetchProject } from "$lib/stores/projects.svelte";
-  import * as api from "$lib/api/tauri";
+  import { sandboxes, fetchSandbox, getSandboxStats } from "$lib/stores/sandboxes.svelte";
+  import type { Sandbox, SandboxStats, SandboxInfo } from "$lib/api/tauri";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { onMount } from "svelte";
   import { openServiceWindow, type ServiceType } from "$lib/utils/service-window";
 
-  // Get current project ID from route params
-  let projectId = $derived($page.params.id ?? "");
+  // Get current sandbox ID from route params
+  let sandboxId = $derived($page.params.id ?? "");
 
-  // Get current project
-  let project = $derived(projectId ? getProject(projectId) : undefined);
+  // Local state for sandbox info
+  let sandboxInfo = $state<SandboxInfo | null>(null);
+  let stats = $state<SandboxStats | null>(null);
+  let isLoadingStats = $state(false);
 
-  // Health check states
-  let opencodeHealth = $state<boolean | null>(null);
-  let isCheckingHealth = $state(false);
+  // Get current sandbox from list (quick access)
+  let sandbox = $derived(sandboxInfo?.sandbox ?? sandboxes.list.find(s => s.id === sandboxId));
 
-  async function checkHealth() {
-    if (!project) return;
-    isCheckingHealth = true;
-    try {
-      const result = await api.opencodeHealthCheck(project.id);
-      opencodeHealth = result.healthy;
-    } catch (e) {
-      opencodeHealth = false;
-    } finally {
-      isCheckingHealth = false;
-    }
-  }
-
-  // Check health on mount and when project changes
+  // Load sandbox info on mount
   onMount(() => {
-    if (project && project.status === "running") {
-      checkHealth();
+    if (sandboxId) {
+      loadSandboxInfo();
     }
   });
 
-  $effect(() => {
-    if (project && project.status === "running") {
-      checkHealth();
-    } else {
-      opencodeHealth = null;
+  async function loadSandboxInfo() {
+    const info = await fetchSandbox(sandboxId);
+    if (info) {
+      sandboxInfo = info;
     }
-  });
-
-  function getHealthBadgeVariant(health: boolean | null): "default" | "secondary" | "destructive" | "outline" {
-    if (health === null) return "outline";
-    return health ? "default" : "destructive";
   }
 
-  function getHealthText(health: boolean | null): string {
-    if (health === null) return "Unknown";
-    return health ? "Healthy" : "Unhealthy";
+  async function refreshStats() {
+    if (!sandboxId || sandbox?.status !== "running") return;
+    isLoadingStats = true;
+    try {
+      stats = await getSandboxStats(sandboxId);
+    } catch (e) {
+      console.error("Failed to get stats:", e);
+    } finally {
+      isLoadingStats = false;
+    }
+  }
+
+  // Refresh stats when sandbox is running
+  $effect(() => {
+    if (sandbox?.status === "running") {
+      refreshStats();
+    } else {
+      stats = null;
+    }
+  });
+
+  function getStatusBadgeVariant(status: string | undefined): "default" | "secondary" | "destructive" | "outline" {
+    switch (status) {
+      case "running": return "default";
+      case "paused": return "secondary";
+      case "exited":
+      case "dead": return "destructive";
+      default: return "outline";
+    }
+  }
+
+  // Format bytes to human readable
+  function formatBytes(bytes: number): string {
+    if (bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
   }
 
   // Open service URL in-app (desktop) or system browser (mobile)
   function openService(url: string | null | undefined, title: string, serviceType: ServiceType) {
-    if (url && project) {
+    if (url && sandbox) {
       openServiceWindow({
         url,
-        title: `${title} - ${project.name}`,
+        title: `${title} - ${sandbox.name}`,
         serviceType,
-        projectId: project.id,
+        projectId: sandbox.id,
       });
     }
   }
 </script>
 
 <div class="space-y-6">
-  <h2 class="text-xl font-semibold">Project Settings</h2>
+  <h2 class="text-xl font-semibold">Sandbox Settings</h2>
 
   <!-- Service URLs Section -->
   <div class="border rounded-lg p-4 space-y-4">
     <h3 class="font-medium">Service URLs</h3>
     
     <div class="grid gap-3">
+      <!-- Main URL -->
+      {#if sandbox?.urls.main}
+        <div class="flex items-center justify-between p-3 bg-muted/50 rounded">
+          <div class="min-w-0 flex-1">
+            <div class="font-medium">Main URL</div>
+            <div class="text-sm text-muted-foreground truncate">
+              {sandbox.urls.main}
+            </div>
+          </div>
+          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls.main, "Main", "opencode")}>
+            Open
+          </Button>
+        </div>
+      {/if}
+
       <!-- OpenCode API -->
       <div class="flex items-center justify-between p-3 bg-muted/50 rounded">
         <div class="min-w-0 flex-1">
           <div class="font-medium">OpenCode API</div>
           <div class="text-sm text-muted-foreground truncate">
-            {project?.fqdnUrl ?? "Not configured"}
+            {sandbox?.urls.opencode ?? "Not configured"}
           </div>
         </div>
-        {#if project?.fqdnUrl}
-          <Button size="sm" variant="outline" onclick={() => openService(project?.fqdnUrl, "OpenCode", "opencode")}>
+        {#if sandbox?.urls.opencode}
+          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls.opencode, "OpenCode", "opencode")}>
             Open
           </Button>
         {/if}
@@ -96,26 +128,26 @@
         <div class="min-w-0 flex-1">
           <div class="font-medium">Code Server</div>
           <div class="text-sm text-muted-foreground truncate">
-            {project?.codeServerUrl ?? "Not configured"}
+            {sandbox?.urls.codeServer ?? "Not configured"}
           </div>
         </div>
-        {#if project?.codeServerUrl}
-          <Button size="sm" variant="outline" onclick={() => openService(project?.codeServerUrl, "Code Server", "code-server")}>
+        {#if sandbox?.urls.codeServer}
+          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls.codeServer, "Code Server", "code-server")}>
             Open
           </Button>
         {/if}
       </div>
 
       <!-- VNC/Desktop (only show if available) -->
-      {#if project?.vncUrl}
+      {#if sandbox?.urls.vnc}
         <div class="flex items-center justify-between p-3 bg-muted/50 rounded">
           <div class="min-w-0 flex-1">
             <div class="font-medium">Desktop (VNC)</div>
             <div class="text-sm text-muted-foreground truncate">
-              {project.vncUrl}
+              {sandbox.urls.vnc}
             </div>
           </div>
-          <Button size="sm" variant="outline" onclick={() => openService(project?.vncUrl, "Desktop", "vnc")}>
+          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls.vnc, "Desktop", "vnc")}>
             Open
           </Button>
         </div>
@@ -123,60 +155,76 @@
     </div>
   </div>
 
-  <!-- Service Health Section -->
+  <!-- Container Status Section -->
   <div class="border rounded-lg p-4 space-y-4">
     <div class="flex items-center justify-between">
-      <h3 class="font-medium">Service Health</h3>
-      <Button 
-        size="sm" 
-        variant="outline" 
-        onclick={checkHealth} 
-        disabled={isCheckingHealth || project?.status !== "running"}
-      >
-        {isCheckingHealth ? "Checking..." : "Refresh"}
-      </Button>
+      <h3 class="font-medium">Container Status</h3>
+      <Badge variant={getStatusBadgeVariant(sandbox?.status)}>
+        {sandbox?.status ?? "Unknown"}
+      </Badge>
     </div>
     
-    {#if project?.status !== "running"}
+    {#if sandbox?.status !== "running"}
       <div class="text-sm text-muted-foreground p-3 bg-muted/30 rounded">
-        Start the project to check service health.
+        Start the sandbox to view resource usage.
       </div>
     {:else}
       <div class="grid gap-3">
-        <!-- OpenCode Status -->
-        <div class="flex items-center justify-between p-3 bg-muted/50 rounded">
-          <div>
-            <div class="font-medium">OpenCode API</div>
-            <div class="text-sm text-muted-foreground">Port 4096</div>
-          </div>
-          <Badge variant={getHealthBadgeVariant(opencodeHealth)}>
-            {getHealthText(opencodeHealth)}
-          </Badge>
-        </div>
-        
-        <!-- Code Server Status -->
-        <div class="flex items-center justify-between p-3 bg-muted/50 rounded">
-          <div>
-            <div class="font-medium">Code Server</div>
-            <div class="text-sm text-muted-foreground">Port 8080</div>
-          </div>
-          <Badge variant="outline">
-            {project?.status === "running" ? "Running" : "Stopped"}
-          </Badge>
-        </div>
-
-        <!-- VNC Status (only show if available) -->
-        {#if project?.vncUrl}
+        {#if stats}
+          <!-- CPU Usage -->
           <div class="flex items-center justify-between p-3 bg-muted/50 rounded">
             <div>
-              <div class="font-medium">Desktop (VNC)</div>
-              <div class="text-sm text-muted-foreground">Port 6080</div>
+              <div class="font-medium">CPU Usage</div>
+              <div class="text-sm text-muted-foreground">Current utilization</div>
             </div>
-            <Badge variant="outline">
-              {project?.status === "running" ? "Running" : "Stopped"}
-            </Badge>
+            <div class="text-right">
+              <div class="font-mono text-lg">{stats.cpuPercent.toFixed(1)}%</div>
+            </div>
+          </div>
+          
+          <!-- Memory Usage -->
+          <div class="flex items-center justify-between p-3 bg-muted/50 rounded">
+            <div>
+              <div class="font-medium">Memory Usage</div>
+              <div class="text-sm text-muted-foreground">
+                {formatBytes(stats.memoryUsage)} / {formatBytes(stats.memoryLimit)}
+              </div>
+            </div>
+            <div class="text-right">
+              <div class="font-mono text-lg">{stats.memoryPercent.toFixed(1)}%</div>
+            </div>
+          </div>
+
+          <!-- Network I/O -->
+          <div class="flex items-center justify-between p-3 bg-muted/50 rounded">
+            <div>
+              <div class="font-medium">Network I/O</div>
+              <div class="text-sm text-muted-foreground">Received / Transmitted</div>
+            </div>
+            <div class="text-right font-mono text-sm">
+              <div>{formatBytes(stats.networkRx)} / {formatBytes(stats.networkTx)}</div>
+            </div>
+          </div>
+
+          <!-- Block I/O -->
+          <div class="flex items-center justify-between p-3 bg-muted/50 rounded">
+            <div>
+              <div class="font-medium">Disk I/O</div>
+              <div class="text-sm text-muted-foreground">Read / Write</div>
+            </div>
+            <div class="text-right font-mono text-sm">
+              <div>{formatBytes(stats.blockRead)} / {formatBytes(stats.blockWrite)}</div>
+            </div>
+          </div>
+        {:else if isLoadingStats}
+          <div class="text-sm text-muted-foreground p-3 bg-muted/30 rounded">
+            Loading stats...
           </div>
         {/if}
+        
+        <Button size="sm" variant="outline" onclick={refreshStats} disabled={isLoadingStats}>
+          {isLoadingStats ? "Refreshing..." : "Refresh Stats"}
+        </Button>
       </div>
     {/if}
   </div>
@@ -187,43 +235,79 @@
     
     <div class="grid grid-cols-2 gap-4 text-sm">
       <div>
-        <div class="text-muted-foreground">Container Port</div>
-        <div class="font-mono">{project?.containerPort ?? "N/A"}</div>
-      </div>
-      <div>
-        <div class="text-muted-foreground">Coolify App UUID</div>
-        <div class="font-mono truncate" title={project?.coolifyAppUuid}>
-          {project?.coolifyAppUuid?.slice(0, 8) ?? "N/A"}...
+        <div class="text-muted-foreground">Container ID</div>
+        <div class="font-mono truncate" title={sandbox?.containerId}>
+          {sandbox?.containerId?.slice(0, 12) ?? "N/A"}
         </div>
       </div>
       <div>
-        <div class="text-muted-foreground">Forgejo Owner</div>
-        <div class="font-mono">{project?.forgejoOwner ?? "N/A"}</div>
+        <div class="text-muted-foreground">Image</div>
+        <div class="font-mono truncate" title={sandbox?.image}>
+          {sandbox?.image ?? "N/A"}
+        </div>
       </div>
       <div>
-        <div class="text-muted-foreground">Project Slug</div>
-        <div class="font-mono">{project?.slug ?? "N/A"}</div>
+        <div class="text-muted-foreground">Created</div>
+        <div class="font-mono">
+          {sandbox?.createdAt ? new Date(sandbox.createdAt).toLocaleString() : "N/A"}
+        </div>
+      </div>
+      <div>
+        <div class="text-muted-foreground">Started</div>
+        <div class="font-mono">
+          {sandbox?.startedAt ? new Date(sandbox.startedAt).toLocaleString() : "N/A"}
+        </div>
       </div>
     </div>
   </div>
 
+  <!-- Repository Info Section -->
+  {#if sandboxInfo?.repository}
+    <div class="border rounded-lg p-4 space-y-4">
+      <h3 class="font-medium">Repository Info</h3>
+      
+      <div class="grid grid-cols-2 gap-4 text-sm">
+        <div>
+          <div class="text-muted-foreground">Name</div>
+          <div class="font-mono">{sandboxInfo.repository.name}</div>
+        </div>
+        <div>
+          <div class="text-muted-foreground">Branch</div>
+          <div class="font-mono">{sandboxInfo.repository.currentBranch}</div>
+        </div>
+        <div>
+          <div class="text-muted-foreground">Path</div>
+          <div class="font-mono truncate" title={sandboxInfo.repository.path}>
+            {sandboxInfo.repository.path}
+          </div>
+        </div>
+        <div>
+          <div class="text-muted-foreground">Status</div>
+          <Badge variant={sandboxInfo.repository.isDirty ? "secondary" : "outline"}>
+            {sandboxInfo.repository.isDirty ? "Modified" : "Clean"}
+          </Badge>
+        </div>
+      </div>
+    </div>
+  {/if}
+
   <!-- Quick Actions -->
-  {#if project?.status === "running"}
+  {#if sandbox?.status === "running"}
     <div class="border rounded-lg p-4 space-y-3">
       <h3 class="font-medium">Quick Actions</h3>
       <div class="flex flex-wrap gap-2">
-        {#if project.fqdnUrl}
-          <Button size="sm" variant="outline" onclick={() => openService(project?.fqdnUrl, "OpenCode", "opencode")}>
+        {#if sandbox.urls.opencode}
+          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls.opencode, "OpenCode", "opencode")}>
             Open OpenCode
           </Button>
         {/if}
-        {#if project.codeServerUrl}
-          <Button size="sm" variant="outline" onclick={() => openService(project?.codeServerUrl, "Code Server", "code-server")}>
+        {#if sandbox.urls.codeServer}
+          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls.codeServer, "Code Server", "code-server")}>
             Open Code Server
           </Button>
         {/if}
-        {#if project.vncUrl}
-          <Button size="sm" variant="outline" onclick={() => openService(project?.vncUrl, "Desktop", "vnc")}>
+        {#if sandbox.urls.vnc}
+          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls.vnc, "Desktop", "vnc")}>
             Open Desktop
           </Button>
         {/if}

@@ -1,13 +1,12 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { connection } from "$lib/stores/connection.svelte";
-  import { createProject } from "$lib/stores/projects.svelte";
+  import { createSandbox } from "$lib/stores/sandboxes.svelte";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
   import * as Card from "$lib/components/ui/card";
   import * as Tabs from "$lib/components/ui/tabs";
-  import LlmProviderSelector from "$lib/components/llm-provider-selector.svelte";
   import ResourceTierSelector from "$lib/components/resource-tier-selector.svelte";
   import FlavorSelector from "$lib/components/flavor-selector.svelte";
   import AddonSelector from "$lib/components/addon-selector.svelte";
@@ -28,12 +27,6 @@
   
   // GitHub Import form
   let githubUrl = $state("");
-  let syncEnabled = $state(true);
-  
-  // LLM Provider selection
-  let selectedModel = $state("");
-  let selectedProvider = $state("");
-  let showAllProviders = $state(false);
   
   // Modular container configuration
   let selectedResourceTierId = $state("");
@@ -84,23 +77,23 @@
         // From Scratch
         creationProgress = [...creationProgress, "Creating repository..."];
         
-        const project = await createProject({
+        const result = await createSandbox({
           name: projectName.trim(),
           description: projectDescription.trim() || undefined,
-          llmProviderId: selectedProvider || undefined,
-          llmModelId: selectedModel || undefined,
-          resourceTierId: selectedResourceTierId || undefined,
-          flavorId: selectedFlavorId || undefined,
-          addonIds: selectedAddonIds.length > 0 ? selectedAddonIds : undefined,
+          userId: "default-user", // TODO: Get from auth
+          resourceTier: selectedResourceTierId || undefined,
+          flavor: selectedFlavorId || undefined,
+          addons: selectedAddonIds.length > 0 ? selectedAddonIds : undefined,
+          autoStart: true,
         });
         
-        if (project) {
+        if (result) {
           creationProgress = [...creationProgress, "Setting up container..."];
-          creationProgress = [...creationProgress, "Starting OpenCode..."];
+          creationProgress = [...creationProgress, "Starting sandbox..."];
           creationProgress = [...creationProgress, "Done!"];
           
           // Navigate to the new project
-          await goto(`/projects/${project.id}`);
+          await goto(`/projects/${result.sandbox.id}`);
         } else {
           errorMessage = "Failed to create project. Please try again.";
         }
@@ -111,23 +104,23 @@
         // Extract name from URL if not provided
         const repoName = extractRepoName(githubUrl);
         
-        const project = await createProject({
+        const result = await createSandbox({
           name: repoName || "imported-project",
           githubUrl: githubUrl.trim(),
-          llmProviderId: selectedProvider || undefined,
-          llmModelId: selectedModel || undefined,
-          resourceTierId: selectedResourceTierId || undefined,
-          flavorId: selectedFlavorId || undefined,
-          addonIds: selectedAddonIds.length > 0 ? selectedAddonIds : undefined,
+          userId: "default-user", // TODO: Get from auth
+          resourceTier: selectedResourceTierId || undefined,
+          flavor: selectedFlavorId || undefined,
+          addons: selectedAddonIds.length > 0 ? selectedAddonIds : undefined,
+          autoStart: true,
         });
         
-        if (project) {
+        if (result) {
           creationProgress = [...creationProgress, "Setting up container..."];
-          creationProgress = [...creationProgress, "Starting OpenCode..."];
+          creationProgress = [...creationProgress, "Starting sandbox..."];
           creationProgress = [...creationProgress, "Done!"];
           
           // Navigate to the new project
-          await goto(`/projects/${project.id}`);
+          await goto(`/projects/${result.sandbox.id}`);
         } else {
           errorMessage = "Failed to import project. Please check the URL and try again.";
         }
@@ -231,12 +224,10 @@
                   />
                 </div>
                 
-                <!-- LLM Provider selector -->
+                <!-- Flavor selector -->
                 <div class="space-y-2 border-t pt-4">
-                  <LlmProviderSelector
-                    bind:selectedModel
-                    bind:selectedProvider
-                    bind:showAllProviders
+                  <FlavorSelector
+                    bind:selectedFlavorId
                     disabled={isSubmitting}
                   />
                 </div>
@@ -245,14 +236,6 @@
                 <div class="space-y-2 border-t pt-4">
                   <ResourceTierSelector
                     bind:selectedTierId={selectedResourceTierId}
-                    disabled={isSubmitting}
-                  />
-                </div>
-                
-                <!-- Flavor selector -->
-                <div class="space-y-2 border-t pt-4">
-                  <FlavorSelector
-                    bind:selectedFlavorId
                     disabled={isSubmitting}
                   />
                 </div>
@@ -287,30 +270,10 @@
                   </div>
                 {/if}
                 
-                <div class="space-y-3">
-                  <div class="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="sync-enabled"
-                      bind:checked={syncEnabled}
-                      disabled={isSubmitting}
-                      class="h-4 w-4 rounded border-input"
-                    />
-                    <Label for="sync-enabled" class="font-normal cursor-pointer">
-                      Enable GitHub sync
-                    </Label>
-                  </div>
-                  <p class="text-xs text-muted-foreground ml-6">
-                    Keep your project in sync with the GitHub repository. Changes can be pushed back to GitHub.
-                  </p>
-                </div>
-                
-                <!-- LLM Provider selector -->
+                <!-- Flavor selector -->
                 <div class="space-y-2 border-t pt-4">
-                  <LlmProviderSelector
-                    bind:selectedModel
-                    bind:selectedProvider
-                    bind:showAllProviders
+                  <FlavorSelector
+                    bind:selectedFlavorId
                     disabled={isSubmitting}
                   />
                 </div>
@@ -319,14 +282,6 @@
                 <div class="space-y-2 border-t pt-4">
                   <ResourceTierSelector
                     bind:selectedTierId={selectedResourceTierId}
-                    disabled={isSubmitting}
-                  />
-                </div>
-                
-                <!-- Flavor selector -->
-                <div class="space-y-2 border-t pt-4">
-                  <FlavorSelector
-                    bind:selectedFlavorId
                     disabled={isSubmitting}
                   />
                 </div>
@@ -376,9 +331,9 @@
     <div class="text-center text-sm text-muted-foreground">
       <p>
         {#if activeTab === "scratch"}
-          A new Git repository will be created and an OpenCode container will be provisioned.
+          A new Git repository will be created and a sandbox container will be provisioned.
         {:else}
-          The repository will be cloned and an OpenCode container will be set up with the code.
+          The repository will be cloned and a sandbox container will be set up with the code.
         {/if}
       </p>
     </div>

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { page } from "$app/stores";
-  import * as api from "$lib/api/tauri";
+  import { getSandboxLogs } from "$lib/stores/sandboxes.svelte";
   import { Button } from "$lib/components/ui/button";
   import { Label } from "$lib/components/ui/label";
   import { Input } from "$lib/components/ui/input";
@@ -8,8 +8,8 @@
   import * as Card from "$lib/components/ui/card";
   import { ScrollArea } from "$lib/components/ui/scroll-area";
 
-  // Get project ID from route params
-  let projectId = $derived($page.params.id ?? "");
+  // Get sandbox ID from route params
+  let sandboxId = $derived($page.params.id ?? "");
 
   // Logs state
   let logs = $state<string>("");
@@ -21,13 +21,14 @@
 
   // Load logs
   async function loadLogs() {
-    if (!projectId) return;
+    if (!sandboxId) return;
     
     isLoading = true;
     error = null;
     
     try {
-      logs = await api.getProjectLogs(projectId, lines);
+      const result = await getSandboxLogs(sandboxId, lines);
+      logs = result ?? "";
     } catch (e) {
       error = e instanceof Error ? e.message : "Failed to load logs";
       logs = "";
@@ -38,14 +39,14 @@
 
   // Initial load
   $effect(() => {
-    if (projectId) {
+    if (sandboxId) {
       loadLogs();
     }
   });
 
   // Auto-refresh
   $effect(() => {
-    if (autoRefresh && projectId) {
+    if (autoRefresh && sandboxId) {
       refreshInterval = setInterval(loadLogs, 5000);
     } else if (refreshInterval) {
       clearInterval(refreshInterval);

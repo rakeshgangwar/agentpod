@@ -3,8 +3,15 @@
   import { goto } from "$app/navigation";
   import { toast } from "svelte-sonner";
   import { connection } from "$lib/stores/connection.svelte";
-  import { projects, fetchProjects, startProject, stopProject, getProject } from "$lib/stores/projects.svelte";
-  import * as api from "$lib/api/tauri";
+  import { 
+    sandboxes, 
+    fetchSandboxes, 
+    fetchSandbox,
+    startSandbox, 
+    stopSandbox, 
+    restartSandbox,
+    getSandbox 
+  } from "$lib/stores/sandboxes.svelte";
   import { Button } from "$lib/components/ui/button";
   import { Badge } from "$lib/components/ui/badge";
   import * as Tabs from "$lib/components/ui/tabs";
@@ -19,11 +26,11 @@
     }
   });
 
-  // Get current project ID from route params
-  let projectId = $derived($page.params.id ?? "");
+  // Get current sandbox ID from route params
+  let sandboxId = $derived($page.params.id ?? "");
 
-  // Get current project
-  let project = $derived(projectId ? getProject(projectId) : undefined);
+  // Get current sandbox from list
+  let sandbox = $derived(sandboxId ? getSandbox(sandboxId) : undefined);
 
   // Get current tab from URL path
   let currentTab = $derived(() => {
@@ -36,64 +43,90 @@
     return "chat";
   });
 
-  // Deploy state
-  let isDeploying = $state(false);
-  let deployError = $state<string | null>(null);
-  let showDeployDialog = $state(false);
+  // Restart state (replaces deploy for v2)
+  let isRestarting = $state(false);
+  let restartError = $state<string | null>(null);
+  let showRestartDialog = $state(false);
 
-  async function handleDeploy(force: boolean = false) {
-    if (!project) return;
+  async function handleRestart() {
+    if (!sandbox) return;
     
-    isDeploying = true;
-    deployError = null;
+    isRestarting = true;
+    restartError = null;
     
     try {
-      const result = await api.deployProject(project.id, force);
-      showDeployDialog = false;
+      await restartSandbox(sandbox.id);
+      showRestartDialog = false;
       
-      // Show success toast with deployment info
-      toast.success("Deployment triggered", {
-        description: result.deploymentId 
-          ? `Deployment ID: ${result.deploymentId.slice(0, 8)}...` 
-          : "Container is being rebuilt",
+      toast.success("Container restarted", {
+        description: "The sandbox container has been restarted.",
       });
       
-      // Refresh project to get updated status
-      await fetchProjects();
+      // Refresh sandbox info
+      await fetchSandbox(sandbox.id);
     } catch (e) {
-      deployError = e instanceof Error ? e.message : "Deploy failed";
-      toast.error("Deployment failed", {
-        description: deployError,
+      restartError = e instanceof Error ? e.message : "Restart failed";
+      toast.error("Restart failed", {
+        description: restartError,
       });
     } finally {
-      isDeploying = false;
+      isRestarting = false;
     }
   }
 
-  // Load projects if not already loaded
+  // Load sandboxes and fetch current sandbox details
   $effect(() => {
-    if (connection.isConnected && projects.list.length === 0) {
-      fetchProjects();
+    if (connection.isConnected) {
+      if (sandboxes.list.length === 0) {
+        fetchSandboxes();
+      }
+      if (sandboxId) {
+        fetchSandbox(sandboxId);
+      }
     }
   });
 
   function handleTabChange(value: string) {
-    goto(`/projects/${projectId}/${value}`);
+    goto(`/projects/${sandboxId}/${value}`);
   }
 
   function getStatusColor(status: string): "default" | "secondary" | "destructive" | "outline" {
     switch (status) {
       case "running": return "default";
-      case "stopped": return "secondary";
-      case "error": return "destructive";
-      case "creating": return "outline";
+      case "exited":
+      case "created": return "secondary";
+      case "dead":
+      case "unknown": return "destructive";
+      case "paused":
+      case "restarting": return "outline";
       default: return "outline";
     }
+  }
+
+  function getStatusLabel(status: string): string {
+    switch (status) {
+      case "exited": return "stopped";
+      case "created": return "created";
+      default: return status;
+    }
+  }
+
+  // Get display name from labels
+  function getDisplayName(): string {
+    if (!sandbox) return "";
+    return sandbox.labels?.["agentpod.sandbox.name"] || sandbox.name;
+  }
+
+  function getDescription(): string | undefined {
+    if (!sandbox) return undefined;
+    // Description is stored in the repository, not in sandbox labels
+    // For now, show the image
+    return undefined;
   }
 </script>
 
 <main class="container mx-auto px-4 py-8 max-w-6xl">
-  {#if project}
+  {#if sandbox}
     <div class="space-y-6">
       <!-- Header -->
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -103,57 +136,56 @@
           </Button>
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2 overflow-hidden">
-              <h1 class="text-2xl font-bold truncate">{project.name}</h1>
-              <Badge variant={getStatusColor(project.status)} class="shrink-0 whitespace-nowrap">
-                {project.status}
+              <h1 class="text-2xl font-bold truncate">{getDisplayName()}</h1>
+              <Badge variant={getStatusColor(sandbox.status)} class="shrink-0 whitespace-nowrap">
+                {getStatusLabel(sandbox.status)}
               </Badge>
             </div>
-            {#if project.description}
-              <p class="text-muted-foreground text-sm truncate">{project.description}</p>
-            {/if}
+            <p class="text-muted-foreground text-sm truncate">{sandbox.image}</p>
           </div>
         </div>
         <div class="flex gap-2">
-          {#if project.status === "stopped"}
-            <Button size="sm" onclick={() => startProject(project.id)}>
+          {#if sandbox.status === "exited" || sandbox.status === "created"}
+            <Button size="sm" onclick={() => startSandbox(sandbox.id)}>
               Start
             </Button>
-          {:else if project.status === "running"}
-            <Button size="sm" variant="secondary" onclick={() => stopProject(project.id)}>
+          {:else if sandbox.status === "running"}
+            <Button size="sm" variant="secondary" onclick={() => stopSandbox(sandbox.id)}>
               Stop
             </Button>
+          {:else if sandbox.status === "paused"}
+            <Button size="sm" onclick={() => startSandbox(sandbox.id)}>
+              Resume
+            </Button>
           {/if}
-          <Button size="sm" variant="outline" onclick={() => showDeployDialog = true}>
-            Deploy
+          <Button size="sm" variant="outline" onclick={() => showRestartDialog = true}>
+            Restart
           </Button>
         </div>
       </div>
 
-      <!-- Deploy Confirmation Dialog -->
-      <Dialog.Root bind:open={showDeployDialog}>
+      <!-- Restart Confirmation Dialog -->
+      <Dialog.Root bind:open={showRestartDialog}>
         <Dialog.Content>
           <Dialog.Header>
-            <Dialog.Title>Deploy Project</Dialog.Title>
+            <Dialog.Title>Restart Container</Dialog.Title>
             <Dialog.Description>
-              This will rebuild and redeploy the container. The project will be temporarily unavailable during deployment.
+              This will restart the sandbox container. Any unsaved work in the container will be lost.
             </Dialog.Description>
           </Dialog.Header>
           
-          {#if deployError}
+          {#if restartError}
             <div class="text-sm p-3 rounded-md bg-destructive/10 text-destructive">
-              {deployError}
+              {restartError}
             </div>
           {/if}
           
           <Dialog.Footer>
-            <Button variant="outline" onclick={() => showDeployDialog = false} disabled={isDeploying}>
+            <Button variant="outline" onclick={() => showRestartDialog = false} disabled={isRestarting}>
               Cancel
             </Button>
-            <Button onclick={() => handleDeploy(false)} disabled={isDeploying}>
-              {isDeploying ? "Deploying..." : "Deploy"}
-            </Button>
-            <Button variant="secondary" onclick={() => handleDeploy(true)} disabled={isDeploying}>
-              {isDeploying ? "Deploying..." : "Force Deploy"}
+            <Button onclick={handleRestart} disabled={isRestarting}>
+              {isRestarting ? "Restarting..." : "Restart"}
             </Button>
           </Dialog.Footer>
         </Dialog.Content>
@@ -165,7 +197,7 @@
           <Tabs.Trigger value="chat">Chat</Tabs.Trigger>
           <Tabs.Trigger value="files">Files</Tabs.Trigger>
           <Tabs.Trigger value="logs">Logs</Tabs.Trigger>
-          <Tabs.Trigger value="sync">Sync</Tabs.Trigger>
+          <Tabs.Trigger value="sync">Git</Tabs.Trigger>
           <Tabs.Trigger value="settings">Settings</Tabs.Trigger>
         </Tabs.List>
       </Tabs.Root>
@@ -175,7 +207,7 @@
         {@render children()}
       </div>
     </div>
-  {:else if projects.isLoading}
+  {:else if sandboxes.isLoading}
     <div class="flex items-center justify-center min-h-[60vh]">
       <div class="text-center">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
