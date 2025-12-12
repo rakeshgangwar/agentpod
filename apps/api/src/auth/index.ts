@@ -84,10 +84,15 @@ export const auth = betterAuth({
   // ==========================================================================
   emailAndPassword: {
     enabled: true,
+    // Allow sign up with email/password
+    disableSignUp: false,
     // Require email verification (disabled for development simplicity)
     requireEmailVerification: false,
+    // Automatically sign in after sign up
+    autoSignIn: true,
     // Password requirements
     minPasswordLength: 8,
+    maxPasswordLength: 128,
   },
 
   // ==========================================================================
