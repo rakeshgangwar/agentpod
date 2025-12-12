@@ -42,6 +42,9 @@ use commands::{
     init_oauth_flow, poll_oauth_flow, cancel_oauth_flow,
     remove_provider_credentials, set_default_provider,
     list_configured_providers,
+    // User OpenCode config commands
+    get_user_opencode_config, update_user_opencode_settings, update_user_agents_md,
+    list_user_opencode_files, upsert_user_opencode_file, delete_user_opencode_file,
 };
 use tauri::{Manager, RunEvent, WindowEvent};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
@@ -137,6 +140,13 @@ pub fn run() {
             cancel_oauth_flow,
             remove_provider_credentials,
             set_default_provider,
+            // User OpenCode config commands
+            get_user_opencode_config,
+            update_user_opencode_settings,
+            update_user_agents_md,
+            list_user_opencode_files,
+            upsert_user_opencode_file,
+            delete_user_opencode_file,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

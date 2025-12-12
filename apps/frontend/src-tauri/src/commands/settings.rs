@@ -317,15 +317,35 @@ pub async fn upsert_user_opencode_file(
         extension: Option<String>,
     }
     
+    // API returns the file fields directly (not wrapped in "file" object)
     #[derive(serde::Deserialize)]
     struct Response {
-        file: UserOpencodeFile,
+        #[serde(default)]
+        success: bool,
+        #[serde(rename = "type", default)]
+        file_type: String,
+        #[serde(default)]
+        name: String,
+        #[serde(default)]
+        extension: String,
+        #[serde(default)]
+        content: String,
+        #[serde(default)]
+        message: Option<String>,
     }
     
     let path = format!("/api/users/{}/opencode/files/{}/{}", uid, file_type, name);
     let response: Response = client.put(&path, &Body { content, extension }).await?;
     
-    Ok(response.file)
+    Ok(UserOpencodeFile {
+        name: response.name,
+        file_type: response.file_type,
+        extension: response.extension,
+        content: response.content,
+        id: None,
+        created_at: None,
+        updated_at: None,
+    })
 }
 
 /// Delete a user's OpenCode config file
