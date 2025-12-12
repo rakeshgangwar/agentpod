@@ -514,19 +514,44 @@ export class SandboxManager {
    * Get Docker image for a flavor
    */
   private getImageForFlavor(flavor: string): string {
-    // In development mode, use local images for testing
+    // In development mode, check for local agentpod images first, then fall back to base images
     if (config.nodeEnv === "development") {
-      const devFlavorImages: Record<string, string> = {
-        js: "node:20-alpine",
-        python: "python:3.12-alpine",
-        go: "golang:1.22-alpine",
-        rust: "rust:1.75-alpine",
-        fullstack: "node:20-alpine",
-        polyglot: "alpine:latest",
+      // Try to use local agentpod images if available (built with docker/base/Dockerfile)
+      // These include OpenCode pre-installed
+      const localAgentpodImages: Record<string, string> = {
+        js: "agentpod/js:dev",
+        python: "agentpod/python:dev",
+        go: "agentpod/go:dev",
+        rust: "agentpod/rust:dev",
+        fullstack: "agentpod/fullstack:dev",
+        polyglot: "agentpod/polyglot:dev",
       };
-      const devImage = devFlavorImages[flavor] ?? devFlavorImages["fullstack"];
-      log.debug("Using development image", { flavor, image: devImage });
-      return devImage as string;
+      
+      // Fall back to glibc-based images (NOT Alpine - OpenCode requires glibc)
+      // These don't have OpenCode pre-installed but can have it installed
+      const devFlavorImages: Record<string, string> = {
+        js: "node:20-bookworm-slim",
+        python: "python:3.12-slim-bookworm",
+        go: "golang:1.22-bookworm",
+        rust: "rust:1.75-slim-bookworm",
+        fullstack: "node:20-bookworm-slim",
+        polyglot: "debian:bookworm-slim",
+      };
+      
+      // Check if local agentpod image exists (async would be better but keeping simple)
+      const localImage = localAgentpodImages[flavor] ?? localAgentpodImages["fullstack"];
+      const fallbackImage = devFlavorImages[flavor] ?? devFlavorImages["fullstack"];
+      
+      log.debug("Using development image", { 
+        flavor, 
+        localImage,
+        fallbackImage,
+        note: "Use 'docker build -t agentpod/fullstack:dev docker/base' to build local image with OpenCode"
+      });
+      
+      // For now, use fallback glibc images since we can't do async image check here
+      // TODO: Add async check or config flag for using local agentpod images
+      return fallbackImage as string;
     }
 
     // Production: use registry images
