@@ -25,18 +25,16 @@ let error = $state<string | null>(null);
 export const auth = {
   // Session data from Better Auth
   get session() {
-    return $derived(session);
+    return session;
   },
 
   // Convenience getters
   get isAuthenticated() {
-    const s = session;
-    return !!s.value?.data?.user;
+    return !!session.value?.data?.user;
   },
 
   get user() {
-    const s = session;
-    return s.value?.data?.user ?? null;
+    return session.value?.data?.user ?? null;
   },
 
   get isLoading() {
@@ -53,13 +51,14 @@ export const auth = {
 
   // Computed properties
   get displayName() {
-    const user = this.user;
+    const user = session.value?.data?.user;
     if (!user) return null;
     return user.name || user.email || "User";
   },
 
   get initials() {
-    const name = this.displayName;
+    const user = session.value?.data?.user;
+    const name = user?.name || user?.email || null;
     if (!name) return "?";
     return name
       .split(" ")
@@ -70,11 +69,11 @@ export const auth = {
   },
 
   get avatarUrl() {
-    return this.user?.image ?? null;
+    return session.value?.data?.user?.image ?? null;
   },
 
   get email() {
-    return this.user?.email ?? null;
+    return session.value?.data?.user?.email ?? null;
   },
 };
 
