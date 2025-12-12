@@ -1135,26 +1135,44 @@ export class OpenCodeStream {
     this.onEvent = onEvent;
     this.onStatus = onStatus ?? null;
 
-    // Start the SSE stream via Rust backend FIRST to get the streamId
-    // This way we can filter events by streamId (not just projectId)
-    const connection = await sandboxOpencodeConnectStream(this.sandboxId);
-    this.streamId = connection.streamId;
-    console.log("[OpenCodeStream] Connected with streamId:", this.streamId);
-
-    // Now set up event listeners that filter by this specific streamId
+    // IMPORTANT: Set up event listeners BEFORE starting the stream to avoid race condition
+    // The Rust backend starts emitting events immediately after connection, so we need
+    // the listeners ready first. We'll filter by streamId once we have it.
+    let pendingStreamId: string | null = null;
+    
     this.eventUnlisten = await onStreamEvent((payload) => {
       // Filter by streamId to only receive events for THIS stream connection
-      if (payload.streamId === this.streamId && this.onEvent) {
+      const targetStreamId = this.streamId || pendingStreamId;
+      if (payload.streamId === targetStreamId && this.onEvent) {
+        console.debug("[OpenCodeStream] Received event:", payload.event.eventType);
         this.onEvent(payload.event);
       }
     });
 
     this.statusUnlisten = await onStreamStatus((payload) => {
       // Filter by streamId to only receive status for THIS stream connection
-      if (payload.streamId === this.streamId && this.onStatus) {
-        this.onStatus(payload.status, payload.error);
+      const targetStreamId = this.streamId || pendingStreamId;
+      if (payload.streamId === targetStreamId) {
+        console.debug("[OpenCodeStream] Received status:", payload.status);
+        
+        // If server disconnected, reset our internal state so reconnection can happen
+        if (payload.status === "disconnected" || payload.status === "error") {
+          console.log("[OpenCodeStream] Server disconnected, resetting state for streamId:", targetStreamId);
+          this.streamId = null;
+          // Note: We keep the listeners active so the RuntimeProvider can handle reconnection
+        }
+        
+        if (this.onStatus) {
+          this.onStatus(payload.status, payload.error);
+        }
       }
     });
+
+    // Now start the SSE stream via Rust backend
+    const connection = await sandboxOpencodeConnectStream(this.sandboxId);
+    pendingStreamId = connection.streamId;
+    this.streamId = connection.streamId;
+    console.log("[OpenCodeStream] Connected with streamId:", this.streamId);
   }
 
   /**
