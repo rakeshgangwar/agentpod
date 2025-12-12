@@ -529,4 +529,85 @@ export const migrations: Migration[] = [
       db.exec('UPDATE container_flavors SET enabled = 1');
     },
   },
+  
+  // Migration 12: Add Better Auth tables
+  // Creates user, session, account, and verification tables for Better Auth
+  {
+    version: 12,
+    name: 'add_better_auth_tables',
+    up: () => {
+      // Create user table
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS user (
+          id TEXT PRIMARY KEY NOT NULL,
+          name TEXT NOT NULL,
+          email TEXT NOT NULL UNIQUE,
+          emailVerified INTEGER NOT NULL DEFAULT 0,
+          image TEXT,
+          createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+          updatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `);
+      
+      // Create session table
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS session (
+          id TEXT PRIMARY KEY NOT NULL,
+          expiresAt TEXT NOT NULL,
+          token TEXT NOT NULL UNIQUE,
+          createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+          updatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+          ipAddress TEXT,
+          userAgent TEXT,
+          userId TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE
+        )
+      `);
+      
+      // Create account table (for OAuth providers)
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS account (
+          id TEXT PRIMARY KEY NOT NULL,
+          accountId TEXT NOT NULL,
+          providerId TEXT NOT NULL,
+          userId TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+          accessToken TEXT,
+          refreshToken TEXT,
+          idToken TEXT,
+          accessTokenExpiresAt TEXT,
+          refreshTokenExpiresAt TEXT,
+          scope TEXT,
+          password TEXT,
+          createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+          updatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `);
+      
+      // Create verification table (for email verification, password reset)
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS verification (
+          id TEXT PRIMARY KEY NOT NULL,
+          identifier TEXT NOT NULL,
+          value TEXT NOT NULL,
+          expiresAt TEXT NOT NULL,
+          createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+          updatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `);
+      
+      // Create indexes
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_user_email ON user(email);
+        CREATE INDEX IF NOT EXISTS idx_session_userId ON session(userId);
+        CREATE INDEX IF NOT EXISTS idx_session_token ON session(token);
+        CREATE INDEX IF NOT EXISTS idx_account_userId ON account(userId);
+        CREATE INDEX IF NOT EXISTS idx_account_providerId ON account(providerId, accountId);
+      `);
+    },
+    down: () => {
+      db.exec('DROP TABLE IF EXISTS verification');
+      db.exec('DROP TABLE IF EXISTS account');
+      db.exec('DROP TABLE IF EXISTS session');
+      db.exec('DROP TABLE IF EXISTS user');
+    },
+  },
 ];
