@@ -45,16 +45,17 @@
     e.preventDefault();
     clearError();
     
+    let success = false;
     if (authMode === "signin") {
-      const success = await loginWithEmail(email, password);
-      if (success) {
-        // Session will be updated automatically, redirect handled by $effect
-      }
+      success = await loginWithEmail(email, password);
     } else {
-      const success = await signUp(email, password, name);
-      if (success) {
-        // After signup, user is automatically signed in
-      }
+      success = await signUp(email, password, name);
+    }
+    
+    if (success) {
+      // Redirect immediately after successful auth
+      // The session cookie is set, so we're authenticated
+      goto("/projects");
     }
   }
 
