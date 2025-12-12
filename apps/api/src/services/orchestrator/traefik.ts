@@ -261,13 +261,27 @@ export function generateSandboxLabels(options: {
     defaultCertResolver: certResolver,
   });
 
-  // Add AgentPod metadata labels
-  return {
+  // Build URLs for the sandbox
+  const urls = buildSandboxUrls(slug, baseDomain, {
+    tls,
+    hasCodeServer: !!codeServerPort,
+    hasVnc: !!vncPort,
+  });
+
+  // Add AgentPod metadata labels including URLs
+  const labels: Record<string, string> = {
     ...traefikLabels,
     "agentpod.sandbox.id": sandboxId,
     "agentpod.sandbox.slug": slug,
     "agentpod.managed": "true",
   };
+
+  // Add URL labels (these are parsed in containerInfoToSandbox)
+  for (const [key, value] of Object.entries(urls)) {
+    labels[`agentpod.url.${key}`] = value;
+  }
+
+  return labels;
 }
 
 /**

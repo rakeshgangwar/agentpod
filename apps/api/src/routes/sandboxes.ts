@@ -17,13 +17,30 @@
  * - POST   /api/v2/sandboxes/:id/exec  Execute command in sandbox
  */
 
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
+import { streamSSE } from "hono/streaming";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { getSandboxManager } from "../services/sandbox-manager.ts";
+import { opencodeV2, OpenCodeV2Error } from "../services/opencode-v2.ts";
 import { createLogger } from "../utils/logger.ts";
 
 const log = createLogger("sandbox-routes");
+
+/**
+ * Helper to handle OpenCodeV2Error responses with proper status codes
+ */
+function handleOpenCodeError(c: Context, error: unknown, fallbackMessage: string) {
+  if (error instanceof OpenCodeV2Error) {
+    const status = error.statusCode as 400 | 404 | 500 | 503;
+    return c.json({ error: error.message }, status);
+  }
+  log.error(fallbackMessage, { error });
+  return c.json(
+    { error: fallbackMessage, details: error instanceof Error ? error.message : "Unknown error" },
+    500
+  );
+}
 
 // =============================================================================
 // Validation Schemas
@@ -456,6 +473,287 @@ export const sandboxRoutes = new Hono()
         { error: "Failed to get git log", details: error instanceof Error ? error.message : "Unknown error" },
         500
       );
+    }
+  })
+
+  // ===========================================================================
+  // OpenCode: List Sessions
+  // ===========================================================================
+  .get("/:id/opencode/session", async (c) => {
+    const id = c.req.param("id");
+
+    try {
+      const sessions = await opencodeV2.listSessions(id);
+      return c.json(sessions);
+    } catch (error) {
+      return handleOpenCodeError(c, error, "Failed to list OpenCode sessions");
+    }
+  })
+
+  // ===========================================================================
+  // OpenCode: Create Session
+  // ===========================================================================
+  .post("/:id/opencode/session", async (c) => {
+    const id = c.req.param("id");
+
+    try {
+      const body = await c.req.json().catch(() => ({}));
+      const session = await opencodeV2.createSession(id, body.title);
+      return c.json(session);
+    } catch (error) {
+      return handleOpenCodeError(c, error, "Failed to create OpenCode session");
+    }
+  })
+
+  // ===========================================================================
+  // OpenCode: Get Session
+  // ===========================================================================
+  .get("/:id/opencode/session/:sessionId", async (c) => {
+    const id = c.req.param("id");
+    const sessionId = c.req.param("sessionId");
+
+    try {
+      const session = await opencodeV2.getSession(id, sessionId);
+      return c.json(session);
+    } catch (error) {
+      return handleOpenCodeError(c, error, "Failed to get OpenCode session");
+    }
+  })
+
+  // ===========================================================================
+  // OpenCode: Delete Session
+  // ===========================================================================
+  .delete("/:id/opencode/session/:sessionId", async (c) => {
+    const id = c.req.param("id");
+    const sessionId = c.req.param("sessionId");
+
+    try {
+      await opencodeV2.deleteSession(id, sessionId);
+      return c.json({ success: true });
+    } catch (error) {
+      return handleOpenCodeError(c, error, "Failed to delete OpenCode session");
+    }
+  })
+
+  // ===========================================================================
+  // OpenCode: Abort Session
+  // ===========================================================================
+  .post("/:id/opencode/session/:sessionId/abort", async (c) => {
+    const id = c.req.param("id");
+    const sessionId = c.req.param("sessionId");
+
+    try {
+      await opencodeV2.abortSession(id, sessionId);
+      return c.json({ success: true });
+    } catch (error) {
+      return handleOpenCodeError(c, error, "Failed to abort OpenCode session");
+    }
+  })
+
+  // ===========================================================================
+  // OpenCode: List Messages
+  // ===========================================================================
+  .get("/:id/opencode/session/:sessionId/message", async (c) => {
+    const id = c.req.param("id");
+    const sessionId = c.req.param("sessionId");
+
+    try {
+      const messages = await opencodeV2.listMessages(id, sessionId);
+      return c.json(messages);
+    } catch (error) {
+      return handleOpenCodeError(c, error, "Failed to list OpenCode messages");
+    }
+  })
+
+  // ===========================================================================
+  // OpenCode: Send Message (Prompt)
+  // ===========================================================================
+  .post("/:id/opencode/session/:sessionId/message", async (c) => {
+    const id = c.req.param("id");
+    const sessionId = c.req.param("sessionId");
+
+    try {
+      const body = await c.req.json();
+      const message = await opencodeV2.sendMessage(id, sessionId, body);
+      return c.json(message);
+    } catch (error) {
+      return handleOpenCodeError(c, error, "Failed to send OpenCode message");
+    }
+  })
+
+  // ===========================================================================
+  // OpenCode: Get Message
+  // ===========================================================================
+  .get("/:id/opencode/session/:sessionId/message/:messageId", async (c) => {
+    const id = c.req.param("id");
+    const sessionId = c.req.param("sessionId");
+    const messageId = c.req.param("messageId");
+
+    try {
+      const message = await opencodeV2.getMessage(id, sessionId, messageId);
+      return c.json(message);
+    } catch (error) {
+      return handleOpenCodeError(c, error, "Failed to get OpenCode message");
+    }
+  })
+
+  // ===========================================================================
+  // OpenCode: Respond to Permission
+  // ===========================================================================
+  .post("/:id/opencode/session/:sessionId/permissions/:permissionId", async (c) => {
+    const id = c.req.param("id");
+    const sessionId = c.req.param("sessionId");
+    const permissionId = c.req.param("permissionId");
+
+    try {
+      const body = await c.req.json();
+      const response = body.response as "once" | "always" | "reject";
+
+      if (!["once", "always", "reject"].includes(response)) {
+        return c.json({ error: "Invalid response. Must be 'once', 'always', or 'reject'" }, 400);
+      }
+
+      await opencodeV2.respondToPermission(id, sessionId, permissionId, response);
+      return c.json({ success: true });
+    } catch (error) {
+      return handleOpenCodeError(c, error, "Failed to respond to permission");
+    }
+  })
+
+  // ===========================================================================
+  // OpenCode: List Files
+  // ===========================================================================
+  .get("/:id/opencode/file", async (c) => {
+    const id = c.req.param("id");
+    const path = c.req.query("path") ?? "/";
+
+    try {
+      const files = await opencodeV2.listFiles(id, path);
+      return c.json(files);
+    } catch (error) {
+      return handleOpenCodeError(c, error, "Failed to list OpenCode files");
+    }
+  })
+
+  // ===========================================================================
+  // OpenCode: Get File Content
+  // ===========================================================================
+  .get("/:id/opencode/file/content", async (c) => {
+    const id = c.req.param("id");
+    const path = c.req.query("path");
+
+    if (!path) {
+      return c.json({ error: "Path query parameter is required" }, 400);
+    }
+
+    try {
+      const content = await opencodeV2.getFileContent(id, path);
+      return c.json(content);
+    } catch (error) {
+      return handleOpenCodeError(c, error, "Failed to get file content");
+    }
+  })
+
+  // ===========================================================================
+  // OpenCode: Find Files
+  // ===========================================================================
+  .get("/:id/opencode/find/file", async (c) => {
+    const id = c.req.param("id");
+    const query = c.req.query("query");
+
+    if (!query) {
+      return c.json({ error: "Query parameter is required" }, 400);
+    }
+
+    try {
+      const files = await opencodeV2.findFiles(id, query);
+      return c.json(files);
+    } catch (error) {
+      return handleOpenCodeError(c, error, "Failed to find files");
+    }
+  })
+
+  // ===========================================================================
+  // OpenCode: Get App Info
+  // ===========================================================================
+  .get("/:id/opencode/app", async (c) => {
+    const id = c.req.param("id");
+
+    try {
+      const appInfo = await opencodeV2.getAppInfo(id);
+      return c.json(appInfo);
+    } catch (error) {
+      return handleOpenCodeError(c, error, "Failed to get OpenCode app info");
+    }
+  })
+
+  // ===========================================================================
+  // OpenCode: Get Providers
+  // ===========================================================================
+  .get("/:id/opencode/providers", async (c) => {
+    const id = c.req.param("id");
+
+    try {
+      const providers = await opencodeV2.getProviders(id);
+      return c.json({ providers });
+    } catch (error) {
+      return handleOpenCodeError(c, error, "Failed to get OpenCode providers");
+    }
+  })
+
+  // ===========================================================================
+  // OpenCode: Health Check
+  // ===========================================================================
+  .get("/:id/opencode/health", async (c) => {
+    const id = c.req.param("id");
+
+    try {
+      const healthy = await opencodeV2.healthCheck(id);
+      return c.json({ 
+        healthy, 
+        status: healthy ? "ok" : "unreachable" 
+      });
+    } catch (error) {
+      if (error instanceof OpenCodeV2Error) {
+        return c.json({ healthy: false, status: "error", error: error.message });
+      }
+      return c.json({ healthy: false, status: "error" });
+    }
+  })
+
+  // ===========================================================================
+  // OpenCode: SSE Event Stream
+  // ===========================================================================
+  .get("/:id/opencode/event", async (c) => {
+    const id = c.req.param("id");
+
+    try {
+      // For SSE, we'll stream events from OpenCode to the client
+      return streamSSE(c, async (stream) => {
+        const abortController = new AbortController();
+
+        // Handle client disconnect
+        stream.onAbort(() => {
+          abortController.abort();
+        });
+
+        try {
+          const events = await opencodeV2.subscribeToEvents(id, abortController.signal);
+          
+          for await (const event of events) {
+            await stream.writeSSE({
+              event: event.type,
+              data: JSON.stringify(event.properties),
+            });
+          }
+        } catch (error) {
+          if (!abortController.signal.aborted) {
+            log.error("SSE stream error", { id, error });
+          }
+        }
+      });
+    } catch (error) {
+      return handleOpenCodeError(c, error, "Failed to start OpenCode event stream");
     }
   });
 
