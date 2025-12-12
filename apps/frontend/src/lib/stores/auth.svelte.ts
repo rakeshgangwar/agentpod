@@ -44,7 +44,13 @@ export const auth = {
   },
 
   get isLoading() {
-    return isLoading || session.value?.isPending;
+    // Only use our local isLoading state for button states
+    // session.value?.isPending can be stuck if the API is unreachable
+    return isLoading;
+  },
+  
+  get isSessionPending() {
+    return session.value?.isPending ?? false;
   },
 
   get isInitialized() {
