@@ -1,6 +1,6 @@
 # AgentPod Container System
 
-This directory contains the modular container system for AgentPod development environments. The system consists of a base image, language-specific flavors, and optional add-ons.
+This directory contains the modular container system for AgentPod development environments. The system consists of a base image and language-specific flavors.
 
 ## Architecture
 
@@ -9,12 +9,12 @@ This directory contains the modular container system for AgentPod development en
 │                      AgentPod Architecture                       │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────┐  │
-│  │   Mobile     │    │   Desktop    │    │   Browser        │  │
-│  │   App        │    │   App        │    │   (code-server)  │  │
-│  └──────┬───────┘    └──────┬───────┘    └────────┬─────────┘  │
-│         │                   │                      │            │
-│         └───────────────────┼──────────────────────┘            │
+│  ┌──────────────┐    ┌──────────────┐                           │
+│  │   Mobile     │    │   Desktop    │                           │
+│  │   App        │    │   App        │                           │
+│  └──────┬───────┘    └──────┬───────┘                           │
+│         │                   │                                    │
+│         └───────────────────┤                                    │
 │                             │                                    │
 │                             ▼                                    │
 │  ┌──────────────────────────────────────────────────────────┐   │
@@ -64,12 +64,6 @@ codeopen-base
     ├── codeopen-rust (Rust)
     ├── codeopen-fullstack (JS + Python) ← default
     └── codeopen-polyglot (All languages)
-             │
-             ├── + gui (Desktop via KasmVNC)
-             ├── + code-server (VS Code in browser)
-             ├── + databases (PostgreSQL, Redis, DuckDB)
-             ├── + cloud (AWS, GCP, Azure, Terraform)
-             └── + gpu (NVIDIA CUDA)
 ```
 
 ## Quick Start (Local Development)
@@ -113,16 +107,6 @@ docker compose logs -f api
 | `codeopen-fullstack` | JavaScript + Python (default) | ~1.8GB |
 | `codeopen-polyglot` | All languages | ~3GB |
 
-### Add-ons
-
-| Add-on | Description | Port | Size |
-|--------|-------------|------|------|
-| `gui` | Desktop environment via KasmVNC | 6080 | ~800MB |
-| `code-server` | VS Code in browser | 8080 | ~300MB |
-| `databases` | PostgreSQL, Redis, DuckDB | 5432, 6379 | ~400MB |
-| `cloud` | AWS, GCP, Azure CLI, Terraform, kubectl | - | ~600MB |
-| `gpu` | NVIDIA CUDA 12.6, PyTorch | - | ~500MB |
-
 ## Ports
 
 | Port | Service | Description |
@@ -131,10 +115,6 @@ docker compose logs -f api
 | 4096 | OpenCode | OpenCode server API |
 | 4097 | ACP Gateway | Multi-agent orchestration |
 | 3000 | Homepage | Project homepage/dashboard |
-| 8080 | Code Server | VS Code in browser |
-| 6080 | KasmVNC | Desktop GUI (web) |
-| 5432 | PostgreSQL | Database (databases addon) |
-| 6379 | Redis | Cache (databases addon) |
 
 ## Environment Variables
 
@@ -227,18 +207,19 @@ cd docker
 # Build specific components
 ./scripts/build-base.sh
 ./scripts/build-flavor.sh fullstack
-./scripts/build-addon.sh gui --base codeopen-fullstack:latest
 
 # Build with options
 ./scripts/build.sh --no-cache --push
 ./scripts/build-flavor.sh python --push
+
+# Build specific flavors only
+./scripts/build.sh --flavors js,python
 ```
 
 ### Build Order
 
 1. Base image (always first)
 2. Flavors (depend on base)
-3. Add-ons (depend on flavors)
 
 ## Directory Structure
 
@@ -266,18 +247,11 @@ docker/
 │   ├── rust/
 │   ├── fullstack/
 │   └── polyglot/
-├── addons/                        # Optional features
-│   ├── gui/
-│   ├── code-server/
-│   ├── databases/
-│   ├── cloud/
-│   └── gpu/
 ├── scripts/                       # Build scripts
 │   ├── config.sh
 │   ├── build.sh
 │   ├── build-base.sh
 │   ├── build-flavor.sh
-│   ├── build-addon.sh
 │   ├── push.sh
 │   └── login.sh
 ├── README.md
@@ -303,10 +277,6 @@ python = "3.12"
 [resources]
 tier = "builder"  # starter, builder, creator, power
 
-[addons]
-code-server = true
-gui = false
-
 [lifecycle]
 setup = "npm install"
 dev = "npm run dev"
@@ -315,7 +285,6 @@ test = "npm test"
 
 [ports]
 3000 = { label = "Dev Server", public = true }
-5432 = { label = "PostgreSQL", public = false }
 ```
 
 ## Troubleshooting
@@ -331,12 +300,6 @@ test = "npm test"
 1. Ensure the host path exists
 2. Check Docker volume permissions
 3. Verify SELinux/AppArmor settings (Linux)
-
-### Code Server Not Accessible
-
-1. Check if addon is enabled: `ADDON_IDS=code-server`
-2. Verify port 8080 is exposed
-3. Check Traefik routing labels
 
 ### Build Fails on ARM64 (Mac M1/M2)
 

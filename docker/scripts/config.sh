@@ -19,7 +19,6 @@ export CONTAINER_VERSION=$(cat "$DOCKER_DIR/VERSION" 2>/dev/null || echo "0.0.1"
 # Directory structure
 export BASE_DIR="$DOCKER_DIR/base"
 export FLAVORS_DIR="$DOCKER_DIR/flavors"
-export ADDONS_DIR="$DOCKER_DIR/addons"
 
 # Base image
 export BASE_IMAGE="${REGISTRY_URL}/codeopen-base:${CONTAINER_VERSION}"
@@ -28,24 +27,13 @@ export BASE_IMAGE="${REGISTRY_URL}/codeopen-base:${CONTAINER_VERSION}"
 export FLAVORS=("js" "python" "go" "rust" "fullstack" "polyglot")
 export DEFAULT_FLAVOR="fullstack"
 
-# Available addons
-export ADDONS=("gui" "code-server" "gpu" "databases" "cloud")
-
 # Build platform
 export BUILD_PLATFORM="${BUILD_PLATFORM:-linux/amd64}"
 
-# Image naming convention: codeopen-{flavor}[-addon1][-addon2]:{version}
+# Image naming convention: codeopen-{flavor}:{version}
 get_image_name() {
     local flavor="$1"
-    shift
-    local addons=("$@")
-    
-    local name="codeopen-${flavor}"
-    for addon in "${addons[@]}"; do
-        name="${name}-${addon}"
-    done
-    
-    echo "${REGISTRY_URL}/${name}"
+    echo "${REGISTRY_URL}/codeopen-${flavor}"
 }
 
 # Export function
