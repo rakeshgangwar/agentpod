@@ -1,8 +1,59 @@
-# CodeOpen Modular Container System
+# AgentPod Container System
 
-This directory contains the modular container system for CodeOpen development environments. The system consists of a base image, language-specific flavors, and optional add-ons.
+This directory contains the modular container system for AgentPod development environments. The system consists of a base image, language-specific flavors, and optional add-ons.
 
 ## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      AgentPod Architecture                       │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────┐  │
+│  │   Mobile     │    │   Desktop    │    │   Browser        │  │
+│  │   App        │    │   App        │    │   (code-server)  │  │
+│  └──────┬───────┘    └──────┬───────┘    └────────┬─────────┘  │
+│         │                   │                      │            │
+│         └───────────────────┼──────────────────────┘            │
+│                             │                                    │
+│                             ▼                                    │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │                    Traefik Proxy                          │   │
+│  │              (*.localhost / *.your-domain.com)            │   │
+│  └──────────────────────────┬───────────────────────────────┘   │
+│                             │                                    │
+│         ┌───────────────────┼───────────────────┐               │
+│         ▼                   ▼                   ▼               │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐        │
+│  │ Management  │    │  Sandbox 1  │    │  Sandbox 2  │        │
+│  │    API      │    │ (container) │    │ (container) │        │
+│  │  (Better    │    │             │    │             │        │
+│  │   Auth)     │    │ - OpenCode  │    │ - OpenCode  │        │
+│  └──────┬──────┘    │ - Homepage  │    │ - Homepage  │        │
+│         │           │ - ACP GW    │    │ - ACP GW    │        │
+│         │           └──────┬──────┘    └─────────────┘        │
+│         │                  │                                    │
+│         ▼                  ▼                                    │
+│  ┌─────────────┐    ┌─────────────┐                            │
+│  │  SQLite DB  │    │  Workspace  │  (mounted volume)          │
+│  │  (auth,     │    │  /workspace │                            │
+│  │   config)   │    │             │                            │
+│  └─────────────┘    └─────────────┘                            │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Key Changes (v0.4.0)
+
+The new architecture removes external dependencies:
+
+| Old (v0.3.x) | New (v0.4.0) | Reason |
+|--------------|--------------|--------|
+| Coolify | Direct Docker API | Simpler, faster, more control |
+| Forgejo | Filesystem Git | Workspaces mounted as volumes |
+| Keycloak | Better Auth | Lighter, easier to configure |
+
+## Image Hierarchy
 
 ```
 codeopen-base
@@ -21,15 +72,26 @@ codeopen-base
              └── + gpu (NVIDIA CUDA)
 ```
 
-## Image Naming Convention
+## Quick Start (Local Development)
 
-```
-codeopen-{flavor}[-addon1][-addon2]:{version}
+```bash
+# 1. Clone the repository
+git clone https://github.com/agentpod/codeopen.git
+cd codeopen
 
-Examples:
-  codeopen-fullstack:latest              # Default full-stack
-  codeopen-python-gpu:latest             # Python with GPU
-  codeopen-fullstack-gui-databases:latest # Full-stack + Desktop + Databases
+# 2. Copy environment files
+cp .env.example .env
+
+# 3. Start the infrastructure
+docker compose up -d
+
+# 4. Check status
+docker compose ps
+docker compose logs -f api
+
+# 5. Access the services
+# - API: http://api.localhost
+# - Traefik Dashboard: http://localhost:8080
 ```
 
 ## Available Images
@@ -61,49 +123,98 @@ Examples:
 | `cloud` | AWS, GCP, Azure CLI, Terraform, kubectl | - | ~600MB |
 | `gpu` | NVIDIA CUDA 12.6, PyTorch | - | ~500MB |
 
-## Registry
-
-Images are hosted on Forgejo Container Registry:
-```
-forgejo.superchotu.com/rakeshgangwar/codeopen-{image}:latest
-```
-
 ## Ports
 
 | Port | Service | Description |
 |------|---------|-------------|
+| 80 | nginx | Main entry point (reverse proxy) |
 | 4096 | OpenCode | OpenCode server API |
 | 4097 | ACP Gateway | Multi-agent orchestration |
+| 3000 | Homepage | Project homepage/dashboard |
 | 8080 | Code Server | VS Code in browser |
 | 6080 | KasmVNC | Desktop GUI (web) |
 | 5432 | PostgreSQL | Database (databases addon) |
 | 6379 | Redis | Cache (databases addon) |
 
-## What's Included
+## Environment Variables
 
-### Base Image (codeopen-base)
+### Container Configuration
 
-- **OS**: Ubuntu 24.04 LTS
-- **Node.js**: 22 LTS with pnpm
-- **Bun**: Fast JavaScript runtime
-- **OpenCode CLI**: AI coding assistant
-- **ACP Gateway**: Multi-agent orchestration service
-- **CLI Tools**: git, ripgrep, fd, bat, fzf, jq, yq
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SANDBOX_ID` | - | Unique sandbox identifier |
+| `PROJECT_NAME` | `AgentPod Project` | Project display name |
+| `PROJECT_SLUG` | `project` | URL slug for the project |
+| `USER_ID` | - | User identifier for config |
+| `OPENCODE_PORT` | `4096` | OpenCode server port |
+| `ACP_GATEWAY_PORT` | `4097` | ACP Gateway port |
+| `HOMEPAGE_PORT` | `3000` | Homepage service port |
+| `WILDCARD_DOMAIN` | `localhost` | Domain for URL generation |
 
-### ACP Gateway
+### Workspace Configuration
 
-The ACP Gateway runs on port 4097 and provides:
-- Multi-agent support (OpenCode, Claude Code, Gemini CLI, etc.)
-- HTTP API for agent management
-- SSE event streaming
-- File system operations
+| Variable | Description |
+|----------|-------------|
+| `GIT_REPO_URL` | Git repository URL to clone (optional) |
+| `GIT_USERNAME` | Git authentication username |
+| `GIT_TOKEN` | Git authentication token |
+| `GIT_BRANCH` | Branch to checkout (default: main) |
+| `GIT_USER_NAME` | Git commit author name |
+| `GIT_USER_EMAIL` | Git commit author email |
+
+### OpenCode Configuration
+
+| Variable | Description |
+|----------|-------------|
+| `OPENCODE_AUTH_JSON` | LLM provider credentials (JSON) |
+| `OPENCODE_CONFIG_JSON` | OpenCode configuration (JSON) |
+
+### Legacy Variables (Deprecated)
+
+These are still supported for backward compatibility:
+
+| Variable | Replacement |
+|----------|-------------|
+| `FORGEJO_REPO_URL` | `GIT_REPO_URL` |
+| `FORGEJO_USER` | `GIT_USERNAME` |
+| `FORGEJO_TOKEN` | `GIT_TOKEN` |
+
+## Workspace Modes
+
+### Mode 1: Pre-mounted Workspace (Recommended)
+
+The workspace is mounted as a Docker volume. No cloning needed.
+
+```yaml
+# docker-compose.yml
+services:
+  sandbox:
+    image: codeopen-fullstack:latest
+    volumes:
+      - ./my-project:/home/developer/workspace
+```
+
+### Mode 2: Clone from Remote
+
+Clone a repository on container startup.
+
+```yaml
+# docker-compose.yml
+services:
+  sandbox:
+    image: codeopen-fullstack:latest
+    environment:
+      - GIT_REPO_URL=https://github.com/user/repo.git
+      - GIT_USERNAME=myuser
+      - GIT_TOKEN=ghp_xxxxx
+```
 
 ## Building Images
 
 ### Prerequisites
 
 - Docker with Buildx
-- Access to Forgejo registry (for push)
+- Access to container registry (for push)
 
 ### Build Commands
 
@@ -129,30 +240,6 @@ cd docker
 2. Flavors (depend on base)
 3. Add-ons (depend on flavors)
 
-## Environment Variables
-
-### Container Configuration
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `OPENCODE_PORT` | `4096` | OpenCode server port |
-| `ACP_GATEWAY_PORT` | `4097` | ACP Gateway port |
-| `WORKSPACE` | `/home/developer/workspace` | Project workspace |
-
-### Runtime Configuration
-
-| Variable | Description |
-|----------|-------------|
-| `MANAGEMENT_API_URL` | URL of AgentPod Management API |
-| `AUTH_TOKEN` | Bearer token for API authentication |
-| `USER_ID` | User identifier for config fetching |
-| `PROJECT_SLUG` | Project slug for workspace |
-| `FORGEJO_REPO_URL` | Git repository to clone |
-| `FORGEJO_USER` | Git authentication username |
-| `FORGEJO_TOKEN` | Git authentication token |
-| `OPENCODE_AUTH_JSON` | LLM provider credentials (JSON) |
-| `OPENCODE_CONFIG_JSON` | OpenCode configuration (JSON) |
-
 ## Directory Structure
 
 ```
@@ -163,19 +250,15 @@ docker/
 │   ├── README.md
 │   ├── scripts/
 │   │   └── common-setup.sh
-│   └── acp-gateway/               # ACP Gateway service
+│   ├── nginx/
+│   │   └── nginx.conf
+│   ├── acp-gateway/               # ACP Gateway service
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   └── src/
+│   └── homepage/                  # Homepage service
 │       ├── package.json
-│       ├── tsconfig.json
 │       └── src/
-│           ├── index.ts
-│           ├── types.ts
-│           ├── acp-client.ts
-│           ├── agent-manager.ts
-│           ├── agent-registry.ts
-│           ├── auth-handler.ts
-│           ├── event-emitter.ts
-│           ├── file-handler.ts
-│           └── session-manager.ts
 ├── flavors/                       # Language environments
 │   ├── js/
 │   ├── python/
@@ -201,69 +284,80 @@ docker/
 └── VERSION
 ```
 
-## CI/CD Pipeline
+## agentpod.toml Configuration
 
-### Forgejo Actions Workflow
+Projects can include an `agentpod.toml` file to configure their sandbox:
 
-Located at: `.forgejo/workflows/build-containers.yml`
+```toml
+[project]
+name = "my-project"
+description = "A cool project"
 
-**Triggers:**
-- Push to `main` branch (changes in `docker/` directory)
-- Tag push (`v*`)
-- Manual dispatch with target selection
+[environment]
+base = "fullstack"  # js, python, go, rust, fullstack, polyglot
 
-**Build Matrix:**
-- Base image first
-- All flavors in parallel
-- Add-ons per flavor combination
+[environment.languages]
+node = "22"
+python = "3.12"
 
-### Versioning
+[resources]
+tier = "builder"  # starter, builder, creator, power
 
-Version is read from `docker/VERSION` file.
+[addons]
+code-server = true
+gui = false
 
-To release a new version:
-```bash
-echo "0.1.0" > docker/VERSION
-git add docker/VERSION
-git commit -m "chore: bump container version to 0.1.0"
-git push
+[lifecycle]
+setup = "npm install"
+dev = "npm run dev"
+build = "npm run build"
+test = "npm test"
+
+[ports]
+3000 = { label = "Dev Server", public = true }
+5432 = { label = "PostgreSQL", public = false }
 ```
 
-## Migration from Legacy Containers
-
-### Mapping Old Tiers to New System
-
-| Old Tier | New Configuration |
-|----------|-------------------|
-| `lite` | `starter` + `fullstack` + `code-server` |
-| `standard` | `builder` + `fullstack` + `code-server` |
-| `pro` | `creator` + `fullstack` + `code-server` |
-| `desktop` | `creator` + `fullstack` + `gui` + `code-server` |
-
-### Breaking Changes
-
-1. **Image names changed**: `opencode-cli` → `codeopen-fullstack-code-server`
-2. **Port changes**: ACP Gateway now on 4097
-3. **New environment variables**: See configuration section
-
 ## Troubleshooting
+
+### Container Won't Start
+
+1. Check logs: `docker compose logs sandbox`
+2. Verify Docker socket is accessible
+3. Check if ports are already in use
+
+### Workspace Not Mounted
+
+1. Ensure the host path exists
+2. Check Docker volume permissions
+3. Verify SELinux/AppArmor settings (Linux)
+
+### Code Server Not Accessible
+
+1. Check if addon is enabled: `ADDON_IDS=code-server`
+2. Verify port 8080 is exposed
+3. Check Traefik routing labels
 
 ### Build Fails on ARM64 (Mac M1/M2)
 
 Use `--platform linux/amd64` or build via CI:
+
 ```bash
 BUILD_PLATFORM=linux/amd64 ./scripts/build-base.sh
 ```
 
-### ACP Gateway Not Starting
+## Migration from v0.3.x
 
-Check if port 4097 is available and Bun is installed:
-```bash
-curl http://localhost:4097/health
-```
+### Breaking Changes
 
-### Container Size Too Large
+1. **No more Forgejo**: Workspaces are now mounted volumes
+2. **No more Coolify**: Direct Docker API management
+3. **No more Keycloak**: Better Auth handles authentication
+4. **Environment variables renamed**: `FORGEJO_*` → `GIT_*`
 
-- Use specific flavor instead of polyglot
-- Avoid GPU addon unless needed
-- Clean Docker build cache: `docker builder prune`
+### Migration Steps
+
+1. Update environment variables (see Legacy Variables section)
+2. Mount workspaces as volumes instead of cloning
+3. Configure Better Auth (GitHub OAuth optional)
+4. Remove Coolify/Forgejo/Keycloak from docker-compose

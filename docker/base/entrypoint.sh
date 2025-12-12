@@ -16,16 +16,29 @@ echo "=============================================="
 # USER_ID               - User identifier for fetching config
 # PROJECT_NAME          - Project display name
 # PROJECT_SLUG          - Project slug for URLs
-# FORGEJO_REPO_URL      - Git repository URL
-# FORGEJO_USER          - Git username for auth
-# FORGEJO_TOKEN         - Git token for auth
-# OPENCODE_AUTH_JSON    - Pre-built auth.json content (for LLM providers)
-# OPENCODE_CONFIG_JSON  - Pre-built opencode.json content (optional, fallback)
-# OPENCODE_PORT         - Port for OpenCode server (default: 4096)
-# OPENCODE_HOST         - Host for OpenCode server (default: 0.0.0.0)
-# ACP_GATEWAY_PORT      - Port for ACP Gateway (default: 4097)
-# ADDON_IDS             - Comma-separated list of addon IDs to install
-# WILDCARD_DOMAIN       - Domain for URL generation (default: superchotu.com)
+# SANDBOX_ID            - Unique sandbox identifier
+#
+# Git Repository Options (choose one):
+#   Option 1: Pre-mounted workspace (new architecture)
+#     - Workspace is mounted as a volume at /home/developer/workspace
+#     - No cloning needed, repository is already there
+#
+#   Option 2: Clone from remote (legacy, still supported)
+#     GIT_REPO_URL        - Git repository URL to clone
+#     GIT_USERNAME        - Git username for authentication
+#     GIT_TOKEN           - Git token for authentication
+#     GIT_BRANCH          - Branch to checkout (default: main)
+#
+# OpenCode Configuration:
+#   OPENCODE_AUTH_JSON    - Pre-built auth.json content (for LLM providers)
+#   OPENCODE_CONFIG_JSON  - Pre-built opencode.json content (optional)
+#   OPENCODE_PORT         - Port for OpenCode server (default: 4096)
+#   OPENCODE_HOST         - Host for OpenCode server (default: 0.0.0.0)
+#
+# Other:
+#   ACP_GATEWAY_PORT      - Port for ACP Gateway (default: 4097)
+#   ADDON_IDS             - Comma-separated list of addon IDs to enable
+#   WILDCARD_DOMAIN       - Domain for URL generation (default: localhost)
 # =============================================================================
 
 HOME_DIR="/home/developer"
@@ -164,46 +177,85 @@ setup_auth() {
 }
 
 # =============================================================================
-# Clone Repository
+# Initialize Workspace
 # =============================================================================
-clone_repository() {
-    if [ -d "$WORKSPACE/.git" ]; then
-        echo "Existing git repository found in workspace."
-        echo "  Pulling latest changes..."
-        cd "$WORKSPACE"
-        git pull --ff-only 2>/dev/null || echo "  Note: Could not pull (may have local changes or be detached)"
-        cd - > /dev/null
-        return 0
-    fi
-    
-    if [ -z "$FORGEJO_REPO_URL" ]; then
-        echo "No repository URL provided. Starting with empty workspace."
-        return 0
-    fi
-    
+# New architecture: workspace is pre-mounted as a volume
+# Legacy support: can still clone from a remote Git URL
+# =============================================================================
+initialize_workspace() {
+    # Check if workspace already has content (pre-mounted volume)
     if [ -d "$WORKSPACE" ] && [ "$(ls -A $WORKSPACE 2>/dev/null)" ]; then
-        echo "Workspace exists but is not a git repository. Cleaning up..."
-        rm -rf "$WORKSPACE"
+        echo "Workspace is pre-mounted with content."
+        
+        # Check if it's a git repository
+        if [ -d "$WORKSPACE/.git" ]; then
+            echo "  Git repository detected."
+            cd "$WORKSPACE"
+            # Show current branch and status
+            BRANCH=$(git branch --show-current 2>/dev/null || echo "detached")
+            echo "  Branch: $BRANCH"
+            cd - > /dev/null
+        else
+            echo "  Not a git repository. Initializing git..."
+            cd "$WORKSPACE"
+            git init
+            git add -A
+            git commit -m "Initial commit" --allow-empty 2>/dev/null || true
+            cd - > /dev/null
+        fi
+        return 0
+    fi
+    
+    # Legacy: Clone from remote repository if URL is provided
+    if [ -n "$GIT_REPO_URL" ]; then
+        echo "Cloning repository from remote..."
+        echo "  URL: $GIT_REPO_URL"
+        
+        # Ensure workspace directory exists
         mkdir -p "$WORKSPACE"
+        
+        # Build clone URL with authentication if provided
+        if [ -n "$GIT_USERNAME" ] && [ -n "$GIT_TOKEN" ]; then
+            REPO_URL_WITH_AUTH=$(echo "$GIT_REPO_URL" | sed "s|://|://${GIT_USERNAME}:${GIT_TOKEN}@|")
+            CLONE_URL="$REPO_URL_WITH_AUTH"
+        else
+            CLONE_URL="$GIT_REPO_URL"
+        fi
+        
+        # Clone the repository
+        BRANCH="${GIT_BRANCH:-main}"
+        git clone --branch "$BRANCH" "$CLONE_URL" "$WORKSPACE" 2>&1 || {
+            echo "  Warning: Failed to clone branch '$BRANCH', trying default branch..."
+            git clone "$CLONE_URL" "$WORKSPACE" 2>&1 || {
+                echo "  Error: Failed to clone repository"
+                return 1
+            }
+        }
+        
+        echo "  Repository cloned successfully."
+        return 0
     fi
     
-    echo "Cloning repository from Forgejo..."
-    echo "  URL: $FORGEJO_REPO_URL"
-    
-    if [ -n "$FORGEJO_USER" ] && [ -n "$FORGEJO_TOKEN" ]; then
-        REPO_URL_WITH_AUTH=$(echo "$FORGEJO_REPO_URL" | sed "s|://|://${FORGEJO_USER}:${FORGEJO_TOKEN}@|")
-        git clone "$REPO_URL_WITH_AUTH" "$WORKSPACE" 2>&1 || {
-            echo "  Error: Failed to clone repository"
-            return 1
-        }
-    else
-        git clone "$FORGEJO_REPO_URL" "$WORKSPACE" 2>&1 || {
-            echo "  Error: Failed to clone repository"
-            return 1
-        }
+    # Fallback for legacy FORGEJO_* variables (deprecated but still supported)
+    if [ -n "$FORGEJO_REPO_URL" ]; then
+        echo "Warning: FORGEJO_* variables are deprecated. Use GIT_REPO_URL instead."
+        export GIT_REPO_URL="$FORGEJO_REPO_URL"
+        export GIT_USERNAME="${FORGEJO_USER:-}"
+        export GIT_TOKEN="${FORGEJO_TOKEN:-}"
+        initialize_workspace
+        return $?
     fi
     
-    echo "  Repository cloned successfully."
+    # No repository configured - start with empty workspace
+    echo "No repository URL provided. Starting with empty workspace."
+    mkdir -p "$WORKSPACE"
+    cd "$WORKSPACE"
+    git init
+    echo "# New Project" > README.md
+    git add README.md
+    git commit -m "Initial commit" 2>/dev/null || true
+    cd - > /dev/null
+    return 0
 }
 
 # =============================================================================
@@ -211,11 +263,21 @@ clone_repository() {
 # =============================================================================
 configure_git() {
     echo "Configuring git..."
-    git config --global user.email "${GIT_USER_EMAIL:-opencode@container.local}"
-    git config --global user.name "${GIT_USER_NAME:-OpenCode}"
+    git config --global user.email "${GIT_USER_EMAIL:-developer@agentpod.dev}"
+    git config --global user.name "${GIT_USER_NAME:-AgentPod Developer}"
     git config --global --add safe.directory "$WORKSPACE"
     git config --global init.defaultBranch main
     git config --global credential.helper 'cache --timeout=86400'
+    
+    # Configure git to use the token for the repository host if provided
+    if [ -n "$GIT_TOKEN" ] && [ -n "$GIT_REPO_URL" ]; then
+        # Extract host from URL
+        GIT_HOST=$(echo "$GIT_REPO_URL" | sed -E 's|^https?://([^/]+).*|\1|')
+        if [ -n "$GIT_HOST" ]; then
+            git config --global credential.helper "store"
+            echo "https://${GIT_USERNAME:-git}:${GIT_TOKEN}@${GIT_HOST}" >> ~/.git-credentials
+        fi
+    fi
 }
 
 # =============================================================================
@@ -293,7 +355,8 @@ start_homepage() {
     # Export environment for homepage
     export PROJECT_NAME="${PROJECT_NAME:-AgentPod Project}"
     export PROJECT_SLUG="${PROJECT_SLUG:-project}"
-    export WILDCARD_DOMAIN="${WILDCARD_DOMAIN:-superchotu.com}"
+    export SANDBOX_ID="${SANDBOX_ID:-}"
+    export WILDCARD_DOMAIN="${WILDCARD_DOMAIN:-localhost}"
     
     bun run src/index.ts &
     HOMEPAGE_PID=$!
@@ -413,14 +476,23 @@ start_acp_gateway() {
 # Display Startup Information
 # =============================================================================
 show_startup_info() {
-    local BASE_URL="https://${PROJECT_SLUG:-project}.${WILDCARD_DOMAIN:-superchotu.com}"
-    local CODE_URL="https://code-${PROJECT_SLUG:-project}.${WILDCARD_DOMAIN:-superchotu.com}"
+    local DOMAIN="${WILDCARD_DOMAIN:-localhost}"
+    local PROTOCOL="http"
+    
+    # Use HTTPS for non-localhost domains
+    if [ "$DOMAIN" != "localhost" ]; then
+        PROTOCOL="https"
+    fi
+    
+    local BASE_URL="${PROTOCOL}://${PROJECT_SLUG:-project}.${DOMAIN}"
+    local CODE_URL="${PROTOCOL}://code-${PROJECT_SLUG:-project}.${DOMAIN}"
     
     echo ""
     echo "=============================================="
     echo "  Environment Ready"
     echo "=============================================="
     echo "  Project:   ${PROJECT_NAME:-AgentPod Project}"
+    echo "  Sandbox:   ${SANDBOX_ID:-not set}"
     echo "  User:      developer"
     echo "  Workspace: $WORKSPACE"
     echo ""
@@ -472,8 +544,11 @@ mkdir -p "$OPENCODE_CONFIG_DIR"
 mkdir -p "$OPENCODE_CUSTOM_CONFIG_DIR"
 mkdir -p "$OPENCODE_DATA_DIR"
 
-# Clone repository first
-clone_repository
+# Configure git first (needed for workspace initialization)
+configure_git
+
+# Initialize workspace (handles both pre-mounted and remote clone)
+initialize_workspace
 
 # Ensure workspace exists
 mkdir -p "$WORKSPACE"
@@ -483,9 +558,6 @@ fetch_user_config || setup_fallback_config
 
 # Always setup auth from OPENCODE_AUTH_JSON
 setup_auth
-
-# Configure git
-configure_git
 
 # Install addons (based on ADDON_IDS env var)
 install_addons

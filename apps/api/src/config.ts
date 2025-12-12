@@ -23,6 +23,14 @@ function getEnvInt(key: string, defaultValue: number): number {
   return parsed;
 }
 
+function getEnvBool(key: string, defaultValue: boolean): boolean {
+  const value = process.env[key];
+  if (value === undefined) {
+    return defaultValue;
+  }
+  return value.toLowerCase() === 'true' || value === '1';
+}
+
 export const config = {
   // Server
   port: getEnvInt('PORT', 3001),
@@ -40,7 +48,77 @@ export const config = {
     key: getEnv('ENCRYPTION_KEY', 'dev-encryption-key-32-bytes-long!'),
   },
 
-  // Coolify
+  // ==========================================================================
+  // NEW: Docker Orchestrator Configuration
+  // ==========================================================================
+  docker: {
+    // Docker socket path (default: /var/run/docker.sock)
+    socketPath: getEnv('DOCKER_SOCKET', '/var/run/docker.sock'),
+    // Docker host for TCP connection (if not using socket)
+    host: getEnv('DOCKER_HOST', ''),
+    // Docker port for TCP connection
+    port: getEnvInt('DOCKER_PORT', 2375),
+    // Container name prefix
+    containerPrefix: getEnv('DOCKER_CONTAINER_PREFIX', 'agentpod'),
+    // Default Docker network for containers
+    network: getEnv('DOCKER_NETWORK', 'agentpod-net'),
+  },
+
+  // ==========================================================================
+  // NEW: Traefik Reverse Proxy Configuration
+  // ==========================================================================
+  traefik: {
+    // Whether Traefik is enabled
+    enabled: getEnvBool('TRAEFIK_ENABLED', true),
+    // Docker network Traefik is connected to
+    network: getEnv('TRAEFIK_NETWORK', 'agentpod-net'),
+    // Whether to enable TLS by default
+    tls: getEnvBool('TRAEFIK_TLS', false),
+    // Certificate resolver name (for production)
+    certResolver: getEnv('TRAEFIK_CERT_RESOLVER', ''),
+  },
+
+  // ==========================================================================
+  // NEW: Domain Configuration
+  // ==========================================================================
+  domain: {
+    // Base domain for sandbox URLs (e.g., "localhost" or "agentpod.dev")
+    base: getEnv('BASE_DOMAIN', 'localhost'),
+    // Protocol (http or https)
+    protocol: getEnv('DOMAIN_PROTOCOL', 'http'),
+  },
+
+  // ==========================================================================
+  // NEW: Data Storage Configuration
+  // ==========================================================================
+  data: {
+    // Base directory for all persistent data
+    dir: getEnv('DATA_DIR', './data'),
+    // Git repositories directory
+    reposDir: getEnv('REPOS_DIR', './data/repos'),
+    // Container volumes directory
+    volumesDir: getEnv('VOLUMES_DIR', './data/volumes'),
+  },
+
+  // ==========================================================================
+  // NEW: Better Auth Configuration (replaces Keycloak)
+  // ==========================================================================
+  betterAuth: {
+    // GitHub OAuth provider
+    github: {
+      clientId: getEnv('GITHUB_CLIENT_ID', ''),
+      clientSecret: getEnv('GITHUB_CLIENT_SECRET', ''),
+    },
+    // Session configuration
+    session: {
+      // Session cookie secret (for signing)
+      secret: getEnv('SESSION_SECRET', 'dev-session-secret-change-in-production'),
+    },
+  },
+
+  // ==========================================================================
+  // LEGACY: Coolify Configuration (deprecated, kept for migration)
+  // ==========================================================================
   coolify: {
     url: getEnv('COOLIFY_URL', 'http://localhost:8000'),
     token: getEnv('COOLIFY_TOKEN', ''),
@@ -48,7 +126,9 @@ export const config = {
     serverUuid: getEnv('COOLIFY_SERVER_UUID', ''),
   },
 
-  // Forgejo
+  // ==========================================================================
+  // LEGACY: Forgejo Configuration (deprecated, kept for migration)
+  // ==========================================================================
   forgejo: {
     url: getEnv('FORGEJO_URL', 'http://localhost:3000'),
     // Public URL for clone operations (accessible from containers)
@@ -65,15 +145,17 @@ export const config = {
     basePort: getEnvInt('OPENCODE_BASE_PORT', 4001),
     // Wildcard domain for OpenCode container URLs (e.g., superchotu.com -> opencode-{slug}.superchotu.com)
     wildcardDomain: getEnv('OPENCODE_WILDCARD_DOMAIN', ''),
+    // OpenCode server port inside containers
+    serverPort: getEnvInt('OPENCODE_SERVER_PORT', 4096),
   },
   
-  // Centralized SSO Service
+  // Centralized SSO Service (legacy)
   sso: {
     // URL of the central SSO service (oauth2-proxy at sso.superchotu.com)
     url: getEnv('SSO_URL', 'https://sso.superchotu.com'),
   },
   
-  // Container Registry (Forgejo Package Registry)
+  // Container Registry
   registry: {
     // Registry URL (without protocol, used for docker pull)
     url: getEnv('OPENCODE_REGISTRY_URL', 'forgejo.superchotu.com'),
@@ -94,7 +176,9 @@ export const config = {
   // Default user ID (until we have proper authentication)
   defaultUserId: getEnv('DEFAULT_USER_ID', 'default-user'),
   
-  // Keycloak Configuration (for service account and container auth)
+  // ==========================================================================
+  // LEGACY: Keycloak Configuration (deprecated, will be replaced by Better Auth)
+  // ==========================================================================
   keycloak: {
     // Keycloak realm URL (OIDC issuer)
     realmUrl: getEnv('KEYCLOAK_REALM_URL', 'https://auth.superchotu.com/realms/agentpod'),

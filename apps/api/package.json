@@ -24,9 +24,14 @@
     "@agentpod/tsconfig": "workspace:*",
     "@agentpod/types": "workspace:*",
     "@hono/zod-validator": "^0.4.0",
+    "@iarna/toml": "^2.2.5",
     "@opencode-ai/sdk": "^1.0.144",
+    "@types/dockerode": "^3.3.47",
+    "better-auth": "^1.4.6",
+    "dockerode": "^4.0.9",
     "hono": "^4.6.0",
+    "isomorphic-git": "^1.36.0",
     "nanoid": "^5.0.0",
-    "zod": "^3.23.0"
+    "zod": "^3.25.76"
   }
 }

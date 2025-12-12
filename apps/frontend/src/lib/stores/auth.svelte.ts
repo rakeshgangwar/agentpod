@@ -1,22 +1,18 @@
 /**
  * Auth Store
- * 
- * Manages authentication state for Keycloak OAuth using Svelte 5 runes.
+ *
+ * Manages authentication state using Better Auth with Svelte 5 runes.
+ * Replaces the previous Keycloak-based authentication.
  */
 
-import * as api from "$lib/api/tauri";
-import type { AuthStatus } from "$lib/api/tauri";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { authClient, signInWithGitHub, signOut as betterAuthSignOut } from "$lib/auth-client";
 
 // =============================================================================
 // State
 // =============================================================================
 
-let authStatus = $state<AuthStatus>({
-  authenticated: false,
-  user: null,
-  expiresAt: null,
-});
+// Use Better Auth's reactive session
+const session = authClient.useSession();
 
 let isLoading = $state(false);
 let isInitialized = $state(false);
@@ -27,23 +23,58 @@ let error = $state<string | null>(null);
 // =============================================================================
 
 export const auth = {
-  get status() { return authStatus; },
-  get isAuthenticated() { return authStatus.authenticated; },
-  get user() { return authStatus.user; },
-  get expiresAt() { return authStatus.expiresAt; },
-  get isLoading() { return isLoading; },
-  get isInitialized() { return isInitialized; },
-  get error() { return error; },
-  
+  // Session data from Better Auth
+  get session() {
+    return $derived(session);
+  },
+
+  // Convenience getters
+  get isAuthenticated() {
+    const s = session;
+    return !!s.value?.data?.user;
+  },
+
+  get user() {
+    const s = session;
+    return s.value?.data?.user ?? null;
+  },
+
+  get isLoading() {
+    return isLoading || session.value?.isPending;
+  },
+
+  get isInitialized() {
+    return isInitialized;
+  },
+
+  get error() {
+    return error || session.value?.error?.message;
+  },
+
   // Computed properties
   get displayName() {
-    if (!authStatus.user) return null;
-    return authStatus.user.name || authStatus.user.preferredUsername || authStatus.user.email || "User";
+    const user = this.user;
+    if (!user) return null;
+    return user.name || user.email || "User";
   },
+
   get initials() {
     const name = this.displayName;
     if (!name) return "?";
-    return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  },
+
+  get avatarUrl() {
+    return this.user?.image ?? null;
+  },
+
+  get email() {
+    return this.user?.email ?? null;
   },
 };
 
@@ -52,23 +83,21 @@ export const auth = {
 // =============================================================================
 
 /**
- * Initialize auth state from storage
+ * Initialize auth state
+ * Better Auth handles this automatically via useSession()
  */
 export async function initAuth(): Promise<void> {
   if (isInitialized) return;
-  
+
   isLoading = true;
   error = null;
-  
+
   try {
-    authStatus = await api.authGetStatus();
+    // Better Auth's useSession() automatically fetches the session
+    // We just need to wait for the initial fetch to complete
+    await new Promise((resolve) => setTimeout(resolve, 100));
   } catch (err) {
     error = err instanceof Error ? err.message : "Failed to initialize auth";
-    authStatus = {
-      authenticated: false,
-      user: null,
-      expiresAt: null,
-    };
   } finally {
     isLoading = false;
     isInitialized = true;
@@ -76,38 +105,27 @@ export async function initAuth(): Promise<void> {
 }
 
 /**
- * Start the OAuth login flow
- * Opens the browser to Keycloak and sets up callback listener
+ * Sign in with GitHub OAuth
+ * Opens a popup or redirects to GitHub for authentication
  */
 export async function login(): Promise<boolean> {
   isLoading = true;
   error = null;
-  
+
   try {
-    // Set up callback listener
-    const unlisten = await api.onOAuthCallback(async (callbackUrl) => {
-      try {
-        // Complete the login
-        authStatus = await api.authCompleteLogin(callbackUrl);
-        isLoading = false;
-      } catch (err) {
-        error = err instanceof Error ? err.message : "Login failed";
-        isLoading = false;
-      } finally {
-        unlisten();
-      }
-    });
-    
-    // Get the authorization URL and open it
-    const authUrl = await api.authStartLogin();
-    await openUrl(authUrl);
-    
-    // The callback will be handled by the listener above
+    const result = await signInWithGitHub();
+
+    if (result.error) {
+      error = result.error.message ?? "Sign in failed";
+      return false;
+    }
+
     return true;
   } catch (err) {
     error = err instanceof Error ? err.message : "Failed to start login";
-    isLoading = false;
     return false;
+  } finally {
+    isLoading = false;
   }
 }
 
@@ -117,14 +135,9 @@ export async function login(): Promise<boolean> {
 export async function logout(): Promise<void> {
   isLoading = true;
   error = null;
-  
+
   try {
-    await api.authLogout();
-    authStatus = {
-      authenticated: false,
-      user: null,
-      expiresAt: null,
-    };
+    await betterAuthSignOut();
   } catch (err) {
     error = err instanceof Error ? err.message : "Logout failed";
   } finally {
@@ -133,46 +146,31 @@ export async function logout(): Promise<void> {
 }
 
 /**
- * Refresh the access token
+ * Refresh the session
+ * Better Auth handles session refresh automatically
  */
 export async function refreshToken(): Promise<boolean> {
-  isLoading = true;
-  error = null;
-  
-  try {
-    authStatus = await api.authRefreshToken();
-    return true;
-  } catch (err) {
-    error = err instanceof Error ? err.message : "Token refresh failed";
-    return false;
-  } finally {
-    isLoading = false;
-  }
+  // Better Auth automatically manages session refresh
+  // This is kept for API compatibility
+  return auth.isAuthenticated;
 }
 
 /**
- * Get a valid access token (auto-refreshes if needed)
+ * Get the current access token (for API calls)
+ * With Better Auth, we use cookies, so this returns null
+ * API calls should be made with credentials: 'include'
  */
 export async function getToken(): Promise<string | null> {
-  try {
-    return await api.authGetToken();
-  } catch (err) {
-    error = err instanceof Error ? err.message : "Failed to get token";
-    return null;
-  }
+  // Better Auth uses HTTP-only cookies, not bearer tokens
+  // For API calls, use credentials: 'include' instead
+  return null;
 }
 
 /**
- * Check authentication and refresh status
+ * Check authentication status
  */
 export async function checkAuth(): Promise<boolean> {
-  try {
-    authStatus = await api.authGetStatus();
-    return authStatus.authenticated;
-  } catch (err) {
-    error = err instanceof Error ? err.message : "Auth check failed";
-    return false;
-  }
+  return auth.isAuthenticated;
 }
 
 /**
@@ -180,4 +178,40 @@ export async function checkAuth(): Promise<boolean> {
  */
 export function clearError(): void {
   error = null;
+}
+
+// =============================================================================
+// Legacy Exports (for backward compatibility)
+// =============================================================================
+
+export interface AuthStatus {
+  authenticated: boolean;
+  user: {
+    id: string;
+    email?: string;
+    name?: string;
+    preferredUsername?: string;
+  } | null;
+  expiresAt: number | null;
+}
+
+/**
+ * Get auth status in legacy format
+ * @deprecated Use auth.isAuthenticated and auth.user instead
+ */
+export function getAuthStatus(): AuthStatus {
+  const user = auth.user;
+
+  return {
+    authenticated: !!user,
+    user: user
+      ? {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          preferredUsername: user.email?.split("@")[0],
+        }
+      : null,
+    expiresAt: null, // Better Auth handles session expiry automatically
+  };
 }

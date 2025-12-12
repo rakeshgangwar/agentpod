@@ -1,0 +1,196 @@
+# =============================================================================
+# AgentPod - Docker Compose for Local Development
+# =============================================================================
+#
+# This file sets up the complete local development environment:
+# - Traefik reverse proxy (handles *.localhost routing)
+# - Management API (container orchestration, auth)
+# - SQLite database (embedded in API)
+#
+# Quick Start:
+#   1. Copy .env.example to .env and configure
+#   2. docker compose up -d
+#   3. Open http://api.localhost in browser
+#
+# Usage:
+#   docker compose up -d              # Start infrastructure
+#   docker compose up -d --build      # Rebuild and start
+#   docker compose logs -f            # Follow all logs
+#   docker compose logs -f api        # Follow API logs
+#   docker compose down               # Stop everything
+#   docker compose down -v            # Stop and remove volumes
+#
+# URLs (after startup):
+#   - API:            http://api.localhost
+#   - API Health:     http://api.localhost/health
+#   - Traefik UI:     http://localhost:8080
+#   - Sandboxes:      http://{project-slug}.localhost
+#
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # Traefik Reverse Proxy
+  # ===========================================================================
+  # Handles routing for *.localhost domains
+  # Dashboard available at http://localhost:8080
+  traefik:
+    image: traefik:v3.0
+    container_name: agentpod-traefik
+    restart: unless-stopped
+    command:
+      # API and Dashboard
+      - "--api.insecure=true"
+      - "--api.dashboard=true"
+      # Docker provider
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=agentpod-net"
+      # Entrypoints
+      - "--entrypoints.web.address=:80"
+      # Logging
+      - "--log.level=INFO"
+      - "--accesslog=true"
+    ports:
+      # HTTP
+      - "80:80"
+      # Traefik Dashboard
+      - "8080:8080"
+    volumes:
+      # Docker socket for container discovery
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - agentpod-net
+    labels:
+      - "traefik.enable=true"
+      # Dashboard route (optional, also available on :8080)
+      - "traefik.http.routers.traefik.rule=Host(`traefik.localhost`)"
+      - "traefik.http.routers.traefik.service=api@internal"
+
+  # ===========================================================================
+  # Management API
+  # ===========================================================================
+  # Handles container orchestration, project management, and authentication
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: agentpod-api
+    restart: unless-stopped
+    environment:
+      # Server
+      - NODE_ENV=development
+      - PORT=3001
+
+      # =======================================================================
+      # Authentication (Better Auth)
+      # =======================================================================
+      # Session secret for cookie signing (generate with: openssl rand -base64 32)
+      - SESSION_SECRET=${SESSION_SECRET:-dev-session-secret-change-in-production}
+      
+      # GitHub OAuth (optional - create at https://github.com/settings/developers)
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
+
+      # =======================================================================
+      # API Security
+      # =======================================================================
+      # API token for authenticating mobile app requests
+      - API_TOKEN=${API_TOKEN:-dev-token-change-in-production}
+      
+      # Encryption key for storing provider credentials (32 bytes)
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-dev-encryption-key-32-bytes-long!}
+
+      # =======================================================================
+      # Docker Orchestration (New Architecture)
+      # =======================================================================
+      - DOCKER_SOCKET=/var/run/docker.sock
+      - DOCKER_NETWORK=agentpod-net
+      - DOCKER_CONTAINER_PREFIX=agentpod
+
+      # =======================================================================
+      # Traefik Configuration
+      # =======================================================================
+      - TRAEFIK_ENABLED=true
+      - TRAEFIK_NETWORK=agentpod-net
+      - TRAEFIK_TLS=false
+      - TRAEFIK_CERT_RESOLVER=
+
+      # =======================================================================
+      # Domain Configuration
+      # =======================================================================
+      - BASE_DOMAIN=localhost
+      - DOMAIN_PROTOCOL=http
+
+      # =======================================================================
+      # Data Storage
+      # =======================================================================
+      - DATA_DIR=/data
+      - REPOS_DIR=/data/repos
+      - VOLUMES_DIR=/data/volumes
+      - DATABASE_PATH=/data/db/agentpod.sqlite
+
+      # =======================================================================
+      # API URLs
+      # =======================================================================
+      # Public URL that containers can use to call back to the API
+      - MANAGEMENT_API_PUBLIC_URL=http://api.localhost
+
+      # =======================================================================
+      # OpenCode Configuration
+      # =======================================================================
+      - OPENCODE_SERVER_PORT=4096
+
+      # =======================================================================
+      # Container Registry (for production - leave empty for local builds)
+      # =======================================================================
+      - OPENCODE_REGISTRY_URL=${OPENCODE_REGISTRY_URL:-}
+      - OPENCODE_REGISTRY_OWNER=${OPENCODE_REGISTRY_OWNER:-}
+      - OPENCODE_CONTAINER_VERSION=${OPENCODE_CONTAINER_VERSION:-latest}
+
+      # =======================================================================
+      # Legacy Configuration (deprecated, kept for migration)
+      # =======================================================================
+      - COOLIFY_URL=
+      - COOLIFY_TOKEN=
+      - FORGEJO_URL=
+      - FORGEJO_TOKEN=
+
+    volumes:
+      # Docker socket for container management
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Persistent data (database, repos, volumes)
+      - agentpod-data:/data
+      # Source code for hot reload (development only)
+      - ./apps/api/src:/app/apps/api/src:ro
+    networks:
+      - agentpod-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`api.localhost`)"
+      - "traefik.http.routers.api.entrypoints=web"
+      - "traefik.http.services.api.loadbalancer.server.port=3001"
+      - "agentpod.managed=false"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      - traefik
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  agentpod-data:
+    driver: local
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  agentpod-net:
+    driver: bridge
+    name: agentpod-net
