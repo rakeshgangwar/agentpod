@@ -12,6 +12,10 @@
     "gh_grep": {
       "type": "remote",
       "url": "https://mcp.grep.app"
+    },
+    "assistant-ui": {
+      "type": "local",
+      "command": ["npx", "-y", "@assistant-ui/mcp-docs-server"]
     }
   },
   
