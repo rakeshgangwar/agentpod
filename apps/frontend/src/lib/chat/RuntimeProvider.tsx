@@ -616,18 +616,21 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
     );
   }
 
-  // Show error state
-  if (error) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <p className="text-destructive">Error: {error}</p>
-      </div>
-    );
-  }
-
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <div className="flex flex-col flex-1 min-h-0">
+        {/* Error banner - dismissible, doesn't hide chat */}
+        {error && (
+          <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-2 flex items-center justify-between gap-2">
+            <span className="text-sm">{error}</span>
+            <button
+              onClick={() => setError(null)}
+              className="text-destructive hover:text-destructive/80 text-sm font-medium px-2 py-1 rounded hover:bg-destructive/10"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
         <div className="flex-1 min-h-0">
           {children}
         </div>
