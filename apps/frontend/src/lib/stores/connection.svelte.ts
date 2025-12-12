@@ -6,6 +6,7 @@
 
 import * as api from "$lib/api/tauri";
 import type { ConnectionStatus } from "$lib/api/tauri";
+import { setAuthApiUrl } from "./auth.svelte";
 
 // =============================================================================
 // State
@@ -51,6 +52,11 @@ export async function initConnection(): Promise<void> {
     // If we have a stored connection, test it
     if (connectionStatus.connected) {
       connectionStatus = await api.testConnection();
+      
+      // Set the API URL for the auth client
+      if (connectionStatus.connected && connectionStatus.apiUrl) {
+        setAuthApiUrl(connectionStatus.apiUrl);
+      }
     }
   } catch (error) {
     connectionStatus = {
@@ -72,6 +78,12 @@ export async function connect(apiUrl: string, apiKey?: string): Promise<boolean>
   isLoading = true;
   try {
     connectionStatus = await api.connect(apiUrl, apiKey);
+    
+    // Set the API URL for the auth client when connection succeeds
+    if (connectionStatus.connected) {
+      setAuthApiUrl(apiUrl);
+    }
+    
     return connectionStatus.connected;
   } catch (error) {
     connectionStatus = {

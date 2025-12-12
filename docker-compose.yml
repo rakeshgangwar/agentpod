@@ -192,5 +192,7 @@ volumes:
 # =============================================================================
 networks:
   agentpod-net:
-    driver: bridge
+    # Use existing network if it exists (created by sandbox manager)
+    # Otherwise create it
+    external: true
     name: agentpod-net

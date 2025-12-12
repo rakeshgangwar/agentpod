@@ -50,8 +50,9 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/apps/api ./apps/api
 
-# Create data directory for SQLite
-RUN mkdir -p /app/data && chown -R appuser:appgroup /app/data
+# Create data directories for SQLite and repos (both /app/data for defaults and /data for docker-compose)
+RUN mkdir -p /app/data /data/db /data/repos /data/volumes && \
+    chown -R appuser:appgroup /app/data /data
 
 # Switch to non-root user
 USER appuser

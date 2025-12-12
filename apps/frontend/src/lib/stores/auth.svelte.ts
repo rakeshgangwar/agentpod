@@ -3,55 +3,88 @@
  *
  * Manages authentication state using Better Auth with Svelte 5 runes.
  * Replaces the previous Keycloak-based authentication.
+ * 
+ * The auth client is created dynamically based on the connected API URL.
  */
 
-import { 
-  authClient, 
-  signInWithGitHub, 
-  signInWithEmail,
-  signUpWithEmail,
-  signOut as betterAuthSignOut 
-} from "$lib/auth-client";
+import { createAuthClient } from "better-auth/svelte";
 import { authStoreSession, authLogout as tauriAuthLogout } from "$lib/api/tauri";
+
+// =============================================================================
+// Dynamic Auth Client
+// =============================================================================
+
+// The auth client is created dynamically based on the connected API URL
+let currentAuthClient: ReturnType<typeof createAuthClient> | null = null;
+let currentApiUrl: string | null = null;
+
+/**
+ * Get or create the auth client for the given API URL
+ */
+function getAuthClient(apiUrl?: string): ReturnType<typeof createAuthClient> {
+  const url = apiUrl || currentApiUrl || "http://localhost:3001";
+  
+  // Create a new client if URL changed or client doesn't exist
+  if (!currentAuthClient || url !== currentApiUrl) {
+    currentApiUrl = url;
+    currentAuthClient = createAuthClient({
+      baseURL: url,
+    });
+  }
+  
+  return currentAuthClient;
+}
+
+/**
+ * Set the API URL and create a new auth client
+ * Called when connection is established
+ */
+export function setAuthApiUrl(apiUrl: string) {
+  currentApiUrl = apiUrl;
+  currentAuthClient = createAuthClient({
+    baseURL: apiUrl,
+  });
+}
+
+/**
+ * Get the current API URL
+ */
+export function getAuthApiUrl(): string | null {
+  return currentApiUrl;
+}
 
 // =============================================================================
 // State
 // =============================================================================
 
-// Use Better Auth's reactive session
-const session = authClient.useSession();
-
 let isLoading = $state(false);
 let isInitialized = $state(false);
 let error = $state<string | null>(null);
+let sessionData = $state<{
+  user: {
+    id: string;
+    email: string;
+    name?: string | null;
+    image?: string | null;
+  };
+} | null>(null);
 
 // =============================================================================
 // Derived State
 // =============================================================================
 
 export const auth = {
-  // Session data from Better Auth
-  get session() {
-    return session;
-  },
-
   // Convenience getters
   get isAuthenticated() {
-    return !!session.value?.data?.user;
+    return !!sessionData?.user;
   },
 
   get user() {
-    return session.value?.data?.user ?? null;
+    return sessionData?.user ?? null;
   },
 
   get isLoading() {
-    // Only use our local isLoading state for button states
-    // session.value?.isPending can be stuck if the API is unreachable
     return isLoading;
-  },
-  
-  get isSessionPending() {
-    return session.value?.isPending ?? false;
   },
 
   get isInitialized() {
@@ -59,34 +92,34 @@ export const auth = {
   },
 
   get error() {
-    return error || session.value?.error?.message;
+    return error;
   },
 
   // Computed properties
   get displayName() {
-    const user = session.value?.data?.user;
+    const user = sessionData?.user;
     if (!user) return null;
     return user.name || user.email || "User";
   },
 
   get initials() {
-    const user = session.value?.data?.user;
+    const user = sessionData?.user;
     const name = user?.name || user?.email || null;
     if (!name) return "?";
     return name
       .split(" ")
-      .map((n) => n[0])
+      .map((n: string) => n[0])
       .join("")
       .toUpperCase()
       .slice(0, 2);
   },
 
   get avatarUrl() {
-    return session.value?.data?.user?.image ?? null;
+    return sessionData?.user?.image ?? null;
   },
 
   get email() {
-    return session.value?.data?.user?.email ?? null;
+    return sessionData?.user?.email ?? null;
   },
 };
 
@@ -96,7 +129,6 @@ export const auth = {
 
 /**
  * Initialize auth state
- * Better Auth handles this automatically via useSession()
  */
 export async function initAuth(): Promise<void> {
   if (isInitialized) return;
@@ -105,9 +137,13 @@ export async function initAuth(): Promise<void> {
   error = null;
 
   try {
-    // Better Auth's useSession() automatically fetches the session
-    // We just need to wait for the initial fetch to complete
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Check if we have a stored session via the auth client
+    if (currentAuthClient) {
+      const session = currentAuthClient.useSession();
+      if (session.value?.data?.user) {
+        sessionData = { user: session.value.data.user as typeof sessionData extends { user: infer U } | null ? U : never };
+      }
+    }
   } catch (err) {
     error = err instanceof Error ? err.message : "Failed to initialize auth";
   } finally {
@@ -125,7 +161,10 @@ export async function login(): Promise<boolean> {
   error = null;
 
   try {
-    const result = await signInWithGitHub();
+    const client = getAuthClient();
+    const result = await client.signIn.social({
+      provider: "github",
+    });
 
     if (result.error) {
       error = result.error.message ?? "Sign in failed";
@@ -144,26 +183,42 @@ export async function login(): Promise<boolean> {
 /**
  * Sign in with email and password
  */
-export async function loginWithEmail(email: string, password: string): Promise<boolean> {
+export async function loginWithEmail(emailInput: string, password: string): Promise<boolean> {
   isLoading = true;
   error = null;
 
   try {
-    const result = await signInWithEmail(email, password);
+    const client = getAuthClient();
+    const result = await client.signIn.email({
+      email: emailInput,
+      password,
+    });
 
     if (result.error) {
       error = result.error.message ?? "Sign in failed";
       return false;
     }
 
-    // Store the session token for Tauri API calls
-    if (result.data?.token && result.data?.user) {
-      await authStoreSession(
-        result.data.token,
-        result.data.user.id,
-        result.data.user.email,
-        result.data.user.name
-      );
+    // Store the session data
+    if (result.data?.user) {
+      sessionData = {
+        user: {
+          id: result.data.user.id,
+          email: result.data.user.email,
+          name: result.data.user.name,
+          image: result.data.user.image,
+        },
+      };
+
+      // Store the session token for Tauri API calls
+      if (result.data.token) {
+        await authStoreSession(
+          result.data.token,
+          result.data.user.id,
+          result.data.user.email,
+          result.data.user.name
+        );
+      }
     }
 
     return true;
@@ -178,26 +233,43 @@ export async function loginWithEmail(email: string, password: string): Promise<b
 /**
  * Sign up with email and password
  */
-export async function signUp(email: string, password: string, name: string): Promise<boolean> {
+export async function signUp(emailInput: string, password: string, name: string): Promise<boolean> {
   isLoading = true;
   error = null;
 
   try {
-    const result = await signUpWithEmail(email, password, name);
+    const client = getAuthClient();
+    const result = await client.signUp.email({
+      email: emailInput,
+      password,
+      name,
+    });
 
     if (result.error) {
       error = result.error.message ?? "Sign up failed";
       return false;
     }
 
-    // Store the session token for Tauri API calls (signup also returns a session)
-    if (result.data?.token && result.data?.user) {
-      await authStoreSession(
-        result.data.token,
-        result.data.user.id,
-        result.data.user.email,
-        result.data.user.name
-      );
+    // Store the session data
+    if (result.data?.user) {
+      sessionData = {
+        user: {
+          id: result.data.user.id,
+          email: result.data.user.email,
+          name: result.data.user.name,
+          image: result.data.user.image,
+        },
+      };
+
+      // Store the session token for Tauri API calls
+      if (result.data.token) {
+        await authStoreSession(
+          result.data.token,
+          result.data.user.id,
+          result.data.user.email,
+          result.data.user.name
+        );
+      }
     }
 
     return true;
@@ -217,11 +289,16 @@ export async function logout(): Promise<void> {
   error = null;
 
   try {
+    const client = getAuthClient();
+    
     // Clear both Better Auth session and Tauri stored session
     await Promise.all([
-      betterAuthSignOut(),
+      client.signOut(),
       tauriAuthLogout()
     ]);
+    
+    // Clear local session data
+    sessionData = null;
   } catch (err) {
     error = err instanceof Error ? err.message : "Logout failed";
   } finally {
@@ -292,7 +369,7 @@ export function getAuthStatus(): AuthStatus {
       ? {
           id: user.id,
           email: user.email,
-          name: user.name,
+          name: user.name ?? undefined,
           preferredUsername: user.email?.split("@")[0],
         }
       : null,
