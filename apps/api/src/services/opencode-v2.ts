@@ -159,10 +159,12 @@ export const opencodeV2 = {
   /**
    * Create a new session
    */
-  async createSession(sandboxId: string, title?: string): Promise<Session> {
+  async createSession(sandboxId: string, title?: string | null): Promise<Session> {
     const { client } = await getClient(sandboxId);
+    // OpenCode API expects title to be a string or omitted, not null
+    const body = title ? { title } : {};
     const result = await client.session.create({
-      body: { title },
+      body,
     });
     return result.data!;
   },

@@ -306,7 +306,11 @@ pub async fn sandbox_opencode_list_sessions(sandbox_id: String) -> Result<Vec<Se
 #[tauri::command]
 pub async fn sandbox_opencode_create_session(sandbox_id: String, title: Option<String>) -> Result<Session, AppError> {
     let client = get_client()?;
-    let body = serde_json::json!({ "title": title });
+    // Only include title if it's Some, otherwise send empty object
+    let body = match title {
+        Some(t) => serde_json::json!({ "title": t }),
+        None => serde_json::json!({}),
+    };
     client
         .post(&format!("/api/v2/sandboxes/{}/opencode/session", sandbox_id), &body)
         .await
