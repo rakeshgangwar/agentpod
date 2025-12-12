@@ -8,7 +8,7 @@
  */
 
 import { createAuthClient } from "better-auth/svelte";
-import { authStoreSession, authLogout as tauriAuthLogout } from "$lib/api/tauri";
+import { authStoreSession, authLogout as tauriAuthLogout, authGetStatus } from "$lib/api/tauri";
 
 // =============================================================================
 // Dynamic Auth Client
@@ -129,6 +129,7 @@ export const auth = {
 
 /**
  * Initialize auth state
+ * First tries to load from Tauri's secure storage, which persists across refreshes
  */
 export async function initAuth(): Promise<void> {
   if (isInitialized) return;
@@ -137,14 +138,21 @@ export async function initAuth(): Promise<void> {
   error = null;
 
   try {
-    // Check if we have a stored session via the auth client
-    if (currentAuthClient) {
-      const session = currentAuthClient.useSession();
-      if (session.value?.data?.user) {
-        sessionData = { user: session.value.data.user as typeof sessionData extends { user: infer U } | null ? U : never };
-      }
+    // First, try to load from Tauri secure storage (persists across app restarts)
+    const storedStatus = await authGetStatus();
+    if (storedStatus.authenticated && storedStatus.user) {
+      sessionData = {
+        user: {
+          id: storedStatus.user.id,
+          email: storedStatus.user.email ?? "",
+          name: storedStatus.user.name ?? null,
+          image: null,
+        },
+      };
     }
   } catch (err) {
+    // Tauri storage failed, continue without stored session
+    console.warn("[Auth] Failed to load stored session:", err);
     error = err instanceof Error ? err.message : "Failed to initialize auth";
   } finally {
     isLoading = false;

@@ -49,7 +49,7 @@ export const config = {
   },
 
   // ==========================================================================
-  // NEW: Docker Orchestrator Configuration
+  // Docker Orchestrator Configuration
   // ==========================================================================
   docker: {
     // Docker socket path (default: /var/run/docker.sock)
@@ -65,7 +65,7 @@ export const config = {
   },
 
   // ==========================================================================
-  // NEW: Traefik Reverse Proxy Configuration
+  // Traefik Reverse Proxy Configuration
   // ==========================================================================
   traefik: {
     // Whether Traefik is enabled
@@ -79,7 +79,7 @@ export const config = {
   },
 
   // ==========================================================================
-  // NEW: Domain Configuration
+  // Domain Configuration
   // ==========================================================================
   domain: {
     // Base domain for sandbox URLs (e.g., "localhost" or "agentpod.dev")
@@ -89,7 +89,7 @@ export const config = {
   },
 
   // ==========================================================================
-  // NEW: Data Storage Configuration
+  // Data Storage Configuration
   // ==========================================================================
   data: {
     // Base directory for all persistent data
@@ -105,7 +105,7 @@ export const config = {
   },
 
   // ==========================================================================
-  // NEW: Better Auth Configuration (replaces Keycloak)
+  // Better Auth Configuration
   // ==========================================================================
   betterAuth: {
     // GitHub OAuth provider
@@ -120,43 +120,14 @@ export const config = {
     },
   },
 
-  // ==========================================================================
-  // LEGACY: Coolify Configuration (deprecated, kept for migration)
-  // ==========================================================================
-  coolify: {
-    url: getEnv('COOLIFY_URL', 'http://localhost:8000'),
-    token: getEnv('COOLIFY_TOKEN', ''),
-    projectUuid: getEnv('COOLIFY_PROJECT_UUID', ''),
-    serverUuid: getEnv('COOLIFY_SERVER_UUID', ''),
-  },
-
-  // ==========================================================================
-  // LEGACY: Forgejo Configuration (deprecated, kept for migration)
-  // ==========================================================================
-  forgejo: {
-    url: getEnv('FORGEJO_URL', 'http://localhost:3000'),
-    // Public URL for clone operations (accessible from containers)
-    // This should be the HTTPS URL through Traefik, without port
-    publicUrl: getEnv('FORGEJO_PUBLIC_URL', getEnv('FORGEJO_URL', 'http://localhost:3000')),
-    token: getEnv('FORGEJO_TOKEN', ''),
-    owner: getEnv('FORGEJO_OWNER', 'admin'),
-  },
-
   // OpenCode containers
   opencode: {
-    // Legacy image setting (deprecated, use registry settings below)
-    image: getEnv('OPENCODE_IMAGE', 'opencode-server:latest'),
+    // Base port for OpenCode containers (auto-incremented per container)
     basePort: getEnvInt('OPENCODE_BASE_PORT', 4001),
     // Wildcard domain for OpenCode container URLs (e.g., superchotu.com -> opencode-{slug}.superchotu.com)
     wildcardDomain: getEnv('OPENCODE_WILDCARD_DOMAIN', ''),
     // OpenCode server port inside containers
     serverPort: getEnvInt('OPENCODE_SERVER_PORT', 4096),
-  },
-  
-  // Centralized SSO Service (legacy)
-  sso: {
-    // URL of the central SSO service (oauth2-proxy at sso.superchotu.com)
-    url: getEnv('SSO_URL', 'https://sso.superchotu.com'),
   },
   
   // Container Registry
@@ -179,22 +150,6 @@ export const config = {
   
   // Default user ID (until we have proper authentication)
   defaultUserId: getEnv('DEFAULT_USER_ID', 'default-user'),
-  
-  // ==========================================================================
-  // LEGACY: Keycloak Configuration (deprecated, will be replaced by Better Auth)
-  // ==========================================================================
-  keycloak: {
-    // Keycloak realm URL (OIDC issuer)
-    realmUrl: getEnv('KEYCLOAK_REALM_URL', 'https://auth.superchotu.com/realms/agentpod'),
-    // Service account client for API-to-container calls
-    apiClientId: getEnv('KEYCLOAK_API_CLIENT_ID', 'agentpod-api'),
-    apiClientSecret: getEnv('KEYCLOAK_API_CLIENT_SECRET', ''),
-    // Container client for oauth2-proxy
-    containerClientId: getEnv('KEYCLOAK_CONTAINER_CLIENT_ID', 'agentpod-container'),
-    containerClientSecret: getEnv('KEYCLOAK_CONTAINER_CLIENT_SECRET', ''),
-    // Cookie secret for oauth2-proxy (32-byte base64)
-    cookieSecret: getEnv('KEYCLOAK_COOKIE_SECRET', ''),
-  },
 } as const;
 
 export type Config = typeof config;

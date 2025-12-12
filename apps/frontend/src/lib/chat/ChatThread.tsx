@@ -8,7 +8,6 @@
 import { type FC, type PropsWithChildren, useState, useRef, useCallback, useEffect } from "react";
 import {
   ThreadPrimitive,
-  ComposerPrimitive,
   MessagePrimitive,
   useThread,
   useMessage,
@@ -18,6 +17,8 @@ import {
 import { MarkdownTextPrimitive } from "@assistant-ui/react-markdown";
 import { CommandPicker, type Command } from "./CommandPicker";
 import { FilePicker } from "./FilePicker";
+import { FileAttachmentButton, FileAttachmentPreview, type AttachedFile } from "./FileAttachment";
+import { useAttachments } from "./RuntimeProvider";
 
 /**
  * TextPart component renders a text part with markdown support.
@@ -27,6 +28,76 @@ function TextPart() {
   return (
     <MarkdownTextPrimitive 
       className="prose prose-sm dark:prose-invert max-w-none"
+    />
+  );
+}
+
+/**
+ * ImagePart component renders an image attachment
+ */
+interface ImagePartProps {
+  image: string;
+}
+
+function ImagePart({ image }: ImagePartProps) {
+  return (
+    <div className="my-2">
+      <img 
+        src={image} 
+        alt="Attached image"
+        className="max-w-full max-h-64 rounded-lg object-contain"
+      />
+    </div>
+  );
+}
+
+/**
+ * FilePart component renders a non-image file attachment
+ */
+interface FilePartProps {
+  file: {
+    url: string;
+    filename?: string;
+    mime?: string;
+  };
+}
+
+function FilePart({ file }: FilePartProps) {
+  // Get file icon based on MIME type
+  const getFileIcon = (mime?: string): string => {
+    if (!mime) return "document";
+    if (mime === "application/pdf") return "pdf";
+    if (mime.startsWith("text/")) return "text";
+    if (mime.startsWith("audio/")) return "audio";
+    if (mime.startsWith("video/")) return "video";
+    return "document";
+  };
+  
+  const iconType = getFileIcon(file.mime);
+  
+  return (
+    <div className="my-2 inline-flex items-center gap-2 px-3 py-2 bg-background/20 rounded-lg text-sm">
+      <span className="text-lg">
+        {iconType === "pdf" && "📄"}
+        {iconType === "text" && "📝"}
+        {iconType === "audio" && "🎵"}
+        {iconType === "video" && "🎬"}
+        {iconType === "document" && "📎"}
+      </span>
+      <span className="truncate max-w-[200px]">
+        {file.filename || "Attached file"}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * UserTextPart - simple text rendering for user messages without markdown
+ */
+function UserTextPart() {
+  return (
+    <MarkdownTextPrimitive 
+      className="prose prose-sm prose-invert max-w-none"
     />
   );
 }
@@ -100,17 +171,55 @@ const ToolGroup: FC<PropsWithChildren<{ startIndex: number; endIndex: number }>>
 };
 
 /**
- * UserMessage component renders user messages
+ * UserMessage component renders user messages with text and file attachments
  */
 function UserMessage() {
+  const message = useMessage();
+  
+  // Extract custom file attachments from message content (we add these via ThreadMessageLike)
+  // Cast to unknown first to bypass strict typing since we're adding custom content types
+  const content = message.content as unknown[];
+  
+  const imageAttachments: { type: "image"; image: string }[] = [];
+  const fileAttachments: { type: "file"; file: { url: string; filename?: string; mime?: string } }[] = [];
+  
+  for (const part of content) {
+    const p = part as { type: string; image?: string; file?: { url: string; filename?: string; mime?: string } };
+    if (p.type === "image" && p.image) {
+      imageAttachments.push({ type: "image", image: p.image });
+    } else if (p.type === "file" && p.file) {
+      fileAttachments.push({ type: "file", file: p.file });
+    }
+  }
+  
+  // Check if there's any text content
+  const hasText = content.some((p) => {
+    const part = p as { type: string; text?: string };
+    return part.type === "text" && part.text && part.text.trim().length > 0;
+  });
+
   return (
     <MessagePrimitive.Root className="flex justify-end mb-4">
       <div className="max-w-[80%] rounded-lg px-4 py-2 bg-primary text-primary-foreground">
-        <MessagePrimitive.Content
-          components={{
-            Text: TextPart,
-          }}
-        />
+        {/* Render images */}
+        {imageAttachments.map((img, index) => (
+          <ImagePart key={`img-${index}`} image={img.image} />
+        ))}
+        
+        {/* Render other file attachments */}
+        {fileAttachments.map((file, index) => (
+          <FilePart key={`file-${index}`} file={file.file} />
+        ))}
+        
+        {/* Render text content - suppress default Image rendering by providing empty component */}
+        {hasText && (
+          <MessagePrimitive.Content
+            components={{
+              Text: UserTextPart,
+              Image: () => null, // Suppress default image rendering (we render them above)
+            }}
+          />
+        )}
       </div>
     </MessagePrimitive.Root>
   );
@@ -151,7 +260,7 @@ function AssistantMessage() {
 }
 
 /**
- * Composer component for message input with slash commands and file picker
+ * Composer component for message input with slash commands, file picker, and file attachments
  */
 interface ComposerProps {
   projectId?: string;
@@ -162,6 +271,8 @@ interface ComposerProps {
 }
 
 function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, onPendingFilePathClear }: ComposerProps) {
+  // Get the sendWithAttachments handler from context
+  const { sendWithAttachments } = useAttachments();
   const composerRuntime = useComposerRuntime();
   const [inputValue, setInputValue] = useState("");
   const [showCommandPicker, setShowCommandPicker] = useState(false);
@@ -170,6 +281,10 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
   const [fileQuery, setFileQuery] = useState("");
   const [pickerPosition, setPickerPosition] = useState({ top: 60, left: 0 });
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // File attachments state
+  const [attachments, setAttachments] = useState<AttachedFile[]>([]);
   
   // Track cursor position for @ detection
   const [cursorPosition, setCursorPosition] = useState(0);
@@ -253,16 +368,73 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
     inputRef.current?.focus();
   }, [inputValue, cursorPosition]);
   
+  // Handle file attachment from file input
+  const handleAttachmentSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    
+    const maxSizeMB = 10;
+    const acceptedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf", "text/plain"];
+    
+    for (const file of files) {
+      if (!acceptedTypes.includes(file.type)) {
+        console.warn(`File type ${file.type} not supported`);
+        continue;
+      }
+      if (file.size > maxSizeMB * 1024 * 1024) {
+        console.warn(`File ${file.name} exceeds ${maxSizeMB}MB limit`);
+        continue;
+      }
+      
+      try {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(new Error("Failed to read file"));
+          reader.readAsDataURL(file);
+        });
+        
+        setAttachments(prev => [...prev, {
+          id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+          name: file.name,
+          mime: file.type,
+          size: file.size,
+          url: dataUrl,
+        }]);
+      } catch (err) {
+        console.error("Failed to read file:", file.name, err);
+      }
+    }
+    
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }, []);
+  
+  const handleRemoveAttachment = useCallback((id: string) => {
+    setAttachments(prev => prev.filter(a => a.id !== id));
+  }, []);
+
   // Handle form submission
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputValue.trim()) return;
+    if (!inputValue.trim() && attachments.length === 0) return;
     
-    // Use the composer runtime to send the message
+    // If we have attachments, use the attachment handler from context
+    if (attachments.length > 0) {
+      sendWithAttachments(inputValue, attachments);
+      setInputValue("");
+      setAttachments([]);
+      return;
+    }
+    
+    // Otherwise use the composer runtime for text-only messages
     composerRuntime.setText(inputValue);
     composerRuntime.send();
     setInputValue("");
-  }, [inputValue, composerRuntime]);
+    setAttachments([]);
+  }, [inputValue, attachments, composerRuntime, sendWithAttachments]);
   
   // Handle key events for picker navigation
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -308,7 +480,30 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
       )}
       
       <form onSubmit={handleSubmit}>
-        <div className="flex gap-2">
+        {/* File attachment preview */}
+        <FileAttachmentPreview 
+          attachments={attachments} 
+          onRemove={handleRemoveAttachment} 
+        />
+        
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain"
+          onChange={handleAttachmentSelect}
+          className="hidden"
+        />
+        
+        <div className="flex gap-2 items-end">
+          {/* Attachment button */}
+          <FileAttachmentButton
+            onClick={() => fileInputRef.current?.click()}
+            disabled={attachments.length >= 5}
+            hasAttachments={attachments.length > 0}
+          />
+          
           <textarea
             ref={inputRef}
             value={inputValue}
@@ -320,7 +515,7 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
           />
           <button
             type="submit"
-            disabled={!inputValue.trim()}
+            disabled={!inputValue.trim() && attachments.length === 0}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Send
@@ -328,7 +523,7 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
         </div>
       </form>
       <p className="text-xs text-muted-foreground mt-2">
-        Press Enter to send, Shift+Enter for new line · Type <kbd className="px-1 bg-muted rounded">/</kbd> for commands · Type <kbd className="px-1 bg-muted rounded">@</kbd> for files
+        Press Enter to send, Shift+Enter for new line · <kbd className="px-1 bg-muted rounded">📎</kbd> to attach files · <kbd className="px-1 bg-muted rounded">/</kbd> for commands · <kbd className="px-1 bg-muted rounded">@</kbd> for files
       </p>
     </div>
   );
@@ -419,13 +614,14 @@ export interface ChatThreadProps {
 
 /**
  * ChatThread component renders the full chat interface
+ * Note: File attachment sending is handled via useAttachments context from RuntimeProvider
  */
 export function ChatThread({ 
   projectId, 
   findFiles, 
   onFilePickerRequest, 
   pendingFilePath, 
-  onPendingFilePathClear 
+  onPendingFilePathClear,
 }: ChatThreadProps) {
   return (
     <ThreadPrimitive.Root className="flex flex-col h-full">

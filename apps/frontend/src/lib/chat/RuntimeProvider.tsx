@@ -11,7 +11,7 @@
  * This also integrates the Permission system for human-in-the-loop approvals.
  */
 
-import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useRef, createContext, useContext, type ReactNode } from "react";
 import {
   AssistantRuntimeProvider,
   useExternalStoreRuntime,
@@ -23,15 +23,39 @@ import {
   sandboxOpencodeListSessions,
   sandboxOpencodeCreateSession,
   sandboxOpencodeSendMessage,
+  sandboxOpencodeSendMessageWithParts,
   sandboxOpencodeAbortSession,
   OpenCodeStream,
   type Message,
   type OpenCodeEvent,
   type ModelSelection,
   type PermissionRequest,
+  type MessagePartInput,
 } from "../api/tauri";
+import type { AttachedFile } from "./FileAttachment";
 import { PermissionProvider, usePermissions } from "./PermissionContext";
 import { PermissionBar } from "./PermissionBar";
+
+/**
+ * Context for file attachment sending functionality.
+ * Allows ChatThread (or any descendant) to send messages with file attachments.
+ */
+interface AttachmentContextValue {
+  sendWithAttachments: (text: string, attachments: AttachedFile[]) => Promise<void>;
+}
+
+const AttachmentContext = createContext<AttachmentContextValue | null>(null);
+
+/**
+ * Hook to access the attachment sending functionality from any child component.
+ */
+export function useAttachments(): AttachmentContextValue {
+  const context = useContext(AttachmentContext);
+  if (!context) {
+    throw new Error("useAttachments must be used within RuntimeProvider");
+  }
+  return context;
+}
 
 interface RuntimeProviderProps {
   projectId: string;
@@ -39,10 +63,20 @@ interface RuntimeProviderProps {
   selectedModel?: ModelSelection;
   onSessionModelDetected?: (model: ModelSelection) => void;
   children: ReactNode;
+  /** Render prop to pass the send with attachments handler to children */
+  renderWithAttachmentHandler?: (handler: (text: string, attachments: AttachedFile[]) => Promise<void>) => ReactNode;
 }
 
 // Tool call status for tracking state
 type ToolCallStatus = "pending" | "running" | "completed" | "error";
+
+// File attachment in a message
+interface InternalFilePart {
+  id: string;
+  url: string;
+  filename?: string;
+  mime?: string;
+}
 
 // Internal message type (mutable) that we manage
 interface InternalMessage {
@@ -56,6 +90,7 @@ interface InternalMessage {
     result?: unknown;
     status?: ToolCallStatus;
   }>;
+  files: InternalFilePart[];
   createdAt?: Date;
 }
 
@@ -68,6 +103,7 @@ function convertOpenCodeMessage(msg: Message): InternalMessage {
     role: msg.info.role,
     text: "",
     toolCalls: new Map(),
+    files: [],
     createdAt: msg.info.time?.created ? new Date(msg.info.time.created) : undefined,
   };
 
@@ -75,6 +111,15 @@ function convertOpenCodeMessage(msg: Message): InternalMessage {
     if (part.type === "text" && part.text) {
       internal.text += part.text;
     } 
+    // Handle file parts
+    else if (part.type === "file" && part.url) {
+      internal.files.push({
+        id: part.id,
+        url: part.url,
+        filename: part.filename,
+        mime: part.mime,
+      });
+    }
     // Handle tool-invocation format (legacy)
     else if (part.type === "tool-invocation" && part.toolInvocation) {
       internal.toolCalls.set(part.toolInvocation.toolCallId, {
@@ -119,6 +164,27 @@ function convertToThreadMessage(msg: InternalMessage): ThreadMessageLike {
   
   if (msg.text) {
     (content as unknown[]).push({ type: "text", text: msg.text });
+  }
+  
+  // Add file parts - images as "image" type, others as custom "file" type
+  for (const file of msg.files) {
+    if (file.mime?.startsWith("image/")) {
+      // assistant-ui supports "image" type for image content
+      (content as unknown[]).push({
+        type: "image",
+        image: file.url,
+      });
+    } else {
+      // For non-image files, use a custom "file" type that we'll handle in the UI
+      (content as unknown[]).push({
+        type: "file",
+        file: {
+          url: file.url,
+          filename: file.filename,
+          mime: file.mime,
+        },
+      });
+    }
   }
   
   for (const tc of msg.toolCalls.values()) {
@@ -319,6 +385,7 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
               role,
               text: "",
               toolCalls: new Map(),
+              files: [],
               createdAt: new Date(),
             },
           ];
@@ -349,6 +416,7 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
             role: "assistant", // Parts arriving before message.updated are typically from assistant
             text: "",
             toolCalls: new Map(),
+            files: [],
             createdAt: new Date(),
           };
           
@@ -566,6 +634,7 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
         role: "user" as const,
         text: textPart.text,
         toolCalls: new Map(),
+        files: [],
         createdAt: new Date(),
       },
     ]);
@@ -592,6 +661,71 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
     setIsRunning(false);
   }, [projectId, sessionId]);
 
+  // Handle sending a message with file attachments
+  const sendWithAttachments = useCallback(async (text: string, attachments: AttachedFile[]) => {
+    if (!sessionId) {
+      console.error("[RuntimeProvider] No session ID");
+      return;
+    }
+
+    setIsRunning(true);
+    setError(null);
+
+    // Convert AttachedFile[] to MessagePartInput[]
+    const parts: MessagePartInput[] = [];
+    
+    // Add text part if there's text
+    if (text.trim()) {
+      parts.push({
+        type: "text",
+        text: text,
+      });
+    }
+
+    // Add file parts
+    for (const file of attachments) {
+      parts.push({
+        type: "file",
+        url: file.url,
+        filename: file.name,
+        mime: file.mime,
+      });
+    }
+
+    // Add optimistic user message to state immediately
+    const userMessageId = `user-${Date.now()}`;
+    const displayText = text.trim() || `[${attachments.length} file${attachments.length > 1 ? "s" : ""} attached]`;
+    
+    // Convert attachments to InternalFilePart format for display
+    const fileParts: InternalFilePart[] = attachments.map((file, index) => ({
+      id: `${userMessageId}-file-${index}`,
+      url: file.url,
+      filename: file.name,
+      mime: file.mime,
+    }));
+    
+    setInternalMessages((prev) => [
+      ...prev,
+      {
+        id: userMessageId,
+        role: "user" as const,
+        text: displayText,
+        toolCalls: new Map(),
+        files: fileParts,
+        createdAt: new Date(),
+      },
+    ]);
+
+    try {
+      // Send message with parts to OpenCode
+      await sandboxOpencodeSendMessageWithParts(projectId, sessionId, parts, selectedModel);
+    } catch (err) {
+      console.error("[RuntimeProvider] Failed to send message with attachments:", err);
+      setError(err instanceof Error ? err.message : "Failed to send message");
+      setIsRunning(false);
+    }
+  }, [projectId, sessionId, selectedModel]);
+
   // Convert internal messages to ThreadMessageLike for the runtime
   const threadMessages = internalMessages.map(convertToThreadMessage);
 
@@ -616,26 +750,33 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
     );
   }
 
+  // Memoize the context value to prevent unnecessary re-renders
+  const attachmentContextValue: AttachmentContextValue = {
+    sendWithAttachments,
+  };
+
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <div className="flex flex-col flex-1 min-h-0">
-        {/* Error banner - dismissible, doesn't hide chat */}
-        {error && (
-          <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-2 flex items-center justify-between gap-2">
-            <span className="text-sm">{error}</span>
-            <button
-              onClick={() => setError(null)}
-              className="text-destructive hover:text-destructive/80 text-sm font-medium px-2 py-1 rounded hover:bg-destructive/10"
-            >
-              Dismiss
-            </button>
+      <AttachmentContext.Provider value={attachmentContextValue}>
+        <div className="flex flex-col flex-1 min-h-0">
+          {/* Error banner - dismissible, doesn't hide chat */}
+          {error && (
+            <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-2 flex items-center justify-between gap-2">
+              <span className="text-sm">{error}</span>
+              <button
+                onClick={() => setError(null)}
+                className="text-destructive hover:text-destructive/80 text-sm font-medium px-2 py-1 rounded hover:bg-destructive/10"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+          <div className="flex-1 min-h-0">
+            {children}
           </div>
-        )}
-        <div className="flex-1 min-h-0">
-          {children}
+          <PermissionBar />
         </div>
-        <PermissionBar />
-      </div>
+      </AttachmentContext.Provider>
     </AssistantRuntimeProvider>
   );
 }

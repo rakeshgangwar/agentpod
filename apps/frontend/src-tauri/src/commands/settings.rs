@@ -6,6 +6,8 @@ use crate::models::{
     AppError, AppSettings, ExportData, Provider, ProvidersResponse,
     ProviderWithModels, ProvidersWithModelsResponse, OAuthFlowInit, OAuthFlowStatus,
     UserOpencodeConfig, UserOpencodeSettings, UserOpencodeFile, SettingsUpdateResponse, FilesListResponse,
+    ResourceTier, ResourceTiersResponse, ContainerFlavor, ContainerFlavorsResponse, 
+    ContainerAddon, ContainerAddonsResponse,
 };
 use crate::services::{ApiClient, SettingsService};
 use chrono::Utc;
@@ -350,4 +352,62 @@ pub async fn delete_user_opencode_file(
     }
     
     Ok(())
+}
+
+// =============================================================================
+// Resource Tiers (Modular Container System)
+// =============================================================================
+
+/// List all available resource tiers
+#[tauri::command]
+pub async fn list_resource_tiers() -> Result<Vec<ResourceTier>, AppError> {
+    let client = ApiClient::new()?;
+    let response: ResourceTiersResponse = client.get("/api/resource-tiers").await?;
+    Ok(response.tiers)
+}
+
+/// Get the default resource tier
+#[tauri::command]
+pub async fn get_default_resource_tier() -> Result<ResourceTier, AppError> {
+    let client = ApiClient::new()?;
+    client.get("/api/resource-tiers/default").await
+}
+
+// =============================================================================
+// Container Flavors
+// =============================================================================
+
+/// List all available container flavors
+#[tauri::command]
+pub async fn list_container_flavors() -> Result<Vec<ContainerFlavor>, AppError> {
+    let client = ApiClient::new()?;
+    let response: ContainerFlavorsResponse = client.get("/api/flavors").await?;
+    Ok(response.flavors)
+}
+
+/// Get the default container flavor
+#[tauri::command]
+pub async fn get_default_container_flavor() -> Result<ContainerFlavor, AppError> {
+    let client = ApiClient::new()?;
+    client.get("/api/flavors/default").await
+}
+
+// =============================================================================
+// Container Addons
+// =============================================================================
+
+/// List all available container addons
+#[tauri::command]
+pub async fn list_container_addons() -> Result<Vec<ContainerAddon>, AppError> {
+    let client = ApiClient::new()?;
+    let response: ContainerAddonsResponse = client.get("/api/addons").await?;
+    Ok(response.addons)
+}
+
+/// Get non-GPU addons only
+#[tauri::command]
+pub async fn list_non_gpu_addons() -> Result<Vec<ContainerAddon>, AppError> {
+    let client = ApiClient::new()?;
+    let response: ContainerAddonsResponse = client.get("/api/addons/non-gpu").await?;
+    Ok(response.addons)
 }

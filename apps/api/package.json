@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "bun run --hot src/index.ts",
     "start": "bun run src/index.ts",
-    "build": "bun build src/index.ts --outdir dist --target bun",
+    "build": "bun build src/index.ts --outdir dist --target bun --external cpu-features --external ssh2",
     "test": "bun test tests/unit && bun test tests/integration",
     "test:unit": "bun test tests/unit",
     "test:integration": "bun test tests/integration",

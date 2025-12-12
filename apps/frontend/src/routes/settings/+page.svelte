@@ -7,7 +7,7 @@
     sendNotification 
   } from "@tauri-apps/plugin-notification";
   import { connection, disconnect, testConnection } from "$lib/stores/connection.svelte";
-  import { projects, fetchProjects } from "$lib/stores/projects.svelte";
+  import { sandboxes, fetchSandboxes } from "$lib/stores/sandboxes.svelte";
   import { 
     settings, 
     initSettings, 
@@ -53,10 +53,10 @@
     }
   });
 
-  // Load projects for stats
+  // Load sandboxes for stats
   $effect(() => {
-    if (connection.isConnected && projects.list.length === 0) {
-      fetchProjects();
+    if (connection.isConnected && sandboxes.list.length === 0) {
+      fetchSandboxes();
     }
   });
 
@@ -600,7 +600,7 @@ export default {
           <Card.Title>OpenCode Permissions</Card.Title>
           <Card.Description>
             Control what actions OpenCode can perform without asking for permission.
-            These settings apply to all your projects.
+            These settings apply to all your sandboxes.
           </Card.Description>
         </Card.Header>
         <Card.Content class="space-y-4">
@@ -674,7 +674,7 @@ export default {
         <Card.Header>
           <Card.Title>Global Instructions (AGENTS.md)</Card.Title>
           <Card.Description>
-            Define global instructions and context for OpenCode that apply to all your projects.
+            Define global instructions and context for OpenCode that apply to all your sandboxes.
             This is your personal AGENTS.md file.
           </Card.Description>
         </Card.Header>
@@ -720,7 +720,7 @@ export default {
               <Card.Title>Custom Agents & Commands</Card.Title>
               <Card.Description>
                 Create and manage custom agents, commands, tools, and plugins.
-                These are available in all your projects.
+                These are available in all your sandboxes.
               </Card.Description>
             </div>
             <Button onclick={handleOpenNewFileDialog} size="sm">
@@ -1033,26 +1033,26 @@ export default {
         <Card.Header>
           <Card.Title>Statistics</Card.Title>
           <Card.Description>
-            Overview of your projects
+            Overview of your sandboxes
           </Card.Description>
         </Card.Header>
         <Card.Content>
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div class="text-center p-4 bg-muted rounded-lg">
-              <p class="text-3xl font-bold">{projects.count}</p>
-              <p class="text-sm text-muted-foreground">Total Projects</p>
+              <p class="text-3xl font-bold">{sandboxes.count}</p>
+              <p class="text-sm text-muted-foreground">Total Sandboxes</p>
             </div>
             <div class="text-center p-4 bg-green-500/10 rounded-lg">
-              <p class="text-3xl font-bold text-green-600 dark:text-green-400">{projects.running.length}</p>
+              <p class="text-3xl font-bold text-green-600 dark:text-green-400">{sandboxes.running.length}</p>
               <p class="text-sm text-muted-foreground">Running</p>
             </div>
             <div class="text-center p-4 bg-muted rounded-lg">
-              <p class="text-3xl font-bold">{projects.stopped.length}</p>
+              <p class="text-3xl font-bold">{sandboxes.stopped.length}</p>
               <p class="text-sm text-muted-foreground">Stopped</p>
             </div>
-            <div class="text-center p-4 bg-destructive/10 rounded-lg">
-              <p class="text-3xl font-bold text-destructive">{projects.errored.length}</p>
-              <p class="text-sm text-muted-foreground">Errors</p>
+            <div class="text-center p-4 bg-yellow-500/10 rounded-lg">
+              <p class="text-3xl font-bold text-yellow-600 dark:text-yellow-400">{sandboxes.paused.length}</p>
+              <p class="text-sm text-muted-foreground">Paused</p>
             </div>
           </div>
         </Card.Content>
@@ -1067,7 +1067,7 @@ export default {
     <Dialog.Header>
       <Dialog.Title>Create New File</Dialog.Title>
       <Dialog.Description>
-        Create a new {newFileType} file that will be available in all your projects.
+        Create a new {newFileType} file that will be available in all your sandboxes.
       </Dialog.Description>
     </Dialog.Header>
     <div class="space-y-4 py-4">

@@ -14,10 +14,6 @@ use commands::{
     auth_get_user, auth_get_token, auth_is_authenticated,
     // Connection commands
     connect, disconnect, get_connection_status, test_connection,
-    // Project commands (legacy, uses Coolify)
-    list_projects, get_project, create_project, delete_project,
-    start_project, stop_project, restart_project,
-    get_project_logs, deploy_project,
     // Sandbox commands (v2, direct Docker orchestration)
     docker_health, list_sandboxes, get_sandbox, create_sandbox, delete_sandbox,
     start_sandbox, stop_sandbox, restart_sandbox, pause_sandbox, unpause_sandbox,
@@ -31,8 +27,6 @@ use commands::{
     sandbox_opencode_respond_permission,
     sandbox_opencode_list_messages, sandbox_opencode_send_message, sandbox_opencode_get_message,
     sandbox_opencode_list_files, sandbox_opencode_get_file_content, sandbox_opencode_find_files,
-    // Container tier commands (legacy)
-    list_container_tiers, get_default_container_tier,
     // Resource tier commands (modular containers)
     list_resource_tiers, get_default_resource_tier,
     // Container flavor commands
@@ -42,25 +36,11 @@ use commands::{
     // Settings commands
     get_settings, save_settings, list_providers, get_default_provider,
     export_settings, import_settings,
-    // Provider commands (new)
+    // Provider commands
     list_providers_with_models, configure_provider_api_key,
     init_oauth_flow, poll_oauth_flow, cancel_oauth_flow,
     remove_provider_credentials, set_default_provider,
     list_configured_providers,
-    // User OpenCode config commands
-    get_user_opencode_config, update_user_opencode_settings,
-    update_user_agents_md, list_user_opencode_files,
-    upsert_user_opencode_file, delete_user_opencode_file,
-    // OpenCode commands
-    opencode_get_app_info, opencode_health_check, opencode_get_providers,
-    opencode_list_sessions, opencode_create_session, opencode_get_session,
-    opencode_delete_session, opencode_abort_session,
-    opencode_respond_permission,
-    opencode_list_messages, opencode_send_message, opencode_send_message_with_files,
-    opencode_get_message,
-    opencode_list_files, opencode_get_file_content, opencode_find_files,
-    // OpenCode streaming commands
-    opencode_connect_stream, opencode_disconnect_stream,
 };
 use tauri::{Manager, RunEvent, WindowEvent};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
@@ -95,16 +75,6 @@ pub fn run() {
             disconnect,
             test_connection,
             get_connection_status,
-            // Project commands (legacy, uses Coolify)
-            list_projects,
-            get_project,
-            create_project,
-            delete_project,
-            start_project,
-            stop_project,
-            restart_project,
-            get_project_logs,
-            deploy_project,
             // Sandbox commands (v2, direct Docker orchestration)
             docker_health,
             list_sandboxes,
@@ -139,9 +109,6 @@ pub fn run() {
             sandbox_opencode_list_files,
             sandbox_opencode_get_file_content,
             sandbox_opencode_find_files,
-            // Container tier commands (legacy)
-            list_container_tiers,
-            get_default_container_tier,
             // Resource tier commands (modular containers)
             list_resource_tiers,
             get_default_resource_tier,
@@ -158,7 +125,7 @@ pub fn run() {
             get_default_provider,
             export_settings,
             import_settings,
-            // Provider commands (new)
+            // Provider commands
             list_providers_with_models,
             list_configured_providers,
             configure_provider_api_key,
@@ -167,37 +134,6 @@ pub fn run() {
             cancel_oauth_flow,
             remove_provider_credentials,
             set_default_provider,
-            // User OpenCode config commands
-            get_user_opencode_config,
-            update_user_opencode_settings,
-            update_user_agents_md,
-            list_user_opencode_files,
-            upsert_user_opencode_file,
-            delete_user_opencode_file,
-            // OpenCode commands - App Info & Health
-            opencode_get_app_info,
-            opencode_health_check,
-            opencode_get_providers,
-            // OpenCode commands - Sessions
-            opencode_list_sessions,
-            opencode_create_session,
-            opencode_get_session,
-            opencode_delete_session,
-            opencode_abort_session,
-            // OpenCode commands - Permissions
-            opencode_respond_permission,
-            // OpenCode commands - Messages
-            opencode_list_messages,
-            opencode_send_message,
-            opencode_send_message_with_files,
-            opencode_get_message,
-            // OpenCode commands - Files
-            opencode_list_files,
-            opencode_get_file_content,
-            opencode_find_files,
-            // OpenCode commands - Streaming
-            opencode_connect_stream,
-            opencode_disconnect_stream,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
