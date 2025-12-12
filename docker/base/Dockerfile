@@ -199,7 +199,8 @@ ENV HOMEPAGE_PORT=3000
 ENV NGINX_PORT=80
 
 # OpenCode configuration
-ENV OPENCODE_CONFIG_DIR=/home/developer/.config/opencode-custom
+# Note: OPENCODE_CONFIG_DIR can be used to override the default ~/.config/opencode
+# We don't set it here so OpenCode uses its default location
 ENV TERM=xterm-256color
 
 # =============================================================================

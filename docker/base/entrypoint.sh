@@ -31,7 +31,11 @@ echo "=============================================="
 #
 # OpenCode Configuration:
 #   OPENCODE_AUTH_JSON    - Pre-built auth.json content (for LLM providers)
-#   OPENCODE_CONFIG_JSON  - Pre-built opencode.json content (optional)
+#                           Written to ~/.local/share/opencode/auth.json
+#   OPENCODE_USER_CONFIG  - User's global config JSON (settings, custom files)
+#                           Written to ~/.config/opencode/
+#   CODEOPEN_FLAVOR       - Container flavor (js, python, go, rust, fullstack, polyglot)
+#                           Used for flavor-specific AGENTS.md in workspace
 #   OPENCODE_PORT         - Port for OpenCode server (default: 4096)
 #   OPENCODE_HOST         - Host for OpenCode server (default: 0.0.0.0)
 #
@@ -44,7 +48,6 @@ echo "=============================================="
 HOME_DIR="/home/developer"
 WORKSPACE="${HOME_DIR}/workspace"
 OPENCODE_CONFIG_DIR="${HOME_DIR}/.config/opencode"
-OPENCODE_CUSTOM_CONFIG_DIR="${HOME_DIR}/.config/opencode-custom"
 OPENCODE_DATA_DIR="${HOME_DIR}/.local/share/opencode"
 
 # Source common functions if available
@@ -54,6 +57,11 @@ fi
 
 # =============================================================================
 # Fetch User Configuration from Management API
+# =============================================================================
+# Fetches global config from Management API and writes to:
+#   - ~/.config/opencode/opencode.json (settings)
+#   - ~/.config/opencode/{agent,command,tool,plugin}/ (custom files)
+# Note: AGENTS.md from API is no longer used - project AGENTS.md is flavor-specific
 # =============================================================================
 fetch_user_config() {
     if [ -z "$MANAGEMENT_API_URL" ] || [ -z "$USER_ID" ]; then
@@ -87,24 +95,19 @@ fetch_user_config() {
     
     echo "  Configuration fetched successfully."
     
-    # Extract and write AGENTS.md (global instructions)
-    AGENTS_CONTENT=$(echo "$RESPONSE" | jq -r '.agents_md // empty')
-    if [ -n "$AGENTS_CONTENT" ] && [ "$AGENTS_CONTENT" != "null" ]; then
-        echo "  Writing AGENTS.md to $OPENCODE_CONFIG_DIR/AGENTS.md"
-        mkdir -p "$OPENCODE_CONFIG_DIR"
-        echo "$AGENTS_CONTENT" > "$OPENCODE_CONFIG_DIR/AGENTS.md"
-    fi
+    # Global config directory
+    GLOBAL_CONFIG_DIR="$OPENCODE_CONFIG_DIR"
+    mkdir -p "$GLOBAL_CONFIG_DIR"
     
-    # Extract and write user settings to opencode.json
+    # Extract and write user settings to global opencode.json
     SETTINGS=$(echo "$RESPONSE" | jq -r '.settings // {}')
     if [ "$SETTINGS" != "{}" ] && [ "$SETTINGS" != "null" ]; then
-        echo "  Writing user settings to $OPENCODE_CONFIG_DIR/opencode.json"
-        mkdir -p "$OPENCODE_CONFIG_DIR"
-        echo "$SETTINGS" > "$OPENCODE_CONFIG_DIR/opencode.json"
+        echo "  Writing user settings to $GLOBAL_CONFIG_DIR/opencode.json"
+        echo "$SETTINGS" > "$GLOBAL_CONFIG_DIR/opencode.json"
     fi
     
-    # Extract and write custom config files
-    mkdir -p "$OPENCODE_CUSTOM_CONFIG_DIR"/{agent,command,tool,plugin}
+    # Extract and write custom config files to global directory
+    mkdir -p "$GLOBAL_CONFIG_DIR"/{agent,command,tool,plugin}
     
     for FILE_TYPE in agent command tool plugin; do
         echo "$RESPONSE" | jq -c ".files[]? | select(.type==\"$FILE_TYPE\")" 2>/dev/null | while IFS= read -r file_json; do
@@ -115,14 +118,13 @@ fetch_user_config() {
                 
                 if [ -n "$NAME" ] && [ -n "$CONTENT" ]; then
                     FILENAME="${NAME}.${EXT}"
-                    echo "  Writing custom config: $OPENCODE_CUSTOM_CONFIG_DIR/$FILE_TYPE/$FILENAME"
-                    echo "$CONTENT" > "$OPENCODE_CUSTOM_CONFIG_DIR/$FILE_TYPE/$FILENAME"
+                    echo "  Writing global config: $GLOBAL_CONFIG_DIR/$FILE_TYPE/$FILENAME"
+                    echo "$CONTENT" > "$GLOBAL_CONFIG_DIR/$FILE_TYPE/$FILENAME"
                 fi
             fi
         done
     done
     
-    export OPENCODE_CONFIG_DIR="$OPENCODE_CUSTOM_CONFIG_DIR"
     return 0
 }
 
@@ -174,6 +176,238 @@ setup_auth() {
         mkdir -p "$OPENCODE_DATA_DIR"
         echo "$OPENCODE_AUTH_JSON" > "$OPENCODE_DATA_DIR/auth.json"
     fi
+}
+
+# =============================================================================
+# Setup User Config from Environment
+# =============================================================================
+# Parses OPENCODE_USER_CONFIG JSON and sets up GLOBAL config:
+#   - settings -> ~/.config/opencode/opencode.json
+#   - agents_md (global instructions) -> ~/.config/opencode/AGENTS.md
+#   - files (agent/, command/, tool/, plugin/) -> ~/.config/opencode/
+# =============================================================================
+setup_user_config() {
+    if [ -z "$OPENCODE_USER_CONFIG" ]; then
+        return 0
+    fi
+    
+    echo "Setting up user OpenCode configuration from OPENCODE_USER_CONFIG..."
+    
+    # Validate JSON
+    if ! echo "$OPENCODE_USER_CONFIG" | jq empty 2>/dev/null; then
+        echo "  Warning: Invalid JSON in OPENCODE_USER_CONFIG. Skipping."
+        return 1
+    fi
+    
+    # Global config directory: ~/.config/opencode/
+    GLOBAL_CONFIG_DIR="$OPENCODE_CONFIG_DIR"
+    mkdir -p "$GLOBAL_CONFIG_DIR"
+    
+    # Extract and write global settings to ~/.config/opencode/opencode.json
+    SETTINGS=$(echo "$OPENCODE_USER_CONFIG" | jq -r '.settings // {}')
+    if [ "$SETTINGS" != "{}" ] && [ "$SETTINGS" != "null" ]; then
+        echo "  Writing global settings to $GLOBAL_CONFIG_DIR/opencode.json"
+        echo "$SETTINGS" > "$GLOBAL_CONFIG_DIR/opencode.json"
+    fi
+    
+    # Extract and write global instructions (agents_md) to ~/.config/opencode/AGENTS.md
+    # This is the user's global instructions that apply to all projects
+    AGENTS_MD=$(echo "$OPENCODE_USER_CONFIG" | jq -r '.agents_md // empty')
+    if [ -n "$AGENTS_MD" ] && [ "$AGENTS_MD" != "null" ]; then
+        echo "  Writing global instructions to $GLOBAL_CONFIG_DIR/AGENTS.md"
+        echo "$AGENTS_MD" > "$GLOBAL_CONFIG_DIR/AGENTS.md"
+    fi
+    
+    # Extract and write custom config files to global directory
+    # These go in ~/.config/opencode/{agent,command,tool,plugin}/
+    mkdir -p "$GLOBAL_CONFIG_DIR"/{agent,command,tool,plugin}
+    
+    for FILE_TYPE in agent command tool plugin; do
+        echo "$OPENCODE_USER_CONFIG" | jq -c ".files[]? | select(.type==\"$FILE_TYPE\")" 2>/dev/null | while IFS= read -r file_json; do
+            if [ -n "$file_json" ]; then
+                NAME=$(echo "$file_json" | jq -r '.name // empty')
+                EXT=$(echo "$file_json" | jq -r '.extension // "md"')
+                CONTENT=$(echo "$file_json" | jq -r '.content // empty')
+                
+                if [ -n "$NAME" ] && [ -n "$CONTENT" ]; then
+                    FILENAME="${NAME}.${EXT}"
+                    echo "  Writing global config: $GLOBAL_CONFIG_DIR/$FILE_TYPE/$FILENAME"
+                    echo "$CONTENT" > "$GLOBAL_CONFIG_DIR/$FILE_TYPE/$FILENAME"
+                fi
+            fi
+        done
+    done
+    
+    echo "  User global configuration setup complete."
+    return 0
+}
+
+# =============================================================================
+# Setup Project Config
+# =============================================================================
+# Sets up project-level configuration in the workspace:
+#   - opencode.json (with permissions)
+#   - AGENTS.md (flavor-specific instructions)
+# =============================================================================
+setup_project_config() {
+    echo "Setting up project-level OpenCode configuration..."
+    
+    # Ensure workspace exists
+    mkdir -p "$WORKSPACE"
+    
+    # Get flavor from environment (set by container)
+    FLAVOR="${CODEOPEN_FLAVOR:-fullstack}"
+    
+    # Create project opencode.json if it doesn't exist
+    if [ ! -f "$WORKSPACE/opencode.json" ]; then
+        echo "  Creating project opencode.json with default permissions"
+        cat > "$WORKSPACE/opencode.json" << 'EOF'
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "edit": "allow",
+    "bash": "allow",
+    "write": "allow",
+    "webfetch": "allow",
+    "mcp": "allow",
+    "external_directory": "allow"
+  }
+}
+EOF
+    fi
+    
+    # Create flavor-specific AGENTS.md if it doesn't exist
+    if [ ! -f "$WORKSPACE/AGENTS.md" ]; then
+        echo "  Creating AGENTS.md for flavor: $FLAVOR"
+        case "$FLAVOR" in
+            js)
+                cat > "$WORKSPACE/AGENTS.md" << 'EOF'
+# Project Instructions
+
+## Environment
+This is a JavaScript/TypeScript development environment with:
+- Node.js 22 LTS
+- Bun runtime
+- TypeScript, tsx, ts-node
+- Yarn, pnpm package managers
+- Deno runtime
+- ESLint, Prettier, Biome
+
+## Code Style
+- Use TypeScript for type safety
+- Prefer ES modules over CommonJS
+- Use async/await over callbacks
+- Follow project's existing code style
+EOF
+                ;;
+            python)
+                cat > "$WORKSPACE/AGENTS.md" << 'EOF'
+# Project Instructions
+
+## Environment
+This is a Python development environment with:
+- Python 3.12+
+- pip, pipx, uv package managers
+- Poetry for dependency management
+- pytest for testing
+- Black, Ruff for formatting/linting
+- pyright for type checking
+
+## Code Style
+- Use type hints for function signatures
+- Follow PEP 8 style guidelines
+- Use virtual environments for dependencies
+- Prefer pathlib over os.path
+EOF
+                ;;
+            go)
+                cat > "$WORKSPACE/AGENTS.md" << 'EOF'
+# Project Instructions
+
+## Environment
+This is a Go development environment with:
+- Go 1.22+
+- Standard Go toolchain (go build, go test, go mod)
+- golangci-lint for linting
+- delve for debugging
+
+## Code Style
+- Follow Effective Go guidelines
+- Use gofmt for formatting
+- Handle errors explicitly
+- Keep packages small and focused
+EOF
+                ;;
+            rust)
+                cat > "$WORKSPACE/AGENTS.md" << 'EOF'
+# Project Instructions
+
+## Environment
+This is a Rust development environment with:
+- Rust stable toolchain
+- Cargo package manager
+- rustfmt for formatting
+- clippy for linting
+- rust-analyzer for IDE support
+
+## Code Style
+- Follow Rust API guidelines
+- Use rustfmt for formatting
+- Handle Results and Options properly
+- Prefer references over cloning
+EOF
+                ;;
+            fullstack)
+                cat > "$WORKSPACE/AGENTS.md" << 'EOF'
+# Project Instructions
+
+## Environment
+This is a full-stack development environment with:
+- Node.js 22 LTS, Bun, Deno
+- Python 3.12+ with pip, poetry
+- Go 1.22+ with standard toolchain
+- Common CLI tools and utilities
+
+## Code Style
+- Follow the conventions of the primary language being used
+- Use appropriate linters and formatters for each language
+- Write tests alongside implementation code
+EOF
+                ;;
+            polyglot)
+                cat > "$WORKSPACE/AGENTS.md" << 'EOF'
+# Project Instructions
+
+## Environment
+This is a polyglot development environment with:
+- Node.js 22, Bun, Deno (JavaScript/TypeScript)
+- Python 3.12+ (Python)
+- Go 1.22+ (Go)
+- Rust stable (Rust)
+- All standard tools for each language
+
+## Code Style
+- Follow the conventions of the language being used
+- Use appropriate linters and formatters
+- Maintain consistency within each language's codebase
+EOF
+                ;;
+            *)
+                cat > "$WORKSPACE/AGENTS.md" << 'EOF'
+# Project Instructions
+
+## Environment
+This is a CodeOpen development environment.
+
+## Code Style
+- Follow the project's existing code conventions
+- Use appropriate tools for the language being used
+EOF
+                ;;
+        esac
+    fi
+    
+    echo "  Project configuration setup complete."
 }
 
 # =============================================================================
@@ -541,7 +775,6 @@ trap cleanup SIGTERM SIGINT
 
 # Ensure config directories exist
 mkdir -p "$OPENCODE_CONFIG_DIR"
-mkdir -p "$OPENCODE_CUSTOM_CONFIG_DIR"
 mkdir -p "$OPENCODE_DATA_DIR"
 
 # Configure git first (needed for workspace initialization)
@@ -556,8 +789,14 @@ mkdir -p "$WORKSPACE"
 # Try to fetch config from Management API, fall back to env vars
 fetch_user_config || setup_fallback_config
 
-# Always setup auth from OPENCODE_AUTH_JSON
+# Always setup auth from OPENCODE_AUTH_JSON (provider credentials)
 setup_auth
+
+# Setup user config from OPENCODE_USER_CONFIG (global settings, custom files)
+setup_user_config
+
+# Setup project-level config (opencode.json, flavor-specific AGENTS.md)
+setup_project_config
 
 # Install addons (based on ADDON_IDS env var)
 install_addons

@@ -21,6 +21,8 @@ import {
 import type { Sandbox, SandboxConfig, SandboxStats } from "./orchestrator/types.ts";
 import type { Repository } from "./git/types.ts";
 import { createLogger } from "../utils/logger.ts";
+import { buildOpenCodeAuthJson } from "../models/provider.ts";
+import { getUserOpencodeFullConfig } from "../models/user-opencode-config.ts";
 
 const log = createLogger("sandbox-manager");
 
@@ -198,6 +200,37 @@ export class SandboxManager {
     // Add GitHub URL if cloned
     if (githubUrl) {
       containerSpec.labels["agentpod.sandbox.github"] = githubUrl;
+    }
+
+    // Step 3.5: Inject OpenCode configuration
+    // This includes auth (provider credentials) and user config (settings, AGENTS.md, custom files)
+    try {
+      // Inject provider credentials (auth.json)
+      const authJson = await buildOpenCodeAuthJson();
+      if (authJson && authJson !== "{}") {
+        containerSpec.env = {
+          ...containerSpec.env,
+          OPENCODE_AUTH_JSON: authJson,
+        };
+        log.debug("Injected OpenCode auth configuration");
+      }
+
+      // Inject user OpenCode configuration (settings, AGENTS.md, custom files)
+      const userConfig = getUserOpencodeFullConfig(userId);
+      if (userConfig) {
+        // Pass the full config as JSON - the entrypoint will parse it
+        containerSpec.env = {
+          ...containerSpec.env,
+          OPENCODE_USER_CONFIG: JSON.stringify(userConfig),
+        };
+        log.debug("Injected user OpenCode configuration", {
+          hasSettings: !!userConfig.settings,
+          hasAgentsMd: !!userConfig.agents_md,
+          filesCount: userConfig.files?.length ?? 0,
+        });
+      }
+    } catch (configError) {
+      log.warn("Failed to build OpenCode config, continuing without it", { error: configError });
     }
 
     // Step 4: Create the container

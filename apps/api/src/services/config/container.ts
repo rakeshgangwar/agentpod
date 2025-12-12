@@ -211,6 +211,11 @@ function generateEnv(
     // Sandbox identification
     SANDBOX_ID: options.sandboxId,
     SANDBOX_USER_ID: options.userId,
+    
+    // Management API URL for fetching config on container restart
+    // Container can fetch fresh config from this URL
+    MANAGEMENT_API_URL: `http://${config.docker.network === 'host' ? 'localhost' : 'agentpod-api'}:${config.port}`,
+    USER_ID: options.userId,
 
     // Project info
     PROJECT_NAME: agentConfig.project.name,
