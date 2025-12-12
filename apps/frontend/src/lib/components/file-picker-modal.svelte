@@ -5,8 +5,8 @@
   import { ScrollArea } from "$lib/components/ui/scroll-area";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import {
-    opencodeListFiles,
-    opencodeFindFiles,
+    sandboxOpencodeListFiles,
+    sandboxOpencodeFindFiles,
     type FileNode,
   } from "$lib/api/tauri";
 
@@ -63,7 +63,8 @@
   async function loadFileTree() {
     isLoadingTree = true;
     try {
-      fileTree = await opencodeListFiles(projectId);
+      // projectId is actually sandboxId in v2 API
+      fileTree = await sandboxOpencodeListFiles(projectId);
     } catch (err) {
       console.error("Failed to load file tree:", err);
     } finally {
@@ -78,7 +79,8 @@
       if (!searchQuery) return;
       isSearching = true;
       try {
-        const results = await opencodeFindFiles(projectId, searchQuery);
+        // projectId is actually sandboxId in v2 API
+        const results = await sandboxOpencodeFindFiles(projectId, searchQuery);
         searchResults = results.slice(0, 50); // Limit results
         selectedIndex = 0;
       } catch (err) {
@@ -107,7 +109,8 @@
     loadingFolders.add(path);
     loadingFolders = new Set(loadingFolders);
     try {
-      const contents = await opencodeListFiles(projectId, path);
+      // projectId is actually sandboxId in v2 API
+      const contents = await sandboxOpencodeListFiles(projectId, path);
       folderContents.set(path, contents);
       folderContents = new Map(folderContents);
     } catch (err) {

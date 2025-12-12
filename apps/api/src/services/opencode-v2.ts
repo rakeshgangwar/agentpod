@@ -13,6 +13,7 @@ import type { Session, Message, Part } from "@opencode-ai/sdk";
 import { getSandboxManager } from "./sandbox-manager.ts";
 import type { Sandbox } from "./orchestrator/types.ts";
 import { createLogger } from "../utils/logger.ts";
+import { config } from "../config.ts";
 
 /**
  * Custom fetch that bypasses SSL verification for container-to-container communication.
@@ -74,33 +75,30 @@ const clientCache = new Map<string, ReturnType<typeof createOpencodeClient>>();
 
 /**
  * Get the OpenCode API base URL for a sandbox
- * Uses the URL stored in sandbox labels (set by Traefik configuration)
+ * 
+ * When running inside Docker, we use the internal container name for direct communication
+ * over the Docker network instead of going through Traefik (which uses *.localhost domains
+ * that don't resolve inside containers).
  */
 function getOpenCodeUrl(sandbox: Sandbox): string {
-  // First, check if we have an explicit opencode URL in sandbox.urls
-  if (sandbox.urls?.opencode) {
-    return sandbox.urls.opencode;
-  }
-
-  // Fall back to constructing from labels
-  const slug = sandbox.labels?.["agentpod.sandbox.slug"];
-  if (!slug) {
-    throw new OpenCodeV2Error(
-      "Sandbox is missing slug label. Cannot determine OpenCode URL.",
-      500
-    );
-  }
-
-  // Try to get URL from labels (agentpod.url.opencode)
-  const urlFromLabel = sandbox.labels?.["agentpod.url.opencode"];
-  if (urlFromLabel) {
-    return urlFromLabel;
-  }
-
-  throw new OpenCodeV2Error(
-    "No OpenCode URL configured for this sandbox. Sandbox may have been created before URL labels were implemented.",
-    500
-  );
+  // Use internal Docker network URL: http://{containerName}:{opencodePort}
+  // Container name format: {prefix}-{sandboxId} (e.g., "agentpod-MN1N1-rsnw0v")
+  const containerPrefix = config.docker.containerPrefix;
+  const opencodePort = config.opencode.serverPort;
+  
+  // The container name is stored or can be derived from sandbox.id
+  const containerName = `${containerPrefix}-${sandbox.id}`;
+  
+  const internalUrl = `http://${containerName}:${opencodePort}`;
+  
+  log.debug("Using internal Docker URL for OpenCode", {
+    sandboxId: sandbox.id,
+    containerName,
+    internalUrl,
+    externalUrl: sandbox.urls?.opencode,
+  });
+  
+  return internalUrl;
 }
 
 /**
@@ -130,7 +128,7 @@ async function getClient(sandboxId: string) {
   log.debug("Creating OpenCode SDK client", { sandboxId, baseUrl });
 
   const client = createOpencodeClient({
-    baseUrl: `${baseUrl}/opencode`,
+    baseUrl,
     throwOnError: true,
     // Use custom fetch with SSL verification disabled for container-to-container communication
     fetch: insecureFetch,

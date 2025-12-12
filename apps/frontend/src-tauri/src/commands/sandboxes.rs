@@ -279,11 +279,18 @@ pub async fn sandbox_opencode_health_check(sandbox_id: String) -> Result<OpenCod
 
 /// Get configured LLM providers for a sandbox
 #[tauri::command]
-pub async fn sandbox_opencode_get_providers(sandbox_id: String) -> Result<serde_json::Value, AppError> {
+pub async fn sandbox_opencode_get_providers(sandbox_id: String) -> Result<Vec<crate::models::OpenCodeProvider>, AppError> {
     let client = get_client()?;
-    client
+    
+    #[derive(serde::Deserialize)]
+    struct Response {
+        providers: Vec<crate::models::OpenCodeProvider>,
+    }
+    
+    let response: Response = client
         .get(&format!("/api/v2/sandboxes/{}/opencode/providers", sandbox_id))
-        .await
+        .await?;
+    Ok(response.providers)
 }
 
 /// List all OpenCode sessions for a sandbox

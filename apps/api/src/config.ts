@@ -94,10 +94,14 @@ export const config = {
   data: {
     // Base directory for all persistent data
     dir: getEnv('DATA_DIR', './data'),
-    // Git repositories directory
+    // Git repositories directory (container path)
     reposDir: getEnv('REPOS_DIR', './data/repos'),
-    // Container volumes directory
+    // Container volumes directory (container path)
     volumesDir: getEnv('VOLUMES_DIR', './data/volumes'),
+    // Host path prefix for bind mounts (when running in Docker)
+    // This is needed because bind mounts must use host paths, not container paths
+    // If not set, assumes running directly on host and uses reposDir/volumesDir as-is
+    hostPathPrefix: getEnv('HOST_PATH_PREFIX', ''),
   },
 
   // ==========================================================================

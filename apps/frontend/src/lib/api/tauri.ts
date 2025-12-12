@@ -1367,10 +1367,16 @@ export async function authIsAuthenticated(): Promise<boolean> {
 export type SandboxStatus = "created" | "running" | "paused" | "restarting" | "exited" | "dead" | "unknown";
 
 export interface SandboxUrls {
-  main?: string;
+  homepage?: string;
   opencode?: string;
   codeServer?: string;
   vnc?: string;
+}
+
+export interface SandboxHealth {
+  status: string;
+  failingStreak?: number;
+  lastCheck?: string;
 }
 
 export interface Sandbox {
@@ -1383,6 +1389,7 @@ export interface Sandbox {
   startedAt?: string;
   image: string;
   labels: Record<string, string>;
+  health?: SandboxHealth;
 }
 
 export interface Repository {

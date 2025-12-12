@@ -741,9 +741,10 @@ export const sandboxRoutes = new Hono()
           const events = await opencodeV2.subscribeToEvents(id, abortController.signal);
           
           for await (const event of events) {
+            // Send the full event object (type + properties) to match OpenCode SDK format
             await stream.writeSSE({
               event: event.type,
-              data: JSON.stringify(event.properties),
+              data: JSON.stringify(event),
             });
           }
         } catch (error) {

@@ -9,8 +9,8 @@
   import { MarkdownViewer } from "$lib/components/ui/markdown";
   import { toast } from "svelte-sonner";
   import {
-    opencodeListFiles,
-    opencodeGetFileContent,
+    sandboxOpencodeListFiles,
+    sandboxOpencodeGetFileContent,
     type FileNode,
     type FileContent,
   } from "$lib/api/tauri";
@@ -101,7 +101,8 @@
     folderContents = new Map();
     expandedPaths = new Set();
     try {
-      fileTree = await opencodeListFiles(projectId);
+      // projectId is actually sandboxId in v2 API
+      fileTree = await sandboxOpencodeListFiles(projectId);
     } catch (err) {
       treeError = err instanceof Error ? err.message : "Failed to load files";
       console.error("Failed to load file tree:", err);
@@ -122,7 +123,8 @@
     fileContent = null;
 
     try {
-      const response = await opencodeGetFileContent(projectId, node.path);
+      // projectId is actually sandboxId in v2 API
+      const response = await sandboxOpencodeGetFileContent(projectId, node.path);
       
       // OpenCode API returns base64 encoded content - decode it
       let content = response.content;
@@ -162,7 +164,8 @@
     loadingFolders = new Set(loadingFolders);
     
     try {
-      const contents = await opencodeListFiles(projectId, path);
+      // projectId is actually sandboxId in v2 API
+      const contents = await sandboxOpencodeListFiles(projectId, path);
       folderContents.set(path, contents);
       folderContents = new Map(folderContents);
     } catch (err) {

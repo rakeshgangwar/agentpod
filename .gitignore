@@ -35,3 +35,4 @@ vite.config.ts.timestamp-*
 
 # Logs
 *.log
+data/

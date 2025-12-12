@@ -74,6 +74,8 @@ export class SandboxManager {
       port: config.docker.port,
       containerPrefix: config.docker.containerPrefix,
       defaultNetwork: config.docker.network,
+      // Host path prefix for bind mounts (when API runs in Docker)
+      hostPathPrefix: config.data.hostPathPrefix || undefined,
     });
 
     // Initialize Git backend
@@ -516,15 +518,13 @@ export class SandboxManager {
   private getImageForFlavor(flavor: string): string {
     // In development mode, use the AgentPod base image which has OpenCode pre-installed
     if (config.nodeEnv === "development") {
-      // Use agentpod/base:dev - built from docker/base/Dockerfile
-      // This image includes: Ubuntu 24.04, Node.js 22, Bun, OpenCode CLI, nginx, etc.
-      // Build it with: cd docker/base && docker build -t agentpod/base:dev .
-      const devImage = "agentpod/base:dev";
+      // Use codeopen-js:dev for development
+      // Build it with: docker build -t codeopen-js:dev docker/flavors/js
+      const devImage = "codeopen-js:dev";
       
       log.debug("Using development image", { 
         flavor, 
         image: devImage,
-        note: "Build with: cd docker/base && docker build -t agentpod/base:dev ."
       });
       
       return devImage;

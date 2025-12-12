@@ -129,6 +129,10 @@ services:
       - REPOS_DIR=/data/repos
       - VOLUMES_DIR=/data/volumes
       - DATABASE_PATH=/data/db/agentpod.sqlite
+      # Host path prefix for bind mounts (required when API runs in Docker)
+      # This translates container paths to host paths for sandbox bind mounts
+      # Set to the absolute path of this project on the host machine
+      - HOST_PATH_PREFIX=${HOST_PATH_PREFIX:-}
 
       # =======================================================================
       # API URLs
@@ -159,8 +163,13 @@ services:
     volumes:
       # Docker socket for container management
       - /var/run/docker.sock:/var/run/docker.sock
-      # Persistent data (database, repos, volumes)
-      - agentpod-data:/data
+      # Database (use named volume)
+      - agentpod-data:/data/db
+      # Repos directory (use host path so sandbox containers can mount it)
+      # This must be a host path, not a Docker volume, for bind mounts to work
+      - ./data/repos:/data/repos
+      # Volumes directory (use host path for same reason)
+      - ./data/volumes:/data/volumes
       # Source code for hot reload (development only)
       - ./apps/api/src:/app/apps/api/src:ro
     networks:

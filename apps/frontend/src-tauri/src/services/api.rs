@@ -614,17 +614,17 @@ impl ApiClient {
     // OpenCode - SSE Event Stream
     // =========================================================================
 
-    /// Get the SSE event stream URL for a project
-    pub fn opencode_event_stream_url(&self, project_id: &str) -> String {
-        format!("{}/api/projects/{}/opencode/event", self.base_url, project_id)
+    /// Get the SSE event stream URL for a sandbox (v2 API)
+    pub fn opencode_event_stream_url(&self, sandbox_id: &str) -> String {
+        format!("{}/api/v2/sandboxes/{}/opencode/event", self.base_url, sandbox_id)
     }
 
-    /// Connect to the SSE event stream and return a response for streaming
+    /// Connect to the SSE event stream and return a response for streaming (v2 API)
     pub async fn opencode_connect_event_stream(
         &self,
-        project_id: &str,
+        sandbox_id: &str,
     ) -> Result<reqwest::Response, AppError> {
-        let url = self.opencode_event_stream_url(project_id);
+        let url = self.opencode_event_stream_url(sandbox_id);
         let mut request = self.sse_client.get(&url)
             .header("Accept", "text/event-stream");
         

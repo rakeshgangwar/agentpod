@@ -93,16 +93,16 @@
     <h3 class="font-medium">Service URLs</h3>
     
     <div class="grid gap-3">
-      <!-- Main URL -->
-      {#if sandbox?.urls.main}
+      <!-- Homepage URL -->
+      {#if sandbox?.urls.homepage}
         <div class="flex items-center justify-between p-3 bg-muted/50 rounded">
           <div class="min-w-0 flex-1">
-            <div class="font-medium">Main URL</div>
+            <div class="font-medium">Homepage URL</div>
             <div class="text-sm text-muted-foreground truncate">
-              {sandbox.urls.main}
+              {sandbox.urls.homepage}
             </div>
           </div>
-          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls.main, "Main", "opencode")}>
+          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls.homepage, "Homepage", "opencode")}>
             Open
           </Button>
         </div>

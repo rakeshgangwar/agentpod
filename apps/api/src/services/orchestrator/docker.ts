@@ -39,6 +39,18 @@ export interface DockerOrchestratorConfig {
   /** Container name prefix */
   containerPrefix?: string;
 
+  /**
+   * Host path prefix for bind mounts.
+   * When the API runs inside a Docker container, bind mounts must use host paths,
+   * not container paths. This prefix is prepended to volume.host paths that start
+   * with the container's data directory (e.g., /data/repos).
+   * 
+   * Example: If hostPathPrefix is "/home/user/agentpod" and a volume.host is
+   * "/data/repos/sandbox-123", the actual bind mount will be:
+   * "/home/user/agentpod/data/repos/sandbox-123"
+   */
+  hostPathPrefix?: string;
+
   /** Default network name */
   defaultNetwork?: string;
 
@@ -52,6 +64,7 @@ const DEFAULT_CONFIG: Required<DockerOrchestratorConfig> = {
   port: 2375,
   containerPrefix: "agentpod",
   defaultNetwork: "agentpod-net",
+  hostPathPrefix: "",
   defaultResources: {
     cpus: "1.0",
     memory: "2g",
@@ -633,7 +646,18 @@ export class DockerOrchestrator {
 
   private formatVolumeMount(volume: VolumeMount): string {
     const mode = volume.mode === "ro" ? "ro" : "rw";
-    return `${volume.host}:${volume.container}:${mode}`;
+    
+    // Translate container paths to host paths when running inside Docker
+    let hostPath = volume.host;
+    if (this.config.hostPathPrefix) {
+      // If the volume.host starts with /data (the container's data directory),
+      // prepend the host path prefix to convert it to an actual host path
+      if (hostPath.startsWith("/data")) {
+        hostPath = `${this.config.hostPathPrefix}${hostPath}`;
+      }
+    }
+    
+    return `${hostPath}:${volume.container}:${mode}`;
   }
 
   private parseMemoryLimit(limit?: string): number | undefined {

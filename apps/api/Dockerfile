@@ -9,7 +9,7 @@
 # -----------------------------------------------------------------------------
 # Stage 1: Build
 # -----------------------------------------------------------------------------
-FROM oven/bun:1.1-alpine AS builder
+FROM oven/bun:1.2-alpine AS builder
 
 WORKDIR /app
 
@@ -36,9 +36,15 @@ COPY apps/api/tsconfig.json ./apps/api/
 # -----------------------------------------------------------------------------
 # Stage 2: Production
 # -----------------------------------------------------------------------------
-FROM oven/bun:1.1-alpine AS production
+FROM oven/bun:1.2-alpine AS production
 
 WORKDIR /app
+
+# Install required packages:
+# - shadow: for usermod/groupadd commands
+# - su-exec: for dropping privileges
+# - git: for repository management
+RUN apk add --no-cache shadow su-exec git
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S appgroup && \
@@ -53,9 +59,6 @@ COPY --from=builder /app/apps/api ./apps/api
 # Create data directories for SQLite and repos (both /app/data for defaults and /data for docker-compose)
 RUN mkdir -p /app/data /data/db /data/repos /data/volumes && \
     chown -R appuser:appgroup /app/data /data
-
-# Switch to non-root user
-USER appuser
 
 # Set working directory to API
 WORKDIR /app/apps/api
@@ -72,5 +75,10 @@ EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:3001/health || exit 1
 
-# Run the application
+# Copy entrypoint script
+COPY apps/api/scripts/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+# Run via entrypoint (handles Docker socket permissions, then drops to appuser)
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["bun", "run", "src/index.ts"]

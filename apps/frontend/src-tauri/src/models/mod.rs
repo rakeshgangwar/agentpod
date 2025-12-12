@@ -300,10 +300,23 @@ pub enum SandboxStatus {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SandboxUrls {
-    pub main: Option<String>,
+    pub homepage: Option<String>,
     pub opencode: Option<String>,
+    #[serde(default)]
     pub code_server: Option<String>,
+    #[serde(default)]
     pub vnc: Option<String>,
+}
+
+/// Health status from Docker container
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SandboxHealth {
+    pub status: String,
+    #[serde(default)]
+    pub failing_streak: u32,
+    #[serde(default)]
+    pub last_check: Option<String>,
 }
 
 /// Sandbox model from v2 API
@@ -316,10 +329,13 @@ pub struct Sandbox {
     pub status: SandboxStatus,
     pub urls: SandboxUrls,
     pub created_at: String,
+    #[serde(default)]
     pub started_at: Option<String>,
     pub image: String,
     #[serde(default)]
     pub labels: std::collections::HashMap<String, String>,
+    #[serde(default)]
+    pub health: Option<SandboxHealth>,
 }
 
 /// Repository model from v2 API
@@ -519,4 +535,25 @@ pub struct DockerInfo {
 pub struct DockerContainerStats {
     pub running: u32,
     pub stopped: u32,
+}
+
+// =============================================================================
+// OpenCode Types
+// =============================================================================
+
+/// OpenCode model info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenCodeModel {
+    pub id: String,
+    pub name: String,
+}
+
+/// OpenCode provider with models
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenCodeProvider {
+    pub id: String,
+    pub name: String,
+    pub models: Vec<OpenCodeModel>,
 }
