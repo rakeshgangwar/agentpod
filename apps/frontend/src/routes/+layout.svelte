@@ -5,6 +5,7 @@
   import { initConnection } from "$lib/stores/connection.svelte";
   import { auth, initAuth } from "$lib/stores/auth.svelte";
   import { initSettings } from "$lib/stores/settings.svelte";
+  import { themeStore } from "$lib/themes/store.svelte";
   import { Toaster } from "$lib/components/ui/sonner";
 
   let { children } = $props();
@@ -18,7 +19,10 @@
     // Get current path
     currentPath = window.location.pathname;
     
-    // Initialize settings first (for theme)
+    // Initialize theme store first (applies saved theme immediately)
+    themeStore.initialize();
+    
+    // Initialize settings
     await initSettings();
     // Initialize auth
     await initAuth();

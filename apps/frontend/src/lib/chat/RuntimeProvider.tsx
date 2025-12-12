@@ -237,6 +237,14 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
   
   // Permission context
   const { addPermission, removePermission, clearPermissions } = usePermissions();
+  
+  // Refs for permission functions to keep handleSSEEvent stable
+  const addPermissionRef = useRef(addPermission);
+  const removePermissionRef = useRef(removePermission);
+  useEffect(() => {
+    addPermissionRef.current = addPermission;
+    removePermissionRef.current = removePermission;
+  }, [addPermission, removePermission]);
 
   // Clear permissions when session changes
   useEffect(() => {
@@ -336,7 +344,7 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
           time: (properties.time as { created: number }) || { created: Date.now() },
         };
         
-        addPermission(permission);
+        addPermissionRef.current(permission);
       }
     }
     
@@ -346,7 +354,7 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
       
       const permissionId = properties?.permissionID as string | undefined;
       if (permissionId) {
-        removePermission(permissionId);
+        removePermissionRef.current(permissionId);
       }
     }
 
@@ -560,39 +568,58 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
         setInternalMessages((prev) => prev.filter((m) => m.id !== messageId));
       }
     }
-  }, [sessionId, addPermission, removePermission]);
+  }, [sessionId]); // Use refs for permission functions to keep this callback stable
 
   // Connect to SSE stream when session is available
+  // Use a ref for handleSSEEvent to avoid triggering reconnects when it changes
+  const handleSSEEventRef = useRef(handleSSEEvent);
+  useEffect(() => {
+    handleSSEEventRef.current = handleSSEEvent;
+  }, [handleSSEEvent]);
+
   useEffect(() => {
     if (!sessionId || isLoading) return;
 
     let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
     let isCleaningUp = false;
     
-    const connectStream = () => {
+    const connectStream = async () => {
       if (isCleaningUp) return;
+      
+      // If there's already a connected stream, don't create another
+      if (streamRef.current?.isConnected) {
+        console.log("[RuntimeProvider] Stream already connected, skipping");
+        return;
+      }
+      
+      // Clean up existing stream before creating new one
+      if (streamRef.current) {
+        await streamRef.current.disconnect().catch(console.error);
+      }
       
       const stream = new OpenCodeStream(projectId);
       streamRef.current = stream;
 
-      stream.connect(
-        handleSSEEvent,
-        (status, err) => {
-          if (status === "error") {
-            console.warn("[RuntimeProvider] Stream error:", err);
+      try {
+        await stream.connect(
+          (event) => handleSSEEventRef.current(event),
+          (status, err) => {
+            if (status === "error") {
+              console.warn("[RuntimeProvider] Stream error:", err);
+            }
+            // Try to reconnect after disconnection (unless we're cleaning up)
+            if (status === "disconnected" && !isCleaningUp) {
+              reconnectTimeout = setTimeout(connectStream, 2000);
+            }
           }
-          // Try to reconnect after disconnection (unless we're cleaning up)
-          if (status === "disconnected" && !isCleaningUp) {
-            reconnectTimeout = setTimeout(connectStream, 2000);
-          }
-        }
-      ).catch((err) => {
+        );
+      } catch (err) {
         console.error("[RuntimeProvider] Failed to connect SSE:", err);
         // Try to reconnect after failure (unless we're cleaning up)
         if (!isCleaningUp) {
           reconnectTimeout = setTimeout(connectStream, 2000);
         }
-      });
+      }
     };
 
     connectStream();
@@ -607,7 +634,7 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
         streamRef.current = null;
       }
     };
-  }, [projectId, sessionId, isLoading, handleSSEEvent]);
+  }, [projectId, sessionId, isLoading]); // Removed handleSSEEvent - using ref instead
 
   // Handle sending a new message
   const onNew = useCallback(async (message: AppendMessage) => {

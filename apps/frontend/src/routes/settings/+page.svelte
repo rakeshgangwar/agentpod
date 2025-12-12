@@ -11,9 +11,7 @@
   import { 
     settings, 
     initSettings, 
-    loadProviders, 
-    setTheme, 
-    setDefaultProvider,
+    loadProviders,
     setAutoRefreshInterval,
     setInAppNotifications,
     setSystemNotifications,
@@ -22,7 +20,6 @@
     resetSettings 
   } from "$lib/stores/settings.svelte";
   import type { 
-    Theme, 
     PermissionLevel, 
     PermissionSettings, 
     UserOpencodeSettings,
@@ -32,7 +29,6 @@
     getUserOpencodeConfig, 
     updateUserOpencodeSettings,
     updateUserAgentsMd,
-    listUserOpencodeFiles,
     upsertUserOpencodeFile,
     deleteUserOpencodeFile
   } from "$lib/api/tauri";
@@ -44,7 +40,15 @@
   import * as Select from "$lib/components/ui/select";
   import * as Tabs from "$lib/components/ui/tabs";
   import * as Dialog from "$lib/components/ui/dialog";
-  import LlmProviderSelector from "$lib/components/llm-provider-selector.svelte";
+  import LlmProvidersSettings from "$lib/components/llm-providers-settings.svelte";
+  import ThemePicker from "$lib/components/theme-picker.svelte";
+  
+  // Icons
+  import PlugIcon from "@lucide/svelte/icons/plug";
+  import PaletteIcon from "@lucide/svelte/icons/palette";
+  import BrainIcon from "@lucide/svelte/icons/brain";
+  import TerminalIcon from "@lucide/svelte/icons/terminal";
+  import InfoIcon from "@lucide/svelte/icons/info";
 
   // Redirect if not connected
   $effect(() => {
@@ -68,16 +72,14 @@
     }
   });
 
+  // Active tab state
+  let activeTab = $state("connection");
+
   // Settings state
   let isTesting = $state(false);
   let testResult = $state<{ success: boolean; message: string } | null>(null);
-  let exportData = $state<string | null>(null);
   let importInput = $state("");
   let showImportDialog = $state(false);
-  
-  // LLM Provider selector state
-  let selectedModel = $state("");
-  let showAllProviders = $state(false);
 
   // OpenCode Config state
   let opencodeConfigLoading = $state(false);
@@ -92,7 +94,6 @@
   
   // Config files state
   let configFiles = $state<UserOpencodeFile[]>([]);
-  let configFilesLoading = $state(false);
   let selectedFileType = $state<"agent" | "command" | "tool" | "plugin">("agent");
   let selectedFile = $state<UserOpencodeFile | null>(null);
   let editingFileContent = $state("");
@@ -153,18 +154,6 @@
   
   function handleResetAgentsMd() {
     agentsMd = agentsMdOriginal;
-  }
-  
-  // Config files handlers
-  async function loadConfigFiles(fileType?: "agent" | "command" | "tool" | "plugin") {
-    configFilesLoading = true;
-    try {
-      configFiles = await listUserOpencodeFiles(fileType);
-    } catch (e) {
-      console.error("Failed to load config files:", e);
-    } finally {
-      configFilesLoading = false;
-    }
   }
   
   function handleSelectFile(file: UserOpencodeFile) {
@@ -402,16 +391,6 @@ export default {
     isTesting = false;
   }
 
-  async function handleThemeChange(value: string | undefined) {
-    if (value) {
-      await setTheme(value as Theme);
-    }
-  }
-
-  async function handleProviderChange(value: string | undefined) {
-    await setDefaultProvider(value ?? null);
-  }
-
   async function handleExport() {
     const json = await exportSettingsJson();
     if (json) {
@@ -474,27 +453,24 @@ export default {
     reader.readAsText(file);
   }
 
-  // Theme options for select
-  const themeOptions = [
-    { value: "system", label: "System" },
-    { value: "light", label: "Light" },
-    { value: "dark", label: "Dark" },
+  // Main settings tabs configuration
+  const settingsTabs = [
+    { value: "connection", label: "Connection", icon: PlugIcon },
+    { value: "appearance", label: "Appearance", icon: PaletteIcon },
+    { value: "ai-models", label: "AI Models", icon: BrainIcon },
+    { value: "opencode", label: "OpenCode", icon: TerminalIcon },
+    { value: "about", label: "About", icon: InfoIcon },
   ];
-
-  // Get current theme label
-  function getThemeLabel(theme: Theme): string {
-    return themeOptions.find(t => t.value === theme)?.label ?? "System";
-  }
 </script>
 
-<main class="container mx-auto px-4 py-8 max-w-6xl">
+<main class="container mx-auto px-4 py-6 max-w-6xl">
   <div class="space-y-6">
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold">Settings</h1>
         <p class="text-muted-foreground text-sm">
-          Manage your connection and preferences
+          Manage your connection, preferences, and AI configuration
         </p>
       </div>
       <Button variant="ghost" onclick={() => goto("/projects")}>
@@ -502,562 +478,572 @@ export default {
       </Button>
     </div>
 
-    <div class="grid gap-6 md:grid-cols-2">
-      <!-- Connection Info -->
-      <Card.Root>
-        <Card.Header>
-          <Card.Title>Connection</Card.Title>
-          <Card.Description>
-            Manage your API connection
-          </Card.Description>
-        </Card.Header>
-        <Card.Content class="space-y-4">
-          <div class="space-y-1">
-            <Label class="text-muted-foreground text-xs">API URL</Label>
-            <p class="font-mono text-sm break-all">{connection.apiUrl}</p>
-          </div>
-          <div class="space-y-1">
-            <Label class="text-muted-foreground text-xs">Status</Label>
-            <div class="flex items-center gap-2">
-              <span class="h-2 w-2 rounded-full bg-green-500"></span>
-              <span class="text-sm">Connected</span>
-            </div>
-          </div>
-          {#if testResult}
-            <div class="text-sm p-3 rounded-md {testResult.success ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-destructive/10 text-destructive'}">
-              {testResult.message}
-            </div>
-          {/if}
-        </Card.Content>
-        <Card.Footer class="flex gap-2">
-          <Button 
-            variant="outline" 
-            onclick={handleTestConnection}
-            disabled={isTesting}
-          >
-            {isTesting ? "Testing..." : "Test Connection"}
-          </Button>
-          <Button 
-            variant="destructive" 
-            onclick={handleDisconnect}
-          >
-            Disconnect
-          </Button>
-        </Card.Footer>
-      </Card.Root>
+    <!-- Main Tabs -->
+    <Tabs.Root bind:value={activeTab} class="w-full">
+      <Tabs.List class="grid w-full grid-cols-5 mb-6">
+        {#each settingsTabs as tab}
+          <Tabs.Trigger value={tab.value} class="flex items-center gap-2">
+            <tab.icon class="h-4 w-4" />
+            <span class="hidden sm:inline">{tab.label}</span>
+          </Tabs.Trigger>
+        {/each}
+      </Tabs.List>
 
-      <!-- Appearance Settings -->
-      <Card.Root>
-        <Card.Header>
-          <Card.Title>Appearance</Card.Title>
-          <Card.Description>
-            Customize how CodeOpen looks
-          </Card.Description>
-        </Card.Header>
-        <Card.Content class="space-y-4">
-          <div class="space-y-2">
-            <Label for="theme">Theme</Label>
-            <Select.Root 
-              type="single"
-              value={settings.theme}
-              onValueChange={(v) => handleThemeChange(v)}
-            >
-              <Select.Trigger class="w-full">
-                {getThemeLabel(settings.theme)}
-              </Select.Trigger>
-              <Select.Content>
-                {#each themeOptions as option}
-                  <Select.Item value={option.value} label={option.label} />
-                {/each}
-              </Select.Content>
-            </Select.Root>
-            <p class="text-xs text-muted-foreground">
-              Choose between light, dark, or follow your system preference
-            </p>
-          </div>
-        </Card.Content>
-      </Card.Root>
-
-      <!-- LLM Providers -->
-      <Card.Root class="md:col-span-2">
-        <Card.Header>
-          <Card.Title>LLM Providers</Card.Title>
-          <Card.Description>
-            Configure AI model providers. Click "Configure" to add API keys or authenticate with OAuth.
-          </Card.Description>
-        </Card.Header>
-        <Card.Content>
-          <LlmProviderSelector
-            bind:selectedModel
-            bind:showAllProviders
-          />
-        </Card.Content>
-      </Card.Root>
-
-      <!-- OpenCode Configuration -->
-      <Card.Root class="md:col-span-2">
-        <Card.Header>
-          <Card.Title>OpenCode Permissions</Card.Title>
-          <Card.Description>
-            Control what actions OpenCode can perform without asking for permission.
-            These settings apply to all your sandboxes.
-          </Card.Description>
-        </Card.Header>
-        <Card.Content class="space-y-4">
-          {#if opencodeConfigLoading}
-            <div class="flex items-center justify-center py-8">
-              <div class="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
-              <span class="ml-2 text-muted-foreground">Loading configuration...</span>
-            </div>
-          {:else if opencodeConfigError}
-            <div class="p-4 rounded-md bg-destructive/10 text-destructive">
-              <p class="font-medium">Failed to load configuration</p>
-              <p class="text-sm">{opencodeConfigError}</p>
+      <!-- Connection Tab -->
+      <Tabs.Content value="connection" class="space-y-6">
+        <div class="grid gap-6 md:grid-cols-2">
+          <!-- Connection Status -->
+          <Card.Root>
+            <Card.Header>
+              <Card.Title>Connection Status</Card.Title>
+              <Card.Description>
+                Your current API connection details
+              </Card.Description>
+            </Card.Header>
+            <Card.Content class="space-y-4">
+              <div class="space-y-1">
+                <Label class="text-muted-foreground text-xs">API URL</Label>
+                <p class="font-mono text-sm break-all">{connection.apiUrl}</p>
+              </div>
+              <div class="space-y-1">
+                <Label class="text-muted-foreground text-xs">Status</Label>
+                <div class="flex items-center gap-2">
+                  <span class="h-2 w-2 rounded-full bg-green-500"></span>
+                  <span class="text-sm">Connected</span>
+                </div>
+              </div>
+              {#if testResult}
+                <div class="text-sm p-3 rounded-md {testResult.success ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-destructive/10 text-destructive'}">
+                  {testResult.message}
+                </div>
+              {/if}
+            </Card.Content>
+            <Card.Footer class="flex gap-2">
               <Button 
                 variant="outline" 
-                size="sm" 
-                onclick={loadOpencodeConfig}
-                class="mt-2"
+                onclick={handleTestConnection}
+                disabled={isTesting}
               >
-                Retry
+                {isTesting ? "Testing..." : "Test Connection"}
               </Button>
-            </div>
-          {:else}
-            <div class="grid gap-4">
-              {#each permissionTools as tool}
-                <div class="flex items-center justify-between p-3 border rounded-lg">
-                  <div class="space-y-0.5">
-                    <Label class="font-medium">{tool.name}</Label>
-                    <p class="text-xs text-muted-foreground">{tool.description}</p>
-                  </div>
-                  <Select.Root 
-                    type="single"
-                    value={permissionSettings[tool.key] || "ask"}
-                    onValueChange={(v) => {
-                      if (v) handlePermissionChange(tool.key, v as PermissionLevel);
-                    }}
-                    disabled={opencodeConfigSaving}
-                  >
-                    <Select.Trigger class="w-28">
-                      {getPermissionLabel(permissionSettings[tool.key])}
-                    </Select.Trigger>
-                    <Select.Content>
-                      {#each permissionLevels as level}
-                        <Select.Item value={level.value} label={level.label} />
-                      {/each}
-                    </Select.Content>
-                  </Select.Root>
-                </div>
-              {/each}
-            </div>
-            
-            <div class="mt-4 p-3 bg-muted rounded-lg">
-              <p class="text-sm text-muted-foreground">
-                <strong>Allow:</strong> Execute automatically without asking<br/>
-                <strong>Ask:</strong> Request permission each time (default)<br/>
-                <strong>Deny:</strong> Never allow this action
-              </p>
-            </div>
-          {/if}
-        </Card.Content>
-        {#if !opencodeConfigLoading && !opencodeConfigError}
-          <Card.Footer>
-            <p class="text-xs text-muted-foreground">
-              Changes are saved automatically and apply to new OpenCode sessions.
-            </p>
-          </Card.Footer>
-        {/if}
-      </Card.Root>
+              <Button 
+                variant="destructive" 
+                onclick={handleDisconnect}
+              >
+                Disconnect
+              </Button>
+            </Card.Footer>
+          </Card.Root>
 
-      <!-- AGENTS.md Editor -->
-      <Card.Root class="md:col-span-2">
-        <Card.Header>
-          <Card.Title>Global Instructions (AGENTS.md)</Card.Title>
-          <Card.Description>
-            Define global instructions and context for OpenCode that apply to all your sandboxes.
-            This is your personal AGENTS.md file.
-          </Card.Description>
-        </Card.Header>
-        <Card.Content class="space-y-4">
-          {#if opencodeConfigLoading}
-            <div class="flex items-center justify-center py-8">
-              <div class="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
-              <span class="ml-2 text-muted-foreground">Loading...</span>
-            </div>
-          {:else}
-            <textarea 
-              bind:value={agentsMd}
-              placeholder="# My Global Instructions&#10;&#10;Add your personal coding preferences, guidelines, and context here..."
-              class="w-full h-64 p-3 text-sm font-mono border rounded-md bg-background resize-y"
-            ></textarea>
-            <p class="text-xs text-muted-foreground">
-              Use Markdown formatting. These instructions will be included in all your OpenCode sessions.
-            </p>
-          {/if}
-        </Card.Content>
-        <Card.Footer class="flex gap-2">
-          <Button 
-            onclick={handleSaveAgentsMd}
-            disabled={agentsMdSaving || agentsMd === agentsMdOriginal}
-          >
-            {agentsMdSaving ? "Saving..." : "Save Changes"}
-          </Button>
-          <Button 
-            variant="outline"
-            onclick={handleResetAgentsMd}
-            disabled={agentsMd === agentsMdOriginal}
-          >
-            Discard Changes
-          </Button>
-        </Card.Footer>
-      </Card.Root>
-
-      <!-- Config Files Management -->
-      <Card.Root class="md:col-span-2">
-        <Card.Header>
-          <div class="flex items-center justify-between">
-            <div>
-              <Card.Title>Custom Agents & Commands</Card.Title>
+          <!-- Connection Info -->
+          <Card.Root>
+            <Card.Header>
+              <Card.Title>Connection Details</Card.Title>
               <Card.Description>
-                Create and manage custom agents, commands, tools, and plugins.
-                These are available in all your sandboxes.
+                Information about your management API
               </Card.Description>
-            </div>
-            <Button onclick={handleOpenNewFileDialog} size="sm">
-              + New File
-            </Button>
-          </div>
-        </Card.Header>
-        <Card.Content class="space-y-4">
-          {#if opencodeConfigLoading}
-            <div class="flex items-center justify-center py-8">
-              <div class="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
-              <span class="ml-2 text-muted-foreground">Loading files...</span>
-            </div>
-          {:else}
-            <Tabs.Root bind:value={selectedFileType}>
-              <Tabs.List class="grid w-full grid-cols-4">
-                {#each fileTypeTabs as tab}
-                  <Tabs.Trigger value={tab.value}>
-                    {tab.label}
-                    {#if getFilteredFiles(tab.value).length > 0}
-                      <span class="ml-1 text-xs bg-muted px-1.5 py-0.5 rounded-full">
-                        {getFilteredFiles(tab.value).length}
-                      </span>
-                    {/if}
-                  </Tabs.Trigger>
-                {/each}
-              </Tabs.List>
-              
-              {#each fileTypeTabs as tab}
-                <Tabs.Content value={tab.value} class="mt-4">
-                  <p class="text-sm text-muted-foreground mb-3">{tab.description}</p>
-                  
-                  {#if getFilteredFiles(tab.value).length === 0}
-                    <div class="text-center py-8 border-2 border-dashed rounded-lg">
-                      <p class="text-muted-foreground">No {tab.label.toLowerCase()} yet</p>
-                      <Button 
-                        variant="link" 
-                        onclick={() => {
-                          newFileType = tab.value;
-                          handleOpenNewFileDialog();
-                        }}
-                      >
-                        Create your first {tab.value}
-                      </Button>
-                    </div>
-                  {:else}
-                    <div class="space-y-2">
-                      {#each getFilteredFiles(tab.value) as file}
-                        <div 
-                          class="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors {selectedFile?.name === file.name && selectedFile?.type === file.type ? 'bg-muted border-primary' : ''}"
-                          onclick={() => handleSelectFile(file)}
-                          onkeydown={(e) => e.key === 'Enter' && handleSelectFile(file)}
-                          tabindex="0"
-                          role="button"
-                        >
-                          <div class="flex items-center gap-3">
-                            <span class="text-lg">
-                              {#if file.type === "agent"}
-                                🤖
-                              {:else if file.type === "command"}
-                                ⚡
-                              {:else if file.type === "tool"}
-                                🔧
-                              {:else}
-                                🔌
-                              {/if}
-                            </span>
-                            <div>
-                              <p class="font-medium">{file.name}</p>
-                              <p class="text-xs text-muted-foreground">{file.name}.{file.extension}</p>
-                            </div>
-                          </div>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onclick={(e: MouseEvent) => {
-                              e.stopPropagation();
-                              handleDeleteFile(file);
-                            }}
-                            class="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      {/each}
-                    </div>
-                  {/if}
-                  
-                  <!-- File Editor -->
-                  {#if selectedFile && selectedFile.type === tab.value}
-                    <div class="mt-4 p-4 border rounded-lg bg-muted/30">
-                      <div class="flex items-center justify-between mb-3">
-                        <h4 class="font-medium">
-                          Editing: {selectedFile.name}.{selectedFile.extension}
-                        </h4>
-                        <Button variant="ghost" size="sm" onclick={handleCloseFile}>
-                          Close
-                        </Button>
-                      </div>
-                      <textarea 
-                        bind:value={editingFileContent}
-                        class="w-full h-64 p-3 text-sm font-mono border rounded-md bg-background resize-y"
-                      ></textarea>
-                      <div class="flex gap-2 mt-3">
-                        <Button 
-                          onclick={handleSaveFile}
-                          disabled={fileSaving || editingFileContent === selectedFile.content}
-                        >
-                          {fileSaving ? "Saving..." : "Save"}
-                        </Button>
-                        <Button 
-                          variant="outline"
-                          onclick={() => editingFileContent = selectedFile?.content || ""}
-                          disabled={editingFileContent === selectedFile.content}
-                        >
-                          Reset
-                        </Button>
-                      </div>
-                    </div>
-                  {/if}
-                </Tabs.Content>
-              {/each}
-            </Tabs.Root>
-          {/if}
-        </Card.Content>
-        <Card.Footer>
-          <p class="text-xs text-muted-foreground">
-            Changes require container restart to take effect.
-          </p>
-        </Card.Footer>
-      </Card.Root>
+            </Card.Header>
+            <Card.Content class="space-y-4">
+              <div class="p-4 bg-muted rounded-lg space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-muted-foreground">Protocol</span>
+                  <span class="text-sm font-medium">
+                    {connection.apiUrl?.startsWith("https") ? "HTTPS (Secure)" : "HTTP"}
+                  </span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-muted-foreground">Authentication</span>
+                  <span class="text-sm font-medium">Bearer Token</span>
+                </div>
+              </div>
+              <p class="text-xs text-muted-foreground">
+                Your connection credentials are stored securely on this device.
+                To connect a different API, disconnect first.
+              </p>
+            </Card.Content>
+          </Card.Root>
+        </div>
+      </Tabs.Content>
 
-      <!-- Preferences -->
-      <Card.Root>
-        <Card.Header>
-          <Card.Title>Preferences</Card.Title>
-          <Card.Description>
-            General application settings
-          </Card.Description>
-        </Card.Header>
-        <Card.Content class="space-y-6">
-          <div class="flex items-center justify-between">
-            <div class="space-y-0.5">
-              <Label for="in-app-notifications">In-App Notifications</Label>
-              <p class="text-xs text-muted-foreground">Show toast notifications inside the app</p>
-            </div>
-            <Switch 
-              id="in-app-notifications"
-              checked={settings.inAppNotifications}
-              onCheckedChange={async (checked) => {
-                await setInAppNotifications(checked);
-                if (checked) {
-                  toast.success("In-app notifications enabled");
-                }
-              }}
-            />
-          </div>
+      <!-- Appearance Tab -->
+      <Tabs.Content value="appearance" class="space-y-6">
+        <Card.Root>
+          <Card.Header>
+            <Card.Title>Theme & Appearance</Card.Title>
+            <Card.Description>
+              Customize the look and feel of CodeOpen with theme presets
+            </Card.Description>
+          </Card.Header>
+          <Card.Content>
+            <ThemePicker />
+          </Card.Content>
+        </Card.Root>
+      </Tabs.Content>
 
-          <div class="flex items-center justify-between">
-            <div class="space-y-0.5">
-              <Label for="system-notifications">System Notifications</Label>
-              <p class="text-xs text-muted-foreground">Show OS notifications when app is in background</p>
-            </div>
-            <Switch 
-              id="system-notifications"
-              checked={settings.systemNotifications}
-              onCheckedChange={async (checked) => {
-                if (checked) {
-                  // Request permission if enabling
-                  let permissionGranted = await isPermissionGranted();
-                  if (!permissionGranted) {
-                    const permission = await requestPermission();
-                    permissionGranted = permission === "granted";
-                  }
-                  
-                  if (permissionGranted) {
-                    await setSystemNotifications(true);
-                    // Send test notification
-                    sendNotification({
-                      title: "CodeOpen",
-                      body: "System notifications enabled!",
-                    });
-                  } else {
-                    toast.error("Permission denied", {
-                      description: "Please enable notifications in system settings",
-                    });
-                  }
-                } else {
-                  await setSystemNotifications(false);
-                  toast.info("System notifications disabled");
-                }
-              }}
-            />
-          </div>
+      <!-- AI Models Tab -->
+      <Tabs.Content value="ai-models" class="space-y-6">
+        <LlmProvidersSettings />
+      </Tabs.Content>
 
-          <div class="space-y-2">
-            <Label for="refresh-interval">Auto-refresh Interval</Label>
-            <div class="flex items-center gap-2">
-              <Input 
-                id="refresh-interval"
-                type="number" 
-                min="0" 
-                max="300"
-                value={settings.autoRefreshInterval}
-                onchange={(e: Event) => {
-                  const target = e.target as HTMLInputElement;
-                  setAutoRefreshInterval(parseInt(target.value) || 0);
-                }}
-                class="w-24"
-              />
-              <span class="text-sm text-muted-foreground">seconds (0 = disabled)</span>
-            </div>
-          </div>
-        </Card.Content>
-      </Card.Root>
-
-      <!-- Export/Import -->
-      <Card.Root>
-        <Card.Header>
-          <Card.Title>Backup & Restore</Card.Title>
-          <Card.Description>
-            Export or import your settings
-          </Card.Description>
-        </Card.Header>
-        <Card.Content class="space-y-4">
-          <p class="text-sm text-muted-foreground">
-            Export your settings to a file for backup or transfer to another device.
-          </p>
-          
-          {#if showImportDialog}
-            <div class="space-y-3 p-3 border rounded-md">
-              <Label>Import Settings</Label>
-              <input 
-                type="file" 
-                accept=".json"
-                onchange={handleFileUpload}
-                class="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
-              />
-              <p class="text-xs text-muted-foreground">Or paste JSON directly:</p>
-              <textarea 
-                bind:value={importInput}
-                placeholder="Paste settings JSON here..."
-                class="w-full h-24 p-2 text-xs font-mono border rounded-md bg-muted"
-              ></textarea>
-              <div class="flex gap-2">
-                <Button size="sm" onclick={handleImport} disabled={!importInput.trim()}>
-                  Import
-                </Button>
-                <Button size="sm" variant="outline" onclick={() => { showImportDialog = false; importInput = ""; }}>
-                  Cancel
+      <!-- OpenCode Tab -->
+      <Tabs.Content value="opencode" class="space-y-6">
+        <!-- Permissions -->
+        <Card.Root>
+          <Card.Header>
+            <Card.Title>Tool Permissions</Card.Title>
+            <Card.Description>
+              Control what actions OpenCode can perform without asking for permission.
+              These settings apply to all your sandboxes.
+            </Card.Description>
+          </Card.Header>
+          <Card.Content class="space-y-4">
+            {#if opencodeConfigLoading}
+              <div class="flex items-center justify-center py-8">
+                <div class="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
+                <span class="ml-2 text-muted-foreground">Loading configuration...</span>
+              </div>
+            {:else if opencodeConfigError}
+              <div class="p-4 rounded-md bg-destructive/10 text-destructive">
+                <p class="font-medium">Failed to load configuration</p>
+                <p class="text-sm">{opencodeConfigError}</p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onclick={loadOpencodeConfig}
+                  class="mt-2"
+                >
+                  Retry
                 </Button>
               </div>
-            </div>
-          {/if}
-          
-          {#if settings.error}
-            <div class="text-sm p-3 rounded-md bg-destructive/10 text-destructive">
-              {settings.error}
-            </div>
-          {/if}
-        </Card.Content>
-        <Card.Footer class="flex gap-2">
-          <Button variant="outline" onclick={handleExport}>
-            Export Settings
-          </Button>
-          {#if !showImportDialog}
-            <Button variant="outline" onclick={() => showImportDialog = true}>
-              Import Settings
+            {:else}
+              <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {#each permissionTools as tool}
+                  <div class="flex items-center justify-between p-3 border rounded-lg">
+                    <div class="space-y-0.5">
+                      <Label class="font-medium">{tool.name}</Label>
+                      <p class="text-xs text-muted-foreground">{tool.description}</p>
+                    </div>
+                    <Select.Root 
+                      type="single"
+                      value={permissionSettings[tool.key] || "ask"}
+                      onValueChange={(v) => {
+                        if (v) handlePermissionChange(tool.key, v as PermissionLevel);
+                      }}
+                      disabled={opencodeConfigSaving}
+                    >
+                      <Select.Trigger class="w-24">
+                        {getPermissionLabel(permissionSettings[tool.key])}
+                      </Select.Trigger>
+                      <Select.Content>
+                        {#each permissionLevels as level}
+                          <Select.Item value={level.value} label={level.label} />
+                        {/each}
+                      </Select.Content>
+                    </Select.Root>
+                  </div>
+                {/each}
+              </div>
+              
+              <div class="p-3 bg-muted rounded-lg">
+                <p class="text-sm text-muted-foreground">
+                  <strong>Allow:</strong> Execute automatically &bull;
+                  <strong>Ask:</strong> Request permission (default) &bull;
+                  <strong>Deny:</strong> Never allow
+                </p>
+              </div>
+            {/if}
+          </Card.Content>
+        </Card.Root>
+
+        <!-- AGENTS.md Editor -->
+        <Card.Root>
+          <Card.Header>
+            <Card.Title>Global Instructions (AGENTS.md)</Card.Title>
+            <Card.Description>
+              Define global instructions and context for OpenCode that apply to all your sandboxes.
+            </Card.Description>
+          </Card.Header>
+          <Card.Content class="space-y-4">
+            {#if opencodeConfigLoading}
+              <div class="flex items-center justify-center py-8">
+                <div class="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
+                <span class="ml-2 text-muted-foreground">Loading...</span>
+              </div>
+            {:else}
+              <textarea 
+                bind:value={agentsMd}
+                placeholder="# My Global Instructions&#10;&#10;Add your personal coding preferences, guidelines, and context here..."
+                class="w-full h-48 p-3 text-sm font-mono border rounded-md bg-background resize-y"
+              ></textarea>
+              <p class="text-xs text-muted-foreground">
+                Use Markdown formatting. These instructions will be included in all your OpenCode sessions.
+              </p>
+            {/if}
+          </Card.Content>
+          <Card.Footer class="flex gap-2">
+            <Button 
+              onclick={handleSaveAgentsMd}
+              disabled={agentsMdSaving || agentsMd === agentsMdOriginal}
+            >
+              {agentsMdSaving ? "Saving..." : "Save Changes"}
             </Button>
-          {/if}
-          <Button variant="ghost" onclick={handleReset}>
-            Reset to Defaults
-          </Button>
-        </Card.Footer>
-      </Card.Root>
+            <Button 
+              variant="outline"
+              onclick={handleResetAgentsMd}
+              disabled={agentsMd === agentsMdOriginal}
+            >
+              Discard Changes
+            </Button>
+          </Card.Footer>
+        </Card.Root>
 
-      <!-- App Info -->
-      <Card.Root>
-        <Card.Header>
-          <Card.Title>About</Card.Title>
-          <Card.Description>
-            Application information
-          </Card.Description>
-        </Card.Header>
-        <Card.Content class="space-y-4">
-          <div class="space-y-1">
-            <Label class="text-muted-foreground text-xs">Application</Label>
-            <p class="text-sm font-medium">CodeOpen</p>
-          </div>
-          <div class="space-y-1">
-            <Label class="text-muted-foreground text-xs">Version</Label>
-            <p class="text-sm font-mono">0.1.0</p>
-          </div>
-          <div class="space-y-1">
-            <Label class="text-muted-foreground text-xs">Description</Label>
-            <p class="text-sm text-muted-foreground">
-              Portable Command Center for OpenCode - manage your AI-powered development environments from anywhere.
+        <!-- Config Files Management -->
+        <Card.Root>
+          <Card.Header>
+            <div class="flex items-center justify-between">
+              <div>
+                <Card.Title>Custom Agents & Commands</Card.Title>
+                <Card.Description>
+                  Create and manage custom agents, commands, tools, and plugins.
+                </Card.Description>
+              </div>
+              <Button onclick={handleOpenNewFileDialog} size="sm">
+                + New File
+              </Button>
+            </div>
+          </Card.Header>
+          <Card.Content class="space-y-4">
+            {#if opencodeConfigLoading}
+              <div class="flex items-center justify-center py-8">
+                <div class="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
+                <span class="ml-2 text-muted-foreground">Loading files...</span>
+              </div>
+            {:else}
+              <Tabs.Root bind:value={selectedFileType}>
+                <Tabs.List class="grid w-full grid-cols-4">
+                  {#each fileTypeTabs as tab}
+                    <Tabs.Trigger value={tab.value}>
+                      {tab.label}
+                      {#if getFilteredFiles(tab.value).length > 0}
+                        <span class="ml-1 text-xs bg-muted px-1.5 py-0.5 rounded-full">
+                          {getFilteredFiles(tab.value).length}
+                        </span>
+                      {/if}
+                    </Tabs.Trigger>
+                  {/each}
+                </Tabs.List>
+                
+                {#each fileTypeTabs as tab}
+                  <Tabs.Content value={tab.value} class="mt-4">
+                    <p class="text-sm text-muted-foreground mb-3">{tab.description}</p>
+                    
+                    {#if getFilteredFiles(tab.value).length === 0}
+                      <div class="text-center py-8 border-2 border-dashed rounded-lg">
+                        <p class="text-muted-foreground">No {tab.label.toLowerCase()} yet</p>
+                        <Button 
+                          variant="link" 
+                          onclick={() => {
+                            newFileType = tab.value;
+                            handleOpenNewFileDialog();
+                          }}
+                        >
+                          Create your first {tab.value}
+                        </Button>
+                      </div>
+                    {:else}
+                      <div class="space-y-2">
+                        {#each getFilteredFiles(tab.value) as file}
+                          <div 
+                            class="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors {selectedFile?.name === file.name && selectedFile?.type === file.type ? 'bg-muted border-primary' : ''}"
+                            onclick={() => handleSelectFile(file)}
+                            onkeydown={(e) => e.key === 'Enter' && handleSelectFile(file)}
+                            tabindex="0"
+                            role="button"
+                          >
+                            <div class="flex items-center gap-3">
+                              <span class="text-lg">
+                                {#if file.type === "agent"}
+                                  🤖
+                                {:else if file.type === "command"}
+                                  ⚡
+                                {:else if file.type === "tool"}
+                                  🔧
+                                {:else}
+                                  🔌
+                                {/if}
+                              </span>
+                              <div>
+                                <p class="font-medium">{file.name}</p>
+                                <p class="text-xs text-muted-foreground">{file.name}.{file.extension}</p>
+                              </div>
+                            </div>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onclick={(e: MouseEvent) => {
+                                e.stopPropagation();
+                                handleDeleteFile(file);
+                              }}
+                              class="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                              Delete
+                            </Button>
+                          </div>
+                        {/each}
+                      </div>
+                    {/if}
+                    
+                    <!-- File Editor -->
+                    {#if selectedFile && selectedFile.type === tab.value}
+                      <div class="mt-4 p-4 border rounded-lg bg-muted/30">
+                        <div class="flex items-center justify-between mb-3">
+                          <h4 class="font-medium">
+                            Editing: {selectedFile.name}.{selectedFile.extension}
+                          </h4>
+                          <Button variant="ghost" size="sm" onclick={handleCloseFile}>
+                            Close
+                          </Button>
+                        </div>
+                        <textarea 
+                          bind:value={editingFileContent}
+                          class="w-full h-48 p-3 text-sm font-mono border rounded-md bg-background resize-y"
+                        ></textarea>
+                        <div class="flex gap-2 mt-3">
+                          <Button 
+                            onclick={handleSaveFile}
+                            disabled={fileSaving || editingFileContent === selectedFile.content}
+                          >
+                            {fileSaving ? "Saving..." : "Save"}
+                          </Button>
+                          <Button 
+                            variant="outline"
+                            onclick={() => editingFileContent = selectedFile?.content || ""}
+                            disabled={editingFileContent === selectedFile.content}
+                          >
+                            Reset
+                          </Button>
+                        </div>
+                      </div>
+                    {/if}
+                  </Tabs.Content>
+                {/each}
+              </Tabs.Root>
+            {/if}
+          </Card.Content>
+          <Card.Footer>
+            <p class="text-xs text-muted-foreground">
+              Changes require container restart to take effect.
             </p>
-          </div>
-        </Card.Content>
-        <Card.Footer>
-          <p class="text-xs text-muted-foreground">
-            Built with Tauri, Svelte, and Rust
-          </p>
-        </Card.Footer>
-      </Card.Root>
+          </Card.Footer>
+        </Card.Root>
+      </Tabs.Content>
 
-      <!-- Statistics -->
-      <Card.Root class="md:col-span-2">
-        <Card.Header>
-          <Card.Title>Statistics</Card.Title>
-          <Card.Description>
-            Overview of your sandboxes
-          </Card.Description>
-        </Card.Header>
-        <Card.Content>
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div class="text-center p-4 bg-muted rounded-lg">
-              <p class="text-3xl font-bold">{sandboxes.count}</p>
-              <p class="text-sm text-muted-foreground">Total Sandboxes</p>
-            </div>
-            <div class="text-center p-4 bg-green-500/10 rounded-lg">
-              <p class="text-3xl font-bold text-green-600 dark:text-green-400">{sandboxes.running.length}</p>
-              <p class="text-sm text-muted-foreground">Running</p>
-            </div>
-            <div class="text-center p-4 bg-muted rounded-lg">
-              <p class="text-3xl font-bold">{sandboxes.stopped.length}</p>
-              <p class="text-sm text-muted-foreground">Stopped</p>
-            </div>
-            <div class="text-center p-4 bg-yellow-500/10 rounded-lg">
-              <p class="text-3xl font-bold text-yellow-600 dark:text-yellow-400">{sandboxes.paused.length}</p>
-              <p class="text-sm text-muted-foreground">Paused</p>
-            </div>
-          </div>
-        </Card.Content>
-      </Card.Root>
-    </div>
+      <!-- About Tab -->
+      <Tabs.Content value="about" class="space-y-6">
+        <div class="grid gap-6 md:grid-cols-2">
+          <!-- Preferences -->
+          <Card.Root>
+            <Card.Header>
+              <Card.Title>Preferences</Card.Title>
+              <Card.Description>
+                General application settings
+              </Card.Description>
+            </Card.Header>
+            <Card.Content class="space-y-6">
+              <div class="flex items-center justify-between">
+                <div class="space-y-0.5">
+                  <Label for="in-app-notifications">In-App Notifications</Label>
+                  <p class="text-xs text-muted-foreground">Show toast notifications</p>
+                </div>
+                <Switch 
+                  id="in-app-notifications"
+                  checked={settings.inAppNotifications}
+                  onCheckedChange={async (checked) => {
+                    await setInAppNotifications(checked);
+                    if (checked) {
+                      toast.success("In-app notifications enabled");
+                    }
+                  }}
+                />
+              </div>
+
+              <div class="flex items-center justify-between">
+                <div class="space-y-0.5">
+                  <Label for="system-notifications">System Notifications</Label>
+                  <p class="text-xs text-muted-foreground">OS notifications when in background</p>
+                </div>
+                <Switch 
+                  id="system-notifications"
+                  checked={settings.systemNotifications}
+                  onCheckedChange={async (checked) => {
+                    if (checked) {
+                      let permissionGranted = await isPermissionGranted();
+                      if (!permissionGranted) {
+                        const permission = await requestPermission();
+                        permissionGranted = permission === "granted";
+                      }
+                      
+                      if (permissionGranted) {
+                        await setSystemNotifications(true);
+                        sendNotification({
+                          title: "CodeOpen",
+                          body: "System notifications enabled!",
+                        });
+                      } else {
+                        toast.error("Permission denied", {
+                          description: "Please enable notifications in system settings",
+                        });
+                      }
+                    } else {
+                      await setSystemNotifications(false);
+                      toast.info("System notifications disabled");
+                    }
+                  }}
+                />
+              </div>
+
+              <div class="space-y-2">
+                <Label for="refresh-interval">Auto-refresh Interval</Label>
+                <div class="flex items-center gap-2">
+                  <Input 
+                    id="refresh-interval"
+                    type="number" 
+                    min="0" 
+                    max="300"
+                    value={settings.autoRefreshInterval}
+                    onchange={(e: Event) => {
+                      const target = e.target as HTMLInputElement;
+                      setAutoRefreshInterval(parseInt(target.value) || 0);
+                    }}
+                    class="w-24"
+                  />
+                  <span class="text-sm text-muted-foreground">seconds (0 = disabled)</span>
+                </div>
+              </div>
+            </Card.Content>
+          </Card.Root>
+
+          <!-- Statistics -->
+          <Card.Root>
+            <Card.Header>
+              <Card.Title>Statistics</Card.Title>
+              <Card.Description>
+                Overview of your sandboxes
+              </Card.Description>
+            </Card.Header>
+            <Card.Content>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="text-center p-3 bg-muted rounded-lg">
+                  <p class="text-2xl font-bold">{sandboxes.count}</p>
+                  <p class="text-xs text-muted-foreground">Total</p>
+                </div>
+                <div class="text-center p-3 bg-green-500/10 rounded-lg">
+                  <p class="text-2xl font-bold text-green-600 dark:text-green-400">{sandboxes.running.length}</p>
+                  <p class="text-xs text-muted-foreground">Running</p>
+                </div>
+                <div class="text-center p-3 bg-muted rounded-lg">
+                  <p class="text-2xl font-bold">{sandboxes.stopped.length}</p>
+                  <p class="text-xs text-muted-foreground">Stopped</p>
+                </div>
+                <div class="text-center p-3 bg-yellow-500/10 rounded-lg">
+                  <p class="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{sandboxes.paused.length}</p>
+                  <p class="text-xs text-muted-foreground">Paused</p>
+                </div>
+              </div>
+            </Card.Content>
+          </Card.Root>
+
+          <!-- Backup & Restore -->
+          <Card.Root>
+            <Card.Header>
+              <Card.Title>Backup & Restore</Card.Title>
+              <Card.Description>
+                Export or import your settings
+              </Card.Description>
+            </Card.Header>
+            <Card.Content class="space-y-4">
+              <p class="text-sm text-muted-foreground">
+                Export your settings for backup or transfer to another device.
+              </p>
+              
+              {#if showImportDialog}
+                <div class="space-y-3 p-3 border rounded-md">
+                  <Label>Import Settings</Label>
+                  <input 
+                    type="file" 
+                    accept=".json"
+                    onchange={handleFileUpload}
+                    class="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                  />
+                  <p class="text-xs text-muted-foreground">Or paste JSON:</p>
+                  <textarea 
+                    bind:value={importInput}
+                    placeholder="Paste settings JSON here..."
+                    class="w-full h-20 p-2 text-xs font-mono border rounded-md bg-muted"
+                  ></textarea>
+                  <div class="flex gap-2">
+                    <Button size="sm" onclick={handleImport} disabled={!importInput.trim()}>
+                      Import
+                    </Button>
+                    <Button size="sm" variant="outline" onclick={() => { showImportDialog = false; importInput = ""; }}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              {/if}
+              
+              {#if settings.error}
+                <div class="text-sm p-3 rounded-md bg-destructive/10 text-destructive">
+                  {settings.error}
+                </div>
+              {/if}
+            </Card.Content>
+            <Card.Footer class="flex flex-wrap gap-2">
+              <Button variant="outline" onclick={handleExport}>
+                Export
+              </Button>
+              {#if !showImportDialog}
+                <Button variant="outline" onclick={() => showImportDialog = true}>
+                  Import
+                </Button>
+              {/if}
+              <Button variant="ghost" onclick={handleReset}>
+                Reset
+              </Button>
+            </Card.Footer>
+          </Card.Root>
+
+          <!-- App Info -->
+          <Card.Root>
+            <Card.Header>
+              <Card.Title>About CodeOpen</Card.Title>
+              <Card.Description>
+                Application information
+              </Card.Description>
+            </Card.Header>
+            <Card.Content class="space-y-4">
+              <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-muted-foreground">Version</span>
+                  <span class="text-sm font-mono">0.1.0</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-muted-foreground">Platform</span>
+                  <span class="text-sm font-medium">Desktop</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-muted-foreground">Built with</span>
+                  <span class="text-sm font-medium">Tauri + Svelte</span>
+                </div>
+              </div>
+              <p class="text-xs text-muted-foreground pt-2 border-t">
+                Portable Command Center for OpenCode - manage your AI-powered development environments from anywhere.
+              </p>
+            </Card.Content>
+          </Card.Root>
+        </div>
+      </Tabs.Content>
+    </Tabs.Root>
   </div>
 </main>
 

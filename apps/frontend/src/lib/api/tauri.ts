@@ -1059,6 +1059,21 @@ export async function sandboxOpencodeFindFiles(sandboxId: string, query: string)
   return invoke<string[]>("sandbox_opencode_find_files", { sandboxId, query });
 }
 
+/**
+ * Connect to OpenCode SSE event stream for a sandbox
+ * This starts the Rust background task that processes SSE events
+ */
+export async function sandboxOpencodeConnectStream(sandboxId: string): Promise<StreamConnection> {
+  return invoke<StreamConnection>("sandbox_opencode_connect_stream", { sandboxId });
+}
+
+/**
+ * Disconnect from OpenCode SSE event stream
+ */
+export async function sandboxOpencodeDisconnectStream(streamId: string): Promise<void> {
+  return invoke<void>("sandbox_opencode_disconnect_stream", { streamId });
+}
+
 // =============================================================================
 // SSE Event Listeners (for sandbox OpenCode streams)
 // =============================================================================
@@ -1094,6 +1109,7 @@ export async function onStreamStatus(
  */
 export class OpenCodeStream {
   private sandboxId: string;
+  private streamId: string | null = null;
   private eventUnlisten: UnlistenFn | null = null;
   private statusUnlisten: UnlistenFn | null = null;
   private onEvent: ((event: OpenCodeEvent) => void) | null = null;
@@ -1110,32 +1126,53 @@ export class OpenCodeStream {
     onEvent: (event: OpenCodeEvent) => void,
     onStatus?: (status: StreamStatus, error?: string) => void
   ): Promise<void> {
+    // Prevent duplicate connections
+    if (this.streamId) {
+      console.warn("[OpenCodeStream] Already connected, ignoring duplicate connect call");
+      return;
+    }
+
     this.onEvent = onEvent;
     this.onStatus = onStatus ?? null;
 
-    // Set up event listeners
+    // Start the SSE stream via Rust backend FIRST to get the streamId
+    // This way we can filter events by streamId (not just projectId)
+    const connection = await sandboxOpencodeConnectStream(this.sandboxId);
+    this.streamId = connection.streamId;
+    console.log("[OpenCodeStream] Connected with streamId:", this.streamId);
+
+    // Now set up event listeners that filter by this specific streamId
     this.eventUnlisten = await onStreamEvent((payload) => {
-      if (payload.projectId === this.sandboxId && this.onEvent) {
+      // Filter by streamId to only receive events for THIS stream connection
+      if (payload.streamId === this.streamId && this.onEvent) {
         this.onEvent(payload.event);
       }
     });
 
     this.statusUnlisten = await onStreamStatus((payload) => {
-      if (payload.projectId === this.sandboxId && this.onStatus) {
+      // Filter by streamId to only receive status for THIS stream connection
+      if (payload.streamId === this.streamId && this.onStatus) {
         this.onStatus(payload.status, payload.error);
       }
     });
-
-    // Notify connected
-    if (this.onStatus) {
-      this.onStatus("connected");
-    }
   }
 
   /**
    * Disconnect from the stream and clean up listeners
    */
   async disconnect(): Promise<void> {
+    // Disconnect the SSE stream via Rust backend
+    if (this.streamId) {
+      try {
+        await sandboxOpencodeDisconnectStream(this.streamId);
+        console.log("[OpenCodeStream] Disconnected streamId:", this.streamId);
+      } catch (err) {
+        console.warn("[OpenCodeStream] Error disconnecting stream:", err);
+      }
+      this.streamId = null;
+    }
+
+    // Clean up event listeners
     if (this.eventUnlisten) {
       this.eventUnlisten();
       this.eventUnlisten = null;
@@ -1154,7 +1191,7 @@ export class OpenCodeStream {
    * Check if the stream is connected
    */
   get isConnected(): boolean {
-    return this.eventUnlisten !== null;
+    return this.streamId !== null && this.eventUnlisten !== null;
   }
 }
 

@@ -161,6 +161,25 @@ impl ApiClient {
         }
     }
     
+    /// Make an SSE GET request (returns Response for streaming)
+    pub async fn sse_get(&self, path: &str) -> Result<reqwest::Response, AppError> {
+        let url = format!("{}{}", self.base_url, path);
+        let request = self.add_auth(self.sse_client.get(&url)).await;
+        let response = request.send().await?;
+        
+        if response.status().is_success() {
+            Ok(response)
+        } else {
+            let status = response.status();
+            let error_text = response
+                .json::<ErrorResponse>()
+                .await
+                .map(|e| e.error)
+                .unwrap_or_else(|_| format!("HTTP {}", status));
+            Err(AppError::ApiError(error_text))
+        }
+    }
+    
     /// Create a POST request with a specific client and add auth
     pub async fn add_auth_to_client(&self, client: &Client, url: &str) -> reqwest::RequestBuilder {
         let request = client.post(url);

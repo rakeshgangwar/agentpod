@@ -27,6 +27,7 @@ use commands::{
     sandbox_opencode_respond_permission,
     sandbox_opencode_list_messages, sandbox_opencode_send_message, sandbox_opencode_get_message,
     sandbox_opencode_list_files, sandbox_opencode_get_file_content, sandbox_opencode_find_files,
+    sandbox_opencode_connect_stream, sandbox_opencode_disconnect_stream,
     // Resource tier commands (modular containers)
     list_resource_tiers, get_default_resource_tier,
     // Container flavor commands
@@ -109,6 +110,8 @@ pub fn run() {
             sandbox_opencode_list_files,
             sandbox_opencode_get_file_content,
             sandbox_opencode_find_files,
+            sandbox_opencode_connect_stream,
+            sandbox_opencode_disconnect_stream,
             // Resource tier commands (modular containers)
             list_resource_tiers,
             get_default_resource_tier,

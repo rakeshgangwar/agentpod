@@ -11,6 +11,7 @@ import { userRoutes } from './routes/users.ts';
 import { resourceTiersRouter } from './routes/resource-tiers.ts';
 import { flavorsRouter } from './routes/flavors.ts';
 import { addonsRouter } from './routes/addons.ts';
+import { providerRoutes } from './routes/providers.ts';
 // v2 Routes (direct Docker orchestrator)
 import { sandboxRoutes, sandboxHealthRoutes } from './routes/sandboxes.ts';
 import { repoRoutes } from './routes/repos.ts';
@@ -55,6 +56,8 @@ const app = new Hono()
   .use('/api/*', authMiddleware)
   // User configuration endpoints
   .route('/api/users', userRoutes) // User OpenCode config
+  // LLM Provider configuration endpoints
+  .route('/api/providers', providerRoutes) // LLM provider management
   // Modular container configuration endpoints
   .route('/api/resource-tiers', resourceTiersRouter) // Resource tiers (CPU, memory, storage)
   .route('/api/flavors', flavorsRouter) // Container flavors (language environments)
@@ -85,6 +88,15 @@ console.log(`
 ║  - GET  /api/auth/callback/github     OAuth callback          ║
 ║  - GET  /api/auth/session             Get current session     ║
 ║  - POST /api/auth/sign-out            Sign out                ║
+╠═══════════════════════════════════════════════════════════════╣
+║  LLM Provider Endpoints:                                      ║
+║  - GET  /api/providers                List all providers      ║
+║  - GET  /api/providers/configured     Configured providers    ║
+║  - GET  /api/providers/default        Get default provider    ║
+║  - POST /api/providers/:id/configure  Configure API key       ║
+║  - POST /api/providers/:id/oauth/init Start OAuth device flow ║
+║  - POST /api/providers/:id/set-default Set as default         ║
+║  - DELETE /api/providers/:id          Remove credentials      ║
 ╠═══════════════════════════════════════════════════════════════╣
 ║  Modular Container Endpoints:                                 ║
 ║  - GET  /api/resource-tiers           List resource tiers     ║
