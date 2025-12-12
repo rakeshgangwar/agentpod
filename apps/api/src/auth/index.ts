@@ -11,6 +11,7 @@
  */
 
 import { betterAuth } from "better-auth";
+import { bearer } from "better-auth/plugins";
 import { Database } from "bun:sqlite";
 import { config } from "../config";
 import { createLogger } from "../utils/logger";
@@ -116,6 +117,15 @@ export const auth = betterAuth({
     "http://localhost:5173",  // Vite dev
     "tauri://localhost",      // Tauri production
     config.publicUrl,         // API URL itself
+  ],
+
+  // ==========================================================================
+  // Plugins
+  // ==========================================================================
+  plugins: [
+    // Bearer token plugin - allows using session tokens as Bearer tokens
+    // This is needed for Tauri/native apps that can't use cookies
+    bearer(),
   ],
 
   // ==========================================================================

@@ -12,6 +12,7 @@ import {
   signUpWithEmail,
   signOut as betterAuthSignOut 
 } from "$lib/auth-client";
+import { authStoreSession, authLogout as tauriAuthLogout } from "$lib/api/tauri";
 
 // =============================================================================
 // State
@@ -155,6 +156,16 @@ export async function loginWithEmail(email: string, password: string): Promise<b
       return false;
     }
 
+    // Store the session token for Tauri API calls
+    if (result.data?.token && result.data?.user) {
+      await authStoreSession(
+        result.data.token,
+        result.data.user.id,
+        result.data.user.email,
+        result.data.user.name
+      );
+    }
+
     return true;
   } catch (err) {
     error = err instanceof Error ? err.message : "Failed to sign in";
@@ -179,6 +190,16 @@ export async function signUp(email: string, password: string, name: string): Pro
       return false;
     }
 
+    // Store the session token for Tauri API calls (signup also returns a session)
+    if (result.data?.token && result.data?.user) {
+      await authStoreSession(
+        result.data.token,
+        result.data.user.id,
+        result.data.user.email,
+        result.data.user.name
+      );
+    }
+
     return true;
   } catch (err) {
     error = err instanceof Error ? err.message : "Failed to sign up";
@@ -196,7 +217,11 @@ export async function logout(): Promise<void> {
   error = null;
 
   try {
-    await betterAuthSignOut();
+    // Clear both Better Auth session and Tauri stored session
+    await Promise.all([
+      betterAuthSignOut(),
+      tauriAuthLogout()
+    ]);
   } catch (err) {
     error = err instanceof Error ? err.message : "Logout failed";
   } finally {

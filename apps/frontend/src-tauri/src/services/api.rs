@@ -1,7 +1,7 @@
 //! API client service for communicating with the Management API
 //!
 //! This module provides a typed HTTP client for all Management API operations.
-//! Authentication is handled via OAuth tokens from Keycloak.
+//! Authentication is handled via session tokens from Better Auth.
 
 use crate::models::{
     AppError, AppInfo, ConnectionConfig, ContainerTier, ContainerTiersResponse, 
@@ -11,7 +11,7 @@ use crate::models::{
     HealthResponse, Message, OpenCodeHealth, Project, ProjectResponse, 
     ProjectsResponse, SendMessageInput, Session, SuccessResponse,
 };
-use crate::services::auth::{AuthService, KeycloakConfig};
+use crate::services::auth::AuthService;
 use reqwest::Client;
 use std::time::Duration;
 
@@ -65,25 +65,27 @@ impl ApiClient {
         })
     }
     
-    /// Get a valid auth token (OAuth or legacy API key)
+    /// Get a valid auth token (Better Auth session token or legacy API key)
     async fn get_auth_token(&self) -> Option<String> {
-        // First try to get OAuth token
-        let keycloak_config = KeycloakConfig::default();
-        match AuthService::get_valid_token(&keycloak_config).await {
-            Ok(token) => {
-                tracing::info!("Using OAuth token (length: {})", token.len());
+        // First try to get Better Auth session token
+        match AuthService::get_token() {
+            Ok(Some(token)) => {
+                tracing::debug!("Using Better Auth session token");
                 return Some(token);
             }
+            Ok(None) => {
+                tracing::debug!("No Better Auth session token available");
+            }
             Err(e) => {
-                tracing::debug!("OAuth token not available: {}", e);
+                tracing::debug!("Failed to get session token: {}", e);
             }
         }
         
         // Fall back to legacy API key
         if self.api_key.is_some() {
-            tracing::info!("Falling back to legacy API key");
+            tracing::debug!("Falling back to legacy API key");
         } else {
-            tracing::warn!("No auth token available (no OAuth token and no API key)");
+            tracing::warn!("No auth token available (no session token and no API key)");
         }
         self.api_key.clone()
     }

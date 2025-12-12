@@ -1291,43 +1291,37 @@ export async function deleteUserOpencodeFile(
 }
 
 // =============================================================================
-// Auth Types (Keycloak OAuth)
+// Auth Types (Better Auth Session)
 // =============================================================================
 
-/** User information from Keycloak */
+/** User information from stored session */
 export interface AuthUser {
-  sub: string;
+  id: string;
   email?: string;
-  emailVerified?: boolean;
   name?: string;
-  preferredUsername?: string;
 }
 
 /** Authentication status */
 export interface AuthStatus {
   authenticated: boolean;
   user: AuthUser | null;
-  expiresAt: number | null;
 }
 
 // =============================================================================
-// Auth Commands (Keycloak OAuth)
+// Auth Commands (Better Auth Session Storage)
 // =============================================================================
 
 /**
- * Start the OAuth login flow
- * Returns the authorization URL that should be opened in a browser
+ * Store session token from Better Auth login for use in Tauri API calls.
+ * This allows the Rust backend to make authenticated API requests.
  */
-export async function authStartLogin(): Promise<string> {
-  return invoke<string>("auth_start_login");
-}
-
-/**
- * Complete the OAuth flow with the callback URL
- * Parses the callback URL, exchanges code for tokens, and stores auth data
- */
-export async function authCompleteLogin(callbackUrl: string): Promise<AuthStatus> {
-  return invoke<AuthStatus>("auth_complete_login", { callbackUrl });
+export async function authStoreSession(
+  token: string,
+  userId: string,
+  email?: string,
+  name?: string
+): Promise<void> {
+  return invoke("auth_store_session", { token, userId, email, name });
 }
 
 /**
@@ -1339,52 +1333,31 @@ export async function authGetStatus(): Promise<AuthStatus> {
 
 /**
  * Logout the current user
- * Revokes tokens with Keycloak and clears local auth data
+ * Clears stored session data
  */
 export async function authLogout(): Promise<void> {
   return invoke("auth_logout");
 }
 
 /**
- * Get current user info
+ * Get current user info from stored session
  */
 export async function authGetUser(): Promise<AuthUser | null> {
   return invoke<AuthUser | null>("auth_get_user");
 }
 
 /**
- * Get a valid access token (refreshes if needed)
- * Useful for making authenticated API calls
+ * Get the stored session token for API calls
  */
-export async function authGetToken(): Promise<string> {
-  return invoke<string>("auth_get_token");
+export async function authGetToken(): Promise<string | null> {
+  return invoke<string | null>("auth_get_token");
 }
 
 /**
- * Refresh the access token
- * Forces a token refresh even if the current token is still valid
- */
-export async function authRefreshToken(): Promise<AuthStatus> {
-  return invoke<AuthStatus>("auth_refresh_token");
-}
-
-/**
- * Check if user is authenticated
+ * Check if user is authenticated (has valid stored session)
  */
 export async function authIsAuthenticated(): Promise<boolean> {
   return invoke<boolean>("auth_is_authenticated");
-}
-
-/**
- * Listen for OAuth callback events
- * The OAuth plugin emits these when the redirect is received
- */
-export async function onOAuthCallback(
-  callback: (url: string) => void
-): Promise<UnlistenFn> {
-  return listen<string>("oauth-callback", (event) => {
-    callback(event.payload);
-  });
 }
 
 // =============================================================================

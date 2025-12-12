@@ -6,6 +6,6 @@ pub mod settings;
 pub mod storage;
 
 pub use api::ApiClient;
-pub use auth::{AuthService, KeycloakConfig, AuthData, AuthStatus, UserInfo};
+pub use auth::{AuthService, AuthStatus, SessionData, UserInfo};
 pub use settings::SettingsService;
 pub use storage::StorageService;
