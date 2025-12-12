@@ -10,8 +10,7 @@
 
 import { createOpencodeClient } from "@opencode-ai/sdk";
 import type { Session, Message, Part } from "@opencode-ai/sdk";
-import { getSandboxManager } from "./sandbox-manager.ts";
-import type { Sandbox } from "./orchestrator/types.ts";
+import { getSandboxManager, type Sandbox } from "./sandbox-manager.ts";
 import { createLogger } from "../utils/logger.ts";
 import { config } from "../config.ts";
 

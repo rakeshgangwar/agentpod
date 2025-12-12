@@ -610,4 +610,324 @@ export const migrations: Migration[] = [
       db.exec('DROP TABLE IF EXISTS user');
     },
   },
+  
+  // =============================================================================
+  // DATA PERSISTENCE MIGRATIONS (v13-v18)
+  // See docs/implementation/data-persistence-plan.md for full architecture
+  // =============================================================================
+  
+  // Migration 13: Add sandboxes table
+  // Replaces Docker labels as source of truth for sandbox metadata
+  // Associates sandboxes with users for proper data ownership
+  {
+    version: 13,
+    name: 'add_sandboxes_table',
+    up: () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS sandboxes (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+          name TEXT NOT NULL,
+          slug TEXT NOT NULL,
+          description TEXT,
+          
+          -- Git/Repository info
+          repo_name TEXT NOT NULL,
+          github_url TEXT,
+          
+          -- Container configuration (modular system)
+          resource_tier_id TEXT DEFAULT 'starter',
+          flavor_id TEXT DEFAULT 'fullstack',
+          addon_ids TEXT DEFAULT '[]',
+          
+          -- Container runtime info
+          container_id TEXT,
+          container_name TEXT,
+          status TEXT DEFAULT 'created' CHECK(status IN ('created', 'starting', 'running', 'stopping', 'stopped', 'error')),
+          error_message TEXT,
+          
+          -- URLs
+          opencode_url TEXT,
+          acp_gateway_url TEXT,
+          vnc_url TEXT,
+          code_server_url TEXT,
+          
+          -- Timestamps
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now')),
+          last_accessed_at TEXT,
+          
+          UNIQUE(user_id, slug)
+        )
+      `);
+      
+      // Create indexes
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_sandboxes_user_id ON sandboxes(user_id);
+        CREATE INDEX IF NOT EXISTS idx_sandboxes_status ON sandboxes(status);
+        CREATE INDEX IF NOT EXISTS idx_sandboxes_container_id ON sandboxes(container_id);
+      `);
+    },
+    down: () => {
+      db.exec('DROP TABLE IF EXISTS sandboxes');
+    },
+  },
+  
+  // Migration 14: Add chat_sessions table
+  // Unified session tracking for both OpenCode and ACP Gateway sessions
+  // Enables cross-device chat history access
+  {
+    version: 14,
+    name: 'add_chat_sessions_table',
+    up: () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS chat_sessions (
+          id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+          sandbox_id TEXT NOT NULL REFERENCES sandboxes(id) ON DELETE CASCADE,
+          user_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+          
+          -- Session source
+          source TEXT NOT NULL CHECK(source IN ('opencode', 'acp_gateway')),
+          
+          -- External references
+          opencode_session_id TEXT,
+          acp_session_id TEXT,
+          acp_agent_id TEXT,
+          
+          -- Session metadata
+          title TEXT,
+          status TEXT DEFAULT 'active' CHECK(status IN ('active', 'archived', 'deleted')),
+          
+          -- Statistics
+          message_count INTEGER DEFAULT 0,
+          user_message_count INTEGER DEFAULT 0,
+          assistant_message_count INTEGER DEFAULT 0,
+          total_input_tokens INTEGER DEFAULT 0,
+          total_output_tokens INTEGER DEFAULT 0,
+          
+          -- Timestamps
+          last_message_at TEXT,
+          last_synced_at TEXT,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+      
+      // Create indexes - unique constraint on external IDs per sandbox
+      db.exec(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_sessions_opencode 
+          ON chat_sessions(sandbox_id, opencode_session_id) 
+          WHERE opencode_session_id IS NOT NULL;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_sessions_acp 
+          ON chat_sessions(sandbox_id, acp_session_id) 
+          WHERE acp_session_id IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_chat_sessions_user ON chat_sessions(user_id);
+        CREATE INDEX IF NOT EXISTS idx_chat_sessions_sandbox ON chat_sessions(sandbox_id);
+        CREATE INDEX IF NOT EXISTS idx_chat_sessions_status ON chat_sessions(status);
+      `);
+    },
+    down: () => {
+      db.exec('DROP TABLE IF EXISTS chat_sessions');
+    },
+  },
+  
+  // Migration 15: Add chat_messages table
+  // Stores message content in raw format from source (OpenCode or ACP)
+  // Supports streaming status and token tracking
+  {
+    version: 15,
+    name: 'add_chat_messages_table',
+    up: () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS chat_messages (
+          id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+          session_id TEXT NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+          
+          -- External reference
+          external_message_id TEXT,
+          
+          -- Message content (raw format from source)
+          role TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'system')),
+          content TEXT NOT NULL,
+          tool_calls TEXT,
+          tool_results TEXT,
+          thinking TEXT,
+          
+          -- Model info
+          model_provider TEXT,
+          model_id TEXT,
+          agent_id TEXT,
+          
+          -- Token usage
+          input_tokens INTEGER,
+          output_tokens INTEGER,
+          
+          -- Message status
+          status TEXT DEFAULT 'complete' CHECK(status IN ('streaming', 'complete', 'error', 'cancelled')),
+          error_message TEXT,
+          
+          -- Timestamps
+          created_at TEXT DEFAULT (datetime('now')),
+          completed_at TEXT
+        )
+      `);
+      
+      // Create indexes
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id);
+        CREATE INDEX IF NOT EXISTS idx_chat_messages_external ON chat_messages(session_id, external_message_id);
+        CREATE INDEX IF NOT EXISTS idx_chat_messages_created ON chat_messages(created_at);
+      `);
+    },
+    down: () => {
+      db.exec('DROP TABLE IF EXISTS chat_messages');
+    },
+  },
+  
+  // Migration 16: Add user_preferences table
+  // Server-side storage for user app settings
+  // Enables bidirectional sync across devices
+  {
+    version: 16,
+    name: 'add_user_preferences_table',
+    up: () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS user_preferences (
+          id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+          user_id TEXT NOT NULL UNIQUE REFERENCES user(id) ON DELETE CASCADE,
+          
+          -- Theme
+          theme_mode TEXT DEFAULT 'system' CHECK(theme_mode IN ('light', 'dark', 'system')),
+          theme_preset TEXT DEFAULT 'default-neutral',
+          
+          -- App behavior
+          auto_refresh_interval INTEGER DEFAULT 30,
+          in_app_notifications INTEGER DEFAULT 1,
+          system_notifications INTEGER DEFAULT 1,
+          
+          -- Default sandbox configuration
+          default_resource_tier_id TEXT DEFAULT 'starter',
+          default_flavor_id TEXT DEFAULT 'fullstack',
+          default_addon_ids TEXT DEFAULT '["code-server"]',
+          default_agent_id TEXT DEFAULT 'opencode',
+          
+          -- Sync tracking
+          settings_version INTEGER DEFAULT 1,
+          
+          -- Timestamps
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+      
+      // Create index
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_user_preferences_user ON user_preferences(user_id);
+      `);
+    },
+    down: () => {
+      db.exec('DROP TABLE IF EXISTS user_preferences');
+    },
+  },
+  
+  // Migration 17: Add activity_log and activity_log_archive tables
+  // Activity logging with 90-day retention, then archived (anonymized)
+  // Supports audit trail and analytics
+  {
+    version: 17,
+    name: 'add_activity_log_tables',
+    up: () => {
+      // Create activity_log table (90-day retention)
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS activity_log (
+          id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+          user_id TEXT REFERENCES user(id) ON DELETE SET NULL,
+          
+          -- Action details
+          action TEXT NOT NULL,
+          entity_type TEXT,
+          entity_id TEXT,
+          
+          -- Context
+          metadata TEXT,
+          ip_address TEXT,
+          user_agent TEXT,
+          
+          -- For anonymization
+          anonymized INTEGER DEFAULT 0,
+          
+          created_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+      
+      // Create activity_log_archive table (permanent, anonymized)
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS activity_log_archive (
+          id TEXT PRIMARY KEY,
+          
+          -- Anonymized action details
+          action TEXT NOT NULL,
+          entity_type TEXT,
+          
+          -- Aggregated metadata (no PII)
+          metadata TEXT,
+          
+          -- Timestamps
+          original_created_at TEXT NOT NULL,
+          archived_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+      
+      // Create indexes
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_activity_log_user ON activity_log(user_id);
+        CREATE INDEX IF NOT EXISTS idx_activity_log_action ON activity_log(action);
+        CREATE INDEX IF NOT EXISTS idx_activity_log_entity ON activity_log(entity_type, entity_id);
+        CREATE INDEX IF NOT EXISTS idx_activity_log_created ON activity_log(created_at);
+        CREATE INDEX IF NOT EXISTS idx_activity_archive_action ON activity_log_archive(action);
+        CREATE INDEX IF NOT EXISTS idx_activity_archive_original ON activity_log_archive(original_created_at);
+      `);
+    },
+    down: () => {
+      db.exec('DROP TABLE IF EXISTS activity_log_archive');
+      db.exec('DROP TABLE IF EXISTS activity_log');
+    },
+  },
+  
+  // Migration 18: Migrate existing Docker sandboxes to database
+  // This is a data migration that will be populated at runtime
+  // The actual migration happens in sandbox-manager when Docker containers are detected
+  {
+    version: 18,
+    name: 'prepare_docker_sandbox_migration',
+    up: () => {
+      // Add a flag to track migration status
+      // The actual migration of Docker containers to the sandboxes table
+      // happens at runtime in the sandbox-manager service
+      db.exec(`
+        INSERT OR IGNORE INTO settings (key, value, updated_at)
+        VALUES ('docker_sandbox_migration_pending', 'true', datetime('now'))
+      `);
+      
+      // Ensure settings table exists (it might not if this is a fresh install)
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS settings (
+          key TEXT PRIMARY KEY,
+          value TEXT,
+          updated_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+      
+      // Re-insert the setting after ensuring table exists
+      db.exec(`
+        INSERT OR REPLACE INTO settings (key, value, updated_at)
+        VALUES ('docker_sandbox_migration_pending', 'true', datetime('now'))
+      `);
+    },
+    down: () => {
+      db.exec(`
+        DELETE FROM settings WHERE key = 'docker_sandbox_migration_pending'
+      `);
+    },
+  },
 ];

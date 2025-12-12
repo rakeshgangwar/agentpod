@@ -574,8 +574,20 @@ export const sandboxRoutes = new Hono()
 
     try {
       const body = await c.req.json();
-      const message = await opencodeV2.sendMessage(id, sessionId, body);
-      return c.json(message);
+      const response = await opencodeV2.sendMessage(id, sessionId, body);
+      
+      // Sync the conversation after AI responds
+      // This captures both the user message and AI response with all parts (text, tools, etc.)
+      try {
+        const { syncSessionMessages } = await import('../services/sync/opencode-sync.ts');
+        await syncSessionMessages(id, sessionId);
+        log.debug('Synced messages after prompt', { sandboxId: id, sessionId });
+      } catch (syncError) {
+        // Don't fail the request if sync fails, just log it
+        log.warn('Failed to sync messages after prompt', { sandboxId: id, sessionId, error: syncError });
+      }
+      
+      return c.json(response);
     } catch (error) {
       return handleOpenCodeError(c, error, "Failed to send OpenCode message");
     }
@@ -625,7 +637,17 @@ export const sandboxRoutes = new Hono()
   // ===========================================================================
   .get("/:id/opencode/file", async (c) => {
     const id = c.req.param("id");
-    const path = c.req.query("path") ?? "/";
+    let path = c.req.query("path") ?? "/";
+    
+    // OpenCode expects paths relative to the workspace root
+    // Strip common absolute path prefixes if provided
+    const workspacePrefixes = ["/home/developer/workspace/", "/home/developer/workspace", "/workspace/", "/workspace"];
+    for (const prefix of workspacePrefixes) {
+      if (path.startsWith(prefix)) {
+        path = path.slice(prefix.length) || "/";
+        break;
+      }
+    }
 
     try {
       const files = await opencodeV2.listFiles(id, path);
@@ -640,10 +662,20 @@ export const sandboxRoutes = new Hono()
   // ===========================================================================
   .get("/:id/opencode/file/content", async (c) => {
     const id = c.req.param("id");
-    const path = c.req.query("path");
+    let path = c.req.query("path");
 
     if (!path) {
       return c.json({ error: "Path query parameter is required" }, 400);
+    }
+
+    // OpenCode expects paths relative to the workspace root
+    // Strip common absolute path prefixes if provided
+    const workspacePrefixes = ["/home/developer/workspace/", "/home/developer/workspace", "/workspace/", "/workspace"];
+    for (const prefix of workspacePrefixes) {
+      if (path.startsWith(prefix)) {
+        path = path.slice(prefix.length) || "/";
+        break;
+      }
     }
 
     try {

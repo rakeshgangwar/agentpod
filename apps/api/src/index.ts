@@ -12,9 +12,18 @@ import { resourceTiersRouter } from './routes/resource-tiers.ts';
 import { flavorsRouter } from './routes/flavors.ts';
 import { addonsRouter } from './routes/addons.ts';
 import { providerRoutes } from './routes/providers.ts';
+import { preferencesRoutes } from './routes/preferences.ts';
+import { activityRoutes } from './routes/activity.ts';
+import { accountRoutes } from './routes/account.ts';
 // v2 Routes (direct Docker orchestrator)
 import { sandboxRoutes, sandboxHealthRoutes } from './routes/sandboxes.ts';
 import { repoRoutes } from './routes/repos.ts';
+import { chatRoutes } from './routes/chat.ts';
+// Middleware
+import { activityLoggerMiddleware } from './middleware/activity-logger.ts';
+// Sync services
+import { startSyncForRunningSandboxes, stopAllSync } from './services/sync/opencode-sync.ts';
+import { startArchivalService, stopArchivalService } from './services/sync/activity-archival.ts';
 
 // Initialize database
 console.log('Initializing database...');
@@ -54,8 +63,13 @@ const app = new Hono()
   })
   // Protected API routes require authentication (Better Auth session or API key)
   .use('/api/*', authMiddleware)
+  // Activity logging middleware (logs POST/PUT/PATCH/DELETE actions)
+  .use('/api/*', activityLoggerMiddleware)
   // User configuration endpoints
   .route('/api/users', userRoutes) // User OpenCode config
+  .route('/api/users/me/preferences', preferencesRoutes) // User preferences (sync)
+  .route('/api/users/me/activity', activityRoutes) // User activity log
+  .route('/api/account', accountRoutes) // Account management (delete, export)
   // LLM Provider configuration endpoints
   .route('/api/providers', providerRoutes) // LLM provider management
   // Modular container configuration endpoints
@@ -64,11 +78,37 @@ const app = new Hono()
   .route('/api/addons', addonsRouter) // Container addons (optional features)
   // v2 API routes (direct Docker orchestrator)
   .route('/api/v2/sandboxes', sandboxRoutes) // Sandbox management
+  .route('/api/v2/sandboxes', chatRoutes) // Chat history (persisted)
   .route('/api/v2/repos', repoRoutes) // Git repository management
   .route('/api/v2/health', sandboxHealthRoutes); // Health checks (includes /docker)
 
 // Export type for Hono Client (type-safe RPC from mobile app)
 export type AppType = typeof app;
+
+// Start sync services for running sandboxes
+console.log('Starting sync services for running sandboxes...');
+startSyncForRunningSandboxes().catch((error) => {
+  console.error('Failed to start sync services:', error);
+});
+
+// Start activity archival service (runs daily at 3 AM)
+console.log('Starting activity archival service...');
+startArchivalService();
+
+// Handle graceful shutdown
+process.on('SIGINT', () => {
+  console.log('Shutting down...');
+  stopAllSync();
+  stopArchivalService();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('Shutting down...');
+  stopAllSync();
+  stopArchivalService();
+  process.exit(0);
+});
 
 // Start server
 const port = config.port;
@@ -125,6 +165,14 @@ console.log(`
 ║  - GET  /api/v2/sandboxes/:id/opencode/event     SSE stream   ║
 ║  - GET  /api/v2/sandboxes/:id/opencode/file      List files   ║
 ╠═══════════════════════════════════════════════════════════════╣
+║  v2 Chat History Endpoints (persisted):                       ║
+║  - GET  .../chat/sessions             List sessions           ║
+║  - GET  .../chat/sessions/:sid        Get session + messages  ║
+║  - GET  .../chat/sessions/:sid/messages  Paginated messages   ║
+║  - POST .../chat/sessions/:sid/sync   Force sync              ║
+║  - DELETE .../chat/sessions/:sid      Archive session         ║
+║  - POST /api/v2/sandboxes/:id/chat/sync  Full sync            ║
+╠═══════════════════════════════════════════════════════════════╣
 ║  v2 Repository Endpoints:                                     ║
 ║  - GET  /api/v2/repos                 List repositories       ║
 ║  - POST /api/v2/repos                 Create repository       ║
@@ -133,6 +181,24 @@ console.log(`
 ║  - GET  /api/v2/repos/:name/status    Git status              ║
 ║  - POST /api/v2/repos/:name/commit    Create commit           ║
 ║  - GET  /api/v2/health/docker         Docker health check     ║
+╠═══════════════════════════════════════════════════════════════╣
+║  User Preferences Endpoints:                                  ║
+║  - GET  /api/users/me/preferences     Get preferences         ║
+║  - PUT  /api/users/me/preferences     Replace preferences     ║
+║  - PATCH /api/users/me/preferences    Partial update          ║
+║  - GET  /api/users/me/preferences/version  Get version        ║
+║  - GET  /api/users/me/preferences/sync     Check sync status  ║
+║  - DELETE /api/users/me/preferences   Reset to defaults       ║
+╠═══════════════════════════════════════════════════════════════╣
+║  User Activity Endpoints:                                     ║
+║  - GET  /api/users/me/activity        List activity logs      ║
+║  - GET  /api/users/me/activity/stats  Get activity stats      ║
+║  - GET  /api/users/me/activity/export Export as JSON/CSV      ║
+╠═══════════════════════════════════════════════════════════════╣
+║  Account Management Endpoints:                                ║
+║  - GET  /api/account                  Get account info        ║
+║  - DELETE /api/account                Delete account          ║
+║  - GET  /api/account/data-export      Export all user data    ║
 ╚═══════════════════════════════════════════════════════════════╝
 `);
 

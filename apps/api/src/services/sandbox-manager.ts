@@ -2,15 +2,22 @@
  * Sandbox Manager Service
  *
  * High-level service that coordinates:
+ * - Database (source of truth for sandbox metadata)
  * - Docker orchestrator (container lifecycle)
  * - Git backend (repository management)
  * - Configuration service (agentpod.toml parsing)
+ *
+ * Architecture:
+ * - Database is the primary source of truth for sandbox metadata
+ * - Docker containers are managed based on DB state
+ * - Container IDs, status, and URLs are synced back to DB
  *
  * This replaces the old project-manager.ts which used Coolify + Forgejo.
  */
 
 import { nanoid } from "nanoid";
 import { config } from "../config.ts";
+import { db } from "../db/index.ts";
 import { DockerOrchestrator } from "./orchestrator/docker.ts";
 import { FileSystemGitBackend } from "./git/filesystem.ts";
 import {
@@ -18,17 +25,65 @@ import {
   configToContainerSpec,
   createMinimalContainerSpec,
 } from "./config/index.ts";
-import type { Sandbox, SandboxConfig, SandboxStats } from "./orchestrator/types.ts";
+import type { Sandbox as DockerSandbox, SandboxConfig, SandboxStats, SandboxStatus as DockerStatus } from "./orchestrator/types.ts";
 import type { Repository } from "./git/types.ts";
 import { createLogger } from "../utils/logger.ts";
 import { buildOpenCodeAuthJson } from "../models/provider.ts";
 import { getUserOpencodeFullConfig } from "../models/user-opencode-config.ts";
+import * as SandboxModel from "../models/sandbox.ts";
+import type { Sandbox as DbSandbox, SandboxStatus as DbSandboxStatus } from "../models/sandbox.ts";
+import { getOpenCodeSyncService } from "./sync/opencode-sync.ts";
 
 const log = createLogger("sandbox-manager");
 
 // =============================================================================
-// Types
+// Type Mapping & Types
 // =============================================================================
+
+/**
+ * Maps Docker container status to database sandbox status
+ */
+function dockerStatusToDbStatus(dockerStatus: DockerStatus): DbSandboxStatus {
+  const statusMap: Record<DockerStatus, DbSandboxStatus> = {
+    creating: 'starting',
+    running: 'running',
+    stopped: 'stopped',
+    paused: 'stopped',
+    restarting: 'starting',
+    removing: 'stopping',
+    exited: 'stopped',
+    dead: 'error',
+    error: 'error',
+    unknown: 'error',
+  };
+  return statusMap[dockerStatus] ?? 'error';
+}
+
+/**
+ * Combined sandbox type that includes both DB metadata and Docker runtime info
+ * This is what the API returns to clients
+ */
+export interface Sandbox extends DbSandbox {
+  // URLs object for backward compatibility with orchestrator types
+  urls: {
+    opencode?: string;
+    codeServer?: string;
+    vnc?: string;
+    homepage?: string;
+    acpGateway?: string;
+    [service: string]: string | undefined;
+  };
+  
+  // Additional Docker runtime info (not stored in DB, enriched at runtime)
+  image?: string;
+  labels?: Record<string, string>;
+  health?: {
+    status: "healthy" | "unhealthy" | "starting" | "none";
+    failingStreak: number;
+    lastCheck?: Date;
+  };
+  startedAt?: Date;
+}
 
 export interface CreateSandboxOptions {
   /** Project name */
@@ -67,6 +122,7 @@ export interface SandboxInfo {
 export class SandboxManager {
   private orchestrator: DockerOrchestrator;
   private gitBackend: FileSystemGitBackend;
+  private migrationChecked = false;
 
   constructor() {
     // Initialize Docker orchestrator
@@ -97,33 +153,198 @@ export class SandboxManager {
   }
 
   // ===========================================================================
+  // Migration from Docker labels to Database
+  // ===========================================================================
+
+  /**
+   * Check if Docker-to-DB migration is needed and run it
+   * This is called lazily on first sandbox operation
+   */
+  private async checkAndRunMigration(): Promise<void> {
+    if (this.migrationChecked) return;
+    this.migrationChecked = true;
+
+    try {
+      // Check if migration is pending
+      const result = db.query<{ value: string }, []>(
+        "SELECT value FROM settings WHERE key = 'docker_sandbox_migration_pending'"
+      ).get();
+
+      if (result?.value !== 'true') {
+        return; // Migration already done or not needed
+      }
+
+      log.info("Running Docker-to-DB sandbox migration");
+      await this.migrateDockerSandboxesToDb();
+
+      // Mark migration as complete
+      db.run(
+        "UPDATE settings SET value = 'false', updated_at = datetime('now') WHERE key = 'docker_sandbox_migration_pending'"
+      );
+      log.info("Docker-to-DB sandbox migration complete");
+    } catch (error) {
+      log.error("Docker-to-DB migration failed", { error });
+      // Don't throw - allow operations to continue
+    }
+  }
+
+  /**
+   * Migrate existing Docker containers (with agentpod labels) to the database
+   */
+  private async migrateDockerSandboxesToDb(): Promise<void> {
+    const dockerSandboxes = await this.orchestrator.listSandboxes({});
+    let migrated = 0;
+
+    for (const dockerSandbox of dockerSandboxes) {
+      const labels = dockerSandbox.labels ?? {};
+      const sandboxId = labels["agentpod.sandbox.id"];
+      const userId = labels["agentpod.sandbox.user"];
+
+      if (!sandboxId || !userId) {
+        log.debug("Skipping container without agentpod labels", { containerId: dockerSandbox.containerId });
+        continue;
+      }
+
+      // Check if already in database
+      const existing = SandboxModel.getSandboxById(sandboxId);
+      if (existing) {
+        // Update container info if changed
+        if (existing.containerId !== dockerSandbox.containerId || existing.status !== dockerStatusToDbStatus(dockerSandbox.status)) {
+          SandboxModel.updateSandbox(sandboxId, {
+            containerId: dockerSandbox.containerId,
+            containerName: labels["agentpod.sandbox.name"],
+            status: dockerStatusToDbStatus(dockerSandbox.status),
+            opencodeUrl: dockerSandbox.urls.opencode,
+            vncUrl: dockerSandbox.urls.vnc,
+            codeServerUrl: dockerSandbox.urls.codeServer,
+          });
+        }
+        continue;
+      }
+
+      // Create new DB record from Docker labels
+      try {
+        SandboxModel.createSandbox({
+          id: sandboxId,
+          userId,
+          name: labels["agentpod.sandbox.name"] ?? `Sandbox ${sandboxId}`,
+          slug: labels["agentpod.sandbox.slug"] ?? sandboxId,
+          description: undefined,
+          repoName: labels["agentpod.sandbox.repo"] ?? `repo-${sandboxId}`,
+          githubUrl: labels["agentpod.sandbox.github"],
+          resourceTierId: 'starter', // Default, not stored in labels
+          flavorId: 'fullstack', // Default, not stored in labels
+          addonIds: ['code-server'], // Default
+        });
+
+        // Update with container runtime info
+        SandboxModel.updateSandbox(sandboxId, {
+          containerId: dockerSandbox.containerId,
+          containerName: labels["agentpod.sandbox.name"],
+          status: dockerStatusToDbStatus(dockerSandbox.status),
+          opencodeUrl: dockerSandbox.urls.opencode,
+          vncUrl: dockerSandbox.urls.vnc,
+          codeServerUrl: dockerSandbox.urls.codeServer,
+        });
+
+        migrated++;
+        log.info("Migrated sandbox from Docker to DB", { sandboxId, userId });
+      } catch (error) {
+        log.warn("Failed to migrate sandbox", { sandboxId, error });
+      }
+    }
+
+    log.info("Docker-to-DB migration complete", { migrated, total: dockerSandboxes.length });
+  }
+
+  // ===========================================================================
+  // Helper: Enrich DB sandbox with Docker runtime info
+  // ===========================================================================
+
+  /**
+   * Enrich a DB sandbox with live Docker container info
+   */
+  private async enrichSandboxWithDocker(dbSandbox: DbSandbox): Promise<Sandbox> {
+    // Build the urls object from DB fields
+    const sandbox: Sandbox = {
+      ...dbSandbox,
+      urls: {
+        opencode: dbSandbox.opencodeUrl,
+        codeServer: dbSandbox.codeServerUrl,
+        vnc: dbSandbox.vncUrl,
+        acpGateway: dbSandbox.acpGatewayUrl,
+      },
+    };
+
+    if (dbSandbox.containerId) {
+      try {
+        const dockerSandbox = await this.orchestrator.getSandbox(dbSandbox.id);
+        if (dockerSandbox) {
+          sandbox.image = dockerSandbox.image;
+          sandbox.labels = dockerSandbox.labels;
+          sandbox.health = dockerSandbox.health;
+          sandbox.startedAt = dockerSandbox.startedAt;
+
+          // Sync status if different
+          const currentDbStatus = dockerStatusToDbStatus(dockerSandbox.status);
+          if (dbSandbox.status !== currentDbStatus) {
+            SandboxModel.updateSandboxStatus(dbSandbox.id, currentDbStatus);
+            sandbox.status = currentDbStatus;
+          }
+
+          // Update URLs if changed
+          if (dockerSandbox.urls.opencode !== dbSandbox.opencodeUrl ||
+              dockerSandbox.urls.vnc !== dbSandbox.vncUrl ||
+              dockerSandbox.urls.codeServer !== dbSandbox.codeServerUrl) {
+            SandboxModel.updateSandbox(dbSandbox.id, {
+              opencodeUrl: dockerSandbox.urls.opencode,
+              vncUrl: dockerSandbox.urls.vnc,
+              codeServerUrl: dockerSandbox.urls.codeServer,
+            });
+            sandbox.opencodeUrl = dockerSandbox.urls.opencode;
+            sandbox.vncUrl = dockerSandbox.urls.vnc;
+            sandbox.codeServerUrl = dockerSandbox.urls.codeServer;
+          }
+        }
+      } catch (error) {
+        log.debug("Failed to get Docker info for sandbox", { sandboxId: dbSandbox.id, error });
+      }
+    }
+
+    return sandbox;
+  }
+
+  // ===========================================================================
   // Sandbox Lifecycle
   // ===========================================================================
 
   /**
    * Create a new sandbox with a Git repository and container
+   * Creates DB record first, then Docker container
    */
   async createSandbox(options: CreateSandboxOptions): Promise<SandboxWithRepo> {
+    await this.checkAndRunMigration();
+
     const {
       name,
       description,
       githubUrl,
       userId,
-      flavor,
-      resourceTier,
-      // addons - reserved for future use
+      flavor = "fullstack",
+      resourceTier = "starter",
+      addons = ["code-server"],
       autoStart = false,
     } = options;
 
-    // Generate unique sandbox ID
+    // Generate unique sandbox ID and slug
     const sandboxId = nanoid(12);
-    const slug = this.generateSlug(name);
+    const slug = SandboxModel.generateUniqueSlug(userId, name);
+    const repoName = `${slug}-${sandboxId}`;
 
-    log.info("Creating sandbox", { sandboxId, name, slug, githubUrl });
+    log.info("Creating sandbox", { sandboxId, name, slug, githubUrl, userId });
 
     // Step 1: Create or clone the repository
     let repository: Repository;
-    const repoName = `${slug}-${sandboxId}`;
 
     try {
       if (githubUrl) {
@@ -148,13 +369,40 @@ export class SandboxManager {
       throw new Error(`Failed to create repository: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
 
-    // Step 2: Load or detect configuration
+    // Step 2: Create DB record (before Docker container)
+    let dbSandbox: DbSandbox;
+    try {
+      dbSandbox = SandboxModel.createSandbox({
+        id: sandboxId,
+        userId,
+        name,
+        slug,
+        description,
+        repoName,
+        githubUrl,
+        resourceTierId: resourceTier,
+        flavorId: flavor,
+        addonIds: addons,
+      });
+      log.info("Created sandbox DB record", { sandboxId });
+    } catch (error) {
+      // Cleanup repository on failure
+      log.error("Failed to create sandbox DB record, cleaning up repository", { error });
+      try {
+        await this.gitBackend.deleteRepo(repoName);
+      } catch (cleanupError) {
+        log.warn("Failed to cleanup repository", { cleanupError });
+      }
+      throw new Error(`Failed to create sandbox: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+
+    // Step 3: Load or detect configuration
     const configResult = await loadOrDetectConfig(repository.path);
     if (!configResult.valid) {
       log.warn("Configuration validation failed", { errors: configResult.errors });
     }
 
-    // Step 3: Create container specification
+    // Step 4: Create container specification
     let containerSpec: SandboxConfig;
 
     if (configResult.config) {
@@ -175,16 +423,12 @@ export class SandboxManager {
     }
 
     // Override with explicit options if provided
-    if (flavor) {
-      containerSpec.image = this.getImageForFlavor(flavor);
-    }
-    if (resourceTier) {
-      const tierResources = this.getResourcesForTier(resourceTier);
-      containerSpec.resources = {
-        ...containerSpec.resources,
-        ...tierResources,
-      };
-    }
+    containerSpec.image = this.getImageForFlavor(flavor);
+    const tierResources = this.getResourcesForTier(resourceTier);
+    containerSpec.resources = {
+      ...containerSpec.resources,
+      ...tierResources,
+    };
 
     // Add sandbox metadata to labels
     containerSpec.labels = {
@@ -202,10 +446,8 @@ export class SandboxManager {
       containerSpec.labels["agentpod.sandbox.github"] = githubUrl;
     }
 
-    // Step 3.5: Inject OpenCode configuration
-    // This includes auth (provider credentials) and user config (settings, AGENTS.md, custom files)
+    // Step 5: Inject OpenCode configuration
     try {
-      // Inject provider credentials (auth.json)
       const authJson = await buildOpenCodeAuthJson();
       if (authJson && authJson !== "{}") {
         containerSpec.env = {
@@ -215,10 +457,8 @@ export class SandboxManager {
         log.debug("Injected OpenCode auth configuration");
       }
 
-      // Inject user OpenCode configuration (settings, AGENTS.md, custom files)
       const userConfig = getUserOpencodeFullConfig(userId);
       if (userConfig) {
-        // Pass the full config as JSON - the entrypoint will parse it
         containerSpec.env = {
           ...containerSpec.env,
           OPENCODE_USER_CONFIG: JSON.stringify(userConfig),
@@ -233,33 +473,66 @@ export class SandboxManager {
       log.warn("Failed to build OpenCode config, continuing without it", { error: configError });
     }
 
-    // Step 4: Create the container
-    let sandbox: Sandbox;
+    // Step 6: Create the Docker container
+    let dockerSandbox: DockerSandbox;
     try {
       log.info("Creating container", { sandboxId, image: containerSpec.image });
-      sandbox = await this.orchestrator.createSandbox(containerSpec);
-      log.info("Container created", { sandboxId, containerId: sandbox.containerId });
+      SandboxModel.updateSandboxStatus(sandboxId, 'starting');
+      dockerSandbox = await this.orchestrator.createSandbox(containerSpec);
+      log.info("Container created", { sandboxId, containerId: dockerSandbox.containerId });
     } catch (error) {
-      // Cleanup repository on failure
-      log.error("Failed to create container, cleaning up repository", { error });
+      // Update DB status to error, cleanup repository
+      log.error("Failed to create container", { error });
+      SandboxModel.updateSandboxStatus(sandboxId, 'error', error instanceof Error ? error.message : "Container creation failed");
+      
       try {
         await this.gitBackend.deleteRepo(repoName);
+        SandboxModel.deleteSandbox(sandboxId);
       } catch (cleanupError) {
-        log.warn("Failed to cleanup repository", { cleanupError });
+        log.warn("Failed to cleanup after container creation failure", { cleanupError });
       }
       throw new Error(`Failed to create container: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
 
-    // Step 5: Start if requested
+    // Step 7: Update DB with container info
+    SandboxModel.updateSandbox(sandboxId, {
+      containerId: dockerSandbox.containerId,
+      containerName: dockerSandbox.name,
+      status: dockerStatusToDbStatus(dockerSandbox.status),
+      opencodeUrl: dockerSandbox.urls.opencode,
+      vncUrl: dockerSandbox.urls.vnc,
+      codeServerUrl: dockerSandbox.urls.codeServer,
+    });
+
+    // Step 8: Start if requested
     if (autoStart) {
       try {
         await this.orchestrator.startSandbox(sandboxId);
+        SandboxModel.updateSandboxStatus(sandboxId, 'running');
         log.info("Container started", { sandboxId });
+        
+        // Start sync service for this sandbox
+        try {
+          await getOpenCodeSyncService().startSync(sandboxId);
+        } catch (syncError) {
+          log.warn("Failed to start sync for sandbox", { sandboxId, error: syncError });
+          // Don't fail the creation if sync fails
+        }
       } catch (error) {
         log.warn("Failed to auto-start container", { sandboxId, error });
+        SandboxModel.updateSandboxStatus(sandboxId, 'error', 'Failed to auto-start');
       }
+    } else {
+      SandboxModel.updateSandboxStatus(sandboxId, 'stopped');
     }
 
+    // Get final sandbox state
+    const finalSandbox = SandboxModel.getSandboxById(sandboxId);
+    if (!finalSandbox) {
+      throw new Error("Sandbox created but not found in database");
+    }
+
+    const sandbox = await this.enrichSandboxWithDocker(finalSandbox);
     return { sandbox, repository };
   }
 
@@ -267,40 +540,119 @@ export class SandboxManager {
    * Start a sandbox container
    */
   async startSandbox(sandboxId: string): Promise<void> {
+    await this.checkAndRunMigration();
     log.info("Starting sandbox", { sandboxId });
-    await this.orchestrator.startSandbox(sandboxId);
+
+    const dbSandbox = SandboxModel.getSandboxById(sandboxId);
+    if (!dbSandbox) {
+      throw new Error(`Sandbox not found: ${sandboxId}`);
+    }
+
+    SandboxModel.updateSandboxStatus(sandboxId, 'starting');
+    
+    try {
+      await this.orchestrator.startSandbox(sandboxId);
+      SandboxModel.updateSandboxStatus(sandboxId, 'running');
+      SandboxModel.touchSandbox(sandboxId);
+      
+      // Start sync service for this sandbox
+      try {
+        await getOpenCodeSyncService().startSync(sandboxId);
+      } catch (syncError) {
+        log.warn("Failed to start sync for sandbox", { sandboxId, error: syncError });
+        // Don't fail the start if sync fails
+      }
+    } catch (error) {
+      SandboxModel.updateSandboxStatus(sandboxId, 'error', error instanceof Error ? error.message : 'Start failed');
+      throw error;
+    }
   }
 
   /**
    * Stop a sandbox container
    */
   async stopSandbox(sandboxId: string, timeout?: number): Promise<void> {
+    await this.checkAndRunMigration();
     log.info("Stopping sandbox", { sandboxId, timeout });
-    await this.orchestrator.stopSandbox(sandboxId, timeout);
+
+    const dbSandbox = SandboxModel.getSandboxById(sandboxId);
+    if (!dbSandbox) {
+      throw new Error(`Sandbox not found: ${sandboxId}`);
+    }
+
+    // Stop sync service before stopping container
+    try {
+      getOpenCodeSyncService().stopSync(sandboxId);
+    } catch (syncError) {
+      log.warn("Failed to stop sync for sandbox", { sandboxId, error: syncError });
+      // Don't fail the stop if sync stop fails
+    }
+
+    SandboxModel.updateSandboxStatus(sandboxId, 'stopping');
+    
+    try {
+      await this.orchestrator.stopSandbox(sandboxId, timeout);
+      SandboxModel.updateSandboxStatus(sandboxId, 'stopped');
+    } catch (error) {
+      SandboxModel.updateSandboxStatus(sandboxId, 'error', error instanceof Error ? error.message : 'Stop failed');
+      throw error;
+    }
   }
 
   /**
    * Restart a sandbox container
    */
   async restartSandbox(sandboxId: string, timeout?: number): Promise<void> {
+    await this.checkAndRunMigration();
     log.info("Restarting sandbox", { sandboxId });
-    await this.orchestrator.restartSandbox(sandboxId, timeout);
+
+    const dbSandbox = SandboxModel.getSandboxById(sandboxId);
+    if (!dbSandbox) {
+      throw new Error(`Sandbox not found: ${sandboxId}`);
+    }
+
+    SandboxModel.updateSandboxStatus(sandboxId, 'starting');
+    
+    try {
+      await this.orchestrator.restartSandbox(sandboxId, timeout);
+      SandboxModel.updateSandboxStatus(sandboxId, 'running');
+      SandboxModel.touchSandbox(sandboxId);
+    } catch (error) {
+      SandboxModel.updateSandboxStatus(sandboxId, 'error', error instanceof Error ? error.message : 'Restart failed');
+      throw error;
+    }
   }
 
   /**
    * Pause a sandbox container
    */
   async pauseSandbox(sandboxId: string): Promise<void> {
+    await this.checkAndRunMigration();
     log.info("Pausing sandbox", { sandboxId });
+
+    if (!SandboxModel.getSandboxById(sandboxId)) {
+      throw new Error(`Sandbox not found: ${sandboxId}`);
+    }
+
     await this.orchestrator.pauseSandbox(sandboxId);
+    SandboxModel.updateSandboxStatus(sandboxId, 'stopped');
   }
 
   /**
    * Unpause a sandbox container
    */
   async unpauseSandbox(sandboxId: string): Promise<void> {
+    await this.checkAndRunMigration();
     log.info("Unpausing sandbox", { sandboxId });
+
+    const dbSandbox = SandboxModel.getSandboxById(sandboxId);
+    if (!dbSandbox) {
+      throw new Error(`Sandbox not found: ${sandboxId}`);
+    }
+
     await this.orchestrator.unpauseSandbox(sandboxId);
+    SandboxModel.updateSandboxStatus(sandboxId, 'running');
+    SandboxModel.touchSandbox(sandboxId);
   }
 
   /**
@@ -310,20 +662,29 @@ export class SandboxManager {
     sandboxId: string,
     options: { deleteRepo?: boolean; removeVolumes?: boolean } = {}
   ): Promise<void> {
+    await this.checkAndRunMigration();
     const { deleteRepo = true, removeVolumes = false } = options;
 
     log.info("Deleting sandbox", { sandboxId, deleteRepo, removeVolumes });
 
-    // Get sandbox info to find associated repository
-    const sandbox = await this.orchestrator.getSandbox(sandboxId);
-    const repoName = sandbox?.labels?.["agentpod.sandbox.repo"];
+    // Stop sync service before deleting
+    try {
+      getOpenCodeSyncService().stopSync(sandboxId);
+    } catch (syncError) {
+      log.warn("Failed to stop sync for sandbox", { sandboxId, error: syncError });
+      // Don't fail the delete if sync stop fails
+    }
+
+    // Get sandbox from DB (source of truth)
+    const dbSandbox = SandboxModel.getSandboxById(sandboxId);
+    const repoName = dbSandbox?.repoName;
 
     // Delete container
     try {
       await this.orchestrator.deleteSandbox(sandboxId, removeVolumes);
       log.info("Container deleted", { sandboxId });
     } catch (error) {
-      log.warn("Failed to delete container", { sandboxId, error });
+      log.warn("Failed to delete container (may not exist)", { sandboxId, error });
     }
 
     // Delete repository if requested
@@ -335,6 +696,12 @@ export class SandboxManager {
         log.warn("Failed to delete repository", { repoName, error });
       }
     }
+
+    // Delete from database
+    if (dbSandbox) {
+      SandboxModel.deleteSandbox(sandboxId);
+      log.info("Sandbox DB record deleted", { sandboxId });
+    }
   }
 
   // ===========================================================================
@@ -342,25 +709,32 @@ export class SandboxManager {
   // ===========================================================================
 
   /**
-   * Get sandbox by ID
+   * Get sandbox by ID (from DB, enriched with Docker info)
    */
   async getSandbox(sandboxId: string): Promise<Sandbox | null> {
-    return this.orchestrator.getSandbox(sandboxId);
+    await this.checkAndRunMigration();
+    
+    const dbSandbox = SandboxModel.getSandboxById(sandboxId);
+    if (!dbSandbox) return null;
+
+    return this.enrichSandboxWithDocker(dbSandbox);
   }
 
   /**
    * Get sandbox with associated repository info
    */
   async getSandboxInfo(sandboxId: string): Promise<SandboxInfo | null> {
-    const sandbox = await this.orchestrator.getSandbox(sandboxId);
-    if (!sandbox) return null;
+    await this.checkAndRunMigration();
+    
+    const dbSandbox = SandboxModel.getSandboxById(sandboxId);
+    if (!dbSandbox) return null;
 
-    const repoName = sandbox.labels?.["agentpod.sandbox.repo"];
+    const sandbox = await this.enrichSandboxWithDocker(dbSandbox);
     let repository: Repository | null = null;
     let sandboxConfig: Record<string, unknown> | null = null;
 
-    if (repoName) {
-      repository = await this.gitBackend.getRepo(repoName);
+    if (dbSandbox.repoName) {
+      repository = await this.gitBackend.getRepo(dbSandbox.repoName);
       if (repository) {
         const configResult = await loadOrDetectConfig(repository.path);
         if (configResult.config) {
@@ -369,32 +743,55 @@ export class SandboxManager {
       }
     }
 
+    // Update last accessed
+    SandboxModel.touchSandbox(sandboxId);
+
     return { sandbox, repository, config: sandboxConfig };
   }
 
   /**
-   * List all sandboxes
+   * List all sandboxes (from DB, enriched with Docker info)
    */
   async listSandboxes(filter?: {
     userId?: string;
     status?: string | string[];
   }): Promise<Sandbox[]> {
-    const sandboxFilter: Record<string, unknown> = {};
+    await this.checkAndRunMigration();
+
+    let dbSandboxes: DbSandbox[];
 
     if (filter?.userId) {
-      sandboxFilter.labels = { "agentpod.sandbox.user": filter.userId };
-    }
-    if (filter?.status) {
-      sandboxFilter.status = filter.status;
+      dbSandboxes = SandboxModel.listSandboxesByUserId(filter.userId);
+    } else {
+      dbSandboxes = SandboxModel.listAllSandboxes();
     }
 
-    return this.orchestrator.listSandboxes(sandboxFilter);
+    // Filter by status if provided
+    if (filter?.status) {
+      const statuses = Array.isArray(filter.status) ? filter.status : [filter.status];
+      dbSandboxes = dbSandboxes.filter(s => statuses.includes(s.status));
+    }
+
+    // Enrich with Docker info (in parallel for performance)
+    const sandboxes = await Promise.all(
+      dbSandboxes.map(s => this.enrichSandboxWithDocker(s))
+    );
+
+    return sandboxes;
   }
 
   /**
    * Get sandbox status
    */
   async getSandboxStatus(sandboxId: string) {
+    await this.checkAndRunMigration();
+    
+    const dbSandbox = SandboxModel.getSandboxById(sandboxId);
+    if (!dbSandbox) {
+      throw new Error(`Sandbox not found: ${sandboxId}`);
+    }
+
+    // Get live status from Docker
     return this.orchestrator.getSandboxStatus(sandboxId);
   }
 
@@ -402,6 +799,13 @@ export class SandboxManager {
    * Get sandbox resource stats
    */
   async getSandboxStats(sandboxId: string): Promise<SandboxStats> {
+    await this.checkAndRunMigration();
+    
+    const dbSandbox = SandboxModel.getSandboxById(sandboxId);
+    if (!dbSandbox) {
+      throw new Error(`Sandbox not found: ${sandboxId}`);
+    }
+
     return this.orchestrator.getSandboxStats(sandboxId);
   }
 
@@ -412,6 +816,13 @@ export class SandboxManager {
     sandboxId: string,
     options?: { tail?: number; since?: Date; timestamps?: boolean }
   ): Promise<string> {
+    await this.checkAndRunMigration();
+    
+    const dbSandbox = SandboxModel.getSandboxById(sandboxId);
+    if (!dbSandbox) {
+      throw new Error(`Sandbox not found: ${sandboxId}`);
+    }
+
     return this.orchestrator.getLogs(sandboxId, options);
   }
 
@@ -441,6 +852,13 @@ export class SandboxManager {
       user?: string;
     }
   ) {
+    await this.checkAndRunMigration();
+    
+    const dbSandbox = SandboxModel.getSandboxById(sandboxId);
+    if (!dbSandbox) {
+      throw new Error(`Sandbox not found: ${sandboxId}`);
+    }
+
     return this.orchestrator.exec(sandboxId, command, options);
   }
 
@@ -452,13 +870,12 @@ export class SandboxManager {
    * Get repository for a sandbox
    */
   async getRepository(sandboxId: string): Promise<Repository | null> {
-    const sandbox = await this.orchestrator.getSandbox(sandboxId);
-    if (!sandbox) return null;
+    await this.checkAndRunMigration();
+    
+    const dbSandbox = SandboxModel.getSandboxById(sandboxId);
+    if (!dbSandbox) return null;
 
-    const repoName = sandbox.labels?.["agentpod.sandbox.repo"];
-    if (!repoName) return null;
-
-    return this.gitBackend.getRepo(repoName);
+    return this.gitBackend.getRepo(dbSandbox.repoName);
   }
 
   /**
@@ -533,17 +950,6 @@ export class SandboxManager {
   // ===========================================================================
   // Private Helpers
   // ===========================================================================
-
-  /**
-   * Generate a URL-safe slug from a name
-   */
-  private generateSlug(name: string): string {
-    return name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "")
-      .substring(0, 50);
-  }
 
   /**
    * Get Docker image for a flavor
