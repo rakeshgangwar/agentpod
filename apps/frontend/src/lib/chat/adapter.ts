@@ -200,10 +200,20 @@ export function createOpenCodeAdapter(projectId: string, initialSessionId?: stri
               }
             }
             
-            // Handle errors
+            // Handle errors (legacy event type)
             if (event.eventType === "error") {
               console.error('[OpenCode Adapter] Error event:', event.data);
               streamState.error = new Error(String(event.data));
+              streamState.isComplete = true;
+            }
+            
+            // Handle session.error - OpenCode SDK error event
+            if (event.eventType === "session.error") {
+              const errorMessage = (properties?.error as string) || 
+                                  (properties?.message as string) || 
+                                  "Session error occurred";
+              console.error('[OpenCode Adapter] Session error:', errorMessage, properties);
+              streamState.error = new Error(errorMessage);
               streamState.isComplete = true;
             }
           },

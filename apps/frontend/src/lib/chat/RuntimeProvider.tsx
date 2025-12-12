@@ -473,6 +473,25 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
         setIsRunning(false);
       }
     }
+
+    // Handle session.error - display error to user
+    if (event.eventType === "session.error") {
+      console.error("[RuntimeProvider] Session error:", properties);
+      const errorMessage = (properties?.error as string) || 
+                          (properties?.message as string) || 
+                          "An error occurred";
+      setError(errorMessage);
+      setIsRunning(false);
+    }
+
+    // Handle message.removed - remove message from state
+    if (event.eventType === "message.removed") {
+      const messageId = properties?.messageID as string | undefined;
+      if (messageId) {
+        console.log("[RuntimeProvider] Message removed:", messageId);
+        setInternalMessages((prev) => prev.filter((m) => m.id !== messageId));
+      }
+    }
   }, [sessionId, addPermission, removePermission]);
 
   // Connect to SSE stream when session is available
