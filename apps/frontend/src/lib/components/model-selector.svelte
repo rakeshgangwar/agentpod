@@ -8,7 +8,7 @@
   
   import { onMount } from "svelte";
   import { 
-    opencodeGetProviders,
+    sandboxOpencodeGetProviders,
     type OpenCodeProvider,
     type ModelSelection,
   } from "$lib/api/tauri";
@@ -48,7 +48,8 @@
     error = null;
     
     try {
-      const result = await opencodeGetProviders(projectId);
+      // projectId is actually sandboxId in v2 API
+      const result = await sandboxOpencodeGetProviders(projectId);
       providers = result;
       
       // Auto-select first model if none selected

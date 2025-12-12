@@ -11,7 +11,7 @@
 
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
 import {
-  opencodeRespondPermission,
+  sandboxOpencodeRespondPermission,
   type PermissionRequest,
   type PermissionResponseType,
 } from "../api/tauri";
@@ -113,8 +113,8 @@ export function PermissionProvider({ projectId, children }: PermissionProviderPr
       );
 
       try {
-        // Call the Tauri command to respond
-        await opencodeRespondPermission(
+        // Call the Tauri command to respond (projectId is actually sandboxId in v2 API)
+        await sandboxOpencodeRespondPermission(
           projectId,
           permission.sessionID,
           permissionId,

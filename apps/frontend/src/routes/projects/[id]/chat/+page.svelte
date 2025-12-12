@@ -8,19 +8,19 @@
   import FilePickerModal from "$lib/components/file-picker-modal.svelte";
   import ModelSelector from "$lib/components/model-selector.svelte";
   import {
-    opencodeListSessions,
-    opencodeCreateSession,
-    opencodeDeleteSession,
-    opencodeFindFiles,
+    sandboxOpencodeListSessions,
+    sandboxOpencodeCreateSession,
+    sandboxOpencodeDeleteSession,
+    sandboxOpencodeFindFiles,
     type Session,
     type ModelSelection,
   } from "$lib/api/tauri";
   import { confirm } from "@tauri-apps/plugin-dialog";
 
-  // File finder wrapper for ChatThread
-  async function findFiles(projectId: string, pattern: string): Promise<string[]> {
+  // File finder wrapper for ChatThread (uses sandboxId, same as projectId in URL)
+  async function findFiles(sandboxId: string, pattern: string): Promise<string[]> {
     try {
-      return await opencodeFindFiles(projectId, pattern);
+      return await sandboxOpencodeFindFiles(sandboxId, pattern);
     } catch (err) {
       console.error("Failed to find files:", err);
       return [];
@@ -102,7 +102,8 @@
     isLoading = true;
     error = null;
     try {
-      sessions = await opencodeListSessions(projectId);
+      // projectId is actually sandboxId in v2 API
+      sessions = await sandboxOpencodeListSessions(projectId);
       // Auto-select the most recent session if none selected
       if (!selectedSessionId && sessions.length > 0) {
         selectedSessionId = sessions[0].id;
@@ -118,7 +119,8 @@
   async function createNewSession() {
     isCreating = true;
     try {
-      const session = await opencodeCreateSession(projectId);
+      // projectId is actually sandboxId in v2 API
+      const session = await sandboxOpencodeCreateSession(projectId);
       sessions = [session, ...sessions];
       selectedSessionId = session.id;
     } catch (err) {
@@ -138,7 +140,8 @@
     if (!shouldDelete) return;
 
     try {
-      await opencodeDeleteSession(projectId, sessionId);
+      // projectId is actually sandboxId in v2 API
+      await sandboxOpencodeDeleteSession(projectId, sessionId);
       sessions = sessions.filter((s) => s.id !== sessionId);
       // If we deleted the selected session, select another
       if (selectedSessionId === sessionId) {

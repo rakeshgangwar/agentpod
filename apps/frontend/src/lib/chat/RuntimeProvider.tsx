@@ -19,11 +19,11 @@ import {
   type AppendMessage,
 } from "@assistant-ui/react";
 import {
-  opencodeListMessages,
-  opencodeListSessions,
-  opencodeCreateSession,
-  opencodeSendMessage,
-  opencodeAbortSession,
+  sandboxOpencodeListMessages,
+  sandboxOpencodeListSessions,
+  sandboxOpencodeCreateSession,
+  sandboxOpencodeSendMessage,
+  sandboxOpencodeAbortSession,
   OpenCodeStream,
   type Message,
   type OpenCodeEvent,
@@ -183,13 +183,13 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
 
     async function loadMessages() {
       if (!sessionId) {
-        // Try to get or create a session
+        // Try to get or create a session (projectId is actually sandboxId in v2 API)
         try {
-          const sessions = await opencodeListSessions(projectId);
+          const sessions = await sandboxOpencodeListSessions(projectId);
           if (sessions.length > 0) {
             setSessionId(sessions[0].id);
           } else {
-            const newSession = await opencodeCreateSession(projectId);
+            const newSession = await sandboxOpencodeCreateSession(projectId);
             setSessionId(newSession.id);
           }
         } catch (err) {
@@ -204,7 +204,8 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
       setError(null);
 
       try {
-        const opencodeMessages = await opencodeListMessages(projectId, sessionId);
+        // projectId is actually sandboxId in v2 API
+        const opencodeMessages = await sandboxOpencodeListMessages(projectId, sessionId);
 
         if (cancelled) return;
 
@@ -551,8 +552,8 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
     ]);
 
     try {
-      // Send message to OpenCode - response comes via SSE
-      await opencodeSendMessage(projectId, sessionId, textPart.text, selectedModel);
+      // Send message to OpenCode - response comes via SSE (projectId is actually sandboxId in v2 API)
+      await sandboxOpencodeSendMessage(projectId, sessionId, textPart.text, selectedModel);
     } catch (err) {
       console.error("[RuntimeProvider] Failed to send message:", err);
       setError(err instanceof Error ? err.message : "Failed to send message");
@@ -564,7 +565,8 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
   const onCancel = useCallback(async () => {
     if (!sessionId) return;
     try {
-      await opencodeAbortSession(projectId, sessionId);
+      // projectId is actually sandboxId in v2 API
+      await sandboxOpencodeAbortSession(projectId, sessionId);
     } catch (err) {
       console.error("[RuntimeProvider] Failed to abort:", err);
     }

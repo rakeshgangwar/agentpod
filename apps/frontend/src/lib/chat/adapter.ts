@@ -15,11 +15,11 @@
 import type { ChatModelAdapter, ChatModelRunOptions, ChatModelRunResult } from "@assistant-ui/react";
 import type { ReadonlyJSONObject } from "assistant-stream/utils";
 import {
-  opencodeCreateSession,
-  opencodeListSessions,
-  opencodeSendMessage,
-  opencodeAbortSession,
-  opencodeListMessages,
+  sandboxOpencodeCreateSession,
+  sandboxOpencodeListSessions,
+  sandboxOpencodeSendMessage,
+  sandboxOpencodeAbortSession,
+  sandboxOpencodeListMessages,
   OpenCodeStream,
   type Session,
   type Message,
@@ -65,16 +65,16 @@ export function createOpenCodeAdapter(projectId: string, initialSessionId?: stri
   return {
     async *run({ messages, abortSignal }: ChatModelRunOptions): AsyncGenerator<ChatModelRunResult> {
       try {
-        // Ensure we have a session
+        // Ensure we have a session (projectId is actually sandboxId in v2 API)
         if (!state.sessionId) {
           // Try to get existing sessions first
-          const sessions = await opencodeListSessions(state.projectId);
+          const sessions = await sandboxOpencodeListSessions(state.projectId);
           if (sessions.length > 0) {
             // Use the most recent session
             state.sessionId = sessions[0].id;
           } else {
             // Create a new session
-            const session = await opencodeCreateSession(state.projectId);
+            const session = await sandboxOpencodeCreateSession(state.projectId);
             state.sessionId = session.id;
           }
         }
@@ -226,7 +226,7 @@ export function createOpenCodeAdapter(projectId: string, initialSessionId?: stri
         const abortHandler = () => {
           console.log('[OpenCode Adapter] Abort signal received');
           if (state.sessionId) {
-            opencodeAbortSession(state.projectId, state.sessionId).catch(console.error);
+            sandboxOpencodeAbortSession(state.projectId, state.sessionId).catch(console.error);
           }
           stream?.disconnect().catch(console.error);
           streamState.isComplete = true;
@@ -242,12 +242,12 @@ export function createOpenCodeAdapter(projectId: string, initialSessionId?: stri
         console.log('[OpenCode Adapter] Sending message to session:', state.sessionId);
         let sendPromise: Promise<unknown> | null = null;
         try {
-          // Fire and forget - don't await here!
-          sendPromise = opencodeSendMessage(state.projectId, state.sessionId, textContent.text)
-            .then((response) => {
+          // Fire and forget - don't await here! (projectId is actually sandboxId in v2 API)
+          sendPromise = sandboxOpencodeSendMessage(state.projectId, state.sessionId, textContent.text)
+            .then((response: Message | null) => {
               console.log('[OpenCode Adapter] Message send completed, response has parts:', response?.parts?.length);
             })
-            .catch((sendError) => {
+            .catch((sendError: unknown) => {
               console.error('[OpenCode Adapter] Failed to send message:', sendError);
               streamState.error = sendError instanceof Error ? sendError : new Error(String(sendError));
               streamState.isComplete = true;
@@ -391,24 +391,24 @@ export function createOpenCodeAdapter(projectId: string, initialSessionId?: stri
 }
 
 /**
- * Get or create a session for a project
+ * Get or create a session for a sandbox (projectId is actually sandboxId in v2 API)
  */
-export async function getOrCreateSession(projectId: string): Promise<Session> {
-  const sessions = await opencodeListSessions(projectId);
+export async function getOrCreateSession(sandboxId: string): Promise<Session> {
+  const sessions = await sandboxOpencodeListSessions(sandboxId);
   if (sessions.length > 0) {
     return sessions[0];
   }
-  return opencodeCreateSession(projectId);
+  return sandboxOpencodeCreateSession(sandboxId);
 }
 
 /**
- * Load message history for a session
+ * Load message history for a session (projectId is actually sandboxId in v2 API)
  */
 export async function loadMessageHistory(
-  projectId: string,
+  sandboxId: string,
   sessionId: string
 ): Promise<Message[]> {
-  return opencodeListMessages(projectId, sessionId);
+  return sandboxOpencodeListMessages(sandboxId, sessionId);
 }
 
 /**
