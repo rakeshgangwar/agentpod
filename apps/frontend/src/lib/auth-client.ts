@@ -32,6 +32,8 @@ function getBaseURL(): string {
  *
  * Provides:
  * - signIn.social({ provider: "github" }) - GitHub OAuth sign-in
+ * - signIn.email({ email, password }) - Email/password sign-in
+ * - signUp.email({ email, password, name }) - Email/password sign-up
  * - signOut() - Sign out
  * - useSession() - Reactive session store
  */
@@ -54,6 +56,37 @@ export const authClient = createAuthClient({
 export async function signInWithGitHub() {
   return authClient.signIn.social({
     provider: "github",
+  });
+}
+
+/**
+ * Sign in with email and password
+ *
+ * @example
+ * ```svelte
+ * <button on:click={() => signInWithEmail(email, password)}>Sign in</button>
+ * ```
+ */
+export async function signInWithEmail(email: string, password: string) {
+  return authClient.signIn.email({
+    email,
+    password,
+  });
+}
+
+/**
+ * Sign up with email and password
+ *
+ * @example
+ * ```svelte
+ * <button on:click={() => signUpWithEmail(email, password, name)}>Sign up</button>
+ * ```
+ */
+export async function signUpWithEmail(email: string, password: string, name: string) {
+  return authClient.signUp.email({
+    email,
+    password,
+    name,
   });
 }
 

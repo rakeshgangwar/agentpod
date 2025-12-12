@@ -5,7 +5,13 @@
  * Replaces the previous Keycloak-based authentication.
  */
 
-import { authClient, signInWithGitHub, signOut as betterAuthSignOut } from "$lib/auth-client";
+import { 
+  authClient, 
+  signInWithGitHub, 
+  signInWithEmail,
+  signUpWithEmail,
+  signOut as betterAuthSignOut 
+} from "$lib/auth-client";
 
 // =============================================================================
 // State
@@ -122,6 +128,54 @@ export async function login(): Promise<boolean> {
     return true;
   } catch (err) {
     error = err instanceof Error ? err.message : "Failed to start login";
+    return false;
+  } finally {
+    isLoading = false;
+  }
+}
+
+/**
+ * Sign in with email and password
+ */
+export async function loginWithEmail(email: string, password: string): Promise<boolean> {
+  isLoading = true;
+  error = null;
+
+  try {
+    const result = await signInWithEmail(email, password);
+
+    if (result.error) {
+      error = result.error.message ?? "Sign in failed";
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    error = err instanceof Error ? err.message : "Failed to sign in";
+    return false;
+  } finally {
+    isLoading = false;
+  }
+}
+
+/**
+ * Sign up with email and password
+ */
+export async function signUp(email: string, password: string, name: string): Promise<boolean> {
+  isLoading = true;
+  error = null;
+
+  try {
+    const result = await signUpWithEmail(email, password, name);
+
+    if (result.error) {
+      error = result.error.message ?? "Sign up failed";
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    error = err instanceof Error ? err.message : "Failed to sign up";
     return false;
   } finally {
     isLoading = false;

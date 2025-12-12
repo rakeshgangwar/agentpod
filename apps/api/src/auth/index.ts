@@ -80,10 +80,14 @@ export const auth = betterAuth({
   },
 
   // ==========================================================================
-  // Email/Password Authentication (Optional)
+  // Email/Password Authentication
   // ==========================================================================
   emailAndPassword: {
-    enabled: false, // Disabled - use GitHub OAuth only
+    enabled: true,
+    // Require email verification (disabled for development simplicity)
+    requireEmailVerification: false,
+    // Password requirements
+    minPasswordLength: 8,
   },
 
   // ==========================================================================
