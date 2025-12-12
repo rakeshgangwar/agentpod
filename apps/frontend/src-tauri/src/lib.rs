@@ -14,10 +14,16 @@ use commands::{
     auth_get_user, auth_get_token, auth_refresh_token, auth_is_authenticated,
     // Connection commands
     connect, disconnect, get_connection_status, test_connection,
-    // Project commands
+    // Project commands (legacy, uses Coolify)
     list_projects, get_project, create_project, delete_project,
     start_project, stop_project, restart_project,
     get_project_logs, deploy_project,
+    // Sandbox commands (v2, direct Docker orchestration)
+    docker_health, list_sandboxes, get_sandbox, create_sandbox, delete_sandbox,
+    start_sandbox, stop_sandbox, restart_sandbox, pause_sandbox, unpause_sandbox,
+    get_sandbox_logs, get_sandbox_stats, get_sandbox_status,
+    exec_in_sandbox,
+    get_sandbox_git_status, get_sandbox_git_log, commit_sandbox_changes,
     // Container tier commands (legacy)
     list_container_tiers, get_default_container_tier,
     // Resource tier commands (modular containers)
@@ -84,7 +90,7 @@ pub fn run() {
             disconnect,
             test_connection,
             get_connection_status,
-            // Project commands
+            // Project commands (legacy, uses Coolify)
             list_projects,
             get_project,
             create_project,
@@ -94,6 +100,24 @@ pub fn run() {
             restart_project,
             get_project_logs,
             deploy_project,
+            // Sandbox commands (v2, direct Docker orchestration)
+            docker_health,
+            list_sandboxes,
+            get_sandbox,
+            create_sandbox,
+            delete_sandbox,
+            start_sandbox,
+            stop_sandbox,
+            restart_sandbox,
+            pause_sandbox,
+            unpause_sandbox,
+            get_sandbox_logs,
+            get_sandbox_stats,
+            get_sandbox_status,
+            exec_in_sandbox,
+            get_sandbox_git_status,
+            get_sandbox_git_log,
+            commit_sandbox_changes,
             // Container tier commands (legacy)
             list_container_tiers,
             get_default_container_tier,

@@ -278,3 +278,245 @@ pub struct ContainerAddon {
 pub struct ContainerAddonsResponse {
     pub addons: Vec<ContainerAddon>,
 }
+
+// =============================================================================
+// V2 Sandbox Types (Direct Docker Orchestration)
+// =============================================================================
+
+/// Sandbox status enum
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum SandboxStatus {
+    Created,
+    Running,
+    Paused,
+    Restarting,
+    Exited,
+    Dead,
+    Unknown,
+}
+
+/// Sandbox URLs for accessing services
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SandboxUrls {
+    pub main: Option<String>,
+    pub opencode: Option<String>,
+    pub code_server: Option<String>,
+    pub vnc: Option<String>,
+}
+
+/// Sandbox model from v2 API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Sandbox {
+    pub id: String,
+    pub container_id: String,
+    pub name: String,
+    pub status: SandboxStatus,
+    pub urls: SandboxUrls,
+    pub created_at: String,
+    pub started_at: Option<String>,
+    pub image: String,
+    #[serde(default)]
+    pub labels: std::collections::HashMap<String, String>,
+}
+
+/// Repository model from v2 API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Repository {
+    pub name: String,
+    pub path: String,
+    pub created_at: String,
+    pub last_modified: String,
+    pub current_branch: String,
+    pub is_dirty: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+/// Input for creating a new sandbox
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateSandboxInput {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub github_url: Option<String>,
+    pub user_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub flavor: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resource_tier: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub addons: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auto_start: Option<bool>,
+}
+
+/// Sandbox with repository response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SandboxWithRepo {
+    pub sandbox: Sandbox,
+    pub repository: Repository,
+}
+
+/// Sandbox info response (includes config)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SandboxInfo {
+    pub sandbox: Sandbox,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub repository: Option<Repository>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub config: Option<serde_json::Value>,
+}
+
+/// Sandbox list response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SandboxListResponse {
+    pub sandboxes: Vec<Sandbox>,
+    pub count: usize,
+}
+
+/// Sandbox resource stats
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SandboxStats {
+    pub cpu_percent: f64,
+    pub memory_usage: u64,
+    pub memory_limit: u64,
+    pub memory_percent: f64,
+    pub network_rx: u64,
+    pub network_tx: u64,
+    pub block_read: u64,
+    pub block_write: u64,
+}
+
+/// Sandbox stats response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SandboxStatsResponse {
+    pub stats: SandboxStats,
+}
+
+/// Sandbox logs response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SandboxLogsResponse {
+    pub logs: String,
+    pub tail: u32,
+}
+
+/// Exec command input
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecCommandInput {
+    pub command: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub working_dir: Option<String>,
+}
+
+/// Exec result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecResult {
+    pub exit_code: i32,
+    pub stdout: String,
+    pub stderr: String,
+}
+
+/// Git file status
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitFileStatus {
+    pub path: String,
+    pub staged: String,
+    pub unstaged: String,
+    pub tracked: bool,
+}
+
+/// Git status response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitStatusResponse {
+    pub files: Vec<GitFileStatus>,
+}
+
+/// Git commit author
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitAuthor {
+    pub name: String,
+    pub email: String,
+    pub timestamp: String,
+}
+
+/// Git commit
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitCommit {
+    pub sha: String,
+    pub message: String,
+    pub author: GitAuthor,
+    pub committer: GitAuthor,
+    pub parents: Vec<String>,
+    pub timestamp: String,
+}
+
+/// Git log response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitLogResponse {
+    pub commits: Vec<GitCommit>,
+}
+
+/// Git commit input
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitCommitInput {
+    pub message: String,
+}
+
+/// Git commit response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitCommitResponse {
+    pub sha: String,
+    pub message: String,
+}
+
+/// Docker health response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DockerHealthResponse {
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub docker: Option<DockerInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+/// Docker info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DockerInfo {
+    pub version: String,
+    pub api_version: String,
+    pub os: String,
+    pub arch: String,
+    pub containers: DockerContainerStats,
+    pub images: u32,
+}
+
+/// Docker container stats
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DockerContainerStats {
+    pub running: u32,
+    pub stopped: u32,
+}

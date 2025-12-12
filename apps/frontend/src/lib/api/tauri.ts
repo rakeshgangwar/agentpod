@@ -1386,3 +1386,268 @@ export async function onOAuthCallback(
     callback(event.payload);
   });
 }
+
+// =============================================================================
+// V2 Sandbox Types (Direct Docker Orchestration)
+// =============================================================================
+
+export type SandboxStatus = "created" | "running" | "paused" | "restarting" | "exited" | "dead" | "unknown";
+
+export interface SandboxUrls {
+  main?: string;
+  opencode?: string;
+  codeServer?: string;
+  vnc?: string;
+}
+
+export interface Sandbox {
+  id: string;
+  containerId: string;
+  name: string;
+  status: SandboxStatus;
+  urls: SandboxUrls;
+  createdAt: string;
+  startedAt?: string;
+  image: string;
+  labels: Record<string, string>;
+}
+
+export interface Repository {
+  name: string;
+  path: string;
+  createdAt: string;
+  lastModified: string;
+  currentBranch: string;
+  isDirty: boolean;
+  description?: string;
+}
+
+export interface CreateSandboxInput {
+  name: string;
+  description?: string;
+  githubUrl?: string;
+  userId: string;
+  flavor?: string;
+  resourceTier?: string;
+  addons?: string[];
+  autoStart?: boolean;
+}
+
+export interface SandboxWithRepo {
+  sandbox: Sandbox;
+  repository: Repository;
+}
+
+export interface SandboxInfo {
+  sandbox: Sandbox;
+  repository?: Repository;
+  config?: Record<string, unknown>;
+}
+
+export interface SandboxStats {
+  cpuPercent: number;
+  memoryUsage: number;
+  memoryLimit: number;
+  memoryPercent: number;
+  networkRx: number;
+  networkTx: number;
+  blockRead: number;
+  blockWrite: number;
+}
+
+export interface ExecResult {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+}
+
+export interface GitFileStatus {
+  path: string;
+  staged: string;
+  unstaged: string;
+  tracked: boolean;
+}
+
+export interface GitStatusResponse {
+  files: GitFileStatus[];
+}
+
+export interface GitAuthor {
+  name: string;
+  email: string;
+  timestamp: string;
+}
+
+export interface GitCommit {
+  sha: string;
+  message: string;
+  author: GitAuthor;
+  committer: GitAuthor;
+  parents: string[];
+  timestamp: string;
+}
+
+export interface GitLogResponse {
+  commits: GitCommit[];
+}
+
+export interface GitCommitResponse {
+  sha: string;
+  message: string;
+}
+
+export interface DockerContainerStats {
+  running: number;
+  stopped: number;
+}
+
+export interface DockerInfo {
+  version: string;
+  apiVersion: string;
+  os: string;
+  arch: string;
+  containers: DockerContainerStats;
+  images: number;
+}
+
+export interface DockerHealthResponse {
+  status: string;
+  docker?: DockerInfo;
+  message?: string;
+}
+
+// =============================================================================
+// V2 Sandbox Commands
+// =============================================================================
+
+/**
+ * Check Docker health
+ */
+export async function dockerHealth(): Promise<DockerHealthResponse> {
+  return invoke<DockerHealthResponse>("docker_health");
+}
+
+/**
+ * List all sandboxes
+ */
+export async function listSandboxes(): Promise<Sandbox[]> {
+  return invoke<Sandbox[]>("list_sandboxes");
+}
+
+/**
+ * Get a sandbox by ID
+ */
+export async function getSandbox(id: string): Promise<SandboxInfo> {
+  return invoke<SandboxInfo>("get_sandbox", { id });
+}
+
+/**
+ * Create a new sandbox
+ */
+export async function createSandbox(input: CreateSandboxInput): Promise<SandboxWithRepo> {
+  return invoke<SandboxWithRepo>("create_sandbox", {
+    name: input.name,
+    description: input.description ?? null,
+    githubUrl: input.githubUrl ?? null,
+    userId: input.userId,
+    flavor: input.flavor ?? null,
+    resourceTier: input.resourceTier ?? null,
+    addons: input.addons ?? null,
+    autoStart: input.autoStart ?? null,
+  });
+}
+
+/**
+ * Delete a sandbox
+ */
+export async function deleteSandbox(id: string): Promise<void> {
+  return invoke("delete_sandbox", { id });
+}
+
+/**
+ * Start a sandbox
+ */
+export async function startSandbox(id: string): Promise<Sandbox> {
+  return invoke<Sandbox>("start_sandbox", { id });
+}
+
+/**
+ * Stop a sandbox
+ */
+export async function stopSandbox(id: string): Promise<Sandbox> {
+  return invoke<Sandbox>("stop_sandbox", { id });
+}
+
+/**
+ * Restart a sandbox
+ */
+export async function restartSandbox(id: string): Promise<Sandbox> {
+  return invoke<Sandbox>("restart_sandbox", { id });
+}
+
+/**
+ * Pause a sandbox
+ */
+export async function pauseSandbox(id: string): Promise<Sandbox> {
+  return invoke<Sandbox>("pause_sandbox", { id });
+}
+
+/**
+ * Unpause a sandbox
+ */
+export async function unpauseSandbox(id: string): Promise<Sandbox> {
+  return invoke<Sandbox>("unpause_sandbox", { id });
+}
+
+/**
+ * Get sandbox logs
+ */
+export async function getSandboxLogs(id: string, tail?: number): Promise<string> {
+  return invoke<string>("get_sandbox_logs", { id, tail });
+}
+
+/**
+ * Get sandbox resource stats
+ */
+export async function getSandboxStats(id: string): Promise<SandboxStats> {
+  return invoke<SandboxStats>("get_sandbox_stats", { id });
+}
+
+/**
+ * Get sandbox status
+ */
+export async function getSandboxStatus(id: string): Promise<string> {
+  return invoke<string>("get_sandbox_status", { id });
+}
+
+/**
+ * Execute a command in a sandbox
+ */
+export async function execInSandbox(
+  id: string,
+  command: string[],
+  workingDir?: string
+): Promise<ExecResult> {
+  return invoke<ExecResult>("exec_in_sandbox", { id, command, workingDir });
+}
+
+/**
+ * Get git status for a sandbox
+ */
+export async function getSandboxGitStatus(id: string): Promise<GitStatusResponse> {
+  return invoke<GitStatusResponse>("get_sandbox_git_status", { id });
+}
+
+/**
+ * Get git log for a sandbox
+ */
+export async function getSandboxGitLog(id: string): Promise<GitLogResponse> {
+  return invoke<GitLogResponse>("get_sandbox_git_log", { id });
+}
+
+/**
+ * Commit changes in a sandbox
+ */
+export async function commitSandboxChanges(id: string, message: string): Promise<GitCommitResponse> {
+  return invoke<GitCommitResponse>("commit_sandbox_changes", { id, message });
+}

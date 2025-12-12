@@ -130,6 +130,14 @@ impl ApiClient {
         self.handle_response(response).await
     }
 
+    /// Make a DELETE request to the API
+    pub async fn delete<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<T, AppError> {
+        let url = format!("{}{}", self.base_url, path);
+        let request = self.add_auth(self.client.delete(&url)).await;
+        let response = request.send().await?;
+        self.handle_response(response).await
+    }
+
     /// Add authorization header (uses OAuth token or legacy API key)
     pub async fn add_auth_header(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
         self.add_auth(request).await
