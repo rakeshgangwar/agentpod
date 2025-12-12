@@ -24,6 +24,13 @@ use commands::{
     get_sandbox_logs, get_sandbox_stats, get_sandbox_status,
     exec_in_sandbox,
     get_sandbox_git_status, get_sandbox_git_log, commit_sandbox_changes,
+    // Sandbox OpenCode commands (v2)
+    sandbox_opencode_get_app_info, sandbox_opencode_health_check, sandbox_opencode_get_providers,
+    sandbox_opencode_list_sessions, sandbox_opencode_create_session, sandbox_opencode_get_session,
+    sandbox_opencode_delete_session, sandbox_opencode_abort_session,
+    sandbox_opencode_respond_permission,
+    sandbox_opencode_list_messages, sandbox_opencode_send_message, sandbox_opencode_get_message,
+    sandbox_opencode_list_files, sandbox_opencode_get_file_content, sandbox_opencode_find_files,
     // Container tier commands (legacy)
     list_container_tiers, get_default_container_tier,
     // Resource tier commands (modular containers)
@@ -116,6 +123,22 @@ pub fn run() {
             get_sandbox_git_status,
             get_sandbox_git_log,
             commit_sandbox_changes,
+            // Sandbox OpenCode commands (v2)
+            sandbox_opencode_get_app_info,
+            sandbox_opencode_health_check,
+            sandbox_opencode_get_providers,
+            sandbox_opencode_list_sessions,
+            sandbox_opencode_create_session,
+            sandbox_opencode_get_session,
+            sandbox_opencode_delete_session,
+            sandbox_opencode_abort_session,
+            sandbox_opencode_respond_permission,
+            sandbox_opencode_list_messages,
+            sandbox_opencode_send_message,
+            sandbox_opencode_get_message,
+            sandbox_opencode_list_files,
+            sandbox_opencode_get_file_content,
+            sandbox_opencode_find_files,
             // Container tier commands (legacy)
             list_container_tiers,
             get_default_container_tier,

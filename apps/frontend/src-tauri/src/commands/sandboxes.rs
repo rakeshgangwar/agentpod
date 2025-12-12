@@ -249,3 +249,186 @@ pub async fn commit_sandbox_changes(id: String, message: String) -> Result<GitCo
         .post(&format!("/api/v2/sandboxes/{}/git/commit", id), &input)
         .await
 }
+
+// =============================================================================
+// OpenCode Integration (v2 Sandbox)
+// =============================================================================
+
+use crate::models::{
+    AppInfo, FileContent, FileNode, Message, OpenCodeHealth, 
+    SendMessageInput, Session,
+};
+
+/// Get OpenCode app info for a sandbox
+#[tauri::command]
+pub async fn sandbox_opencode_get_app_info(sandbox_id: String) -> Result<AppInfo, AppError> {
+    let client = get_client()?;
+    client
+        .get(&format!("/api/v2/sandboxes/{}/opencode/app", sandbox_id))
+        .await
+}
+
+/// Check if OpenCode is healthy in a sandbox
+#[tauri::command]
+pub async fn sandbox_opencode_health_check(sandbox_id: String) -> Result<OpenCodeHealth, AppError> {
+    let client = get_client()?;
+    client
+        .get(&format!("/api/v2/sandboxes/{}/opencode/health", sandbox_id))
+        .await
+}
+
+/// Get configured LLM providers for a sandbox
+#[tauri::command]
+pub async fn sandbox_opencode_get_providers(sandbox_id: String) -> Result<serde_json::Value, AppError> {
+    let client = get_client()?;
+    client
+        .get(&format!("/api/v2/sandboxes/{}/opencode/providers", sandbox_id))
+        .await
+}
+
+/// List all OpenCode sessions for a sandbox
+#[tauri::command]
+pub async fn sandbox_opencode_list_sessions(sandbox_id: String) -> Result<Vec<Session>, AppError> {
+    let client = get_client()?;
+    client
+        .get(&format!("/api/v2/sandboxes/{}/opencode/session", sandbox_id))
+        .await
+}
+
+/// Create a new OpenCode session in a sandbox
+#[tauri::command]
+pub async fn sandbox_opencode_create_session(sandbox_id: String, title: Option<String>) -> Result<Session, AppError> {
+    let client = get_client()?;
+    let body = serde_json::json!({ "title": title });
+    client
+        .post(&format!("/api/v2/sandboxes/{}/opencode/session", sandbox_id), &body)
+        .await
+}
+
+/// Get an OpenCode session by ID
+#[tauri::command]
+pub async fn sandbox_opencode_get_session(sandbox_id: String, session_id: String) -> Result<Session, AppError> {
+    let client = get_client()?;
+    client
+        .get(&format!("/api/v2/sandboxes/{}/opencode/session/{}", sandbox_id, session_id))
+        .await
+}
+
+/// Delete an OpenCode session
+#[tauri::command]
+pub async fn sandbox_opencode_delete_session(sandbox_id: String, session_id: String) -> Result<(), AppError> {
+    let client = get_client()?;
+    let _: crate::models::SuccessResponse = client
+        .delete(&format!("/api/v2/sandboxes/{}/opencode/session/{}", sandbox_id, session_id))
+        .await?;
+    Ok(())
+}
+
+/// Abort a running OpenCode session
+#[tauri::command]
+pub async fn sandbox_opencode_abort_session(sandbox_id: String, session_id: String) -> Result<(), AppError> {
+    let client = get_client()?;
+    let _: crate::models::SuccessResponse = client
+        .post(&format!("/api/v2/sandboxes/{}/opencode/session/{}/abort", sandbox_id, session_id), &())
+        .await?;
+    Ok(())
+}
+
+/// Respond to an OpenCode permission request
+#[tauri::command]
+pub async fn sandbox_opencode_respond_permission(
+    sandbox_id: String,
+    session_id: String,
+    permission_id: String,
+    response: String,
+) -> Result<bool, AppError> {
+    let client = get_client()?;
+    let body = serde_json::json!({ "response": response });
+    let _: crate::models::SuccessResponse = client
+        .post(
+            &format!("/api/v2/sandboxes/{}/opencode/session/{}/permissions/{}", sandbox_id, session_id, permission_id),
+            &body,
+        )
+        .await?;
+    Ok(true)
+}
+
+/// List messages in an OpenCode session
+#[tauri::command]
+pub async fn sandbox_opencode_list_messages(sandbox_id: String, session_id: String) -> Result<Vec<Message>, AppError> {
+    let client = get_client()?;
+    client
+        .get(&format!("/api/v2/sandboxes/{}/opencode/session/{}/message", sandbox_id, session_id))
+        .await
+}
+
+/// Send a message to an OpenCode session
+#[tauri::command]
+pub async fn sandbox_opencode_send_message(
+    sandbox_id: String,
+    session_id: String,
+    input: SendMessageInput,
+) -> Result<Message, AppError> {
+    let client = get_client()?;
+    client
+        .post(
+            &format!("/api/v2/sandboxes/{}/opencode/session/{}/message", sandbox_id, session_id),
+            &input,
+        )
+        .await
+}
+
+/// Get a specific message from an OpenCode session
+#[tauri::command]
+pub async fn sandbox_opencode_get_message(
+    sandbox_id: String,
+    session_id: String,
+    message_id: String,
+) -> Result<Message, AppError> {
+    let client = get_client()?;
+    client
+        .get(&format!(
+            "/api/v2/sandboxes/{}/opencode/session/{}/message/{}",
+            sandbox_id, session_id, message_id
+        ))
+        .await
+}
+
+/// List files in a sandbox directory via OpenCode
+#[tauri::command]
+pub async fn sandbox_opencode_list_files(sandbox_id: String, path: String) -> Result<Vec<FileNode>, AppError> {
+    let client = get_client()?;
+    client
+        .get(&format!(
+            "/api/v2/sandboxes/{}/opencode/file?path={}",
+            sandbox_id,
+            urlencoding::encode(&path)
+        ))
+        .await
+}
+
+/// Get file content via OpenCode
+#[tauri::command]
+pub async fn sandbox_opencode_get_file_content(sandbox_id: String, path: String) -> Result<FileContent, AppError> {
+    let client = get_client()?;
+    client
+        .get(&format!(
+            "/api/v2/sandboxes/{}/opencode/file/content?path={}",
+            sandbox_id,
+            urlencoding::encode(&path)
+        ))
+        .await
+}
+
+/// Find files by query via OpenCode
+#[tauri::command]
+pub async fn sandbox_opencode_find_files(sandbox_id: String, query: String) -> Result<Vec<String>, AppError> {
+    let client = get_client()?;
+    client
+        .get(&format!(
+            "/api/v2/sandboxes/{}/opencode/find/file?query={}",
+            sandbox_id,
+            urlencoding::encode(&query)
+        ))
+        .await
+}

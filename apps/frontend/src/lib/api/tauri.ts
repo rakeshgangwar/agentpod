@@ -1624,3 +1624,136 @@ export async function getSandboxGitLog(id: string): Promise<GitLogResponse> {
 export async function commitSandboxChanges(id: string, message: string): Promise<GitCommitResponse> {
   return invoke<GitCommitResponse>("commit_sandbox_changes", { id, message });
 }
+
+// =============================================================================
+// V2 Sandbox OpenCode Commands
+// =============================================================================
+
+/**
+ * Get OpenCode app info for a sandbox
+ */
+export async function sandboxOpencodeGetAppInfo(sandboxId: string): Promise<AppInfo> {
+  return invoke<AppInfo>("sandbox_opencode_get_app_info", { sandboxId });
+}
+
+/**
+ * Check if OpenCode is healthy in a sandbox
+ */
+export async function sandboxOpencodeHealthCheck(sandboxId: string): Promise<OpenCodeHealth> {
+  return invoke<OpenCodeHealth>("sandbox_opencode_health_check", { sandboxId });
+}
+
+/**
+ * Get configured LLM providers for a sandbox
+ */
+export async function sandboxOpencodeGetProviders(sandboxId: string): Promise<OpenCodeProvider[]> {
+  return invoke<OpenCodeProvider[]>("sandbox_opencode_get_providers", { sandboxId });
+}
+
+/**
+ * List all OpenCode sessions for a sandbox
+ */
+export async function sandboxOpencodeListSessions(sandboxId: string): Promise<Session[]> {
+  return invoke<Session[]>("sandbox_opencode_list_sessions", { sandboxId });
+}
+
+/**
+ * Create a new OpenCode session in a sandbox
+ */
+export async function sandboxOpencodeCreateSession(sandboxId: string, title?: string): Promise<Session> {
+  return invoke<Session>("sandbox_opencode_create_session", { sandboxId, title });
+}
+
+/**
+ * Get an OpenCode session by ID
+ */
+export async function sandboxOpencodeGetSession(sandboxId: string, sessionId: string): Promise<Session> {
+  return invoke<Session>("sandbox_opencode_get_session", { sandboxId, sessionId });
+}
+
+/**
+ * Delete an OpenCode session
+ */
+export async function sandboxOpencodeDeleteSession(sandboxId: string, sessionId: string): Promise<void> {
+  return invoke("sandbox_opencode_delete_session", { sandboxId, sessionId });
+}
+
+/**
+ * Abort a running OpenCode session
+ */
+export async function sandboxOpencodeAbortSession(sandboxId: string, sessionId: string): Promise<void> {
+  return invoke("sandbox_opencode_abort_session", { sandboxId, sessionId });
+}
+
+/**
+ * Respond to an OpenCode permission request in a sandbox
+ */
+export async function sandboxOpencodeRespondPermission(
+  sandboxId: string,
+  sessionId: string,
+  permissionId: string,
+  response: PermissionResponseType
+): Promise<boolean> {
+  return invoke<boolean>("sandbox_opencode_respond_permission", {
+    sandboxId,
+    sessionId,
+    permissionId,
+    response,
+  });
+}
+
+/**
+ * List messages in an OpenCode session for a sandbox
+ */
+export async function sandboxOpencodeListMessages(sandboxId: string, sessionId: string): Promise<Message[]> {
+  return invoke<Message[]>("sandbox_opencode_list_messages", { sandboxId, sessionId });
+}
+
+/**
+ * Send a message to an OpenCode session in a sandbox
+ */
+export async function sandboxOpencodeSendMessage(
+  sandboxId: string,
+  sessionId: string,
+  text: string,
+  model?: ModelSelection
+): Promise<Message> {
+  // Build the input for the Rust command
+  const input = {
+    parts: [{ type: "text", text }],
+    model: model ? { providerID: model.providerId, modelID: model.modelId } : undefined,
+  };
+  return invoke<Message>("sandbox_opencode_send_message", { sandboxId, sessionId, input });
+}
+
+/**
+ * Get a specific message from an OpenCode session in a sandbox
+ */
+export async function sandboxOpencodeGetMessage(
+  sandboxId: string,
+  sessionId: string,
+  messageId: string
+): Promise<Message> {
+  return invoke<Message>("sandbox_opencode_get_message", { sandboxId, sessionId, messageId });
+}
+
+/**
+ * List files in a sandbox directory via OpenCode
+ */
+export async function sandboxOpencodeListFiles(sandboxId: string, path: string = "/"): Promise<FileNode[]> {
+  return invoke<FileNode[]>("sandbox_opencode_list_files", { sandboxId, path });
+}
+
+/**
+ * Get file content from a sandbox via OpenCode
+ */
+export async function sandboxOpencodeGetFileContent(sandboxId: string, path: string): Promise<FileContent> {
+  return invoke<FileContent>("sandbox_opencode_get_file_content", { sandboxId, path });
+}
+
+/**
+ * Find files in a sandbox by query via OpenCode
+ */
+export async function sandboxOpencodeFindFiles(sandboxId: string, query: string): Promise<string[]> {
+  return invoke<string[]>("sandbox_opencode_find_files", { sandboxId, query });
+}
