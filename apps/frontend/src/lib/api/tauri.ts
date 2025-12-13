@@ -307,6 +307,37 @@ export interface ModelSelection {
 }
 
 // =============================================================================
+// OpenCode - Agent Types (from OpenCode SDK)
+// =============================================================================
+
+/** Model selection for an OpenCode agent */
+export interface OpenCodeAgentModel {
+  modelID: string;
+  providerID: string;
+}
+
+/**
+ * OpenCode Agent (mode/persona) from the SDK.
+ * 
+ * Agents define different behaviors/modes for the AI assistant.
+ * These are fetched from the OpenCode SDK's `app.agents()` endpoint.
+ */
+export interface OpenCodeAgent {
+  /** Agent name (used as ID) */
+  name: string;
+  /** Optional description */
+  description?: string;
+  /** Agent mode: "subagent", "primary", or "all" */
+  mode: "subagent" | "primary" | "all";
+  /** Whether this is a built-in agent */
+  builtIn: boolean;
+  /** Optional hex color for UI display */
+  color?: string;
+  /** Optional model override for this agent */
+  model?: OpenCodeAgentModel;
+}
+
+// =============================================================================
 // OpenCode - Permission Types
 // =============================================================================
 
@@ -447,6 +478,28 @@ export interface OAuthFlowStatus {
   isConfigured: boolean;
 }
 
+// =============================================================================
+// Anthropic OAuth Types
+// =============================================================================
+
+/** Anthropic OAuth mode */
+export type AnthropicAuthMode = "max" | "console";
+
+/** Response from initializing Anthropic OAuth */
+export interface AnthropicOAuthInitResponse {
+  authUrl: string;
+  stateId: string;
+  authMode: string;
+  expiresIn: number;
+  message: string;
+}
+
+/** Response from completing Anthropic OAuth */
+export interface AnthropicOAuthCallbackResponse {
+  success: boolean;
+  error?: string;
+}
+
 export interface ExportData {
   version: string;
   exportedAt: string;
@@ -558,6 +611,36 @@ export async function removeProviderCredentials(providerId: string): Promise<voi
  */
 export async function setDefaultProvider(providerId: string): Promise<void> {
   return invoke("set_default_provider", { providerId });
+}
+
+// =============================================================================
+// Anthropic OAuth Commands (PKCE Flow)
+// =============================================================================
+
+/**
+ * Initialize Anthropic OAuth PKCE flow
+ * @param mode 'max' for Claude Pro/Max subscription (free API), 'console' for API Console (creates API key)
+ * @returns Authorization URL and state ID for tracking the flow
+ */
+export async function anthropicOAuthInit(mode: AnthropicAuthMode = "console"): Promise<AnthropicOAuthInitResponse> {
+  return invoke<AnthropicOAuthInitResponse>("anthropic_oauth_init", { mode });
+}
+
+/**
+ * Complete Anthropic OAuth PKCE flow by exchanging the authorization code
+ * @param code The authorization code from the OAuth callback (may include state: "authcode#state")
+ * @param stateId Optional state ID if not included in code
+ */
+export async function anthropicOAuthCallback(code: string, stateId?: string): Promise<AnthropicOAuthCallbackResponse> {
+  return invoke<AnthropicOAuthCallbackResponse>("anthropic_oauth_callback", { code, stateId });
+}
+
+/**
+ * Get the status of an Anthropic OAuth flow
+ * @param stateId The state ID from the init response
+ */
+export async function anthropicOAuthStatus(stateId: string): Promise<OAuthFlowStatus> {
+  return invoke<OAuthFlowStatus>("anthropic_oauth_status", { stateId });
 }
 
 // =============================================================================
@@ -923,6 +1006,16 @@ export async function sandboxOpencodeHealthCheck(sandboxId: string): Promise<Ope
  */
 export async function sandboxOpencodeGetProviders(sandboxId: string): Promise<OpenCodeProvider[]> {
   return invoke<OpenCodeProvider[]>("sandbox_opencode_get_providers", { sandboxId });
+}
+
+/**
+ * Get available agents (modes) for a sandbox from OpenCode SDK.
+ * 
+ * These agents define different behaviors/personas for the AI assistant.
+ * Use this to populate the mode picker in the chat interface.
+ */
+export async function sandboxOpencodeGetAgents(sandboxId: string): Promise<OpenCodeAgent[]> {
+  return invoke<OpenCodeAgent[]>("sandbox_opencode_get_agents", { sandboxId });
 }
 
 /**
@@ -1328,4 +1421,242 @@ export async function deleteUserOpencodeFile(
   userId?: string
 ): Promise<void> {
   return invoke("delete_user_opencode_file", { userId, fileType, name });
+}
+
+// =============================================================================
+// AI Assistant (Agent) Types
+// =============================================================================
+
+/** Status of an AI Assistant process */
+export type AgentStatus = "stopped" | "starting" | "running" | "error" | "auth_required";
+
+/** Authentication type required by an assistant */
+export type AgentAuthType = "none" | "oauth" | "device_flow" | "api_key" | "pkce_oauth";
+
+/** Device flow authentication pattern */
+export type AgentAuthFlowType = "code_first" | "url_first" | "pkce_oauth";
+
+/** Source of an Agent Mode definition */
+export type AgentModeSource = "builtin" | "custom";
+
+/** Status of an authentication flow */
+export type AgentAuthStatus = "idle" | "pending" | "completed" | "failed";
+
+/** Configuration for an AI Assistant */
+export interface AgentConfig {
+  id: string;
+  name: string;
+  description: string;
+  command: string;
+  args: string[];
+  requiresAuth: boolean;
+  authType: AgentAuthType;
+  authFlowType?: AgentAuthFlowType;
+  authProvider?: string;
+  authUrl?: string;
+  envVars?: Record<string, string>;
+  isBuiltIn: boolean;
+  isDefault: boolean;
+  icon?: string;
+}
+
+/** Runtime instance of an AI Assistant */
+export interface AgentInstance {
+  id: string;
+  config: AgentConfig;
+  status: AgentStatus;
+  authenticated: boolean;
+  startedAt?: string;
+  lastActivity?: string;
+  error?: string;
+  sessionCount: number;
+}
+
+/** Agent Mode (persona/behavior) definition */
+export interface AgentMode {
+  id: string;
+  name: string;
+  description: string;
+  source: AgentModeSource;
+  assistantId: string;
+  systemPrompt?: string;
+  opencodeAgentId?: string;
+  icon?: string;
+}
+
+/** State of an ongoing authentication flow */
+export interface AgentAuthState {
+  agentId: string;
+  status: AgentAuthStatus;
+  flowType: string;
+  userCode?: string;
+  verificationUrl?: string;
+  authUrl?: string;
+  expiresAt?: string;
+  error?: string;
+}
+
+/** Response from listing all agents */
+export interface AgentListResponse {
+  assistants: AgentInstance[];
+  defaultAssistantId: string;
+}
+
+/** Response from listing agent modes */
+export interface AgentModesResponse {
+  modes: AgentMode[];
+  defaultModeId?: string;
+}
+
+/** Response from initiating authentication */
+export interface AgentAuthInitResponse {
+  flowType: string;
+  userCode?: string;
+  verificationUrl?: string;
+  authUrl?: string;
+  expiresIn: number;
+  message: string;
+  /** For pkce_oauth: state ID to track the OAuth flow */
+  stateId?: string;
+  /** For pkce_oauth: auth mode ('max' or 'console') */
+  authMode?: string;
+}
+
+/** Response after completing authentication */
+export interface AgentAuthCompleteResponse {
+  success: boolean;
+  error?: string;
+}
+
+/** Response from spawning an agent */
+export interface AgentSpawnResponse {
+  id: string;
+  status: AgentStatus;
+  startedAt?: string;
+}
+
+/** Response from getting auth status */
+export interface AgentAuthStatusResponse {
+  authenticated: boolean;
+  expiresAt?: string;
+}
+
+// =============================================================================
+// AI Assistant (Agent) Commands
+// =============================================================================
+
+/**
+ * List all available AI Assistants
+ */
+export async function listAgents(): Promise<AgentListResponse> {
+  return invoke<AgentListResponse>("list_agents");
+}
+
+/**
+ * Get a specific AI Assistant by ID
+ */
+export async function getAgent(agentId: string): Promise<AgentInstance> {
+  return invoke<AgentInstance>("get_agent", { agentId });
+}
+
+/**
+ * Get available modes for an AI Assistant
+ */
+export async function getAgentModes(agentId: string): Promise<AgentModesResponse> {
+  return invoke<AgentModesResponse>("get_agent_modes", { agentId });
+}
+
+/**
+ * Spawn (start) an AI Assistant
+ */
+export async function spawnAgent(
+  agentId: string,
+  env?: Record<string, string>,
+  workingDirectory?: string
+): Promise<AgentSpawnResponse> {
+  return invoke<AgentSpawnResponse>("spawn_agent", { agentId, env, workingDirectory });
+}
+
+/**
+ * Stop an AI Assistant
+ */
+export async function stopAgent(agentId: string): Promise<void> {
+  return invoke("stop_agent", { agentId });
+}
+
+/**
+ * Initialize authentication flow for an AI Assistant
+ */
+export async function initAgentAuth(agentId: string): Promise<AgentAuthInitResponse> {
+  return invoke<AgentAuthInitResponse>("init_agent_auth", { agentId });
+}
+
+/**
+ * Complete authentication for an AI Assistant
+ */
+export async function completeAgentAuth(
+  agentId: string,
+  code?: string,
+  token?: string
+): Promise<AgentAuthCompleteResponse> {
+  return invoke<AgentAuthCompleteResponse>("complete_agent_auth", { agentId, code, token });
+}
+
+/**
+ * Get authentication status for an AI Assistant
+ */
+export async function getAgentAuthStatus(agentId: string): Promise<AgentAuthStatusResponse> {
+  return invoke<AgentAuthStatusResponse>("get_agent_auth_status", { agentId });
+}
+
+/**
+ * Add a custom AI Assistant
+ */
+export async function addCustomAgent(
+  id: string,
+  name: string,
+  command: string,
+  description?: string,
+  args?: string[],
+  requiresAuth?: boolean,
+  authType?: string,
+  authFlowType?: string,
+  authProvider?: string,
+  authUrl?: string,
+  envVars?: Record<string, string>
+): Promise<AgentInstance> {
+  return invoke<AgentInstance>("add_custom_agent", {
+    id,
+    name,
+    command,
+    description,
+    args,
+    requiresAuth,
+    authType,
+    authFlowType,
+    authProvider,
+    authUrl,
+    envVars,
+  });
+}
+
+/**
+ * Remove an AI Assistant (only works for custom agents)
+ */
+export async function removeAgent(agentId: string): Promise<void> {
+  return invoke("remove_agent", { agentId });
+}
+
+/**
+ * Set the default AI Assistant for new sessions
+ */
+export async function setDefaultAgentId(agentId: string): Promise<void> {
+  return invoke("set_default_agent", { agentId });
+}
+
+/**
+ * Get the default AI Assistant ID
+ */
+export async function getDefaultAgentId(): Promise<string> {
+  return invoke<string>("get_default_agent");
 }

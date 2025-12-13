@@ -5,8 +5,8 @@
 
 use crate::models::{
     AppError, CreateSandboxInput, DockerHealthResponse, ExecCommandInput, ExecResult,
-    GitCommitInput, GitCommitResponse, GitLogResponse, GitStatusResponse, Sandbox,
-    SandboxInfo, SandboxLogsResponse, SandboxStats, SandboxStatsResponse, SandboxWithRepo,
+    GitCommitInput, GitCommitResponse, GitLogResponse, GitStatusResponse, OpenCodeAgent,
+    Sandbox, SandboxInfo, SandboxLogsResponse, SandboxStats, SandboxStatsResponse, SandboxWithRepo,
 };
 use crate::services::ApiClient;
 
@@ -291,6 +291,25 @@ pub async fn sandbox_opencode_get_providers(sandbox_id: String) -> Result<Vec<cr
         .get(&format!("/api/v2/sandboxes/{}/opencode/providers", sandbox_id))
         .await?;
     Ok(response.providers)
+}
+
+/// Get available agents (modes) for a sandbox from OpenCode SDK
+/// 
+/// These agents define different behaviors/personas for the AI assistant.
+/// Uses the OpenCode SDK's `app.agents()` endpoint.
+#[tauri::command]
+pub async fn sandbox_opencode_get_agents(sandbox_id: String) -> Result<Vec<OpenCodeAgent>, AppError> {
+    let client = get_client()?;
+    
+    #[derive(serde::Deserialize)]
+    struct Response {
+        agents: Vec<OpenCodeAgent>,
+    }
+    
+    let response: Response = client
+        .get(&format!("/api/v2/sandboxes/{}/opencode/agents", sandbox_id))
+        .await?;
+    Ok(response.agents)
 }
 
 /// List all OpenCode sessions for a sandbox

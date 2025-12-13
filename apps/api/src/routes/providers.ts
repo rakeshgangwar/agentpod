@@ -16,6 +16,7 @@ import {
   isProviderConfigured,
 } from '../models/provider-credentials.ts';
 import { githubCopilotOAuth } from '../services/oauth/github-copilot.ts';
+import { anthropicOAuth, type AnthropicAuthMode } from '../services/oauth/anthropic.ts';
 import { getSetting, setSetting } from '../models/provider.ts';
 import { createLogger } from '../utils/logger.ts';
 
@@ -263,7 +264,95 @@ export const providerRoutes = new Hono()
   })
 
   // ===========================================================================
-  // OAuth Endpoints
+  // Anthropic OAuth (PKCE Flow) - MUST be before generic /:id routes
+  // ===========================================================================
+
+  /**
+   * POST /api/providers/anthropic/oauth/init
+   * Initialize Anthropic OAuth with PKCE
+   * Body: { mode?: 'max' | 'console' }
+   * - 'max': Claude Pro/Max subscription (free API for Max users)
+   * - 'console': API Console (creates API key, pay-per-use)
+   */
+  .post('/anthropic/oauth/init', zValidator('json', z.object({
+    mode: z.enum(['max', 'console']).optional().default('console'),
+  }).optional()), async (c) => {
+    const body = c.req.valid('json');
+    const mode = (body?.mode || 'console') as AnthropicAuthMode;
+    
+    try {
+      const flow = await anthropicOAuth.initAuth(mode);
+      
+      return c.json({
+        success: true,
+        stateId: flow.id,
+        authUrl: flow.authUrl,
+        authMode: flow.mode,
+        expiresIn: 600,
+        message: mode === 'max' 
+          ? 'Sign in with your Claude Pro/Max subscription'
+          : 'Sign in to Anthropic Console to create an API key',
+      });
+    } catch (error) {
+      log.error('Failed to init Anthropic OAuth flow', { mode, error });
+      return c.json({ error: 'Failed to initialize Anthropic OAuth flow' }, 500);
+    }
+  })
+
+  /**
+   * POST /api/providers/anthropic/oauth/callback
+   * Exchange authorization code for tokens (PKCE flow)
+   * Body: { stateId: string, code: string }
+   */
+  .post('/anthropic/oauth/callback', zValidator('json', z.object({
+    stateId: z.string().min(1, 'State ID is required'),
+    code: z.string().min(1, 'Authorization code is required'),
+  })), async (c) => {
+    const { stateId, code } = c.req.valid('json');
+    
+    try {
+      const status = await anthropicOAuth.exchangeCode(stateId, code);
+      
+      if (status.status === 'completed') {
+        return c.json({
+          success: true,
+          status: 'completed',
+          message: 'Anthropic authentication successful',
+        });
+      }
+      
+      return c.json({
+        success: false,
+        status: status.status,
+        error: status.error || 'Authentication failed',
+      }, status.status === 'expired' ? 410 : 400);
+    } catch (error) {
+      log.error('Failed to exchange Anthropic code', { stateId, error });
+      return c.json({ error: 'Failed to complete Anthropic authentication' }, 500);
+    }
+  })
+
+  /**
+   * GET /api/providers/anthropic/oauth/status/:stateId
+   * Get current Anthropic OAuth flow status
+   */
+  .get('/anthropic/oauth/status/:stateId', (c) => {
+    const stateId = c.req.param('stateId');
+    
+    const status = anthropicOAuth.getFlowStatus(stateId);
+    
+    if (!status) {
+      return c.json({ error: 'OAuth flow not found' }, 404);
+    }
+    
+    return c.json({
+      status: status.status,
+      error: status.error,
+    });
+  })
+
+  // ===========================================================================
+  // Generic OAuth Endpoints (GitHub Copilot device flow)
   // ===========================================================================
 
   /**
@@ -358,6 +447,11 @@ export const providerRoutes = new Hono()
   .delete('/:id/oauth/:stateId', (c) => {
     const id = c.req.param('id');
     const stateId = c.req.param('stateId');
+    
+    if (id === 'anthropic') {
+      anthropicOAuth.cancelFlow(stateId);
+      return c.json({ success: true, message: 'OAuth flow cancelled' });
+    }
     
     if (id !== 'github-copilot') {
       return c.json({ 

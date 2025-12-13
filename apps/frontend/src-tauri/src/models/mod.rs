@@ -1,10 +1,12 @@
 //! Data models for the CodeOpen Tauri app
 //! These models mirror the Management API types
 
+pub mod agent;
 pub mod error;
 pub mod opencode;
 pub mod settings;
 
+pub use agent::*;
 pub use error::AppError;
 pub use opencode::*;
 pub use settings::*;
@@ -137,11 +139,15 @@ pub struct ContainerAddonsResponse {
 #[serde(rename_all = "lowercase")]
 pub enum SandboxStatus {
     Created,
+    Starting,
     Running,
+    Stopping,
+    Stopped,
     Paused,
     Restarting,
     Exited,
     Dead,
+    Error,
     Unknown,
 }
 
@@ -149,12 +155,16 @@ pub enum SandboxStatus {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SandboxUrls {
-    pub homepage: Option<String>,
-    pub opencode: Option<String>,
     #[serde(default)]
+    pub homepage: Option<String>,
+    #[serde(default)]
+    pub opencode: Option<String>,
+    #[serde(default, alias = "codeServer")]
     pub code_server: Option<String>,
     #[serde(default)]
     pub vnc: Option<String>,
+    #[serde(default, alias = "acpGateway")]
+    pub acp_gateway: Option<String>,
 }
 
 /// Health status from Docker container
@@ -173,18 +183,54 @@ pub struct SandboxHealth {
 #[serde(rename_all = "camelCase")]
 pub struct Sandbox {
     pub id: String,
-    pub container_id: String,
     pub name: String,
     pub status: SandboxStatus,
     pub urls: SandboxUrls,
     pub created_at: String,
+    
+    // User/ownership
+    #[serde(default)]
+    pub user_id: Option<String>,
+    #[serde(default)]
+    pub slug: Option<String>,
+    #[serde(default)]
+    pub description: Option<String>,
+    
+    // Repository info
+    #[serde(default)]
+    pub repo_name: Option<String>,
+    #[serde(default)]
+    pub github_url: Option<String>,
+    
+    // Container configuration
+    #[serde(default)]
+    pub resource_tier_id: Option<String>,
+    #[serde(default)]
+    pub flavor_id: Option<String>,
+    #[serde(default)]
+    pub addon_ids: Option<Vec<String>>,
+    
+    // Container runtime info (optional, from Docker enrichment)
+    #[serde(default)]
+    pub container_id: Option<String>,
+    #[serde(default)]
+    pub container_name: Option<String>,
     #[serde(default)]
     pub started_at: Option<String>,
-    pub image: String,
     #[serde(default)]
-    pub labels: std::collections::HashMap<String, String>,
+    pub image: Option<String>,
+    #[serde(default)]
+    pub labels: Option<std::collections::HashMap<String, String>>,
     #[serde(default)]
     pub health: Option<SandboxHealth>,
+    
+    // Timestamps
+    #[serde(default)]
+    pub updated_at: Option<String>,
+    #[serde(default)]
+    pub last_accessed_at: Option<String>,
+    #[serde(default)]
+    pub error_message: Option<String>,
 }
 
 /// Repository model from v2 API
@@ -405,4 +451,48 @@ pub struct OpenCodeProvider {
     pub id: String,
     pub name: String,
     pub models: Vec<OpenCodeModel>,
+}
+
+// =============================================================================
+// OpenCode Agent Types (from OpenCode SDK)
+// =============================================================================
+
+/// OpenCode Agent model selection (optional)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenCodeAgentModel {
+    #[serde(rename = "modelID")]
+    pub model_id: String,
+    #[serde(rename = "providerID")]
+    pub provider_id: String,
+}
+
+/// OpenCode Agent (mode/persona) from the SDK
+/// 
+/// Agents define different behaviors/modes for the AI assistant.
+/// These are fetched from the OpenCode SDK's `app.agents()` endpoint.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenCodeAgent {
+    /// Agent name (used as ID)
+    pub name: String,
+    /// Optional description
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Agent mode: "subagent", "primary", or "all"
+    pub mode: String,
+    /// Whether this is a built-in agent
+    pub built_in: bool,
+    /// Optional hex color for UI display
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    /// Optional model override for this agent
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<OpenCodeAgentModel>,
+}
+
+/// Response from the agents endpoint
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenCodeAgentsResponse {
+    pub agents: Vec<OpenCodeAgent>,
 }

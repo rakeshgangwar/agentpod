@@ -352,6 +352,32 @@ export const opencodeV2 = {
   },
 
   /**
+   * Get available agents from OpenCode
+   * These are the "modes" (personas/behaviors) that can be selected for chat
+   * 
+   * Returns the full Agent type from OpenCode SDK which includes:
+   * - name: Agent name (used as ID)
+   * - description: Optional description
+   * - mode: "subagent" | "primary" | "all"
+   * - builtIn: Whether it's a built-in agent
+   * - color: Optional hex color
+   * - model: Optional model override
+   * - etc.
+   */
+  async getAgents(sandboxId: string): Promise<Array<{
+    name: string;
+    description?: string;
+    mode: "subagent" | "primary" | "all";
+    builtIn: boolean;
+    color?: string;
+    model?: { modelID: string; providerID: string };
+  }>> {
+    const { client } = await getClient(sandboxId);
+    const result = await client.app.agents();
+    return result.data ?? [];
+  },
+
+  /**
    * Get configured providers and their models from OpenCode
    */
   async getProviders(

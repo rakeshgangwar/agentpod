@@ -19,6 +19,7 @@ import { accountRoutes } from './routes/account.ts';
 import { sandboxRoutes, sandboxHealthRoutes } from './routes/sandboxes.ts';
 import { repoRoutes } from './routes/repos.ts';
 import { chatRoutes } from './routes/chat.ts';
+import { agentRoutes } from './routes/agents.ts';
 // Middleware
 import { activityLoggerMiddleware } from './middleware/activity-logger.ts';
 // Sync services
@@ -80,7 +81,9 @@ const app = new Hono()
   .route('/api/v2/sandboxes', sandboxRoutes) // Sandbox management
   .route('/api/v2/sandboxes', chatRoutes) // Chat history (persisted)
   .route('/api/v2/repos', repoRoutes) // Git repository management
-  .route('/api/v2/health', sandboxHealthRoutes); // Health checks (includes /docker)
+  .route('/api/v2/health', sandboxHealthRoutes) // Health checks (includes /docker)
+  // AI Assistants (Agent Management)
+  .route('/api/agents', agentRoutes); // AI Assistant management
 
 // Export type for Hono Client (type-safe RPC from mobile app)
 export type AppType = typeof app;
@@ -202,6 +205,17 @@ console.log(`
 ║  - GET  /api/account                  Get account info        ║
 ║  - DELETE /api/account                Delete account          ║
 ║  - GET  /api/account/data-export      Export all user data    ║
+╠═══════════════════════════════════════════════════════════════╣
+║  AI Assistants Endpoints:                                     ║
+║  - GET  /api/agents                   List all assistants     ║
+║  - GET  /api/agents/:id               Get assistant details   ║
+║  - GET  /api/agents/:id/modes         Get agent modes         ║
+║  - POST /api/agents/:id/spawn         Start assistant process ║
+║  - POST /api/agents/:id/stop          Stop assistant process  ║
+║  - POST /api/agents/:id/auth          Init authentication     ║
+║  - POST /api/agents/:id/auth/complete Complete authentication ║
+║  - POST /api/agents/custom            Add custom assistant    ║
+║  - POST /api/agents/default           Set default assistant   ║
 ╚═══════════════════════════════════════════════════════════════╝
 `);
 

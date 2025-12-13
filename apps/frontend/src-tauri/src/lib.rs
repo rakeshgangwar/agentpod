@@ -22,6 +22,7 @@ use commands::{
     get_sandbox_git_status, get_sandbox_git_log, commit_sandbox_changes,
     // Sandbox OpenCode commands (v2)
     sandbox_opencode_get_app_info, sandbox_opencode_health_check, sandbox_opencode_get_providers,
+    sandbox_opencode_get_agents,
     sandbox_opencode_list_sessions, sandbox_opencode_create_session, sandbox_opencode_get_session,
     sandbox_opencode_delete_session, sandbox_opencode_abort_session,
     sandbox_opencode_respond_permission,
@@ -42,9 +43,17 @@ use commands::{
     init_oauth_flow, poll_oauth_flow, cancel_oauth_flow,
     remove_provider_credentials, set_default_provider,
     list_configured_providers,
+    // Anthropic OAuth commands (PKCE flow)
+    anthropic_oauth_init, anthropic_oauth_callback, anthropic_oauth_status,
     // User OpenCode config commands
     get_user_opencode_config, update_user_opencode_settings, update_user_agents_md,
     list_user_opencode_files, upsert_user_opencode_file, delete_user_opencode_file,
+    // AI Assistant (Agent) commands
+    list_agents, get_agent, get_agent_modes,
+    spawn_agent, stop_agent,
+    init_agent_auth, complete_agent_auth, get_agent_auth_status,
+    add_custom_agent, remove_agent,
+    set_default_agent, get_default_agent,
 };
 use tauri::{Manager, RunEvent, WindowEvent};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
@@ -101,6 +110,7 @@ pub fn run() {
             sandbox_opencode_get_app_info,
             sandbox_opencode_health_check,
             sandbox_opencode_get_providers,
+            sandbox_opencode_get_agents,
             sandbox_opencode_list_sessions,
             sandbox_opencode_create_session,
             sandbox_opencode_get_session,
@@ -140,6 +150,10 @@ pub fn run() {
             cancel_oauth_flow,
             remove_provider_credentials,
             set_default_provider,
+            // Anthropic OAuth commands (PKCE flow)
+            anthropic_oauth_init,
+            anthropic_oauth_callback,
+            anthropic_oauth_status,
             // User OpenCode config commands
             get_user_opencode_config,
             update_user_opencode_settings,
@@ -147,6 +161,19 @@ pub fn run() {
             list_user_opencode_files,
             upsert_user_opencode_file,
             delete_user_opencode_file,
+            // AI Assistant (Agent) commands
+            list_agents,
+            get_agent,
+            get_agent_modes,
+            spawn_agent,
+            stop_agent,
+            init_agent_auth,
+            complete_agent_auth,
+            get_agent_auth_status,
+            add_custom_agent,
+            remove_agent,
+            set_default_agent,
+            get_default_agent,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

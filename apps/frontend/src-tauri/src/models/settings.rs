@@ -277,3 +277,56 @@ pub struct SettingsUpdateResponse {
 pub struct FilesListResponse {
     pub files: Vec<UserOpencodeFile>,
 }
+
+// =============================================================================
+// Anthropic OAuth Types
+// =============================================================================
+
+/// Anthropic OAuth mode (Claude Pro/Max subscription vs API Console)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum AnthropicAuthMode {
+    /// Claude Pro/Max subscription (free API access)
+    Max,
+    /// API Console (creates permanent API key)
+    #[default]
+    Console,
+}
+
+/// Response from initializing Anthropic OAuth flow
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnthropicOAuthInitResponse {
+    /// Authorization URL to open in browser
+    pub auth_url: String,
+    /// State ID to track this OAuth flow
+    pub state_id: String,
+    /// Auth mode being used
+    pub auth_mode: String, // "max" or "console"
+    /// Seconds until expiration
+    pub expires_in: u32,
+    /// Human-readable message
+    pub message: String,
+}
+
+/// Request to complete Anthropic OAuth flow
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnthropicOAuthCallbackRequest {
+    /// Authorization code (may include state: "authcode#state")
+    pub code: String,
+    /// State ID if not included in code
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub state_id: Option<String>,
+}
+
+/// Response from completing Anthropic OAuth flow
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnthropicOAuthCallbackResponse {
+    /// Whether authentication succeeded
+    pub success: bool,
+    /// Error message if failed
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}

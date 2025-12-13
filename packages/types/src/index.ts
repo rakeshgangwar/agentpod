@@ -28,3 +28,6 @@ export * from "./opencode";
 
 // API response types
 export * from "./api";
+
+// Agent types (AI Assistants & Agent Modes)
+export * from "./agent";

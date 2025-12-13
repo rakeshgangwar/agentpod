@@ -431,3 +431,61 @@ pub async fn list_non_gpu_addons() -> Result<Vec<ContainerAddon>, AppError> {
     let response: ContainerAddonsResponse = client.get("/api/addons/non-gpu").await?;
     Ok(response.addons)
 }
+
+// =============================================================================
+// Anthropic OAuth Commands
+// =============================================================================
+
+/// Initialize Anthropic OAuth PKCE flow
+/// Returns the authorization URL and state ID for tracking the flow
+#[tauri::command]
+pub async fn anthropic_oauth_init(mode: Option<String>) -> Result<crate::models::AnthropicOAuthInitResponse, AppError> {
+    let client = ApiClient::new()?;
+    
+    #[derive(serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Body {
+        mode: String,
+    }
+    
+    let auth_mode = mode.unwrap_or_else(|| "console".to_string());
+    let response: crate::models::AnthropicOAuthInitResponse = client
+        .post("/api/providers/anthropic/oauth/init", &Body { mode: auth_mode })
+        .await?;
+    
+    Ok(response)
+}
+
+/// Complete Anthropic OAuth PKCE flow by exchanging the authorization code
+#[tauri::command]
+pub async fn anthropic_oauth_callback(
+    code: String,
+    state_id: Option<String>
+) -> Result<crate::models::AnthropicOAuthCallbackResponse, AppError> {
+    let client = ApiClient::new()?;
+    
+    #[derive(serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Body {
+        code: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        state_id: Option<String>,
+    }
+    
+    let response: crate::models::AnthropicOAuthCallbackResponse = client
+        .post("/api/providers/anthropic/oauth/callback", &Body { code, state_id })
+        .await?;
+    
+    Ok(response)
+}
+
+/// Get the status of an Anthropic OAuth flow
+#[tauri::command]
+pub async fn anthropic_oauth_status(state_id: String) -> Result<OAuthFlowStatus, AppError> {
+    let client = ApiClient::new()?;
+    
+    let path = format!("/api/providers/anthropic/oauth/status/{}", state_id);
+    let response: OAuthFlowStatus = client.get(&path).await?;
+    
+    Ok(response)
+}

@@ -7,6 +7,8 @@
   import { Skeleton } from "$lib/components/ui/skeleton";
   import FilePickerModal from "$lib/components/file-picker-modal.svelte";
   import ModelSelector from "$lib/components/model-selector.svelte";
+  import AssistantPicker from "$lib/components/assistant-picker.svelte";
+  import ModePicker from "$lib/components/mode-picker.svelte";
   import {
     sandboxOpencodeListSessions,
     sandboxOpencodeCreateSession,
@@ -15,6 +17,7 @@
     type Session,
     type ModelSelection,
   } from "$lib/api/tauri";
+  import { assistantsStore } from "$lib/stores/assistants.svelte";
   import { confirm } from "@tauri-apps/plugin-dialog";
 
   // File finder wrapper for ChatThread (uses sandboxId, same as projectId in URL)
@@ -72,6 +75,10 @@
   
   // Track which session's model we've loaded to avoid re-detecting
   let modelLoadedForSession = $state<string | null>(null);
+  
+  // AI Assistant selection state
+  let selectedAssistantId = $state<string>(assistantsStore.defaultId || "opencode");
+  let selectedModeId = $state<string>("default");
   
   // Reset model when session changes so it can be detected from the new session's messages
   $effect(() => {
@@ -272,15 +279,41 @@
     <!-- Chat Area -->
     <div class="flex-1 flex flex-col">
       {#if selectedSessionId}
-        <!-- Model Selector Header -->
+        <!-- Chat Header with Assistant, Mode, and Model Selectors -->
         <div class="border-b px-4 py-2 flex items-center justify-between bg-muted/30">
-          <div class="flex items-center gap-2">
-            <span class="text-xs text-muted-foreground">Model:</span>
-            <ModelSelector 
-              {projectId}
-              bind:selectedModel
-              compact={true}
-            />
+          <div class="flex items-center gap-4">
+            <!-- AI Assistant Selector -->
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-muted-foreground">AI:</span>
+              <AssistantPicker
+                bind:value={selectedAssistantId}
+                compact={true}
+              />
+            </div>
+            
+            <!-- Mode Selector -->
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-muted-foreground">Mode:</span>
+              <ModePicker
+                assistantId={selectedAssistantId}
+                sandboxId={projectId}
+                bind:value={selectedModeId}
+                compact={true}
+              />
+            </div>
+            
+            <!-- Separator -->
+            <div class="h-4 w-px bg-border"></div>
+            
+            <!-- Model Selector -->
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-muted-foreground">Model:</span>
+              <ModelSelector 
+                {projectId}
+                bind:selectedModel
+                compact={true}
+              />
+            </div>
           </div>
         </div>
         

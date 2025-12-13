@@ -41,12 +41,14 @@
   import * as Tabs from "$lib/components/ui/tabs";
   import * as Dialog from "$lib/components/ui/dialog";
   import LlmProvidersSettings from "$lib/components/llm-providers-settings.svelte";
+  import AssistantsSettings from "$lib/components/assistants-settings.svelte";
   import ThemePicker from "$lib/components/theme-picker.svelte";
   
   // Icons
   import PlugIcon from "@lucide/svelte/icons/plug";
   import PaletteIcon from "@lucide/svelte/icons/palette";
   import BrainIcon from "@lucide/svelte/icons/brain";
+  import BotIcon from "@lucide/svelte/icons/bot";
   import TerminalIcon from "@lucide/svelte/icons/terminal";
   import InfoIcon from "@lucide/svelte/icons/info";
 
@@ -458,6 +460,7 @@ export default {
     { value: "connection", label: "Connection", icon: PlugIcon },
     { value: "appearance", label: "Appearance", icon: PaletteIcon },
     { value: "ai-models", label: "AI Models", icon: BrainIcon },
+    { value: "assistants", label: "AI Assistants", icon: BotIcon },
     { value: "opencode", label: "OpenCode", icon: TerminalIcon },
     { value: "about", label: "About", icon: InfoIcon },
   ];
@@ -480,7 +483,7 @@ export default {
 
     <!-- Main Tabs -->
     <Tabs.Root bind:value={activeTab} class="w-full">
-      <Tabs.List class="grid w-full grid-cols-5 mb-6">
+      <Tabs.List class="grid w-full grid-cols-6 mb-6">
         {#each settingsTabs as tab}
           <Tabs.Trigger value={tab.value} class="flex items-center gap-2">
             <tab.icon class="h-4 w-4" />
@@ -583,6 +586,11 @@ export default {
       <!-- AI Models Tab -->
       <Tabs.Content value="ai-models" class="space-y-6">
         <LlmProvidersSettings />
+      </Tabs.Content>
+
+      <!-- AI Assistants Tab -->
+      <Tabs.Content value="assistants" class="space-y-6">
+        <AssistantsSettings />
       </Tabs.Content>
 
       <!-- OpenCode Tab -->
