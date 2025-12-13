@@ -10,7 +10,7 @@
 // IMPORTANT: Import setup first to set environment variables
 import '../setup';
 
-import { describe, test, expect, beforeAll, afterAll, beforeEach } from 'bun:test';
+import { describe, test, expect, beforeAll, afterAll, beforeEach, afterEach } from 'bun:test';
 import { db } from '../../src/db/index';
 
 // Import models directly for testing
@@ -443,8 +443,9 @@ describe('Chat Session Model', () => {
   });
 
   test('should get session stats', () => {
-    ChatSessionModel.createChatSession({ sandboxId: testSandboxId, userId: TEST_USER_ID, source: 'opencode', status: 'active' });
-    ChatSessionModel.createChatSession({ sandboxId: testSandboxId, userId: TEST_USER_ID, source: 'opencode', status: 'archived' });
+    const activeSession = ChatSessionModel.createChatSession({ sandboxId: testSandboxId, userId: TEST_USER_ID, source: 'opencode' });
+    const archivedSession = ChatSessionModel.createChatSession({ sandboxId: testSandboxId, userId: TEST_USER_ID, source: 'opencode' });
+    ChatSessionModel.archiveChatSession(archivedSession.id);
     
     const stats = ChatSessionModel.getChatSessionStats(testSandboxId);
     expect(stats.total).toBeGreaterThanOrEqual(2);

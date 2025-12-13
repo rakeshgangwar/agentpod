@@ -85,6 +85,9 @@ const app = new Hono()
 // Export type for Hono Client (type-safe RPC from mobile app)
 export type AppType = typeof app;
 
+// Export app for testing
+export { app };
+
 // Start sync services for running sandboxes
 console.log('Starting sync services for running sandboxes...');
 startSyncForRunningSandboxes().catch((error) => {

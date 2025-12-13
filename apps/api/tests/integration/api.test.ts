@@ -13,6 +13,9 @@ import { db, initDatabase } from '../../src/db/index';
 // Import app after environment is set up
 import app from '../../src/index';
 
+// Test user ID (matches what Better Auth creates)
+const TEST_USER_ID = 'test-user-api-123';
+
 // Helper to make requests to the app
 async function request(
   path: string,
@@ -29,6 +32,7 @@ async function request(
   };
   
   if (auth) {
+    // Use the API token from test environment
     headers['Authorization'] = 'Bearer test-token';
   }
   
@@ -51,6 +55,26 @@ async function request(
   return { status: response.status, data };
 }
 
+// =============================================================================
+// Setup
+// =============================================================================
+
+beforeAll(() => {
+  // Ensure test user exists
+  try {
+    db.run(
+      "INSERT OR IGNORE INTO user (id, email, name, emailVerified, createdAt, updatedAt) VALUES (?, ?, ?, 1, datetime('now'), datetime('now'))",
+      [TEST_USER_ID, 'test@api.test', 'API Test User']
+    );
+  } catch (e) {
+    // Ignore if user already exists
+  }
+});
+
+// =============================================================================
+// Health Routes
+// =============================================================================
+
 describe('Health Routes', () => {
   test('GET /health should return ok', async () => {
     const { status, data } = await request('/health', { auth: false });
@@ -59,159 +83,141 @@ describe('Health Routes', () => {
     expect((data as any).status).toBe('ok');
     expect((data as any).timestamp).toBeDefined();
   });
-
-  test('GET /api/info should return api info with auth', async () => {
-    const { status, data } = await request('/api/info');
-    
-    expect(status).toBe(200);
-    expect((data as any).name).toBe('Management API');
-    expect((data as any).version).toBe('0.1.0');
-  });
-
-  // Note: /api/info is currently in healthRoutes (public), 
-  // but auth is applied to /api/* so it requires auth
 });
 
-describe('Provider Routes', () => {
-  beforeEach(() => {
-    // Reset providers to initial state
-    db.exec("UPDATE providers SET api_key = NULL, is_configured = 0, is_default = 0");
-  });
+// =============================================================================
+// Resource Tiers Routes
+// =============================================================================
 
-  test('GET /api/providers should return providers list', async () => {
-    const { status, data } = await request('/api/providers');
+describe('Resource Tiers Routes', () => {
+  test('GET /api/resource-tiers should return list of tiers', async () => {
+    const { status, data } = await request('/api/resource-tiers');
     
     expect(status).toBe(200);
-    expect((data as any).providers).toBeDefined();
-    expect(Array.isArray((data as any).providers)).toBe(true);
-    expect((data as any).providers.length).toBeGreaterThan(0);
+    expect((data as any).tiers).toBeDefined();
+    expect(Array.isArray((data as any).tiers)).toBe(true);
     
-    // Check that providers have expected structure
-    const provider = (data as any).providers[0];
-    expect(provider.id).toBeDefined();
-    expect(provider.name).toBeDefined();
-    expect(provider.type).toBeDefined();
-    expect(provider.isConfigured).toBeDefined();
+    // Should have at least the seeded tiers
+    const tiers = (data as any).tiers;
+    expect(tiers.length).toBeGreaterThan(0);
+    
+    // Check tier structure
+    const tier = tiers[0];
+    expect(tier.id).toBeDefined();
+    expect(tier.name).toBeDefined();
+    expect(tier.resources).toBeDefined();
+    expect(tier.resources.cpuCores).toBeDefined();
+    expect(tier.resources.memoryGb).toBeDefined();
   });
 
-  test('GET /api/providers/default should return null when no default', async () => {
-    const { status, data } = await request('/api/providers/default');
-    
-    expect(status).toBe(200);
-    expect((data as any).provider).toBeNull();
-  });
-
-  test('GET /api/providers/:id should return provider', async () => {
-    const { status, data } = await request('/api/providers/anthropic');
+  test('GET /api/resource-tiers/default should return default tier', async () => {
+    const { status, data } = await request('/api/resource-tiers/default');
     
     expect(status).toBe(200);
-    expect((data as any).provider.id).toBe('anthropic');
-    expect((data as any).provider.name).toBe('Anthropic Claude');
+    expect((data as any).id).toBeDefined();
+    expect((data as any).isDefault).toBe(true);
   });
 
-  test('GET /api/providers/:id with invalid id should return 404', async () => {
-    const { status, data } = await request('/api/providers/invalid-provider');
+  test('GET /api/resource-tiers/:id should return specific tier', async () => {
+    const { status, data } = await request('/api/resource-tiers/starter');
+    
+    expect(status).toBe(200);
+    expect((data as any).id).toBe('starter');
+  });
+
+  test('GET /api/resource-tiers/:id with invalid id should return 404', async () => {
+    const { status } = await request('/api/resource-tiers/invalid-tier');
     
     expect(status).toBe(404);
-    expect((data as any).error).toBeDefined();
-  });
-
-  test('POST /api/providers/:id/configure should configure provider', async () => {
-    const { status, data } = await request('/api/providers/openai/configure', {
-      method: 'POST',
-      body: { apiKey: 'sk-test-key-12345' },
-    });
-    
-    expect(status).toBe(200);
-    expect((data as any).provider.id).toBe('openai');
-    expect((data as any).provider.isConfigured).toBe(true);
-    expect((data as any).message).toBe('Provider configured successfully');
-  });
-
-  test('POST /api/providers/:id/set-default should set default provider', async () => {
-    // First configure the provider
-    await request('/api/providers/anthropic/configure', {
-      method: 'POST',
-      body: { apiKey: 'sk-ant-test-key' },
-    });
-
-    // Then set as default
-    const { status, data } = await request('/api/providers/anthropic/set-default', {
-      method: 'POST',
-    });
-    
-    expect(status).toBe(200);
-    expect((data as any).provider.isDefault).toBe(true);
-  });
-
-  test('POST /api/providers/:id/set-default on unconfigured provider should fail', async () => {
-    const { status, data } = await request('/api/providers/google/set-default', {
-      method: 'POST',
-    });
-    
-    expect(status).toBe(400);
-    expect((data as any).error).toContain('unconfigured');
-  });
-
-  test('DELETE /api/providers/:id should remove configuration', async () => {
-    // First configure
-    await request('/api/providers/openrouter/configure', {
-      method: 'POST',
-      body: { apiKey: 'test-key' },
-    });
-
-    // Then delete
-    const { status, data } = await request('/api/providers/openrouter', {
-      method: 'DELETE',
-    });
-    
-    expect(status).toBe(200);
-    expect((data as any).provider.isConfigured).toBe(false);
   });
 });
 
-describe('Project Routes', () => {
-  beforeEach(() => {
-    // Clean projects table
-    db.exec('DELETE FROM projects');
-  });
+// =============================================================================
+// Container Flavors Routes
+// =============================================================================
 
-  test('GET /api/projects should return empty list initially', async () => {
-    const { status, data } = await request('/api/projects');
+describe('Container Flavors Routes', () => {
+  test('GET /api/flavors should return list of flavors', async () => {
+    const { status, data } = await request('/api/flavors');
     
     expect(status).toBe(200);
-    expect((data as any).projects).toEqual([]);
+    expect((data as any).flavors).toBeDefined();
+    expect(Array.isArray((data as any).flavors)).toBe(true);
+    
+    // Should have at least the seeded flavors
+    const flavors = (data as any).flavors;
+    expect(flavors.length).toBeGreaterThan(0);
+    
+    // Check flavor structure
+    const flavor = flavors[0];
+    expect(flavor.id).toBeDefined();
+    expect(flavor.name).toBeDefined();
+    expect(flavor.languages).toBeDefined();
   });
 
-  test('GET /api/projects/:id with non-existent id should return 404', async () => {
-    const { status, data } = await request('/api/projects/non-existent');
+  test('GET /api/flavors/default should return default flavor', async () => {
+    const { status, data } = await request('/api/flavors/default');
     
-    expect(status).toBe(404);
-    expect((data as any).error).toBeDefined();
+    expect(status).toBe(200);
+    // API returns flat object, not wrapped in { flavor: ... }
+    expect((data as any).id).toBeDefined();
+    expect((data as any).isDefault).toBe(true);
   });
 
-  // Note: POST /api/projects requires actual Coolify/Forgejo connection
-  // We'll test that with mocks in the unit tests or manual testing
-
-  test('POST /api/projects with invalid body should return validation error', async () => {
-    const { status } = await request('/api/projects', {
-      method: 'POST',
-      body: { description: 'Missing name' }, // name is required
-    });
+  test('GET /api/flavors/:id should return specific flavor', async () => {
+    const { status, data } = await request('/api/flavors/fullstack');
     
-    expect(status).toBe(400);
+    expect(status).toBe(200);
+    // API returns flat object, not wrapped in { flavor: ... }
+    expect((data as any).id).toBe('fullstack');
   });
 });
+
+// =============================================================================
+// Container Addons Routes
+// =============================================================================
+
+describe('Container Addons Routes', () => {
+  test('GET /api/addons should return list of addons', async () => {
+    const { status, data } = await request('/api/addons');
+    
+    expect(status).toBe(200);
+    expect((data as any).addons).toBeDefined();
+    expect(Array.isArray((data as any).addons)).toBe(true);
+    
+    // Should have at least the seeded addons
+    const addons = (data as any).addons;
+    expect(addons.length).toBeGreaterThan(0);
+    
+    // Check addon structure
+    const addon = addons[0];
+    expect(addon.id).toBeDefined();
+    expect(addon.name).toBeDefined();
+    expect(addon.category).toBeDefined();
+  });
+
+  test('GET /api/addons/:id should return specific addon', async () => {
+    const { status, data } = await request('/api/addons/code-server');
+    
+    expect(status).toBe(200);
+    // API returns flat object, not wrapped in { addon: ... }
+    expect((data as any).id).toBe('code-server');
+  });
+});
+
+// =============================================================================
+// Authentication
+// =============================================================================
 
 describe('Authentication', () => {
   test('protected routes should require auth token', async () => {
-    const { status } = await request('/api/projects', { auth: false });
+    const { status } = await request('/api/resource-tiers', { auth: false });
     expect(status).toBe(401);
   });
 
   test('protected routes should reject invalid token', async () => {
     const response = await app.fetch(
-      new Request('http://localhost/api/projects', {
+      new Request('http://localhost/api/resource-tiers', {
         headers: {
           'Authorization': 'Bearer wrong-token',
         },
