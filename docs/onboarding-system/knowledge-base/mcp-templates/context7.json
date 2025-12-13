@@ -1,0 +1,50 @@
+{
+  "$schema": "https://opencode.ai/mcp-config.json",
+  "id": "mcp_context7",
+  "title": "Context7 Documentation Server",
+  "description": "Access up-to-date documentation for popular libraries and frameworks",
+  "tags": ["documentation", "libraries", "frameworks", "reference"],
+  "applicable_to": null,
+  "priority": "high",
+  
+  "config": {
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp"
+    }
+  },
+  
+  "tools_provided": [
+    {
+      "name": "resolve-library-id",
+      "description": "Find a library ID from a package name (e.g., 'react' -> '/facebook/react')"
+    },
+    {
+      "name": "get-library-docs",
+      "description": "Get documentation for a specific library by ID and topic"
+    }
+  ],
+  
+  "usage_examples": [
+    {
+      "description": "Look up React hooks documentation",
+      "steps": [
+        "Call resolve-library-id with 'react'",
+        "Call get-library-docs with the returned ID and topic 'hooks'"
+      ]
+    },
+    {
+      "description": "Find Next.js routing docs",
+      "steps": [
+        "Call resolve-library-id with 'next.js'",
+        "Call get-library-docs with topic 'routing'"
+      ]
+    }
+  ],
+  
+  "notes": [
+    "Context7 provides real-time, up-to-date documentation",
+    "Useful for staying current with rapidly evolving libraries",
+    "Reduces hallucination by grounding answers in actual docs"
+  ]
+}

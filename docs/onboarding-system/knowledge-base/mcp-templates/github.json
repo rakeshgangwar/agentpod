@@ -1,0 +1,157 @@
+{
+  "$schema": "https://opencode.ai/mcp-config.json",
+  "id": "mcp_github",
+  "title": "GitHub MCP Server",
+  "description": "Interact with GitHub repositories, issues, pull requests, and more",
+  "tags": ["github", "git", "repositories", "issues", "pull-requests"],
+  "applicable_to": ["open_source", "github_action", "npm_package", "python_package"],
+  "priority": "high",
+  
+  "config": {
+    "github": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-github"],
+      "enabled": true,
+      "environment": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "{env:GITHUB_TOKEN}"
+      },
+      "timeout": 10000
+    }
+  },
+  
+  "tools_provided": [
+    {
+      "name": "create_or_update_file",
+      "description": "Create or update a file in a repository"
+    },
+    {
+      "name": "search_repositories",
+      "description": "Search for GitHub repositories"
+    },
+    {
+      "name": "create_repository",
+      "description": "Create a new repository"
+    },
+    {
+      "name": "get_file_contents",
+      "description": "Get contents of a file from a repository"
+    },
+    {
+      "name": "push_files",
+      "description": "Push multiple files to a repository"
+    },
+    {
+      "name": "create_issue",
+      "description": "Create a new issue"
+    },
+    {
+      "name": "create_pull_request",
+      "description": "Create a pull request"
+    },
+    {
+      "name": "fork_repository",
+      "description": "Fork a repository"
+    },
+    {
+      "name": "create_branch",
+      "description": "Create a new branch"
+    },
+    {
+      "name": "list_commits",
+      "description": "List commits in a repository"
+    },
+    {
+      "name": "list_issues",
+      "description": "List issues in a repository"
+    },
+    {
+      "name": "update_issue",
+      "description": "Update an existing issue"
+    },
+    {
+      "name": "add_issue_comment",
+      "description": "Add a comment to an issue"
+    },
+    {
+      "name": "search_code",
+      "description": "Search for code across GitHub"
+    },
+    {
+      "name": "search_issues",
+      "description": "Search for issues and PRs"
+    },
+    {
+      "name": "search_users",
+      "description": "Search for GitHub users"
+    },
+    {
+      "name": "get_issue",
+      "description": "Get details of a specific issue"
+    },
+    {
+      "name": "get_pull_request",
+      "description": "Get details of a specific pull request"
+    },
+    {
+      "name": "list_pull_requests",
+      "description": "List pull requests in a repository"
+    },
+    {
+      "name": "create_pull_request_review",
+      "description": "Create a review on a pull request"
+    },
+    {
+      "name": "merge_pull_request",
+      "description": "Merge a pull request"
+    },
+    {
+      "name": "get_pull_request_files",
+      "description": "Get files changed in a pull request"
+    },
+    {
+      "name": "get_pull_request_status",
+      "description": "Get status checks for a pull request"
+    }
+  ],
+  
+  "required_env": [
+    {
+      "name": "GITHUB_TOKEN",
+      "description": "GitHub Personal Access Token with repo scope"
+    }
+  ],
+  
+  "setup_instructions": [
+    "Create a GitHub Personal Access Token at https://github.com/settings/tokens",
+    "Grant 'repo' scope for full repository access",
+    "Set the token as GITHUB_TOKEN environment variable"
+  ],
+  
+  "usage_examples": [
+    {
+      "description": "Create a new repository",
+      "tool": "create_repository",
+      "args": {
+        "name": "my-new-project",
+        "description": "A cool new project",
+        "private": false
+      }
+    },
+    {
+      "description": "Create an issue",
+      "tool": "create_issue",
+      "args": {
+        "owner": "username",
+        "repo": "my-project",
+        "title": "Bug: Something is broken",
+        "body": "Description of the issue"
+      }
+    }
+  ],
+  
+  "notes": [
+    "Requires a GitHub Personal Access Token",
+    "Token permissions determine available operations",
+    "Rate limits apply based on GitHub API limits"
+  ]
+}

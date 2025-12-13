@@ -1,0 +1,124 @@
+{
+  "$schema": "https://opencode.ai/mcp-config.json",
+  "id": "mcp_filesystem",
+  "title": "Filesystem MCP Server",
+  "description": "Secure file system access with configurable allowed directories",
+  "tags": ["filesystem", "files", "directories", "local"],
+  "applicable_to": null,
+  "priority": "medium",
+  
+  "config": {
+    "filesystem": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "{env:ALLOWED_DIRECTORIES}"],
+      "enabled": true,
+      "timeout": 5000
+    }
+  },
+  
+  "config_variants": {
+    "workspace_only": {
+      "description": "Only allow access to the workspace directory",
+      "config": {
+        "filesystem": {
+          "type": "local",
+          "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/workspace"],
+          "enabled": true
+        }
+      }
+    },
+    "home_directory": {
+      "description": "Allow access to user home directory",
+      "config": {
+        "filesystem": {
+          "type": "local",
+          "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "~"],
+          "enabled": true
+        }
+      }
+    },
+    "multiple_directories": {
+      "description": "Allow access to multiple specific directories",
+      "config": {
+        "filesystem": {
+          "type": "local",
+          "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/workspace", "/data", "/config"],
+          "enabled": true
+        }
+      }
+    }
+  },
+  
+  "tools_provided": [
+    {
+      "name": "read_file",
+      "description": "Read the contents of a file"
+    },
+    {
+      "name": "read_multiple_files",
+      "description": "Read multiple files at once"
+    },
+    {
+      "name": "write_file",
+      "description": "Write content to a file"
+    },
+    {
+      "name": "edit_file",
+      "description": "Make targeted edits to a file"
+    },
+    {
+      "name": "create_directory",
+      "description": "Create a new directory"
+    },
+    {
+      "name": "list_directory",
+      "description": "List files and directories in a path"
+    },
+    {
+      "name": "directory_tree",
+      "description": "Get a tree view of directory structure"
+    },
+    {
+      "name": "move_file",
+      "description": "Move or rename a file"
+    },
+    {
+      "name": "search_files",
+      "description": "Search for files matching a pattern"
+    },
+    {
+      "name": "get_file_info",
+      "description": "Get metadata about a file"
+    }
+  ],
+  
+  "security_notes": [
+    "Only directories specified in command are accessible",
+    "Symlinks outside allowed directories are blocked",
+    "Parent directory traversal (..) is prevented",
+    "Consider security implications before allowing home directory access"
+  ],
+  
+  "usage_examples": [
+    {
+      "description": "Read a configuration file",
+      "tool": "read_file",
+      "args": {
+        "path": "/workspace/config.json"
+      }
+    },
+    {
+      "description": "List project files",
+      "tool": "list_directory",
+      "args": {
+        "path": "/workspace/src"
+      }
+    }
+  ],
+  
+  "notes": [
+    "Useful when you need file access beyond OpenCode's built-in tools",
+    "Commonly used for projects requiring broad file system access",
+    "Security-focused with explicit directory allowlisting"
+  ]
+}
