@@ -734,6 +734,20 @@ export const sandboxRoutes = new Hono()
   })
 
   // ===========================================================================
+  // OpenCode: Get Agents
+  // ===========================================================================
+  .get("/:id/opencode/agents", async (c) => {
+    const id = c.req.param("id");
+
+    try {
+      const agents = await opencodeV2.getAgents(id);
+      return c.json({ agents });
+    } catch (error) {
+      return handleOpenCodeError(c, error, "Failed to get OpenCode agents");
+    }
+  })
+
+  // ===========================================================================
   // OpenCode: Health Check
   // ===========================================================================
   .get("/:id/opencode/health", async (c) => {

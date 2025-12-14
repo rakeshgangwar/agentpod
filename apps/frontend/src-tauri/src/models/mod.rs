@@ -2,16 +2,19 @@
 //! These models mirror the Management API types
 
 pub mod error;
+pub mod onboarding;
 pub mod opencode;
 pub mod settings;
 
 pub use error::AppError;
+pub use onboarding::*;
 pub use opencode::*;
 pub use settings::*;
 use serde::{Deserialize, Serialize};
 
 /// Connection configuration stored securely
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ConnectionConfig {
     pub api_url: String,
     pub api_key: Option<String>,
@@ -19,6 +22,7 @@ pub struct ConnectionConfig {
 
 /// Connection status returned to frontend
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ConnectionStatus {
     pub connected: bool,
     pub api_url: Option<String>,
@@ -133,15 +137,17 @@ pub struct ContainerAddonsResponse {
 // =============================================================================
 
 /// Sandbox status enum
+/// Must match the API's SandboxStatus: 'created' | 'starting' | 'running' | 'stopping' | 'stopped' | 'error'
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum SandboxStatus {
     Created,
+    Starting,
     Running,
-    Paused,
-    Restarting,
-    Exited,
-    Dead,
+    Stopping,
+    Stopped,
+    Error,
+    #[serde(other)]
     Unknown,
 }
 
@@ -149,12 +155,16 @@ pub enum SandboxStatus {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SandboxUrls {
+    #[serde(default)]
     pub homepage: Option<String>,
+    #[serde(default)]
     pub opencode: Option<String>,
     #[serde(default)]
     pub code_server: Option<String>,
     #[serde(default)]
     pub vnc: Option<String>,
+    #[serde(default)]
+    pub acp_gateway: Option<String>,
 }
 
 /// Health status from Docker container
@@ -173,18 +183,63 @@ pub struct SandboxHealth {
 #[serde(rename_all = "camelCase")]
 pub struct Sandbox {
     pub id: String,
-    pub container_id: String,
+    pub user_id: String,
     pub name: String,
-    pub status: SandboxStatus,
-    pub urls: SandboxUrls,
-    pub created_at: String,
+    pub slug: String,
     #[serde(default)]
-    pub started_at: Option<String>,
-    pub image: String,
+    pub description: Option<String>,
+    
+    // Git/Repository info
+    pub repo_name: String,
+    #[serde(default)]
+    pub github_url: Option<String>,
+    
+    // Container configuration
+    #[serde(default)]
+    pub resource_tier_id: Option<String>,
+    #[serde(default)]
+    pub flavor_id: Option<String>,
+    #[serde(default)]
+    pub addon_ids: Vec<String>,
+    
+    // Container runtime info
+    #[serde(default)]
+    pub container_id: Option<String>,
+    #[serde(default)]
+    pub container_name: Option<String>,
+    pub status: SandboxStatus,
+    #[serde(default)]
+    pub error_message: Option<String>,
+    
+    // Individual URL fields from DB
+    #[serde(default)]
+    pub opencode_url: Option<String>,
+    #[serde(default)]
+    pub acp_gateway_url: Option<String>,
+    #[serde(default)]
+    pub vnc_url: Option<String>,
+    #[serde(default)]
+    pub code_server_url: Option<String>,
+    
+    // URLs object (for backward compatibility)
+    #[serde(default)]
+    pub urls: Option<SandboxUrls>,
+    
+    // Timestamps
+    pub created_at: String,
+    pub updated_at: String,
+    #[serde(default)]
+    pub last_accessed_at: Option<String>,
+    
+    // Additional Docker runtime info (enriched at runtime, may not always be present)
+    #[serde(default)]
+    pub image: Option<String>,
     #[serde(default)]
     pub labels: std::collections::HashMap<String, String>,
     #[serde(default)]
     pub health: Option<SandboxHealth>,
+    #[serde(default)]
+    pub started_at: Option<String>,
 }
 
 /// Repository model from v2 API
@@ -405,4 +460,17 @@ pub struct OpenCodeProvider {
     pub id: String,
     pub name: String,
     pub models: Vec<OpenCodeModel>,
+}
+
+/// OpenCode agent info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenCodeAgent {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub mode: String, // "primary" | "subagent" | "all"
+    pub built_in: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
 }

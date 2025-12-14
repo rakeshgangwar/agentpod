@@ -61,7 +61,9 @@ interface RuntimeProviderProps {
   projectId: string;
   sessionId?: string;
   selectedModel?: ModelSelection;
+  selectedAgent?: string;
   onSessionModelDetected?: (model: ModelSelection) => void;
+  onSessionAgentDetected?: (agent: string) => void;
   children: ReactNode;
   /** Render prop to pass the send with attachments handler to children */
   renderWithAttachmentHandler?: (handler: (text: string, attachments: AttachedFile[]) => Promise<void>) => ReactNode;
@@ -222,7 +224,7 @@ function convertToThreadMessage(msg: InternalMessage): ThreadMessageLike {
  * Inner runtime component that has access to the permission context.
  * This is where all the SSE handling and runtime logic lives.
  */
-function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selectedModel, onSessionModelDetected, children }: RuntimeProviderProps) {
+function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selectedModel, selectedAgent, onSessionModelDetected, onSessionAgentDetected, children }: RuntimeProviderProps) {
   // Internal message state (mutable, managed by us)
   const [internalMessages, setInternalMessages] = useState<InternalMessage[]>([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -296,6 +298,19 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
                 providerId: msg.info.providerID,
                 modelId: msg.info.modelID,
               });
+              break;
+            }
+          }
+        }
+        
+        // Detect agent from the last user message that has agent info
+        if (onSessionAgentDetected) {
+          // Find the last user message with agent field
+          for (let i = opencodeMessages.length - 1; i >= 0; i--) {
+            const msg = opencodeMessages[i];
+            // Agent is typically set on user messages (the request specifies which agent to use)
+            if (msg.info.role === "user" && msg.info.agent) {
+              onSessionAgentDetected(msg.info.agent);
               break;
             }
           }
@@ -553,9 +568,21 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
     // Handle session.error - display error to user
     if (event.eventType === "session.error") {
       console.error("[RuntimeProvider] Session error:", properties);
-      const errorMessage = (properties?.error as string) || 
-                          (properties?.message as string) || 
-                          "An error occurred";
+      // Error can be an object with { name, data: { message } } structure
+      const errorObj = properties?.error as { name?: string; data?: { message?: string } } | string | undefined;
+      let errorMessage: string;
+      
+      if (typeof errorObj === "object" && errorObj !== null) {
+        // Handle structured error object from OpenCode API
+        errorMessage = errorObj.data?.message || errorObj.name || "An error occurred";
+      } else if (typeof errorObj === "string") {
+        errorMessage = errorObj;
+      } else if (typeof properties?.message === "string") {
+        errorMessage = properties.message;
+      } else {
+        errorMessage = "An error occurred";
+      }
+      
       setError(errorMessage);
       setIsRunning(false);
     }
@@ -668,13 +695,13 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
 
     try {
       // Send message to OpenCode - response comes via SSE (projectId is actually sandboxId in v2 API)
-      await sandboxOpencodeSendMessage(projectId, sessionId, textPart.text, selectedModel);
+      await sandboxOpencodeSendMessage(projectId, sessionId, textPart.text, selectedModel, selectedAgent);
     } catch (err) {
       console.error("[RuntimeProvider] Failed to send message:", err);
       setError(err instanceof Error ? err.message : "Failed to send message");
       setIsRunning(false);
     }
-  }, [projectId, sessionId, selectedModel]);
+  }, [projectId, sessionId, selectedModel, selectedAgent]);
 
   // Handle cancellation
   const onCancel = useCallback(async () => {
@@ -745,13 +772,13 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
 
     try {
       // Send message with parts to OpenCode
-      await sandboxOpencodeSendMessageWithParts(projectId, sessionId, parts, selectedModel);
+      await sandboxOpencodeSendMessageWithParts(projectId, sessionId, parts, selectedModel, selectedAgent);
     } catch (err) {
       console.error("[RuntimeProvider] Failed to send message with attachments:", err);
       setError(err instanceof Error ? err.message : "Failed to send message");
       setIsRunning(false);
     }
-  }, [projectId, sessionId, selectedModel]);
+  }, [projectId, sessionId, selectedModel, selectedAgent]);
 
   // Convert internal messages to ThreadMessageLike for the runtime
   const threadMessages = internalMessages.map(convertToThreadMessage);
@@ -815,14 +842,16 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
  * This includes the Permission system for human-in-the-loop approvals,
  * with a PermissionBar sticky at the bottom of the chat.
  */
-export function RuntimeProvider({ projectId, sessionId, selectedModel, onSessionModelDetected, children }: RuntimeProviderProps) {
+export function RuntimeProvider({ projectId, sessionId, selectedModel, selectedAgent, onSessionModelDetected, onSessionAgentDetected, children }: RuntimeProviderProps) {
   return (
     <PermissionProvider projectId={projectId}>
       <RuntimeProviderInner
         projectId={projectId}
         sessionId={sessionId}
         selectedModel={selectedModel}
+        selectedAgent={selectedAgent}
         onSessionModelDetected={onSessionModelDetected}
+        onSessionAgentDetected={onSessionAgentDetected}
       >
         {children}
       </RuntimeProviderInner>

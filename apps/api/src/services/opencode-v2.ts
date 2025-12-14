@@ -48,6 +48,8 @@ export interface SendMessageInput {
     providerID: string;
     modelID: string;
   };
+  /** Optional agent to use for this message (e.g., "onboarding", "plan", "build") */
+  agent?: string;
 }
 
 // =============================================================================
@@ -241,10 +243,11 @@ export const opencodeV2 = {
       }
     });
 
-    // Build the body with optional model selection
+    // Build the body with optional model selection and agent
     const body: {
       parts: typeof sdkParts;
       model?: { providerID: string; modelID: string };
+      agent?: string;
     } = {
       parts: sdkParts,
     };
@@ -256,6 +259,15 @@ export const opencodeV2 = {
         sessionId,
         provider: input.model.providerID,
         model: input.model.modelID,
+      });
+    }
+
+    if (input.agent) {
+      body.agent = input.agent;
+      log.info("Sending message with agent selection", {
+        sandboxId,
+        sessionId,
+        agent: input.agent,
       });
     }
 
@@ -446,6 +458,109 @@ export const opencodeV2 = {
   },
 
   // ---------------------------------------------------------------------------
+  // Agents
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Get available agents from OpenCode
+   * Returns all agents with their properties
+   */
+  async getAgents(
+    sandboxId: string
+  ): Promise<
+    Array<{
+      name: string;
+      description?: string;
+      mode: "primary" | "subagent" | "all";
+      builtIn: boolean;
+      color?: string;
+    }>
+  > {
+    const { client } = await getClient(sandboxId);
+    const result = await client.app.agents();
+
+    const agents = result.data ?? [];
+
+    // Return all agents with their properties
+    return agents.map((agent) => ({
+      name: agent.name,
+      description: agent.description,
+      mode: agent.mode,
+      builtIn: agent.builtIn,
+      color: agent.color,
+    }));
+  },
+
+  // ---------------------------------------------------------------------------
+  // Authentication
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Set authentication credentials for a provider in OpenCode.
+   * This properly registers the provider as "connected" in OpenCode.
+   * 
+   * @param sandboxId - The sandbox ID
+   * @param providerId - The provider ID (e.g., "github-copilot", "anthropic")
+   * @param auth - The auth credentials matching OpenCode's expected format
+   */
+  async setAuth(
+    sandboxId: string,
+    providerId: string,
+    auth: { type: "api"; key: string } | { type: "oauth"; refresh: string; access: string; expires: number }
+  ): Promise<boolean> {
+    const { client } = await getClient(sandboxId);
+
+    log.info("Setting auth credentials via SDK", {
+      sandboxId,
+      providerId,
+      authType: auth.type,
+    });
+
+    const result = await client.auth.set({
+      path: { id: providerId },
+      body: auth,
+    });
+
+    log.info("Auth credentials set successfully", {
+      sandboxId,
+      providerId,
+      result: result.data,
+    });
+
+    return result.data ?? true;
+  },
+
+  /**
+   * Set multiple provider credentials at once.
+   * Useful for syncing all user credentials to a container.
+   * 
+   * @param sandboxId - The sandbox ID
+   * @param credentials - Map of provider ID to auth credentials
+   */
+  async setMultipleAuth(
+    sandboxId: string,
+    credentials: Record<string, { type: "api"; key: string } | { type: "oauth"; refresh: string; access: string; expires: number }>
+  ): Promise<{ success: string[]; failed: string[] }> {
+    const results = { success: [] as string[], failed: [] as string[] };
+
+    for (const [providerId, auth] of Object.entries(credentials)) {
+      try {
+        await this.setAuth(sandboxId, providerId, auth);
+        results.success.push(providerId);
+      } catch (error) {
+        log.error("Failed to set auth for provider", {
+          sandboxId,
+          providerId,
+          error: error instanceof Error ? error.message : error,
+        });
+        results.failed.push(providerId);
+      }
+    }
+
+    return results;
+  },
+
+  // ---------------------------------------------------------------------------
   // Utility
   // ---------------------------------------------------------------------------
 
@@ -466,5 +581,90 @@ export const opencodeV2 = {
    */
   clearClientCache(sandboxId: string): void {
     clientCache.delete(sandboxId);
+  },
+
+  /**
+   * Restart the OpenCode server process inside a container.
+   * 
+   * This is needed because OpenCode caches provider state at startup.
+   * After syncing new auth credentials via auth.set(), the provider
+   * won't appear in the "connected" list until OpenCode is restarted.
+   * 
+   * The restart is done by:
+   * 1. Killing the opencode process (pkill)
+   * 2. Starting it again in the background using setsid for proper detachment
+   * 3. Waiting for it to become healthy
+   * 
+   * @param sandboxId - The sandbox ID
+   * @param timeoutMs - How long to wait for OpenCode to restart (default 30s)
+   */
+  async restartOpenCode(sandboxId: string, timeoutMs = 30000): Promise<boolean> {
+    await getClient(sandboxId); // Validate sandbox exists and is running
+    const manager = getSandboxManager();
+
+    log.info("Restarting OpenCode server", { sandboxId });
+
+    // Clear the cached client since we're restarting the server
+    clientCache.delete(sandboxId);
+
+    const opencodePort = config.opencode.serverPort;
+    const workspace = "/home/developer/workspace";
+
+    // Step 1: Kill existing OpenCode process
+    try {
+      await manager.exec(sandboxId, ["pkill", "-f", "opencode serve"], { user: "developer" });
+      log.debug("Killed existing OpenCode process", { sandboxId });
+    } catch {
+      // Process may not exist, that's fine
+      log.debug("No existing OpenCode process to kill", { sandboxId });
+    }
+
+    // Give it a moment to fully terminate
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
+    // Step 2: Start OpenCode in the background using setsid for proper detachment
+    // setsid creates a new session and detaches from the controlling terminal
+    // This ensures the process survives after docker exec completes
+    const startCommand = [
+      "sh",
+      "-c",
+      `setsid sh -c 'cd ${workspace} && exec opencode serve --port ${opencodePort} --hostname 0.0.0.0' </dev/null >/tmp/opencode.log 2>&1 &`
+    ];
+
+    try {
+      await manager.exec(sandboxId, startCommand, { user: "developer" });
+      log.info("OpenCode restart command executed", { sandboxId });
+    } catch (error) {
+      log.error("Failed to execute restart command", {
+        sandboxId,
+        error: error instanceof Error ? error.message : error,
+      });
+      throw error;
+    }
+
+    // Step 3: Wait for OpenCode to become healthy again
+    const startTime = Date.now();
+    const pollInterval = 1000;
+    
+    // Give OpenCode a moment to start before polling
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    while (Date.now() - startTime < timeoutMs) {
+      try {
+        // Try to connect to the new OpenCode instance
+        const isHealthy = await this.healthCheck(sandboxId);
+        if (isHealthy) {
+          log.info("OpenCode server restarted successfully", { sandboxId });
+          return true;
+        }
+      } catch {
+        // Still starting up, continue waiting
+      }
+      
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+    }
+
+    log.warn("OpenCode restart timed out", { sandboxId, timeoutMs });
+    return false;
   },
 };

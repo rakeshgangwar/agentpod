@@ -5,8 +5,63 @@
  * for communicating with the Rust backend.
  */
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { goto } from "$app/navigation";
+
+// =============================================================================
+// Auth Error Handling
+// =============================================================================
+
+/**
+ * Check if an error is an unauthorized error (401/403)
+ */
+function isUnauthorizedError(error: unknown): boolean {
+  if (typeof error === "string") {
+    const message = error.toLowerCase();
+    return (
+      message.includes("unauthorized") ||
+      message.includes("session expired") ||
+      message.includes("access forbidden")
+    );
+  }
+  return false;
+}
+
+/**
+ * Handle unauthorized errors by clearing auth and redirecting to login
+ */
+async function handleUnauthorizedError(): Promise<void> {
+  console.warn("[Tauri] Unauthorized error detected, redirecting to login");
+  
+  // Clear auth state via Tauri command (don't use invoke wrapper to avoid recursion)
+  try {
+    await tauriInvoke("auth_logout");
+  } catch (e) {
+    console.error("[Tauri] Failed to logout:", e);
+  }
+  
+  // Redirect to login
+  await goto("/login");
+}
+
+/**
+ * Wrapped invoke that handles auth errors automatically.
+ * Use this instead of importing invoke directly from @tauri-apps/api/core.
+ */
+export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  try {
+    return await tauriInvoke<T>(cmd, args);
+  } catch (error) {
+    // Check for unauthorized errors and handle them
+    if (isUnauthorizedError(error)) {
+      await handleUnauthorizedError();
+      // Throw a specific error so callers know auth failed
+      throw new Error("Session expired. Please log in again.");
+    }
+    throw error;
+  }
+}
 
 // =============================================================================
 // Connection Types
@@ -205,6 +260,7 @@ export interface MessageInfo {
   modelID?: string;
   providerID?: string;
   mode?: string;
+  agent?: string;  // Agent used for this message (e.g., "build", "plan")
   path?: MessagePath;
   cost?: number;
   tokens?: TokenUsage;
@@ -279,7 +335,7 @@ export interface AppInfo {
 
 export interface OpenCodeHealth {
   healthy: boolean;
-  projectId: string;
+  status?: string;
   error?: string;
 }
 
@@ -304,6 +360,15 @@ export interface OpenCodeProvider {
 export interface ModelSelection {
   providerId: string;
   modelId: string;
+}
+
+/** Agent info as returned from OpenCode's /app/agents endpoint */
+export interface OpenCodeAgent {
+  name: string;
+  description?: string;
+  mode: "primary" | "subagent" | "all";
+  builtIn: boolean;
+  color?: string;
 }
 
 // =============================================================================
@@ -632,13 +697,15 @@ export async function authIsAuthenticated(): Promise<boolean> {
 // V2 Sandbox Types (Direct Docker Orchestration)
 // =============================================================================
 
-export type SandboxStatus = "created" | "running" | "paused" | "restarting" | "exited" | "dead" | "unknown";
+// Must match the API's SandboxStatus: 'created' | 'starting' | 'running' | 'stopping' | 'stopped' | 'error'
+export type SandboxStatus = "created" | "starting" | "running" | "stopping" | "stopped" | "error" | "unknown";
 
 export interface SandboxUrls {
   homepage?: string;
   opencode?: string;
   codeServer?: string;
   vnc?: string;
+  acpGateway?: string;
 }
 
 export interface SandboxHealth {
@@ -649,15 +716,45 @@ export interface SandboxHealth {
 
 export interface Sandbox {
   id: string;
-  containerId: string;
+  userId: string;
   name: string;
+  slug: string;
+  description?: string;
+  
+  // Git/Repository info
+  repoName: string;
+  githubUrl?: string;
+  
+  // Container configuration
+  resourceTierId?: string;
+  flavorId?: string;
+  addonIds: string[];
+  
+  // Container runtime info
+  containerId?: string;
+  containerName?: string;
   status: SandboxStatus;
-  urls: SandboxUrls;
+  errorMessage?: string;
+  
+  // Individual URL fields from DB
+  opencodeUrl?: string;
+  acpGatewayUrl?: string;
+  vncUrl?: string;
+  codeServerUrl?: string;
+  
+  // URLs object (for backward compatibility)
+  urls?: SandboxUrls;
+  
+  // Timestamps
   createdAt: string;
-  startedAt?: string;
-  image: string;
-  labels: Record<string, string>;
+  updatedAt: string;
+  lastAccessedAt?: string;
+  
+  // Additional Docker runtime info (enriched at runtime, may not always be present)
+  image?: string;
+  labels?: Record<string, string>;
   health?: SandboxHealth;
+  startedAt?: string;
 }
 
 export interface Repository {
@@ -926,6 +1023,13 @@ export async function sandboxOpencodeGetProviders(sandboxId: string): Promise<Op
 }
 
 /**
+ * Get available agents for a sandbox
+ */
+export async function sandboxOpencodeGetAgents(sandboxId: string): Promise<OpenCodeAgent[]> {
+  return invoke<OpenCodeAgent[]>("sandbox_opencode_get_agents", { sandboxId });
+}
+
+/**
  * List all OpenCode sessions for a sandbox
  */
 export async function sandboxOpencodeListSessions(sandboxId: string): Promise<Session[]> {
@@ -997,32 +1101,46 @@ export interface MessagePartInput {
 
 /**
  * Send a message to an OpenCode session in a sandbox
+ * @param sandboxId - The sandbox ID
+ * @param sessionId - The session ID
+ * @param text - The message text
+ * @param model - Optional model selection
+ * @param agent - Optional agent to use (e.g., "onboarding", "plan", "build")
  */
 export async function sandboxOpencodeSendMessage(
   sandboxId: string,
   sessionId: string,
   text: string,
-  model?: ModelSelection
+  model?: ModelSelection,
+  agent?: string
 ): Promise<Message> {
   const input = {
     parts: [{ type: "text", text }],
     model: model ? { providerID: model.providerId, modelID: model.modelId } : undefined,
+    agent,
   };
   return invoke<Message>("sandbox_opencode_send_message", { sandboxId, sessionId, input });
 }
 
 /**
  * Send a message with multiple parts (text and/or files) to an OpenCode session
+ * @param sandboxId - The sandbox ID
+ * @param sessionId - The session ID
+ * @param parts - Array of message parts (text and/or files)
+ * @param model - Optional model selection
+ * @param agent - Optional agent to use (e.g., "onboarding", "plan", "build")
  */
 export async function sandboxOpencodeSendMessageWithParts(
   sandboxId: string,
   sessionId: string,
   parts: MessagePartInput[],
-  model?: ModelSelection
+  model?: ModelSelection,
+  agent?: string
 ): Promise<Message> {
   const input = {
     parts,
     model: model ? { providerID: model.providerId, modelID: model.modelId } : undefined,
+    agent,
   };
   return invoke<Message>("sandbox_opencode_send_message", { sandboxId, sessionId, input });
 }

@@ -293,6 +293,22 @@ pub async fn sandbox_opencode_get_providers(sandbox_id: String) -> Result<Vec<cr
     Ok(response.providers)
 }
 
+/// Get available agents for a sandbox
+#[tauri::command]
+pub async fn sandbox_opencode_get_agents(sandbox_id: String) -> Result<Vec<crate::models::OpenCodeAgent>, AppError> {
+    let client = get_client()?;
+    
+    #[derive(serde::Deserialize)]
+    struct Response {
+        agents: Vec<crate::models::OpenCodeAgent>,
+    }
+    
+    let response: Response = client
+        .get(&format!("/api/v2/sandboxes/{}/opencode/agents", sandbox_id))
+        .await?;
+    Ok(response.agents)
+}
+
 /// List all OpenCode sessions for a sandbox
 #[tauri::command]
 pub async fn sandbox_opencode_list_sessions(sandbox_id: String) -> Result<Vec<Session>, AppError> {

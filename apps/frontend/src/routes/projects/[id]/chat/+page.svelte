@@ -7,6 +7,8 @@
   import { Skeleton } from "$lib/components/ui/skeleton";
   import FilePickerModal from "$lib/components/file-picker-modal.svelte";
   import ModelSelector from "$lib/components/model-selector.svelte";
+  import AgentSelector from "$lib/components/agent-selector.svelte";
+  import OnboardingBanner from "$lib/components/onboarding-banner.svelte";
   import {
     sandboxOpencodeListSessions,
     sandboxOpencodeCreateSession,
@@ -16,6 +18,15 @@
     type ModelSelection,
   } from "$lib/api/tauri";
   import { confirm } from "@tauri-apps/plugin-dialog";
+  import { toast } from "svelte-sonner";
+  import {
+    onboarding,
+    fetchOnboardingSession,
+    startOnboarding,
+    skipOnboarding,
+    clearError,
+    sendOnboardingMessage,
+  } from "$lib/stores/onboarding.svelte";
 
   // File finder wrapper for ChatThread (uses sandboxId, same as projectId in URL)
   async function findFiles(sandboxId: string, pattern: string): Promise<string[]> {
@@ -91,12 +102,76 @@
     }
   }
 
-  // Load sessions when project changes
+  // Agent selection state
+  let selectedAgent = $state<string | undefined>(undefined);
+  
+  // Track which session's agent we've loaded to avoid re-detecting
+  let agentLoadedForSession = $state<string | null>(null);
+  
+  // Reset agent when session changes so it can be detected from the new session's messages
+  $effect(() => {
+    if (selectedSessionId && selectedSessionId !== agentLoadedForSession) {
+      // New session selected, reset agent to allow detection
+      selectedAgent = undefined;
+      agentLoadedForSession = null;
+    }
+  });
+  
+  // Callback when RuntimeProvider detects agent from existing session messages
+  function handleSessionAgentDetected(agent: string) {
+    // Only update if we haven't already loaded agent for this session
+    if (selectedSessionId && agentLoadedForSession !== selectedSessionId) {
+      selectedAgent = agent;
+      agentLoadedForSession = selectedSessionId;
+    }
+  }
+
+  // Load sessions and onboarding status when project changes
   $effect(() => {
     if (projectId) {
       loadSessions();
+      // Fetch onboarding status for this sandbox
+      fetchOnboardingSession(projectId);
     }
   });
+
+  // Onboarding handlers with toast notifications
+  async function handleStartOnboarding() {
+    const success = await startOnboarding(projectId);
+    if (success) {
+      // Auto-trigger the onboarding agent by sending a message
+      if (selectedSessionId) {
+        const messageSent = await sendOnboardingMessage(projectId, selectedSessionId);
+        if (messageSent) {
+          toast.info("Setup started", {
+            description: "The onboarding assistant is ready to help configure your workspace.",
+          });
+        } else {
+          // If message failed, fall back to manual trigger
+          toast.info("Setup ready", {
+            description: "Type @onboarding in the chat to start the guided setup.",
+          });
+        }
+      } else {
+        toast.info("Setup ready", {
+          description: "Create a session and type @onboarding to start the guided setup.",
+        });
+      }
+    }
+  }
+
+  async function handleSkipOnboarding() {
+    const success = await skipOnboarding(projectId);
+    if (success) {
+      toast.success("Setup skipped", {
+        description: "You can configure your workspace anytime in settings.",
+      });
+    }
+  }
+
+  function handleDismissError() {
+    clearError(projectId);
+  }
 
   async function loadSessions() {
     isLoading = true;
@@ -272,24 +347,51 @@
     <!-- Chat Area -->
     <div class="flex-1 flex flex-col">
       {#if selectedSessionId}
-        <!-- Model Selector Header -->
+        <!-- Model & Agent Selector Header -->
         <div class="border-b px-4 py-2 flex items-center justify-between bg-muted/30">
-          <div class="flex items-center gap-2">
-            <span class="text-xs text-muted-foreground">Model:</span>
-            <ModelSelector 
-              {projectId}
-              bind:selectedModel
-              compact={true}
-            />
+          <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-muted-foreground">Model:</span>
+              <ModelSelector 
+                {projectId}
+                bind:selectedModel
+                compact={true}
+              />
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-muted-foreground">Agent:</span>
+              <AgentSelector 
+                {projectId}
+                bind:selectedAgent
+                compact={true}
+              />
+            </div>
           </div>
         </div>
+        
+        <!-- Onboarding Banner -->
+        {@const onboardingStatus = onboarding.getStatus(projectId)}
+        {#if onboardingStatus && !onboarding.isComplete(projectId)}
+          <div class="px-4 py-2 border-b">
+            <OnboardingBanner
+              status={onboardingStatus}
+              isLoading={onboarding.isLoading(projectId)}
+              error={onboarding.getError(projectId)}
+              onStart={handleStartOnboarding}
+              onSkip={handleSkipOnboarding}
+              onDismissError={handleDismissError}
+            />
+          </div>
+        {/if}
         
         {#key selectedSessionId}
           <react.RuntimeProvider 
             {projectId} 
             sessionId={selectedSessionId} 
             {selectedModel}
+            {selectedAgent}
             onSessionModelDetected={handleSessionModelDetected}
+            onSessionAgentDetected={handleSessionAgentDetected}
           >
             <react.ChatThread 
               {projectId} 

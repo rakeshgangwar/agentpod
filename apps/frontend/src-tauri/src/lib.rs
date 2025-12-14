@@ -22,6 +22,7 @@ use commands::{
     get_sandbox_git_status, get_sandbox_git_log, commit_sandbox_changes,
     // Sandbox OpenCode commands (v2)
     sandbox_opencode_get_app_info, sandbox_opencode_health_check, sandbox_opencode_get_providers,
+    sandbox_opencode_get_agents,
     sandbox_opencode_list_sessions, sandbox_opencode_create_session, sandbox_opencode_get_session,
     sandbox_opencode_delete_session, sandbox_opencode_abort_session,
     sandbox_opencode_respond_permission,
@@ -45,6 +46,10 @@ use commands::{
     // User OpenCode config commands
     get_user_opencode_config, update_user_opencode_settings, update_user_agents_md,
     list_user_opencode_files, upsert_user_opencode_file, delete_user_opencode_file,
+    // Onboarding commands
+    get_onboarding_session, get_onboarding_session_by_id, create_onboarding_session,
+    start_onboarding, skip_onboarding, complete_onboarding,
+    apply_onboarding_config, reset_onboarding,
 };
 use tauri::{Manager, RunEvent, WindowEvent};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
@@ -101,6 +106,7 @@ pub fn run() {
             sandbox_opencode_get_app_info,
             sandbox_opencode_health_check,
             sandbox_opencode_get_providers,
+            sandbox_opencode_get_agents,
             sandbox_opencode_list_sessions,
             sandbox_opencode_create_session,
             sandbox_opencode_get_session,
@@ -147,6 +153,15 @@ pub fn run() {
             list_user_opencode_files,
             upsert_user_opencode_file,
             delete_user_opencode_file,
+            // Onboarding commands
+            get_onboarding_session,
+            get_onboarding_session_by_id,
+            create_onboarding_session,
+            start_onboarding,
+            skip_onboarding,
+            complete_onboarding,
+            apply_onboarding_config,
+            reset_onboarding,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
