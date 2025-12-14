@@ -14,10 +14,17 @@
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "bun run src/scripts/seed-knowledge.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",
+    "@types/pg": "^8.16.0",
+    "drizzle-kit": "^0.31.8",
     "typescript": "^5.0.0"
   },
   "dependencies": {
@@ -29,9 +36,12 @@
     "@types/dockerode": "^3.3.47",
     "better-auth": "^1.4.6",
     "dockerode": "^4.0.9",
+    "drizzle-orm": "^0.45.1",
+    "gray-matter": "^4.0.3",
     "hono": "^4.6.0",
     "isomorphic-git": "^1.36.0",
     "nanoid": "^5.0.0",
+    "postgres": "^3.4.7",
     "zod": "^3.25.76"
   }
 }

@@ -4,8 +4,8 @@
 #
 # This file sets up the complete local development environment:
 # - Traefik reverse proxy (handles *.localhost routing)
+# - PostgreSQL database with pgvector (vector similarity search)
 # - Management API (container orchestration, auth)
-# - SQLite database (embedded in API)
 #
 # Quick Start:
 #   1. Copy .env.example to .env and configure
@@ -29,6 +29,36 @@
 # =============================================================================
 
 services:
+  # ===========================================================================
+  # PostgreSQL Database with pgvector
+  # ===========================================================================
+  # PostgreSQL 16 with pgvector extension for vector similarity search
+  # Used for all persistent data including auth, sandboxes, and knowledge base
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: agentpod-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: agentpod
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agentpod-dev-password}
+      POSTGRES_DB: agentpod
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Init scripts run automatically on first startup (alphabetical order)
+      - ./apps/api/src/db/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - agentpod-net
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentpod -d agentpod"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    labels:
+      - "traefik.enable=false"
+      - "agentpod.managed=false"
+
   # ===========================================================================
   # Traefik Reverse Proxy
   # ===========================================================================
@@ -128,11 +158,15 @@ services:
       - DATA_DIR=/data
       - REPOS_DIR=/data/repos
       - VOLUMES_DIR=/data/volumes
-      - DATABASE_PATH=/data/db/agentpod.sqlite
       # Host path prefix for bind mounts (required when API runs in Docker)
       # This translates container paths to host paths for sandbox bind mounts
       # Set to the absolute path of this project on the host machine
       - HOST_PATH_PREFIX=${HOST_PATH_PREFIX:-}
+
+      # =======================================================================
+      # PostgreSQL Database
+      # =======================================================================
+      - DATABASE_URL=postgres://agentpod:${POSTGRES_PASSWORD:-agentpod-dev-password}@postgres:5432/agentpod
 
       # =======================================================================
       # API URLs
@@ -187,12 +221,17 @@ services:
       retries: 3
       start_period: 10s
     depends_on:
-      - traefik
+      traefik:
+        condition: service_started
+      postgres:
+        condition: service_healthy
 
 # =============================================================================
 # Volumes
 # =============================================================================
 volumes:
+  postgres-data:
+    driver: local
   agentpod-data:
     driver: local
 

@@ -19,6 +19,10 @@ import { accountRoutes } from './routes/account.ts';
 import { sandboxRoutes, sandboxHealthRoutes } from './routes/sandboxes.ts';
 import { repoRoutes } from './routes/repos.ts';
 import { chatRoutes } from './routes/chat.ts';
+// Onboarding system routes
+import { knowledgeRoutes } from './routes/knowledge.ts';
+import { onboardingRoutes } from './routes/onboarding.ts';
+import { mcpKnowledgeRoutes } from './routes/mcp-knowledge.ts';
 // Middleware
 import { activityLoggerMiddleware } from './middleware/activity-logger.ts';
 // Sync services
@@ -80,7 +84,11 @@ const app = new Hono()
   .route('/api/v2/sandboxes', sandboxRoutes) // Sandbox management
   .route('/api/v2/sandboxes', chatRoutes) // Chat history (persisted)
   .route('/api/v2/repos', repoRoutes) // Git repository management
-  .route('/api/v2/health', sandboxHealthRoutes); // Health checks (includes /docker)
+  .route('/api/v2/health', sandboxHealthRoutes) // Health checks (includes /docker)
+  // Onboarding system endpoints
+  .route('/api/knowledge', knowledgeRoutes) // Knowledge documents
+  .route('/api/onboarding', onboardingRoutes) // Onboarding sessions
+  .route('/api/mcp/knowledge', mcpKnowledgeRoutes); // MCP Knowledge server
 
 // Export type for Hono Client (type-safe RPC from mobile app)
 export type AppType = typeof app;
@@ -202,6 +210,25 @@ console.log(`
 ║  - GET  /api/account                  Get account info        ║
 ║  - DELETE /api/account                Delete account          ║
 ║  - GET  /api/account/data-export      Export all user data    ║
+╠═══════════════════════════════════════════════════════════════╣
+║  Onboarding System Endpoints:                                 ║
+║  - GET  /api/knowledge                Search knowledge docs   ║
+║  - GET  /api/knowledge/:id            Get document            ║
+║  - GET  /api/knowledge/categories     List categories         ║
+║  - GET  /api/knowledge/stats          Get statistics          ║
+║  - POST /api/knowledge/search         Advanced search         ║
+║  - GET  /api/onboarding               List sessions           ║
+║  - POST /api/onboarding               Create session          ║
+║  - GET  /api/onboarding/:id           Get session             ║
+║  - POST /api/onboarding/:id/start     Start onboarding        ║
+║  - POST /api/onboarding/:id/complete  Complete onboarding     ║
+║  - GET  /api/onboarding/models/recommend  Model recommendations║
+╠═══════════════════════════════════════════════════════════════╣
+║  MCP Knowledge Server (for onboarding agent):                 ║
+║  - POST /api/mcp/knowledge              MCP tool endpoint     ║
+║    - tools/list: List available tools                         ║
+║    - tools/call: search_knowledge, get_project_template,      ║
+║                  get_agent_pattern, list_project_types, etc.  ║
 ╚═══════════════════════════════════════════════════════════════╝
 `);
 

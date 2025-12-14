@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1765703179849,
+      "tag": "0000_magenta_thaddeus_ross",
+      "breakpoints": true
+    }
+  ]
+}

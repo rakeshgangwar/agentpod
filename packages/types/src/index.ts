@@ -28,3 +28,6 @@ export * from "./opencode";
 
 // API response types
 export * from "./api";
+
+// Onboarding system types
+export * from "./onboarding";
