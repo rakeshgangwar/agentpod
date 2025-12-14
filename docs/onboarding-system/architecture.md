@@ -104,11 +104,27 @@ Run as an independent microservice for scalability.
 
 | Tool | Description | Input | Output |
 |------|-------------|-------|--------|
-| `search_knowledge` | Semantic/keyword search | `query`, `category?`, `limit?` | Array of documents |
+| `search_knowledge` | Semantic/keyword search | `query`, `category?`, `tags?`, `limit?`, `useSemanticSearch?` | Array of documents |
 | `get_project_template` | Get full project template | `project_type` | Template with files |
 | `get_agent_pattern` | Get agent definition | `role` | Markdown content |
 | `get_command_template` | Get command definition | `name` | Markdown content |
 | `list_project_types` | List available types | - | Array of type info |
+| `get_available_models` | Get user's available models | `tier?`, `capability?` | Models + recommendations |
+| `get_provider_setup_guide` | Get provider setup instructions | `provider` | Setup guide |
+
+**Vector Search:**
+
+The knowledge base uses **sqlite-vec** for semantic search capabilities:
+
+```sql
+-- Vector embeddings stored in virtual table
+CREATE VIRTUAL TABLE knowledge_embeddings USING vec0(
+  document_id TEXT PRIMARY KEY,
+  embedding float[1536]
+);
+```
+
+When `useSemanticSearch: true` is passed to `search_knowledge`, the query is embedded and compared against document embeddings for semantic similarity matching.
 
 ### 3. Sandbox Container
 
@@ -122,8 +138,11 @@ Docker container running OpenCode with injected onboarding configuration.
 ├── AGENTS.md                  # Initial instructions
 └── .opencode/
     └── agent/
-        └── onboarding.md      # Onboarding agent definition
+        ├── onboarding.md      # Onboarding agent (active during setup)
+        └── workspace.md       # Workspace agent (always present, dormant until needed)
 ```
+
+**Note:** Both agents are always present. The `@onboarding` agent is active during initial setup, while the `@workspace` agent becomes the primary helper after onboarding completes.
 
 **Environment Variables:**
 
@@ -161,6 +180,75 @@ tools:
 - Can write files to workspace
 - Can create `.opencode/` configuration
 - Cannot execute bash commands (safety)
+- Queries user's available models via `get_available_models`
+- Helps users set up providers if none configured
+
+### 5. Workspace Agent
+
+A maintenance agent that helps users manage their workspace after onboarding.
+
+**Agent Definition (`.opencode/agent/workspace.md`):**
+
+```markdown
+---
+description: Helps maintain and update your workspace configuration
+mode: subagent
+model: anthropic/claude-sonnet-4-20250514
+tools:
+  write: true
+  edit: true
+  bash: false
+  agentpod_knowledge_*: true
+---
+
+[Agent prompt content...]
+```
+
+**Capabilities:**
+- Add new agents to workspace
+- Add new commands
+- Update opencode.json settings
+- Change models/providers
+- Re-run onboarding for different project type
+- Help with workspace maintenance
+
+**Lifecycle:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    Agent Lifecycle in Sandbox                            │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  Phase 1: Onboarding Active                                             │
+│  ┌─────────────────────────────────────────────────────────────────┐    │
+│  │  @onboarding                                                     │    │
+│  │  - Interview user about project                                  │    │
+│  │  - Query knowledge base for templates                            │    │
+│  │  - Generate opencode.json, AGENTS.md, agents, commands           │    │
+│  │  - Help user configure providers/models                          │    │
+│  └─────────────────────────────────────────────────────────────────┘    │
+│                              │                                           │
+│                              ▼ (onboarding complete)                     │
+│                                                                          │
+│  Phase 2: Workspace Helper Active                                       │
+│  ┌─────────────────────────────────────────────────────────────────┐    │
+│  │  @workspace                                                      │    │
+│  │  - Add new agents to workspace                                   │    │
+│  │  - Add new commands                                              │    │
+│  │  - Update opencode.json settings                                 │    │
+│  │  - Change models/providers                                       │    │
+│  │  - Re-run setup for different project type                       │    │
+│  │  - Help with workspace maintenance                               │    │
+│  └─────────────────────────────────────────────────────────────────┘    │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Re-onboarding:**
+
+When a user wants to re-run onboarding (via `@workspace`), they are asked:
+- **Wipe**: Start fresh, remove existing configuration
+- **Merge**: Keep existing configuration, add/update with new choices
 
 ## Data Flow
 

@@ -4,6 +4,7 @@
 -- This schema extends the existing AgentPod database with tables for:
 -- 1. Knowledge base documents (templates, patterns, guides)
 -- 2. Onboarding session tracking
+-- 3. Vector embeddings for semantic search (via sqlite-vec)
 -- ============================================================================
 
 -- ============================================================================
@@ -22,8 +23,11 @@ CREATE TABLE IF NOT EXISTS knowledge_documents (
     'agent_pattern',       -- Reusable agent definitions (.opencode/agent/*.md)
     'command_template',    -- Reusable command definitions (.opencode/command/*.md)
     'tool_template',       -- Reusable tool definitions (.opencode/tool/*.ts)
+    'plugin_template',     -- Reusable plugin definitions (.opencode/plugin/*.ts)
+    'mcp_template',        -- MCP server configurations
     'workflow_pattern',    -- Multi-step workflow guides
-    'best_practice'        -- General guidance and documentation
+    'best_practice',       -- General guidance and documentation
+    'provider_guide'       -- Provider setup instructions
   )),
   
   -- Document metadata
@@ -35,7 +39,7 @@ CREATE TABLE IF NOT EXISTS knowledge_documents (
   
   -- Tags for filtering and search (JSON array)
   -- Example: ["coding", "react", "frontend", "web"]
-  tags TEXT,
+  tags TEXT DEFAULT '[]',
   
   -- Project types this document applies to (JSON array)
   -- Example: ["web_app", "api_service"]
@@ -46,18 +50,23 @@ CREATE TABLE IF NOT EXISTS knowledge_documents (
   -- For project_template: { "default_model": "...", "recommended_agents": [...] }
   -- For agent_pattern: { "mode": "subagent", "default_tools": {...} }
   -- For command_template: { "agent": "build", "subtask": false }
-  metadata TEXT,
+  metadata TEXT DEFAULT '{}',
   
-  -- Vector embedding for semantic search (optional, for future use)
-  -- Store as BLOB (binary) - can be populated by embedding service
-  embedding BLOB,
+  -- Embedding status for semantic search
+  -- pending: needs embedding generation
+  -- processing: embedding being generated
+  -- completed: embedding ready for search
+  -- failed: embedding generation failed
+  embedding_status TEXT DEFAULT 'pending' CHECK(embedding_status IN (
+    'pending', 'processing', 'completed', 'failed'
+  )),
   
   -- Versioning
   version INTEGER DEFAULT 1,
   
   -- Timestamps
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
 );
 
 -- Indexes for common queries
@@ -67,10 +76,31 @@ CREATE INDEX IF NOT EXISTS idx_knowledge_category
 CREATE INDEX IF NOT EXISTS idx_knowledge_updated 
   ON knowledge_documents(updated_at DESC);
 
+CREATE INDEX IF NOT EXISTS idx_knowledge_embedding_status
+  ON knowledge_documents(embedding_status);
+
+-- ============================================================================
+-- Virtual Table: knowledge_embeddings (sqlite-vec)
+-- ============================================================================
+-- Stores vector embeddings for semantic search using sqlite-vec extension.
+-- This is a virtual table that must be created after loading the extension.
+--
+-- Note: This CREATE statement is for documentation. The actual creation
+-- happens in code after loading the sqlite-vec extension:
+--
+-- db.loadExtension('vec0');
+-- db.exec(`
+--   CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_embeddings USING vec0(
+--     document_id TEXT PRIMARY KEY,
+--     embedding float[1536]
+--   );
+-- `);
+
 -- ============================================================================
 -- Table: onboarding_sessions
 -- ============================================================================
--- Tracks onboarding sessions for each user/sandbox combination.
+-- Tracks onboarding sessions for each sandbox.
+-- Each sandbox can have one onboarding session.
 -- Stores gathered requirements and generated configuration.
 
 CREATE TABLE IF NOT EXISTS onboarding_sessions (
@@ -78,12 +108,13 @@ CREATE TABLE IF NOT EXISTS onboarding_sessions (
   id TEXT PRIMARY KEY,
   
   -- Foreign keys
-  user_id TEXT NOT NULL,
-  sandbox_id TEXT,
+  user_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+  sandbox_id TEXT REFERENCES sandboxes(id) ON DELETE SET NULL,
   
   -- Session status
-  status TEXT NOT NULL DEFAULT 'started' CHECK(status IN (
-    'started',      -- Session created, interview not begun
+  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN (
+    'pending',      -- Session created, waiting for user to start
+    'started',      -- User clicked "Start Setup"
     'gathering',    -- Actively collecting requirements from user
     'generating',   -- Creating configuration based on requirements
     'applying',     -- Writing configuration files to workspace
@@ -111,8 +142,8 @@ CREATE TABLE IF NOT EXISTS onboarding_sessions (
   
   -- Generated configuration (JSON object)
   -- {
-  --   "opencode_json": {...},           -- Contents of opencode.json
-  --   "agents_md": "...",               -- Contents of AGENTS.md
+  --   "opencodeJson": {...},           -- Contents of opencode.json
+  --   "agentsMd": "...",               -- Contents of AGENTS.md
   --   "agents": [                       -- Array of agent files
   --     { "name": "reviewer", "content": "..." }
   --   ],
@@ -122,21 +153,27 @@ CREATE TABLE IF NOT EXISTS onboarding_sessions (
   --   "tools": [                        -- Array of tool files
   --     { "name": "db", "content": "..." }
   --   ],
-  --   "folder_structure": [...]         -- Recommended folders to create
+  --   "plugins": [                      -- Array of plugin files
+  --     { "name": "logger", "content": "..." }
+  --   ],
+  --   "folderStructure": [...]         -- Recommended folders to create
   -- }
   generated_config TEXT,
+  
+  -- Selected models
+  selected_model TEXT,         -- Primary model (e.g., "anthropic/claude-sonnet-4")
+  selected_small_model TEXT,   -- Fast model (e.g., "anthropic/claude-haiku")
   
   -- Error information (if status is 'failed')
   error_message TEXT,
   
   -- Timestamps
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
   completed_at TEXT,
   
-  -- Foreign key constraints
-  FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE,
-  FOREIGN KEY (sandbox_id) REFERENCES sandboxes(id) ON DELETE SET NULL
+  -- Each sandbox can only have one onboarding session
+  UNIQUE(sandbox_id)
 );
 
 -- Indexes for common queries
@@ -153,9 +190,30 @@ CREATE INDEX IF NOT EXISTS idx_onboarding_created
   ON onboarding_sessions(created_at DESC);
 
 -- ============================================================================
+-- Triggers for updated_at
+-- ============================================================================
+
+CREATE TRIGGER IF NOT EXISTS knowledge_documents_updated_at
+  AFTER UPDATE ON knowledge_documents
+  BEGIN
+    UPDATE knowledge_documents 
+    SET updated_at = datetime('now')
+    WHERE id = NEW.id;
+  END;
+
+CREATE TRIGGER IF NOT EXISTS onboarding_sessions_updated_at
+  AFTER UPDATE ON onboarding_sessions
+  BEGIN
+    UPDATE onboarding_sessions 
+    SET updated_at = datetime('now')
+    WHERE id = NEW.id;
+  END;
+
+-- ============================================================================
 -- Sample Data: Project Templates
 -- ============================================================================
--- These would be seeded from the knowledge-base/ markdown files
+-- These would be seeded from the knowledge-base/ markdown files using
+-- the seed:knowledge script.
 
 -- Web Application Template
 INSERT OR IGNORE INTO knowledge_documents (
@@ -292,24 +350,112 @@ INSERT OR IGNORE INTO knowledge_documents (
 );
 
 -- ============================================================================
--- Triggers for updated_at
+-- Sample Data: Provider Guides
 -- ============================================================================
 
-CREATE TRIGGER IF NOT EXISTS knowledge_documents_updated_at
-  AFTER UPDATE ON knowledge_documents
-  BEGIN
-    UPDATE knowledge_documents 
-    SET updated_at = CURRENT_TIMESTAMP 
-    WHERE id = NEW.id;
-  END;
+-- Anthropic Setup Guide
+INSERT OR IGNORE INTO knowledge_documents (
+  id, category, title, description, content, tags, applicable_to, metadata
+) VALUES (
+  'guide_anthropic',
+  'provider_guide',
+  'Anthropic Setup Guide',
+  'How to set up Anthropic as your AI provider',
+  '# Setting up Anthropic
 
-CREATE TRIGGER IF NOT EXISTS onboarding_sessions_updated_at
-  AFTER UPDATE ON onboarding_sessions
-  BEGIN
-    UPDATE onboarding_sessions 
-    SET updated_at = CURRENT_TIMESTAMP 
-    WHERE id = NEW.id;
-  END;
+Anthropic provides Claude, one of the most capable AI models available.
+
+## Steps
+
+1. Go to [console.anthropic.com](https://console.anthropic.com)
+2. Sign up or log in to your account
+3. Navigate to "API Keys" in the sidebar
+4. Click "Create Key" and give it a name
+5. Copy the API key (it starts with "sk-ant-")
+6. Paste it in AgentPod Settings > Providers > Anthropic
+
+## Pricing
+
+- Claude Sonnet 4: $3/M input, $15/M output
+- Claude Haiku: $0.25/M input, $1.25/M output
+
+## Free Credits
+
+New accounts receive $5 in free credits.
+
+[Sign up](https://console.anthropic.com/signup) | [Pricing](https://anthropic.com/pricing)',
+  '["anthropic", "claude", "provider", "setup"]',
+  NULL,
+  '{"signupUrl": "https://console.anthropic.com/signup", "pricingUrl": "https://anthropic.com/pricing", "freeCredits": "$5"}'
+);
+
+-- OpenAI Setup Guide
+INSERT OR IGNORE INTO knowledge_documents (
+  id, category, title, description, content, tags, applicable_to, metadata
+) VALUES (
+  'guide_openai',
+  'provider_guide',
+  'OpenAI Setup Guide',
+  'How to set up OpenAI as your AI provider',
+  '# Setting up OpenAI
+
+OpenAI provides GPT-4 and other powerful models.
+
+## Steps
+
+1. Go to [platform.openai.com](https://platform.openai.com)
+2. Sign up or log in to your account
+3. Navigate to "API Keys" in the sidebar
+4. Click "Create new secret key"
+5. Copy the API key (it starts with "sk-")
+6. Paste it in AgentPod Settings > Providers > OpenAI
+
+## Pricing
+
+- GPT-4o: $5/M input, $15/M output
+- GPT-4o-mini: $0.15/M input, $0.60/M output
+
+[Sign up](https://platform.openai.com/signup) | [Pricing](https://openai.com/pricing)',
+  '["openai", "gpt", "provider", "setup"]',
+  NULL,
+  '{"signupUrl": "https://platform.openai.com/signup", "pricingUrl": "https://openai.com/pricing"}'
+);
+
+-- Google AI Setup Guide
+INSERT OR IGNORE INTO knowledge_documents (
+  id, category, title, description, content, tags, applicable_to, metadata
+) VALUES (
+  'guide_google',
+  'provider_guide',
+  'Google AI Setup Guide',
+  'How to set up Google AI as your AI provider',
+  '# Setting up Google AI
+
+Google provides Gemini models with excellent multimodal capabilities.
+
+## Steps
+
+1. Go to [aistudio.google.com](https://aistudio.google.com)
+2. Sign in with your Google account
+3. Click "Get API key" in the sidebar
+4. Create a new API key or use an existing one
+5. Copy the API key
+6. Paste it in AgentPod Settings > Providers > Google
+
+## Pricing
+
+- Gemini 2.0 Pro: $1.25/M input, $5/M output
+- Gemini 2.0 Flash: $0.075/M input, $0.30/M output
+
+## Free Tier
+
+Google offers a free tier with rate limits.
+
+[Sign up](https://aistudio.google.com) | [Pricing](https://ai.google.dev/pricing)',
+  '["google", "gemini", "provider", "setup"]',
+  NULL,
+  '{"signupUrl": "https://aistudio.google.com", "pricingUrl": "https://ai.google.dev/pricing", "freeCredits": "Free tier available"}'
+);
 
 -- ============================================================================
 -- Views for Common Queries
@@ -326,7 +472,7 @@ SELECT
   os.created_at,
   os.updated_at
 FROM onboarding_sessions os
-WHERE os.status IN ('started', 'gathering', 'generating', 'applying');
+WHERE os.status IN ('pending', 'started', 'gathering', 'generating', 'applying');
 
 -- View: Knowledge documents by category
 CREATE VIEW IF NOT EXISTS v_knowledge_by_category AS
@@ -349,3 +495,15 @@ SELECT
   updated_at
 FROM knowledge_documents
 WHERE category = 'project_template';
+
+-- View: Documents pending embedding
+CREATE VIEW IF NOT EXISTS v_pending_embeddings AS
+SELECT 
+  id,
+  category,
+  title,
+  LENGTH(content) as content_length,
+  created_at
+FROM knowledge_documents
+WHERE embedding_status = 'pending'
+ORDER BY created_at;
