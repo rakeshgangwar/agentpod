@@ -9,7 +9,7 @@
 
 import { createMiddleware } from "hono/factory";
 import type { Context, Next } from "hono";
-import { auth, type Session, type User } from "./index";
+import { auth, type Session, type User } from "./drizzle-auth";
 import { config } from "../config";
 import { createLogger } from "../utils/logger";
 

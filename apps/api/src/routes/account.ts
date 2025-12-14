@@ -12,10 +12,14 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { db } from "../db/index.ts";
+import { db } from "../db/drizzle";
+import { user as userTable, session, account } from "../db/schema/auth";
+import { userOpencodeConfig, userOpencodeFiles, userPreferences } from "../db/schema/settings";
+import { eq } from "drizzle-orm";
 import { getSandboxManager } from "../services/sandbox-manager.ts";
 import { anonymizeUserLogs } from "../models/activity-log.ts";
 import { deleteUserPreferences } from "../models/user-preferences.ts";
+import { deleteAllUserCredentials } from "../models/provider-credentials.ts";
 import * as SandboxModel from "../models/sandbox.ts";
 import * as ChatSessionModel from "../models/chat-session.ts";
 import { createLogger } from "../utils/logger.ts";
@@ -61,13 +65,14 @@ export const accountRoutes = new Hono()
 
     try {
       // Get user's sandboxes
-      const sandboxes = SandboxModel.listSandboxesByUserId(user.id);
+      const sandboxes = await SandboxModel.listSandboxesByUserId(user.id);
       
       // Get total chat sessions
-      const chatSessions = sandboxes.reduce((acc, sandbox) => {
-        const stats = ChatSessionModel.getChatSessionStats(sandbox.id);
-        return acc + stats.total;
-      }, 0);
+      let chatSessions = 0;
+      for (const sandbox of sandboxes) {
+        const stats = await ChatSessionModel.getChatSessionStats(sandbox.id);
+        chatSessions += stats.total;
+      }
 
       return c.json({
         user: {
@@ -114,7 +119,7 @@ export const accountRoutes = new Hono()
       };
 
       // Step 1: Delete all sandboxes (containers + repos)
-      const sandboxes = SandboxModel.listSandboxesByUserId(userId);
+      const sandboxes = await SandboxModel.listSandboxesByUserId(userId);
       const sandboxManager = getSandboxManager();
 
       for (const sandbox of sandboxes) {
@@ -136,7 +141,7 @@ export const accountRoutes = new Hono()
 
       // Step 3: Anonymize activity logs (preserve for analytics)
       try {
-        results.activityLogsAnonymized = anonymizeUserLogs(userId);
+        results.activityLogsAnonymized = await anonymizeUserLogs(userId);
       } catch (error) {
         const errMsg = error instanceof Error ? error.message : "Unknown error";
         log.error("Failed to anonymize activity logs", { userId, error: errMsg });
@@ -145,7 +150,7 @@ export const accountRoutes = new Hono()
 
       // Step 4: Delete user preferences
       try {
-        results.preferencesDeleted = deleteUserPreferences(userId);
+        results.preferencesDeleted = await deleteUserPreferences(userId);
       } catch (error) {
         const errMsg = error instanceof Error ? error.message : "Unknown error";
         log.error("Failed to delete preferences", { userId, error: errMsg });
@@ -154,8 +159,8 @@ export const accountRoutes = new Hono()
 
       // Step 5: Delete OpenCode config
       try {
-        db.run("DELETE FROM user_opencode_files WHERE user_id = ?", [userId]);
-        db.run("DELETE FROM user_opencode_config WHERE user_id = ?", [userId]);
+        await db.delete(userOpencodeFiles).where(eq(userOpencodeFiles.userId, userId));
+        await db.delete(userOpencodeConfig).where(eq(userOpencodeConfig.userId, userId));
       } catch (error) {
         const errMsg = error instanceof Error ? error.message : "Unknown error";
         log.error("Failed to delete OpenCode config", { userId, error: errMsg });
@@ -164,7 +169,7 @@ export const accountRoutes = new Hono()
 
       // Step 6: Delete provider credentials
       try {
-        db.run("DELETE FROM provider_credentials WHERE user_id = ?", [userId]);
+        await deleteAllUserCredentials(userId);
       } catch (error) {
         const errMsg = error instanceof Error ? error.message : "Unknown error";
         log.error("Failed to delete provider credentials", { userId, error: errMsg });
@@ -174,11 +179,11 @@ export const accountRoutes = new Hono()
       // Step 7: Delete user account (Better Auth tables - this will CASCADE)
       try {
         // Delete sessions first
-        db.run("DELETE FROM session WHERE userId = ?", [userId]);
+        await db.delete(session).where(eq(session.userId, userId));
         // Delete accounts (OAuth connections)
-        db.run("DELETE FROM account WHERE userId = ?", [userId]);
+        await db.delete(account).where(eq(account.userId, userId));
         // Delete user
-        db.run("DELETE FROM user WHERE id = ?", [userId]);
+        await db.delete(userTable).where(eq(userTable.id, userId));
         results.userDeleted = true;
       } catch (error) {
         const errMsg = error instanceof Error ? error.message : "Unknown error";
@@ -217,12 +222,12 @@ export const accountRoutes = new Hono()
 
     try {
       // Gather all user data
-      const sandboxes = SandboxModel.listSandboxesByUserId(userId);
+      const sandboxes = await SandboxModel.listSandboxesByUserId(userId);
       
       // Get chat sessions for each sandbox
       const chatData = [];
       for (const sandbox of sandboxes) {
-        const sessions = ChatSessionModel.listChatSessionsBySandboxId(sandbox.id, { limit: 1000 });
+        const sessions = await ChatSessionModel.listChatSessionsBySandboxId(sandbox.id, { limit: 1000 });
         chatData.push({
           sandboxId: sandbox.id,
           sandboxName: sandbox.name,
@@ -236,19 +241,24 @@ export const accountRoutes = new Hono()
       }
 
       // Get OpenCode config
-      const opencodeConfig = db.query<{ settings: string; agents_md: string }, [string]>(
-        "SELECT settings, agents_md FROM user_opencode_config WHERE user_id = ?"
-      ).get(userId);
+      const [opencodeConfigRow] = await db.select({
+        settings: userOpencodeConfig.settings,
+        agentsMd: userOpencodeConfig.agentsMd,
+      }).from(userOpencodeConfig).where(eq(userOpencodeConfig.userId, userId));
 
       // Get OpenCode files
-      const opcodeFiles = db.query<{ type: string; name: string; extension: string; content: string }, [string]>(
-        "SELECT type, name, extension, content FROM user_opencode_files WHERE user_id = ?"
-      ).all(userId);
+      const opcodeFilesRows = await db.select({
+        type: userOpencodeFiles.type,
+        name: userOpencodeFiles.name,
+        extension: userOpencodeFiles.extension,
+        content: userOpencodeFiles.content,
+      }).from(userOpencodeFiles).where(eq(userOpencodeFiles.userId, userId));
 
       // Get preferences
-      const preferences = db.query<{ theme_mode: string; theme_preset: string }, [string]>(
-        "SELECT theme_mode, theme_preset FROM user_preferences WHERE user_id = ?"
-      ).get(userId);
+      const [preferencesRow] = await db.select({
+        themeMode: userPreferences.themeMode,
+        themePreset: userPreferences.themePreset,
+      }).from(userPreferences).where(eq(userPreferences.userId, userId));
 
       const exportData = {
         exportedAt: new Date().toISOString(),
@@ -266,12 +276,12 @@ export const accountRoutes = new Hono()
           createdAt: s.createdAt,
         })),
         chatHistory: chatData,
-        opencodeConfig: opencodeConfig ? {
-          settings: JSON.parse(opencodeConfig.settings || "{}"),
-          agentsMd: opencodeConfig.agents_md,
+        opencodeConfig: opencodeConfigRow ? {
+          settings: JSON.parse(opencodeConfigRow.settings || "{}"),
+          agentsMd: opencodeConfigRow.agentsMd,
         } : null,
-        opencodeFiles: opcodeFiles,
-        preferences: preferences,
+        opencodeFiles: opcodeFilesRows,
+        preferences: preferencesRow,
       };
 
       c.header("Content-Type", "application/json");

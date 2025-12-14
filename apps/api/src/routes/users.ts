@@ -27,6 +27,7 @@ import {
   initializeUserOpencodeConfig,
   type OpencodeSettings,
 } from '../models/user-opencode-config.ts';
+import { syncUserConfigForUser, deleteFileForUser } from '../services/config-sync.ts';
 import { createLogger } from '../utils/logger.ts';
 
 const log = createLogger('users-routes');
@@ -47,7 +48,7 @@ export const userRoutes = new Hono()
     log.info('Fetching full OpenCode config', { userId });
 
     try {
-      const config = getUserOpencodeFullConfig(userId);
+      const config = await getUserOpencodeFullConfig(userId);
       return c.json(config);
     } catch (error) {
       log.error('Failed to get user config', { userId, error });
@@ -68,7 +69,7 @@ export const userRoutes = new Hono()
     log.info('Fetching OpenCode settings', { userId });
 
     try {
-      const config = getUserOpencodeConfig(userId);
+      const config = await getUserOpencodeConfig(userId);
       return c.json({ settings: config?.settings ?? {} });
     } catch (error) {
       log.error('Failed to get settings', { userId, error });
@@ -91,11 +92,17 @@ export const userRoutes = new Hono()
         return c.json({ error: 'Invalid settings object' }, 400);
       }
 
-      const config = updateUserOpencodeSettings(userId, body.settings);
+      const config = await updateUserOpencodeSettings(userId, body.settings);
+      
+      // Fire and forget: sync to running containers
+      syncUserConfigForUser(userId).catch(err => {
+        log.warn('Failed to sync settings to containers', { userId, error: err instanceof Error ? err.message : err });
+      });
+
       return c.json({ 
         success: true, 
         settings: config.settings,
-        message: 'Settings updated. Restart container to apply changes.'
+        message: 'Settings updated and synced to running containers.'
       });
     } catch (error) {
       log.error('Failed to update settings', { userId, error });
@@ -116,7 +123,7 @@ export const userRoutes = new Hono()
     log.info('Fetching AGENTS.md', { userId });
 
     try {
-      const config = getUserOpencodeConfig(userId);
+      const config = await getUserOpencodeConfig(userId);
       return c.json({ content: config?.agentsMd ?? '' });
     } catch (error) {
       log.error('Failed to get AGENTS.md', { userId, error });
@@ -139,11 +146,17 @@ export const userRoutes = new Hono()
         return c.json({ error: 'Invalid content' }, 400);
       }
 
-      const config = updateUserAgentsMd(userId, body.content);
+      const config = await updateUserAgentsMd(userId, body.content);
+      
+      // Fire and forget: sync to running containers
+      syncUserConfigForUser(userId).catch(err => {
+        log.warn('Failed to sync AGENTS.md to containers', { userId, error: err instanceof Error ? err.message : err });
+      });
+
       return c.json({ 
         success: true, 
         content: config.agentsMd,
-        message: 'AGENTS.md updated. Restart container to apply changes.'
+        message: 'AGENTS.md updated and synced to running containers.'
       });
     } catch (error) {
       log.error('Failed to update AGENTS.md', { userId, error });
@@ -166,7 +179,7 @@ export const userRoutes = new Hono()
     log.info('Listing OpenCode files', { userId, type });
 
     try {
-      const files = listUserOpencodeFiles(userId, type);
+      const files = await listUserOpencodeFiles(userId, type);
       return c.json({ 
         files: files.map(f => ({
           type: f.type,
@@ -199,7 +212,7 @@ export const userRoutes = new Hono()
     }
 
     try {
-      const file = getUserOpencodeFile(userId, type, name);
+      const file = await getUserOpencodeFile(userId, type, name);
       if (!file) {
         return c.json({ error: 'File not found' }, 404);
       }
@@ -248,14 +261,20 @@ export const userRoutes = new Hono()
         extension = (type === 'agent' || type === 'command') ? 'md' : 'ts';
       }
 
-      const file = upsertUserOpencodeFile(userId, type, name, extension, body.content);
+      const file = await upsertUserOpencodeFile(userId, type, name, extension, body.content);
+      
+      // Fire and forget: sync to running containers
+      syncUserConfigForUser(userId).catch(err => {
+        log.warn('Failed to sync file to containers', { userId, type, name, error: err instanceof Error ? err.message : err });
+      });
+
       return c.json({
         success: true,
         type: file.type,
         name: file.name,
         extension: file.extension,
         content: file.content,
-        message: 'File updated. Restart container to apply changes.'
+        message: 'File updated and synced to running containers.'
       });
     } catch (error) {
       log.error('Failed to upsert file', { userId, type, name, error });
@@ -279,13 +298,25 @@ export const userRoutes = new Hono()
     }
 
     try {
-      const deleted = deleteUserOpencodeFile(userId, type, name);
-      if (!deleted) {
+      // Get file info before deleting (needed for container sync)
+      const file = await getUserOpencodeFile(userId, type, name);
+      if (!file) {
         return c.json({ error: 'File not found' }, 404);
       }
+
+      const deleted = await deleteUserOpencodeFile(userId, type, name);
+      if (!deleted) {
+        return c.json({ error: 'Failed to delete file' }, 500);
+      }
+
+      // Fire and forget: delete from running containers
+      deleteFileForUser(userId, type, name, file.extension).catch(err => {
+        log.warn('Failed to delete file from containers', { userId, type, name, error: err instanceof Error ? err.message : err });
+      });
+
       return c.json({ 
         success: true,
-        message: 'File deleted. Restart container to apply changes.'
+        message: 'File deleted and removed from running containers.'
       });
     } catch (error) {
       log.error('Failed to delete file', { userId, type, name, error });
@@ -306,7 +337,7 @@ export const userRoutes = new Hono()
     log.info('Initializing user OpenCode config', { userId });
 
     try {
-      const config = initializeUserOpencodeConfig(userId);
+      const config = await initializeUserOpencodeConfig(userId);
       return c.json({
         success: true,
         settings: config.settings,

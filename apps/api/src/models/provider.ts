@@ -1,5 +1,8 @@
-import { db } from '../db/index.ts';
-import { getCredential } from './provider-credentials.ts';
+import { db } from '../db/drizzle';
+import { providers } from '../db/schema/providers';
+import { settings } from '../db/schema/settings';
+import { eq } from 'drizzle-orm';
+import { getCredential, getAllUserCredentials } from './provider-credentials.ts';
 import { modelsDev } from '../services/models-dev.ts';
 
 // =============================================================================
@@ -41,33 +44,21 @@ export interface ConfigureProviderInput {
 // Database Row Mapping
 // =============================================================================
 
-interface ProviderRow {
-  id: string;
-  name: string;
-  type: string;
-  api_key: string | null;
-  access_token: string | null;
-  refresh_token: string | null;
-  token_expires_at: string | null;
-  is_default: number;
-  is_configured: number;
-  created_at: string;
-  updated_at: string;
-}
+type ProviderRow = typeof providers.$inferSelect;
 
 function rowToProvider(row: ProviderRow): Provider {
   return {
     id: row.id,
     name: row.name,
     type: row.type as ProviderType,
-    apiKey: row.api_key,
-    accessToken: row.access_token,
-    refreshToken: row.refresh_token,
-    tokenExpiresAt: row.token_expires_at,
-    isDefault: row.is_default === 1,
-    isConfigured: row.is_configured === 1,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    apiKey: row.apiKey,
+    accessToken: row.accessToken,
+    refreshToken: row.refreshToken,
+    tokenExpiresAt: row.tokenExpiresAt?.toISOString() ?? null,
+    isDefault: row.isDefault ?? false,
+    isConfigured: row.isConfigured ?? false,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
   };
 }
 
@@ -76,8 +67,8 @@ function rowToSummary(row: ProviderRow): ProviderSummary {
     id: row.id,
     name: row.name,
     type: row.type as ProviderType,
-    isDefault: row.is_default === 1,
-    isConfigured: row.is_configured === 1,
+    isDefault: row.isDefault ?? false,
+    isConfigured: row.isConfigured ?? false,
   };
 }
 
@@ -88,66 +79,60 @@ function rowToSummary(row: ProviderRow): ProviderSummary {
 /**
  * Get provider by ID
  */
-export function getProviderById(id: string): Provider | null {
-  const row = db.query('SELECT * FROM providers WHERE id = $id').get({ $id: id }) as ProviderRow | null;
+export async function getProviderById(id: string): Promise<Provider | null> {
+  const [row] = await db.select().from(providers).where(eq(providers.id, id));
   return row ? rowToProvider(row) : null;
 }
 
 /**
  * List all providers (summary only, no credentials)
  */
-export function listProviders(): ProviderSummary[] {
-  const rows = db.query('SELECT * FROM providers ORDER BY name').all() as ProviderRow[];
+export async function listProviders(): Promise<ProviderSummary[]> {
+  const rows = await db.select().from(providers).orderBy(providers.name);
   return rows.map(rowToSummary);
 }
 
 /**
  * Get default provider
  */
-export function getDefaultProvider(): Provider | null {
-  const row = db.query('SELECT * FROM providers WHERE is_default = 1').get() as ProviderRow | null;
+export async function getDefaultProvider(): Promise<Provider | null> {
+  const [row] = await db.select().from(providers).where(eq(providers.isDefault, true));
   return row ? rowToProvider(row) : null;
 }
 
 /**
  * Configure provider credentials
  */
-export function configureProvider(id: string, input: ConfigureProviderInput): Provider | null {
-  const provider = getProviderById(id);
+export async function configureProvider(id: string, input: ConfigureProviderInput): Promise<Provider | null> {
+  const provider = await getProviderById(id);
   if (!provider) {
     return null;
   }
   
-  const updates: string[] = [];
-  const params: Record<string, string | number | null> = { $id: id };
+  const updates: Partial<typeof providers.$inferInsert> = {
+    updatedAt: new Date(),
+  };
   
   if (input.apiKey !== undefined) {
-    updates.push('api_key = $apiKey');
-    params.$apiKey = input.apiKey;
+    updates.apiKey = input.apiKey;
   }
   if (input.accessToken !== undefined) {
-    updates.push('access_token = $accessToken');
-    params.$accessToken = input.accessToken;
+    updates.accessToken = input.accessToken;
   }
   if (input.refreshToken !== undefined) {
-    updates.push('refresh_token = $refreshToken');
-    params.$refreshToken = input.refreshToken;
+    updates.refreshToken = input.refreshToken;
   }
   if (input.tokenExpiresAt !== undefined) {
-    updates.push('token_expires_at = $tokenExpiresAt');
-    params.$tokenExpiresAt = input.tokenExpiresAt;
+    updates.tokenExpiresAt = input.tokenExpiresAt ? new Date(input.tokenExpiresAt) : null;
   }
   
   // Mark as configured if we have credentials
   const hasCredentials = input.apiKey || input.accessToken;
   if (hasCredentials) {
-    updates.push('is_configured = 1');
+    updates.isConfigured = true;
   }
   
-  updates.push("updated_at = datetime('now')");
-  
-  const sql = `UPDATE providers SET ${updates.join(', ')} WHERE id = $id`;
-  db.query(sql).run(params);
+  await db.update(providers).set(updates).where(eq(providers.id, id));
   
   return getProviderById(id);
 }
@@ -155,17 +140,20 @@ export function configureProvider(id: string, input: ConfigureProviderInput): Pr
 /**
  * Set provider as default
  */
-export function setDefaultProvider(id: string): Provider | null {
-  const provider = getProviderById(id);
+export async function setDefaultProvider(id: string): Promise<Provider | null> {
+  const provider = await getProviderById(id);
   if (!provider) {
     return null;
   }
   
   // Clear existing default
-  db.query('UPDATE providers SET is_default = 0').run();
+  await db.update(providers).set({ isDefault: false });
   
   // Set new default
-  db.query("UPDATE providers SET is_default = 1, updated_at = datetime('now') WHERE id = $id").run({ $id: id });
+  await db.update(providers).set({ 
+    isDefault: true, 
+    updatedAt: new Date() 
+  }).where(eq(providers.id, id));
   
   return getProviderById(id);
 }
@@ -173,23 +161,21 @@ export function setDefaultProvider(id: string): Provider | null {
 /**
  * Remove provider configuration (keep the provider, just clear credentials)
  */
-export function removeProviderConfig(id: string): Provider | null {
-  const provider = getProviderById(id);
+export async function removeProviderConfig(id: string): Promise<Provider | null> {
+  const provider = await getProviderById(id);
   if (!provider) {
     return null;
   }
   
-  db.query(`
-    UPDATE providers 
-    SET api_key = NULL, 
-        access_token = NULL, 
-        refresh_token = NULL, 
-        token_expires_at = NULL,
-        is_configured = 0,
-        is_default = 0,
-        updated_at = datetime('now')
-    WHERE id = $id
-  `).run({ $id: id });
+  await db.update(providers).set({
+    apiKey: null,
+    accessToken: null,
+    refreshToken: null,
+    tokenExpiresAt: null,
+    isConfigured: false,
+    isDefault: false,
+    updatedAt: new Date(),
+  }).where(eq(providers.id, id));
   
   return getProviderById(id);
 }
@@ -202,15 +188,15 @@ export function removeProviderConfig(id: string): Provider | null {
  * Also includes OPENCODE_AUTH_JSON with the full auth.json content
  * for the OpenCode container to use.
  */
-export async function getProviderEnvVars(providerId?: string): Promise<Record<string, string>> {
+export async function getProviderEnvVars(userId: string, providerId?: string): Promise<Record<string, string>> {
   // If no providerId specified, try to get from settings
-  const targetProviderId = providerId ?? getSetting('default_provider');
+  const targetProviderId = providerId ?? await getSetting('default_provider');
   
   const envVars: Record<string, string> = {};
   
-  // Always build the full auth.json with all configured providers
+  // Always build the full auth.json with all configured providers for this user
   // This allows OpenCode to access all providers, not just the default one
-  const authJson = await buildOpenCodeAuthJson();
+  const authJson = await buildOpenCodeAuthJson(userId);
   if (authJson && authJson !== '{}') {
     envVars['OPENCODE_AUTH_JSON'] = authJson;
   }
@@ -219,8 +205,8 @@ export async function getProviderEnvVars(providerId?: string): Promise<Record<st
     return envVars;
   }
   
-  // Get decrypted credentials
-  const credential = await getCredential(targetProviderId);
+  // Get decrypted credentials for this user
+  const credential = await getCredential(userId, targetProviderId);
   if (!credential) {
     return envVars;
   }
@@ -247,8 +233,11 @@ export async function getProviderEnvVars(providerId?: string): Promise<Record<st
 /**
  * Check if any provider is configured
  */
-export function hasConfiguredProvider(): boolean {
-  const row = db.query('SELECT 1 FROM providers WHERE is_configured = 1 LIMIT 1').get();
+export async function hasConfiguredProvider(): Promise<boolean> {
+  const [row] = await db.select({ id: providers.id })
+    .from(providers)
+    .where(eq(providers.isConfigured, true))
+    .limit(1);
   return !!row;
 }
 
@@ -267,22 +256,22 @@ interface OpenCodeAuthEntry {
  * Build the auth.json content for OpenCode container
  * This is the format OpenCode expects in ~/.local/share/opencode/auth.json
  * 
+ * @param userId - The user to build auth.json for
  * @param providerId - Optional specific provider, otherwise includes all configured
  * @returns JSON string for auth.json content
  */
-export async function buildOpenCodeAuthJson(providerId?: string): Promise<string> {
+export async function buildOpenCodeAuthJson(userId: string, providerId?: string): Promise<string> {
   const authJson: Record<string, OpenCodeAuthEntry> = {};
   
   if (providerId) {
-    // Get specific provider credential
-    const credential = await getCredential(providerId);
+    // Get specific provider credential for this user
+    const credential = await getCredential(userId, providerId);
     if (credential) {
       authJson[providerId] = credentialToAuthEntry(credential);
     }
   } else {
-    // Get all configured credentials
-    const { getAllCredentials } = await import('./provider-credentials.ts');
-    const allCredentials = await getAllCredentials();
+    // Get all configured credentials for this user
+    const allCredentials = await getAllUserCredentials(userId);
     
     for (const credential of allCredentials) {
       authJson[credential.providerId] = credentialToAuthEntry(credential);
@@ -329,20 +318,28 @@ function credentialToAuthEntry(credential: Awaited<ReturnType<typeof getCredenti
 /**
  * Get a setting value
  */
-export function getSetting(key: string): string | null {
-  const row = db.query(
-    'SELECT value FROM settings WHERE key = $key'
-  ).get({ $key: key }) as { value: string } | null;
-  return row?.value || null;
+export async function getSetting(key: string): Promise<string | null> {
+  const [row] = await db.select({ value: settings.value })
+    .from(settings)
+    .where(eq(settings.key, key));
+  return row?.value ?? null;
 }
 
 /**
  * Set a setting value
  */
-export function setSetting(key: string, value: string): void {
-  db.query(`
-    INSERT INTO settings (key, value, updated_at) 
-    VALUES ($key, $value, datetime('now'))
-    ON CONFLICT(key) DO UPDATE SET value = $value, updated_at = datetime('now')
-  `).run({ $key: key, $value: value });
+export async function setSetting(key: string, value: string): Promise<void> {
+  await db.insert(settings)
+    .values({
+      key,
+      value,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: settings.key,
+      set: {
+        value,
+        updatedAt: new Date(),
+      },
+    });
 }

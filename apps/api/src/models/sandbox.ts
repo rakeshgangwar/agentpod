@@ -6,9 +6,13 @@
  * - Git repository
  * - Container configuration (resource tier, flavor, addons)
  * - Runtime state (container ID, status, URLs)
+ * 
+ * MIGRATED: Now uses PostgreSQL via Drizzle ORM
  */
 
-import { db } from '../db/index.ts';
+import { db } from '../db/drizzle';
+import { sandboxes } from '../db/schema/sandboxes';
+import { eq, and, desc, sql, count } from 'drizzle-orm';
 import { createLogger } from '../utils/logger.ts';
 
 const log = createLogger('sandbox-model');
@@ -48,9 +52,9 @@ export interface Sandbox {
   codeServerUrl?: string;
   
   // Timestamps
-  createdAt: string;
-  updatedAt: string;
-  lastAccessedAt?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  lastAccessedAt?: Date;
 }
 
 export interface CreateSandboxInput {
@@ -82,103 +86,91 @@ export interface UpdateSandboxInput {
   codeServerUrl?: string;
 }
 
-// Database row type
-interface SandboxRow {
-  id: string;
-  user_id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  repo_name: string;
-  github_url: string | null;
-  resource_tier_id: string;
-  flavor_id: string;
-  addon_ids: string;
-  container_id: string | null;
-  container_name: string | null;
-  status: string;
-  error_message: string | null;
-  opencode_url: string | null;
-  acp_gateway_url: string | null;
-  vnc_url: string | null;
-  code_server_url: string | null;
-  created_at: string;
-  updated_at: string;
-  last_accessed_at: string | null;
-}
-
 // =============================================================================
 // Helpers
 // =============================================================================
 
-function rowToSandbox(row: SandboxRow): Sandbox {
+function parseAddonIds(addonIds: string | null): string[] {
+  if (!addonIds) return [];
+  try {
+    return JSON.parse(addonIds);
+  } catch {
+    return [];
+  }
+}
+
+function rowToSandbox(row: typeof sandboxes.$inferSelect): Sandbox {
   return {
     id: row.id,
-    userId: row.user_id,
+    userId: row.userId,
     name: row.name,
     slug: row.slug,
     description: row.description ?? undefined,
-    repoName: row.repo_name,
-    githubUrl: row.github_url ?? undefined,
-    resourceTierId: row.resource_tier_id,
-    flavorId: row.flavor_id,
-    addonIds: JSON.parse(row.addon_ids || '[]'),
-    containerId: row.container_id ?? undefined,
-    containerName: row.container_name ?? undefined,
-    status: row.status as SandboxStatus,
-    errorMessage: row.error_message ?? undefined,
-    opencodeUrl: row.opencode_url ?? undefined,
-    acpGatewayUrl: row.acp_gateway_url ?? undefined,
-    vncUrl: row.vnc_url ?? undefined,
-    codeServerUrl: row.code_server_url ?? undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    lastAccessedAt: row.last_accessed_at ?? undefined,
+    repoName: row.repoName,
+    githubUrl: row.githubUrl ?? undefined,
+    resourceTierId: row.resourceTierId ?? 'starter',
+    flavorId: row.flavorId ?? 'fullstack',
+    addonIds: parseAddonIds(row.addonIds),
+    containerId: row.containerId ?? undefined,
+    containerName: row.containerName ?? undefined,
+    status: (row.status ?? 'created') as SandboxStatus,
+    errorMessage: row.errorMessage ?? undefined,
+    opencodeUrl: row.opencodeUrl ?? undefined,
+    acpGatewayUrl: row.acpGatewayUrl ?? undefined,
+    vncUrl: row.vncUrl ?? undefined,
+    codeServerUrl: row.codeServerUrl ?? undefined,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    lastAccessedAt: row.lastAccessedAt ?? undefined,
   };
 }
 
 // =============================================================================
-// CRUD Operations
+// CRUD Operations (Async)
 // =============================================================================
 
 /**
  * Create a new sandbox
  */
-export function createSandbox(input: CreateSandboxInput): Sandbox {
-  const now = new Date().toISOString();
+export async function createSandbox(input: CreateSandboxInput): Promise<Sandbox> {
+  const now = new Date();
   
-  db.run(
-    `INSERT INTO sandboxes (
-      id, user_id, name, slug, description, repo_name, github_url,
-      resource_tier_id, flavor_id, addon_ids, status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'created', ?, ?)`,
-    [
-      input.id,
-      input.userId,
-      input.name,
-      input.slug,
-      input.description ?? null,
-      input.repoName,
-      input.githubUrl ?? null,
-      input.resourceTierId ?? 'starter',
-      input.flavorId ?? 'fullstack',
-      JSON.stringify(input.addonIds ?? ['code-server']),
-      now,
-      now,
-    ]
-  );
+  const rows = await db
+    .insert(sandboxes)
+    .values({
+      id: input.id,
+      userId: input.userId,
+      name: input.name,
+      slug: input.slug,
+      description: input.description ?? null,
+      repoName: input.repoName,
+      githubUrl: input.githubUrl ?? null,
+      resourceTierId: input.resourceTierId ?? 'starter',
+      flavorId: input.flavorId ?? 'fullstack',
+      addonIds: JSON.stringify(input.addonIds ?? ['code-server']),
+      status: 'created',
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
+  
+  const row = rows[0];
+  if (!row) {
+    throw new Error('Failed to create sandbox');
+  }
   
   log.info('Created sandbox', { sandboxId: input.id, userId: input.userId, name: input.name });
-  return getSandboxById(input.id)!;
+  return rowToSandbox(row);
 }
 
 /**
  * Get a sandbox by ID
  */
-export function getSandboxById(id: string): Sandbox | null {
-  const row = db.query<SandboxRow, [string]>(
-    'SELECT * FROM sandboxes WHERE id = ?'
-  ).get(id);
+export async function getSandboxById(id: string): Promise<Sandbox | null> {
+  const [row] = await db
+    .select()
+    .from(sandboxes)
+    .where(eq(sandboxes.id, id));
   
   return row ? rowToSandbox(row) : null;
 }
@@ -186,10 +178,11 @@ export function getSandboxById(id: string): Sandbox | null {
 /**
  * Get a sandbox by user ID and slug
  */
-export function getSandboxBySlug(userId: string, slug: string): Sandbox | null {
-  const row = db.query<SandboxRow, [string, string]>(
-    'SELECT * FROM sandboxes WHERE user_id = ? AND slug = ?'
-  ).get(userId, slug);
+export async function getSandboxBySlug(userId: string, slug: string): Promise<Sandbox | null> {
+  const [row] = await db
+    .select()
+    .from(sandboxes)
+    .where(and(eq(sandboxes.userId, userId), eq(sandboxes.slug, slug)));
   
   return row ? rowToSandbox(row) : null;
 }
@@ -197,21 +190,25 @@ export function getSandboxBySlug(userId: string, slug: string): Sandbox | null {
 /**
  * Get a sandbox by container ID
  */
-export function getSandboxByContainerId(containerId: string): Sandbox | null {
-  const row = db.query<SandboxRow, [string]>(
-    'SELECT * FROM sandboxes WHERE container_id = ?'
-  ).get(containerId);
+export async function getSandboxByContainerId(containerId: string): Promise<Sandbox | null> {
+  const rows = await db
+    .select()
+    .from(sandboxes)
+    .where(eq(sandboxes.containerId, containerId));
   
+  const row = rows[0];
   return row ? rowToSandbox(row) : null;
 }
 
 /**
  * List all sandboxes for a user
  */
-export function listSandboxesByUserId(userId: string): Sandbox[] {
-  const rows = db.query<SandboxRow, [string]>(
-    'SELECT * FROM sandboxes WHERE user_id = ? ORDER BY created_at DESC'
-  ).all(userId);
+export async function listSandboxesByUserId(userId: string): Promise<Sandbox[]> {
+  const rows = await db
+    .select()
+    .from(sandboxes)
+    .where(eq(sandboxes.userId, userId))
+    .orderBy(desc(sandboxes.createdAt));
   
   return rows.map(rowToSandbox);
 }
@@ -219,10 +216,11 @@ export function listSandboxesByUserId(userId: string): Sandbox[] {
 /**
  * List all sandboxes (admin)
  */
-export function listAllSandboxes(): Sandbox[] {
-  const rows = db.query<SandboxRow, []>(
-    'SELECT * FROM sandboxes ORDER BY created_at DESC'
-  ).all();
+export async function listAllSandboxes(): Promise<Sandbox[]> {
+  const rows = await db
+    .select()
+    .from(sandboxes)
+    .orderBy(desc(sandboxes.createdAt));
   
   return rows.map(rowToSandbox);
 }
@@ -230,10 +228,12 @@ export function listAllSandboxes(): Sandbox[] {
 /**
  * List sandboxes by status
  */
-export function listSandboxesByStatus(status: SandboxStatus): Sandbox[] {
-  const rows = db.query<SandboxRow, [string]>(
-    'SELECT * FROM sandboxes WHERE status = ? ORDER BY created_at DESC'
-  ).all(status);
+export async function listSandboxesByStatus(status: SandboxStatus): Promise<Sandbox[]> {
+  const rows = await db
+    .select()
+    .from(sandboxes)
+    .where(eq(sandboxes.status, status))
+    .orderBy(desc(sandboxes.createdAt));
   
   return rows.map(rowToSandbox);
 }
@@ -241,109 +241,70 @@ export function listSandboxesByStatus(status: SandboxStatus): Sandbox[] {
 /**
  * Update a sandbox
  */
-export function updateSandbox(id: string, input: UpdateSandboxInput): Sandbox | null {
-  const existing = getSandboxById(id);
+export async function updateSandbox(id: string, input: UpdateSandboxInput): Promise<Sandbox | null> {
+  const existing = await getSandboxById(id);
   if (!existing) return null;
   
-  const updates: string[] = [];
-  const values: (string | null)[] = [];
+  // Build update object with only defined values
+  const updateData: Partial<typeof sandboxes.$inferInsert> = {
+    updatedAt: new Date(),
+  };
   
-  if (input.name !== undefined) {
-    updates.push('name = ?');
-    values.push(input.name);
-  }
-  if (input.description !== undefined) {
-    updates.push('description = ?');
-    values.push(input.description ?? null);
-  }
-  if (input.resourceTierId !== undefined) {
-    updates.push('resource_tier_id = ?');
-    values.push(input.resourceTierId);
-  }
-  if (input.flavorId !== undefined) {
-    updates.push('flavor_id = ?');
-    values.push(input.flavorId);
-  }
-  if (input.addonIds !== undefined) {
-    updates.push('addon_ids = ?');
-    values.push(JSON.stringify(input.addonIds));
-  }
-  if (input.containerId !== undefined) {
-    updates.push('container_id = ?');
-    values.push(input.containerId ?? null);
-  }
-  if (input.containerName !== undefined) {
-    updates.push('container_name = ?');
-    values.push(input.containerName ?? null);
-  }
-  if (input.status !== undefined) {
-    updates.push('status = ?');
-    values.push(input.status);
-  }
-  if (input.errorMessage !== undefined) {
-    updates.push('error_message = ?');
-    values.push(input.errorMessage ?? null);
-  }
-  if (input.opencodeUrl !== undefined) {
-    updates.push('opencode_url = ?');
-    values.push(input.opencodeUrl ?? null);
-  }
-  if (input.acpGatewayUrl !== undefined) {
-    updates.push('acp_gateway_url = ?');
-    values.push(input.acpGatewayUrl ?? null);
-  }
-  if (input.vncUrl !== undefined) {
-    updates.push('vnc_url = ?');
-    values.push(input.vncUrl ?? null);
-  }
-  if (input.codeServerUrl !== undefined) {
-    updates.push('code_server_url = ?');
-    values.push(input.codeServerUrl ?? null);
-  }
+  if (input.name !== undefined) updateData.name = input.name;
+  if (input.description !== undefined) updateData.description = input.description ?? null;
+  if (input.resourceTierId !== undefined) updateData.resourceTierId = input.resourceTierId;
+  if (input.flavorId !== undefined) updateData.flavorId = input.flavorId;
+  if (input.addonIds !== undefined) updateData.addonIds = JSON.stringify(input.addonIds);
+  if (input.containerId !== undefined) updateData.containerId = input.containerId ?? null;
+  if (input.containerName !== undefined) updateData.containerName = input.containerName ?? null;
+  if (input.status !== undefined) updateData.status = input.status;
+  if (input.errorMessage !== undefined) updateData.errorMessage = input.errorMessage ?? null;
+  if (input.opencodeUrl !== undefined) updateData.opencodeUrl = input.opencodeUrl ?? null;
+  if (input.acpGatewayUrl !== undefined) updateData.acpGatewayUrl = input.acpGatewayUrl ?? null;
+  if (input.vncUrl !== undefined) updateData.vncUrl = input.vncUrl ?? null;
+  if (input.codeServerUrl !== undefined) updateData.codeServerUrl = input.codeServerUrl ?? null;
   
-  if (updates.length === 0) return existing;
-  
-  updates.push('updated_at = ?');
-  values.push(new Date().toISOString());
-  values.push(id);
-  
-  db.run(
-    `UPDATE sandboxes SET ${updates.join(', ')} WHERE id = ?`,
-    values
-  );
+  const [row] = await db
+    .update(sandboxes)
+    .set(updateData)
+    .where(eq(sandboxes.id, id))
+    .returning();
   
   log.info('Updated sandbox', { sandboxId: id, updates: Object.keys(input) });
-  return getSandboxById(id);
+  return row ? rowToSandbox(row) : null;
 }
 
 /**
  * Update sandbox status
  */
-export function updateSandboxStatus(
+export async function updateSandboxStatus(
   id: string,
   status: SandboxStatus,
   errorMessage?: string
-): Sandbox | null {
+): Promise<Sandbox | null> {
   return updateSandbox(id, { status, errorMessage });
 }
 
 /**
  * Update last accessed timestamp
  */
-export function touchSandbox(id: string): void {
-  db.run(
-    'UPDATE sandboxes SET last_accessed_at = ? WHERE id = ?',
-    [new Date().toISOString(), id]
-  );
+export async function touchSandbox(id: string): Promise<void> {
+  await db
+    .update(sandboxes)
+    .set({ lastAccessedAt: new Date() })
+    .where(eq(sandboxes.id, id));
 }
 
 /**
  * Delete a sandbox
  */
-export function deleteSandbox(id: string): boolean {
-  const result = db.run('DELETE FROM sandboxes WHERE id = ?', [id]);
+export async function deleteSandbox(id: string): Promise<boolean> {
+  const result = await db
+    .delete(sandboxes)
+    .where(eq(sandboxes.id, id))
+    .returning({ id: sandboxes.id });
   
-  if (result.changes > 0) {
+  if (result.length > 0) {
     log.info('Deleted sandbox', { sandboxId: id });
     return true;
   }
@@ -353,13 +314,16 @@ export function deleteSandbox(id: string): boolean {
 /**
  * Delete all sandboxes for a user
  */
-export function deleteSandboxesByUserId(userId: string): number {
-  const result = db.run('DELETE FROM sandboxes WHERE user_id = ?', [userId]);
+export async function deleteSandboxesByUserId(userId: string): Promise<number> {
+  const result = await db
+    .delete(sandboxes)
+    .where(eq(sandboxes.userId, userId))
+    .returning({ id: sandboxes.id });
   
-  if (result.changes > 0) {
-    log.info('Deleted user sandboxes', { userId, count: result.changes });
+  if (result.length > 0) {
+    log.info('Deleted user sandboxes', { userId, count: result.length });
   }
-  return result.changes;
+  return result.length;
 }
 
 // =============================================================================
@@ -369,23 +333,31 @@ export function deleteSandboxesByUserId(userId: string): number {
 /**
  * Check if a slug is available for a user
  */
-export function isSlugAvailable(userId: string, slug: string, excludeId?: string): boolean {
-  let query = 'SELECT COUNT(*) as count FROM sandboxes WHERE user_id = ? AND slug = ?';
-  const params: string[] = [userId, slug];
+export async function isSlugAvailable(userId: string, slug: string, excludeId?: string): Promise<boolean> {
+  let query = db
+    .select({ count: count() })
+    .from(sandboxes)
+    .where(and(eq(sandboxes.userId, userId), eq(sandboxes.slug, slug)));
   
   if (excludeId) {
-    query += ' AND id != ?';
-    params.push(excludeId);
+    query = db
+      .select({ count: count() })
+      .from(sandboxes)
+      .where(and(
+        eq(sandboxes.userId, userId),
+        eq(sandboxes.slug, slug),
+        sql`${sandboxes.id} != ${excludeId}`
+      ));
   }
   
-  const result = db.query<{ count: number }, string[]>(query).get(...params);
+  const [result] = await query;
   return result?.count === 0;
 }
 
 /**
  * Generate a unique slug for a user
  */
-export function generateUniqueSlug(userId: string, baseName: string): string {
+export async function generateUniqueSlug(userId: string, baseName: string): Promise<string> {
   const baseSlug = baseName
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
@@ -394,7 +366,7 @@ export function generateUniqueSlug(userId: string, baseName: string): string {
   let slug = baseSlug;
   let counter = 1;
   
-  while (!isSlugAvailable(userId, slug)) {
+  while (!(await isSlugAvailable(userId, slug))) {
     slug = `${baseSlug}-${counter}`;
     counter++;
   }
@@ -405,11 +377,15 @@ export function generateUniqueSlug(userId: string, baseName: string): string {
 /**
  * Get sandbox counts by status for a user
  */
-export function getSandboxCountsByStatus(userId: string): Record<SandboxStatus, number> {
-  const rows = db.query<{ status: string; count: number }, [string]>(
-    `SELECT status, COUNT(*) as count FROM sandboxes 
-     WHERE user_id = ? GROUP BY status`
-  ).all(userId);
+export async function getSandboxCountsByStatus(userId: string): Promise<Record<SandboxStatus, number>> {
+  const rows = await db
+    .select({
+      status: sandboxes.status,
+      count: count(),
+    })
+    .from(sandboxes)
+    .where(eq(sandboxes.userId, userId))
+    .groupBy(sandboxes.status);
   
   const counts: Record<SandboxStatus, number> = {
     created: 0,
@@ -421,7 +397,9 @@ export function getSandboxCountsByStatus(userId: string): Record<SandboxStatus, 
   };
   
   for (const row of rows) {
-    counts[row.status as SandboxStatus] = row.count;
+    if (row.status) {
+      counts[row.status as SandboxStatus] = row.count;
+    }
   }
   
   return counts;

@@ -3,6 +3,7 @@
  * 
  * Manage LLM provider configurations with encrypted credential storage.
  * Uses Models.dev API for provider/model data.
+ * Credentials are stored per-user.
  */
 
 import { Hono } from 'hono';
@@ -17,9 +18,22 @@ import {
 } from '../models/provider-credentials.ts';
 import { githubCopilotOAuth } from '../services/oauth/github-copilot.ts';
 import { getSetting, setSetting } from '../models/provider.ts';
+import { syncAuthJsonForUser } from '../services/config-sync.ts';
 import { createLogger } from '../utils/logger.ts';
 
 const log = createLogger('provider-routes');
+
+// =============================================================================
+// Helper: Get user from context
+// =============================================================================
+
+function getUser(c: { get: (key: string) => unknown }): { id: string } | null {
+  const user = c.get("user") as { id?: string } | undefined;
+  if (!user?.id || user.id === "anonymous") {
+    return null;
+  }
+  return { id: user.id };
+}
 
 // =============================================================================
 // Validation Schemas
@@ -41,12 +55,17 @@ export const providerRoutes = new Hono()
    * - popularOnly: boolean (default: true) - Only return popular providers
    */
   .get('/', async (c) => {
+    const user = getUser(c);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
     const popularOnly = c.req.query('popularOnly') !== 'false';
     
     try {
-      // Get configured provider IDs and default
-      const configuredIds = getConfiguredProviderIds();
-      const defaultProviderId = getSetting('default_provider');
+      // Get configured provider IDs and default for this user
+      const configuredIds = await getConfiguredProviderIds(user.id);
+      const defaultProviderId = await getSetting('default_provider');
       
       // Get providers with models from Models.dev
       const providers = await modelsDev.getProvidersWithModels(
@@ -71,9 +90,14 @@ export const providerRoutes = new Hono()
    * List only configured providers (with credentials)
    */
   .get('/configured', async (c) => {
+    const user = getUser(c);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
     try {
-      const configuredIds = getConfiguredProviderIds();
-      const defaultProviderId = getSetting('default_provider');
+      const configuredIds = await getConfiguredProviderIds(user.id);
+      const defaultProviderId = await getSetting('default_provider');
       
       // Get all providers and filter to configured only
       const allProviders = await modelsDev.getProvidersWithModels(
@@ -96,14 +120,19 @@ export const providerRoutes = new Hono()
    * Get the default provider
    */
   .get('/default', async (c) => {
-    const defaultProviderId = getSetting('default_provider');
+    const user = getUser(c);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const defaultProviderId = await getSetting('default_provider');
     
     if (!defaultProviderId) {
       return c.json({ provider: null, message: 'No default provider set' });
     }
     
-    // Check if the default provider is actually configured
-    if (!isProviderConfigured(defaultProviderId)) {
+    // Check if the default provider is actually configured for this user
+    if (!(await isProviderConfigured(user.id, defaultProviderId))) {
       return c.json({ provider: null, message: 'Default provider is not configured' });
     }
     
@@ -131,6 +160,11 @@ export const providerRoutes = new Hono()
    * Get a specific provider with its models
    */
   .get('/:id', async (c) => {
+    const user = getUser(c);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
     const id = c.req.param('id');
     
     const provider = await modelsDev.getProvider(id);
@@ -139,8 +173,8 @@ export const providerRoutes = new Hono()
       return c.json({ error: `Provider not found: ${id}` }, 404);
     }
     
-    const configuredIds = getConfiguredProviderIds();
-    const defaultProviderId = getSetting('default_provider');
+    const configuredIds = await getConfiguredProviderIds(user.id);
+    const defaultProviderId = await getSetting('default_provider');
     
     return c.json({
       provider: {
@@ -173,6 +207,11 @@ export const providerRoutes = new Hono()
    * Configure a provider with an API key
    */
   .post('/:id/configure', zValidator('json', configureApiKeySchema), async (c) => {
+    const user = getUser(c);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
     const id = c.req.param('id');
     const { apiKey } = c.req.valid('json');
     
@@ -191,10 +230,15 @@ export const providerRoutes = new Hono()
     }
     
     try {
-      // Save the API key (encrypted)
-      await saveApiKey({ providerId: id, apiKey });
+      // Save the API key (encrypted) for this user
+      await saveApiKey({ userId: user.id, providerId: id, apiKey });
       
-      log.info('Provider configured with API key', { providerId: id });
+      log.info('Provider configured with API key', { userId: user.id, providerId: id });
+      
+      // Fire and forget: sync to running containers
+      syncAuthJsonForUser(user.id).catch(err => {
+        log.warn('Failed to sync auth after configure', { userId: user.id, error: err instanceof Error ? err.message : err });
+      });
       
       return c.json({
         success: true,
@@ -216,18 +260,23 @@ export const providerRoutes = new Hono()
    * Set a provider as the default
    */
   .post('/:id/set-default', async (c) => {
+    const user = getUser(c);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
     const id = c.req.param('id');
     
-    // Verify provider is configured
-    if (!isProviderConfigured(id)) {
+    // Verify provider is configured for this user
+    if (!(await isProviderConfigured(user.id, id))) {
       return c.json({ 
         error: 'Provider must be configured before setting as default' 
       }, 400);
     }
     
-    setSetting('default_provider', id);
+    await setSetting('default_provider', id);
     
-    log.info('Default provider set', { providerId: id });
+    log.info('Default provider set', { userId: user.id, providerId: id });
     
     return c.json({
       success: true,
@@ -239,22 +288,32 @@ export const providerRoutes = new Hono()
    * DELETE /api/providers/:id
    * Remove provider credentials
    */
-  .delete('/:id', (c) => {
+  .delete('/:id', async (c) => {
+    const user = getUser(c);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
     const id = c.req.param('id');
     
-    const deleted = deleteCredential(id);
+    const deleted = await deleteCredential(user.id, id);
     
     if (!deleted) {
       return c.json({ error: 'Provider not configured' }, 404);
     }
     
     // If this was the default provider, clear the default
-    const defaultProviderId = getSetting('default_provider');
+    const defaultProviderId = await getSetting('default_provider');
     if (defaultProviderId === id) {
-      setSetting('default_provider', '');
+      await setSetting('default_provider', '');
     }
     
-    log.info('Provider credentials removed', { providerId: id });
+    log.info('Provider credentials removed', { userId: user.id, providerId: id });
+    
+    // Fire and forget: sync to running containers
+    syncAuthJsonForUser(user.id).catch(err => {
+      log.warn('Failed to sync auth after delete', { userId: user.id, error: err instanceof Error ? err.message : err });
+    });
     
     return c.json({
       success: true,
@@ -271,6 +330,11 @@ export const providerRoutes = new Hono()
    * Initialize OAuth device flow for the provider
    */
   .post('/:id/oauth/init', async (c) => {
+    const user = getUser(c);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
     const id = c.req.param('id');
     
     // Currently only GitHub Copilot uses device flow
@@ -281,7 +345,7 @@ export const providerRoutes = new Hono()
     }
     
     try {
-      const flow = await githubCopilotOAuth.initDeviceFlow();
+      const flow = await githubCopilotOAuth.initDeviceFlow(user.id);
       
       return c.json({
         success: true,
@@ -302,6 +366,11 @@ export const providerRoutes = new Hono()
    * Poll for OAuth completion (device flow)
    */
   .post('/:id/oauth/poll', zValidator('json', z.object({ stateId: z.string() })), async (c) => {
+    const user = getUser(c);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
     const id = c.req.param('id');
     const { stateId } = c.req.valid('json');
     
@@ -312,7 +381,7 @@ export const providerRoutes = new Hono()
     }
     
     try {
-      const status = await githubCopilotOAuth.pollToken(stateId);
+      const status = await githubCopilotOAuth.pollToken(stateId, user.id);
       
       return c.json({
         status: status.status,
@@ -329,7 +398,12 @@ export const providerRoutes = new Hono()
    * GET /api/providers/:id/oauth/status/:stateId
    * Get current OAuth flow status
    */
-  .get('/:id/oauth/status/:stateId', (c) => {
+  .get('/:id/oauth/status/:stateId', async (c) => {
+    const user = getUser(c);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
     const id = c.req.param('id');
     const stateId = c.req.param('stateId');
     
@@ -339,7 +413,7 @@ export const providerRoutes = new Hono()
       }, 400);
     }
     
-    const status = githubCopilotOAuth.getFlowStatus(stateId);
+    const status = await githubCopilotOAuth.getFlowStatus(stateId);
     
     if (!status) {
       return c.json({ error: 'OAuth flow not found' }, 404);
@@ -355,7 +429,12 @@ export const providerRoutes = new Hono()
    * DELETE /api/providers/:id/oauth/:stateId
    * Cancel an OAuth flow
    */
-  .delete('/:id/oauth/:stateId', (c) => {
+  .delete('/:id/oauth/:stateId', async (c) => {
+    const user = getUser(c);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
     const id = c.req.param('id');
     const stateId = c.req.param('stateId');
     
@@ -365,7 +444,7 @@ export const providerRoutes = new Hono()
       }, 400);
     }
     
-    githubCopilotOAuth.cancelFlow(stateId);
+    await githubCopilotOAuth.cancelFlow(stateId);
     
     return c.json({
       success: true,

@@ -46,8 +46,8 @@ const listMessagesSchema = z.object({
 /**
  * Verify sandbox exists and user has access
  */
-function verifySandboxAccess(sandboxId: string, userId?: string): SandboxModel.Sandbox | null {
-  const sandbox = SandboxModel.getSandboxById(sandboxId);
+async function verifySandboxAccess(sandboxId: string, userId?: string): Promise<SandboxModel.Sandbox | null> {
+  const sandbox = await SandboxModel.getSandboxById(sandboxId);
   if (!sandbox) return null;
   
   // If userId provided, verify ownership
@@ -70,19 +70,19 @@ export const chatRoutes = new Hono()
     const sandboxId = c.req.param("sandboxId");
     const { status, limit, offset } = c.req.valid("query");
 
-    const sandbox = verifySandboxAccess(sandboxId);
+    const sandbox = await verifySandboxAccess(sandboxId);
     if (!sandbox) {
       return c.json({ error: "Sandbox not found" }, 404);
     }
 
     try {
-      const sessions = ChatSessionModel.listChatSessionsBySandboxId(sandboxId, {
+      const sessions = await ChatSessionModel.listChatSessionsBySandboxId(sandboxId, {
         status: status as ChatSessionModel.ChatSessionStatus | undefined,
         limit,
         offset,
       });
 
-      const stats = ChatSessionModel.getChatSessionStats(sandboxId);
+      const stats = await ChatSessionModel.getChatSessionStats(sandboxId);
 
       return c.json({
         sessions,
@@ -109,19 +109,19 @@ export const chatRoutes = new Hono()
     const sandboxId = c.req.param("sandboxId");
     const sessionId = c.req.param("sessionId");
 
-    const sandbox = verifySandboxAccess(sandboxId);
+    const sandbox = await verifySandboxAccess(sandboxId);
     if (!sandbox) {
       return c.json({ error: "Sandbox not found" }, 404);
     }
 
     try {
-      const session = ChatSessionModel.getChatSessionById(sessionId);
+      const session = await ChatSessionModel.getChatSessionById(sessionId);
       if (!session || session.sandboxId !== sandboxId) {
         return c.json({ error: "Session not found" }, 404);
       }
 
       // Get recent messages
-      const messages = ChatMessageModel.getRecentMessages(sessionId, 50);
+      const messages = await ChatMessageModel.getRecentMessages(sessionId, 50);
 
       return c.json({
         session,
@@ -145,24 +145,24 @@ export const chatRoutes = new Hono()
     const sessionId = c.req.param("sessionId");
     const { limit, offset, order } = c.req.valid("query");
 
-    const sandbox = verifySandboxAccess(sandboxId);
+    const sandbox = await verifySandboxAccess(sandboxId);
     if (!sandbox) {
       return c.json({ error: "Sandbox not found" }, 404);
     }
 
     try {
-      const session = ChatSessionModel.getChatSessionById(sessionId);
+      const session = await ChatSessionModel.getChatSessionById(sessionId);
       if (!session || session.sandboxId !== sandboxId) {
         return c.json({ error: "Session not found" }, 404);
       }
 
-      const messages = ChatMessageModel.listChatMessagesBySessionId(sessionId, {
+      const messages = await ChatMessageModel.listChatMessagesBySessionId(sessionId, {
         limit,
         offset,
         order,
       });
 
-      const totalCount = ChatMessageModel.getMessageCount(sessionId);
+      const totalCount = await ChatMessageModel.getMessageCount(sessionId);
 
       return c.json({
         messages,
@@ -188,13 +188,13 @@ export const chatRoutes = new Hono()
     const sandboxId = c.req.param("sandboxId");
     const sessionId = c.req.param("sessionId");
 
-    const sandbox = verifySandboxAccess(sandboxId);
+    const sandbox = await verifySandboxAccess(sandboxId);
     if (!sandbox) {
       return c.json({ error: "Sandbox not found" }, 404);
     }
 
     try {
-      const session = ChatSessionModel.getChatSessionById(sessionId);
+      const session = await ChatSessionModel.getChatSessionById(sessionId);
       if (!session || session.sandboxId !== sandboxId) {
         return c.json({ error: "Session not found" }, 404);
       }
@@ -204,7 +204,7 @@ export const chatRoutes = new Hono()
       await syncService.syncSession(sandboxId, sessionId);
 
       // Get updated session
-      const updatedSession = ChatSessionModel.getChatSessionById(sessionId);
+      const updatedSession = await ChatSessionModel.getChatSessionById(sessionId);
 
       return c.json({
         session: updatedSession,
@@ -226,19 +226,19 @@ export const chatRoutes = new Hono()
     const sandboxId = c.req.param("sandboxId");
     const sessionId = c.req.param("sessionId");
 
-    const sandbox = verifySandboxAccess(sandboxId);
+    const sandbox = await verifySandboxAccess(sandboxId);
     if (!sandbox) {
       return c.json({ error: "Sandbox not found" }, 404);
     }
 
     try {
-      const session = ChatSessionModel.getChatSessionById(sessionId);
+      const session = await ChatSessionModel.getChatSessionById(sessionId);
       if (!session || session.sandboxId !== sandboxId) {
         return c.json({ error: "Session not found" }, 404);
       }
 
       // Archive (soft delete)
-      ChatSessionModel.archiveChatSession(sessionId);
+      await ChatSessionModel.archiveChatSession(sessionId);
       log.info("Archived chat session", { sandboxId, sessionId });
 
       return c.json({
@@ -260,7 +260,7 @@ export const chatRoutes = new Hono()
   .get("/:sandboxId/chat/sync/status", async (c) => {
     const sandboxId = c.req.param("sandboxId");
 
-    const sandbox = verifySandboxAccess(sandboxId);
+    const sandbox = await verifySandboxAccess(sandboxId);
     if (!sandbox) {
       return c.json({ error: "Sandbox not found" }, 404);
     }
@@ -268,7 +268,7 @@ export const chatRoutes = new Hono()
     try {
       const syncService = getOpenCodeSyncService();
       const status = syncService.getSyncStatus(sandboxId);
-      const stats = ChatSessionModel.getChatSessionStats(sandboxId);
+      const stats = await ChatSessionModel.getChatSessionStats(sandboxId);
 
       return c.json({
         sync: status,
@@ -290,7 +290,7 @@ export const chatRoutes = new Hono()
   .post("/:sandboxId/chat/sync", async (c) => {
     const sandboxId = c.req.param("sandboxId");
 
-    const sandbox = verifySandboxAccess(sandboxId);
+    const sandbox = await verifySandboxAccess(sandboxId);
     if (!sandbox) {
       return c.json({ error: "Sandbox not found" }, 404);
     }
@@ -303,7 +303,7 @@ export const chatRoutes = new Hono()
       const syncService = getOpenCodeSyncService();
       await syncService.fullSync(sandboxId);
 
-      const stats = ChatSessionModel.getChatSessionStats(sandboxId);
+      const stats = await ChatSessionModel.getChatSessionStats(sandboxId);
 
       return c.json({
         success: true,

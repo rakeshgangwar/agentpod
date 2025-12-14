@@ -64,7 +64,7 @@ export const preferencesRoutes = new Hono()
     }
 
     try {
-      const preferences = UserPreferencesModel.getOrCreateUserPreferences(userId);
+      const preferences = await UserPreferencesModel.getOrCreateUserPreferences(userId);
       
       return c.json({
         preferences,
@@ -91,10 +91,10 @@ export const preferencesRoutes = new Hono()
 
     try {
       // Ensure preferences exist
-      UserPreferencesModel.getOrCreateUserPreferences(userId);
+      await UserPreferencesModel.getOrCreateUserPreferences(userId);
       
       // Update with all provided values
-      const preferences = UserPreferencesModel.updateUserPreferences(userId, input);
+      const preferences = await UserPreferencesModel.updateUserPreferences(userId, input);
       
       if (!preferences) {
         return c.json({ error: "Failed to update preferences" }, 500);
@@ -128,10 +128,10 @@ export const preferencesRoutes = new Hono()
 
     try {
       // Ensure preferences exist
-      UserPreferencesModel.getOrCreateUserPreferences(userId);
+      await UserPreferencesModel.getOrCreateUserPreferences(userId);
       
       // Update only provided values
-      const preferences = UserPreferencesModel.updateUserPreferences(userId, input);
+      const preferences = await UserPreferencesModel.updateUserPreferences(userId, input);
       
       if (!preferences) {
         return c.json({ error: "Failed to update preferences" }, 500);
@@ -162,7 +162,7 @@ export const preferencesRoutes = new Hono()
     }
 
     try {
-      const version = UserPreferencesModel.getSettingsVersion(userId);
+      const version = await UserPreferencesModel.getSettingsVersion(userId);
       
       return c.json({
         version,
@@ -189,8 +189,8 @@ export const preferencesRoutes = new Hono()
     const { localVersion } = c.req.valid("query");
 
     try {
-      const serverVersion = UserPreferencesModel.getSettingsVersion(userId);
-      const needsSync = UserPreferencesModel.isOutOfSync(userId, localVersion);
+      const serverVersion = await UserPreferencesModel.getSettingsVersion(userId);
+      const needsSync = await UserPreferencesModel.isOutOfSync(userId, localVersion);
       
       return c.json({
         localVersion,
@@ -218,10 +218,10 @@ export const preferencesRoutes = new Hono()
 
     try {
       // Delete existing preferences
-      UserPreferencesModel.deleteUserPreferences(userId);
+      await UserPreferencesModel.deleteUserPreferences(userId);
       
       // Create fresh defaults
-      const preferences = UserPreferencesModel.createUserPreferences(userId);
+      const preferences = await UserPreferencesModel.createUserPreferences(userId);
       
       log.info("Reset user preferences to defaults", { userId });
 

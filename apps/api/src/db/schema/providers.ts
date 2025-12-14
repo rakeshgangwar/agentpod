@@ -13,7 +13,9 @@ import {
   boolean,
   index,
   pgEnum,
+  unique,
 } from "drizzle-orm/pg-core";
+import { user } from "./auth";
 
 // =============================================================================
 // Enums
@@ -38,7 +40,10 @@ export const providerCredentials = pgTable(
   "provider_credentials",
   {
     id: text("id").primaryKey(),
-    providerId: text("provider_id").notNull().unique(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    providerId: text("provider_id").notNull(),
     authType: authTypeEnum("auth_type").notNull(),
 
     // All credential fields are encrypted before storage
@@ -58,7 +63,10 @@ export const providerCredentials = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
+    index("provider_credentials_user_id_idx").on(table.userId),
     index("provider_credentials_provider_id_idx").on(table.providerId),
+    // Each user can only have one credential per provider
+    unique("provider_credentials_user_provider_unique").on(table.userId, table.providerId),
   ]
 );
 
@@ -69,6 +77,9 @@ export const oauthState = pgTable(
   "oauth_state",
   {
     id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
     providerId: text("provider_id").notNull(),
     deviceCode: text("device_code").notNull(),
     userCode: text("user_code").notNull(),
@@ -80,6 +91,7 @@ export const oauthState = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
+    index("oauth_state_user_id_idx").on(table.userId),
     index("oauth_state_provider_id_idx").on(table.providerId),
     index("oauth_state_status_idx").on(table.status),
   ]

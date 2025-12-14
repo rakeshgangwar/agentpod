@@ -118,14 +118,14 @@ class ActivityArchivalService {
       log.info('Starting activity log archival', { retentionDays: this.retentionDays });
 
       // Get stats before archival
-      const statsBefore = getActivityStats();
+      const statsBefore = await getActivityStats();
       const totalBefore = statsBefore.reduce((sum, s) => sum + s.count, 0);
 
       // Archive old logs
-      archived = archiveOldLogs(this.retentionDays);
+      archived = await archiveOldLogs(this.retentionDays);
 
       // Get stats after archival
-      const statsAfter = getActivityStats();
+      const statsAfter = await getActivityStats();
       const totalAfter = statsAfter.reduce((sum, s) => sum + s.count, 0);
 
       log.info('Activity log archival complete', {

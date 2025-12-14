@@ -2,10 +2,12 @@
  * Provider Credentials Model
  * 
  * Manages encrypted storage of LLM provider credentials (API keys, OAuth tokens).
- * Credentials are global and shared across all projects.
+ * Credentials are stored per-user - each user has their own set of provider credentials.
  */
 
-import { db } from '../db/index.ts';
+import { db } from '../db/drizzle';
+import { providerCredentials } from '../db/schema/providers';
+import { eq, and } from 'drizzle-orm';
 import { encrypt, decrypt } from '../utils/encryption.ts';
 import { createLogger } from '../utils/logger.ts';
 import type { AuthType } from '../services/models-dev.ts';
@@ -18,6 +20,7 @@ const log = createLogger('provider-credentials');
 
 export interface ProviderCredential {
   id: string;
+  userId: string;
   providerId: string;
   authType: AuthType;
   
@@ -38,27 +41,17 @@ export interface ProviderCredential {
   updatedAt: string;
 }
 
-// Database row type (encrypted fields)
-interface CredentialRow {
-  id: string;
-  provider_id: string;
-  auth_type: string;
-  api_key_encrypted: string | null;
-  access_token_encrypted: string | null;
-  refresh_token_encrypted: string | null;
-  token_expires_at: string | null;
-  oauth_provider: string | null;
-  oauth_scopes: string | null;
-  created_at: string;
-  updated_at: string;
-}
+// Database row type from Drizzle schema
+type CredentialRow = typeof providerCredentials.$inferSelect;
 
 export interface SaveApiKeyInput {
+  userId: string;
   providerId: string;
   apiKey: string;
 }
 
 export interface SaveOAuthTokenInput {
+  userId: string;
   providerId: string;
   accessToken: string;
   refreshToken?: string;
@@ -72,12 +65,15 @@ export interface SaveOAuthTokenInput {
 // =============================================================================
 
 /**
- * Get a credential by provider ID (decrypts sensitive fields)
+ * Get a credential by user ID and provider ID (decrypts sensitive fields)
  */
-export async function getCredential(providerId: string): Promise<ProviderCredential | null> {
-  const row = db.query(`
-    SELECT * FROM provider_credentials WHERE provider_id = $providerId
-  `).get({ $providerId: providerId }) as CredentialRow | null;
+export async function getCredential(userId: string, providerId: string): Promise<ProviderCredential | null> {
+  const [row] = await db.select()
+    .from(providerCredentials)
+    .where(and(
+      eq(providerCredentials.userId, userId),
+      eq(providerCredentials.providerId, providerId)
+    ));
 
   if (!row) {
     return null;
@@ -87,154 +83,175 @@ export async function getCredential(providerId: string): Promise<ProviderCredent
 }
 
 /**
- * Get all configured provider IDs (without decrypting)
+ * Get all configured provider IDs for a user (without decrypting)
  */
-export function getConfiguredProviderIds(): string[] {
-  const rows = db.query(`
-    SELECT provider_id FROM provider_credentials
-  `).all() as Array<{ provider_id: string }>;
+export async function getConfiguredProviderIds(userId: string): Promise<string[]> {
+  const rows = await db.select({ providerId: providerCredentials.providerId })
+    .from(providerCredentials)
+    .where(eq(providerCredentials.userId, userId));
 
-  return rows.map(r => r.provider_id);
+  return rows.map(r => r.providerId);
 }
 
 /**
- * Check if a provider is configured
+ * Check if a provider is configured for a user
  */
-export function isProviderConfigured(providerId: string): boolean {
-  const row = db.query(`
-    SELECT 1 FROM provider_credentials WHERE provider_id = $providerId
-  `).get({ $providerId: providerId });
+export async function isProviderConfigured(userId: string, providerId: string): Promise<boolean> {
+  const [row] = await db.select({ id: providerCredentials.id })
+    .from(providerCredentials)
+    .where(and(
+      eq(providerCredentials.userId, userId),
+      eq(providerCredentials.providerId, providerId)
+    ))
+    .limit(1);
 
-  return row !== null;
+  return row !== undefined;
 }
 
 /**
  * Save an API key credential (encrypts before storage)
  */
 export async function saveApiKey(input: SaveApiKeyInput): Promise<void> {
-  const { providerId, apiKey } = input;
+  const { userId, providerId, apiKey } = input;
 
-  log.info('Saving API key credential', { providerId });
+  log.info('Saving API key credential', { userId, providerId });
 
   // Encrypt the API key
   const apiKeyEncrypted = await encrypt(apiKey);
 
-  // Check if credential exists
-  const existing = db.query(`
-    SELECT id FROM provider_credentials WHERE provider_id = $providerId
-  `).get({ $providerId: providerId }) as { id: string } | null;
+  // Check if credential exists for this user+provider
+  const [existing] = await db.select({ id: providerCredentials.id })
+    .from(providerCredentials)
+    .where(and(
+      eq(providerCredentials.userId, userId),
+      eq(providerCredentials.providerId, providerId)
+    ));
 
   if (existing) {
     // Update existing
-    db.query(`
-      UPDATE provider_credentials 
-      SET api_key_encrypted = $apiKey,
-          auth_type = 'api_key',
-          updated_at = datetime('now')
-      WHERE provider_id = $providerId
-    `).run({
-      $providerId: providerId,
-      $apiKey: apiKeyEncrypted,
-    });
+    await db.update(providerCredentials)
+      .set({
+        apiKeyEncrypted,
+        authType: 'api_key',
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(providerCredentials.userId, userId),
+        eq(providerCredentials.providerId, providerId)
+      ));
   } else {
     // Insert new
     const id = crypto.randomUUID();
-    db.query(`
-      INSERT INTO provider_credentials (id, provider_id, auth_type, api_key_encrypted)
-      VALUES ($id, $providerId, 'api_key', $apiKey)
-    `).run({
-      $id: id,
-      $providerId: providerId,
-      $apiKey: apiKeyEncrypted,
-    });
+    await db.insert(providerCredentials)
+      .values({
+        id,
+        userId,
+        providerId,
+        authType: 'api_key',
+        apiKeyEncrypted,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
   }
 
-  log.info('API key credential saved', { providerId });
+  log.info('API key credential saved', { userId, providerId });
 }
 
 /**
  * Save OAuth tokens (encrypts before storage)
  */
 export async function saveOAuthToken(input: SaveOAuthTokenInput): Promise<void> {
-  const { providerId, accessToken, refreshToken, expiresAt, oauthProvider, scopes } = input;
+  const { userId, providerId, accessToken, refreshToken, expiresAt, oauthProvider, scopes } = input;
 
-  log.info('Saving OAuth token credential', { providerId, oauthProvider });
+  log.info('Saving OAuth token credential', { userId, providerId, oauthProvider });
 
   // Encrypt tokens
   const accessTokenEncrypted = await encrypt(accessToken);
   const refreshTokenEncrypted = refreshToken ? await encrypt(refreshToken) : null;
-  const tokenExpiresAt = expiresAt ? expiresAt.toISOString() : null;
   const oauthScopesJson = scopes ? JSON.stringify(scopes) : null;
 
-  // Check if credential exists
-  const existing = db.query(`
-    SELECT id FROM provider_credentials WHERE provider_id = $providerId
-  `).get({ $providerId: providerId }) as { id: string } | null;
+  // Check if credential exists for this user+provider
+  const [existing] = await db.select({ id: providerCredentials.id })
+    .from(providerCredentials)
+    .where(and(
+      eq(providerCredentials.userId, userId),
+      eq(providerCredentials.providerId, providerId)
+    ));
 
   if (existing) {
     // Update existing
-    db.query(`
-      UPDATE provider_credentials 
-      SET access_token_encrypted = $accessToken,
-          refresh_token_encrypted = $refreshToken,
-          token_expires_at = $expiresAt,
-          oauth_provider = $oauthProvider,
-          oauth_scopes = $scopes,
-          auth_type = 'oauth',
-          updated_at = datetime('now')
-      WHERE provider_id = $providerId
-    `).run({
-      $providerId: providerId,
-      $accessToken: accessTokenEncrypted,
-      $refreshToken: refreshTokenEncrypted,
-      $expiresAt: tokenExpiresAt,
-      $oauthProvider: oauthProvider || null,
-      $scopes: oauthScopesJson,
-    });
+    await db.update(providerCredentials)
+      .set({
+        accessTokenEncrypted,
+        refreshTokenEncrypted,
+        tokenExpiresAt: expiresAt || null,
+        oauthProvider: oauthProvider || null,
+        oauthScopes: oauthScopesJson,
+        authType: 'oauth',
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(providerCredentials.userId, userId),
+        eq(providerCredentials.providerId, providerId)
+      ));
   } else {
     // Insert new
     const id = crypto.randomUUID();
-    db.query(`
-      INSERT INTO provider_credentials (
-        id, provider_id, auth_type, 
-        access_token_encrypted, refresh_token_encrypted, token_expires_at,
-        oauth_provider, oauth_scopes
-      )
-      VALUES ($id, $providerId, 'oauth', $accessToken, $refreshToken, $expiresAt, $oauthProvider, $scopes)
-    `).run({
-      $id: id,
-      $providerId: providerId,
-      $accessToken: accessTokenEncrypted,
-      $refreshToken: refreshTokenEncrypted,
-      $expiresAt: tokenExpiresAt,
-      $oauthProvider: oauthProvider || null,
-      $scopes: oauthScopesJson,
-    });
+    await db.insert(providerCredentials)
+      .values({
+        id,
+        userId,
+        providerId,
+        authType: 'oauth',
+        accessTokenEncrypted,
+        refreshTokenEncrypted,
+        tokenExpiresAt: expiresAt || null,
+        oauthProvider: oauthProvider || null,
+        oauthScopes: oauthScopesJson,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
   }
 
-  log.info('OAuth token credential saved', { providerId });
+  log.info('OAuth token credential saved', { userId, providerId });
 }
 
 /**
- * Delete a credential
+ * Delete a credential for a specific user and provider
  */
-export function deleteCredential(providerId: string): boolean {
-  log.info('Deleting credential', { providerId });
+export async function deleteCredential(userId: string, providerId: string): Promise<boolean> {
+  log.info('Deleting credential', { userId, providerId });
 
-  const result = db.query(`
-    DELETE FROM provider_credentials WHERE provider_id = $providerId
-  `).run({ $providerId: providerId });
+  const result = await db.delete(providerCredentials)
+    .where(and(
+      eq(providerCredentials.userId, userId),
+      eq(providerCredentials.providerId, providerId)
+    ))
+    .returning({ id: providerCredentials.id });
 
-  // Bun sqlite returns changes as a property
-  const deleted = (result as unknown as { changes: number }).changes > 0;
+  const deleted = result.length > 0;
   
   if (deleted) {
-    log.info('Credential deleted', { providerId });
+    log.info('Credential deleted', { userId, providerId });
   } else {
-    log.warn('Credential not found', { providerId });
+    log.warn('Credential not found', { userId, providerId });
   }
 
   return deleted;
+}
+
+/**
+ * Delete all credentials for a user (used during account deletion)
+ */
+export async function deleteAllUserCredentials(userId: string): Promise<number> {
+  log.info('Deleting all credentials for user', { userId });
+
+  const result = await db.delete(providerCredentials)
+    .where(eq(providerCredentials.userId, userId))
+    .returning({ id: providerCredentials.id });
+
+  log.info('Deleted user credentials', { userId, count: result.length });
+  return result.length;
 }
 
 /**
@@ -252,10 +269,12 @@ export function isTokenExpired(credential: ProviderCredential, bufferMinutes = 5
 }
 
 /**
- * Get all credentials for container auth injection (decrypts all)
+ * Get all credentials for a user (decrypts all)
  */
-export async function getAllCredentials(): Promise<ProviderCredential[]> {
-  const rows = db.query(`SELECT * FROM provider_credentials`).all() as CredentialRow[];
+export async function getAllUserCredentials(userId: string): Promise<ProviderCredential[]> {
+  const rows = await db.select()
+    .from(providerCredentials)
+    .where(eq(providerCredentials.userId, userId));
   
   const credentials = await Promise.all(rows.map(row => decryptCredential(row)));
   return credentials;
@@ -271,24 +290,25 @@ export async function getAllCredentials(): Promise<ProviderCredential[]> {
 async function decryptCredential(row: CredentialRow): Promise<ProviderCredential> {
   const credential: ProviderCredential = {
     id: row.id,
-    providerId: row.provider_id,
-    authType: row.auth_type as AuthType,
-    tokenExpiresAt: row.token_expires_at || undefined,
-    oauthProvider: row.oauth_provider || undefined,
-    oauthScopes: row.oauth_scopes ? JSON.parse(row.oauth_scopes) : undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    userId: row.userId,
+    providerId: row.providerId,
+    authType: row.authType as AuthType,
+    tokenExpiresAt: row.tokenExpiresAt?.toISOString() || undefined,
+    oauthProvider: row.oauthProvider || undefined,
+    oauthScopes: row.oauthScopes ? JSON.parse(row.oauthScopes) : undefined,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
   };
 
   // Decrypt sensitive fields
-  if (row.api_key_encrypted) {
-    credential.apiKey = await decrypt(row.api_key_encrypted);
+  if (row.apiKeyEncrypted) {
+    credential.apiKey = await decrypt(row.apiKeyEncrypted);
   }
-  if (row.access_token_encrypted) {
-    credential.accessToken = await decrypt(row.access_token_encrypted);
+  if (row.accessTokenEncrypted) {
+    credential.accessToken = await decrypt(row.accessTokenEncrypted);
   }
-  if (row.refresh_token_encrypted) {
-    credential.refreshToken = await decrypt(row.refresh_token_encrypted);
+  if (row.refreshTokenEncrypted) {
+    credential.refreshToken = await decrypt(row.refreshTokenEncrypted);
   }
 
   return credential;

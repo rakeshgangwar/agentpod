@@ -65,13 +65,13 @@ export const activityRoutes = new Hono()
     const { limit, offset, action } = c.req.valid("query");
 
     try {
-      const activities = ActivityLogModel.listActivityLogsByUserId(userId, {
+      const activities = await ActivityLogModel.listActivityLogsByUserId(userId, {
         limit,
         offset,
         action: action as ActivityLogModel.ActivityAction | undefined,
       });
 
-      const total = ActivityLogModel.countActivityLogsByUserId(userId);
+      const total = await ActivityLogModel.countActivityLogsByUserId(userId);
 
       return c.json({
         activities,
@@ -102,12 +102,12 @@ export const activityRoutes = new Hono()
     const { startDate, endDate } = c.req.valid("query");
 
     try {
-      const stats = ActivityLogModel.getActivityStats({
+      const stats = await ActivityLogModel.getActivityStats({
         startDate,
         endDate,
       });
 
-      const total = ActivityLogModel.countActivityLogsByUserId(userId);
+      const total = await ActivityLogModel.countActivityLogsByUserId(userId);
 
       return c.json({
         total,
@@ -138,7 +138,7 @@ export const activityRoutes = new Hono()
     const { format, limit } = c.req.valid("query");
 
     try {
-      const activities = ActivityLogModel.listActivityLogsByUserId(userId, { limit });
+      const activities = await ActivityLogModel.listActivityLogsByUserId(userId, { limit });
 
       if (format === "csv") {
         // Generate CSV
@@ -194,7 +194,7 @@ export const activityRoutes = new Hono()
     const entityId = c.req.param("entityId");
 
     try {
-      const activities = ActivityLogModel.listActivityLogsByEntity(
+      const activities = await ActivityLogModel.listActivityLogsByEntity(
         entityType as ActivityLogModel.EntityType,
         entityId,
         { limit: 50 }

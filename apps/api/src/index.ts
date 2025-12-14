@@ -2,9 +2,8 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { config } from './config.ts';
-import { initDatabase } from './db/index.ts';
-import { runMigrations, migrations } from './db/migrations.ts';
-import { auth } from './auth/index.ts';
+import { initDatabase } from './db/drizzle.ts';
+import { auth } from './auth/drizzle-auth.ts';
 import { authMiddleware } from './auth/middleware.ts';
 import { healthRoutes } from './routes/health.ts';
 import { userRoutes } from './routes/users.ts';
@@ -29,13 +28,9 @@ import { activityLoggerMiddleware } from './middleware/activity-logger.ts';
 import { startSyncForRunningSandboxes, stopAllSync } from './services/sync/opencode-sync.ts';
 import { startArchivalService, stopArchivalService } from './services/sync/activity-archival.ts';
 
-// Initialize database
+// Initialize database (includes running migrations)
 console.log('Initializing database...');
-initDatabase();
-
-// Run migrations
-console.log('Running migrations...');
-runMigrations(migrations);
+await initDatabase();
 
 // Create the Hono app
 const app = new Hono()

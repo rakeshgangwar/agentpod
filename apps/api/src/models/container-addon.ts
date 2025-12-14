@@ -1,9 +1,13 @@
 /**
  * Container Addon Model
  * Optional features that can be added to containers
+ * 
+ * MIGRATED: Now uses PostgreSQL via Drizzle ORM
  */
 
-import { db } from '../db/index.ts';
+import { db } from '../db/drizzle';
+import { containerAddons } from '../db/schema/containers';
+import { eq, asc, inArray } from 'drizzle-orm';
 
 // =============================================================================
 // Types
@@ -22,59 +26,43 @@ export interface ContainerAddon {
   requiresFlavor: string | null; // Required flavor (if any)
   priceMonthly: number;          // Additional price per month in USD
   sortOrder: number;             // Display order
-  createdAt: string;
-  updatedAt: string;
-}
-
-// Database row type
-interface ContainerAddonRow {
-  id: string;
-  name: string;
-  description: string | null;
-  category: string;
-  image_size_mb: number | null;
-  port: number | null;
-  requires_gpu: number;
-  requires_flavor: string | null;
-  price_monthly: number;
-  sort_order: number;
-  created_at: string;
-  updated_at: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // =============================================================================
 // Helpers
 // =============================================================================
 
-function rowToContainerAddon(row: ContainerAddonRow): ContainerAddon {
+function rowToContainerAddon(row: typeof containerAddons.$inferSelect): ContainerAddon {
   return {
     id: row.id,
     name: row.name,
     description: row.description,
     category: row.category as AddonCategory,
-    imageSizeMb: row.image_size_mb,
+    imageSizeMb: row.imageSizeMb,
     port: row.port,
-    requiresGpu: row.requires_gpu === 1,
-    requiresFlavor: row.requires_flavor,
-    priceMonthly: row.price_monthly,
-    sortOrder: row.sort_order,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    requiresGpu: row.requiresGpu,
+    requiresFlavor: row.requiresFlavor,
+    priceMonthly: row.priceMonthly,
+    sortOrder: row.sortOrder,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   };
 }
 
 // =============================================================================
-// CRUD Operations
+// CRUD Operations (Async)
 // =============================================================================
 
 /**
  * Get all container addons, ordered by sort_order
  */
-export function getAllAddons(): ContainerAddon[] {
-  const rows = db.query(`
-    SELECT * FROM container_addons 
-    ORDER BY sort_order ASC
-  `).all() as ContainerAddonRow[];
+export async function getAllAddons(): Promise<ContainerAddon[]> {
+  const rows = await db
+    .select()
+    .from(containerAddons)
+    .orderBy(asc(containerAddons.sortOrder));
   
   return rows.map(rowToContainerAddon);
 }
@@ -82,11 +70,11 @@ export function getAllAddons(): ContainerAddon[] {
 /**
  * Get a container addon by ID
  */
-export function getAddonById(id: string): ContainerAddon | null {
-  const row = db.query(`
-    SELECT * FROM container_addons 
-    WHERE id = $id
-  `).get({ $id: id }) as ContainerAddonRow | null;
+export async function getAddonById(id: string): Promise<ContainerAddon | null> {
+  const [row] = await db
+    .select()
+    .from(containerAddons)
+    .where(eq(containerAddons.id, id));
   
   return row ? rowToContainerAddon(row) : null;
 }
@@ -94,12 +82,12 @@ export function getAddonById(id: string): ContainerAddon | null {
 /**
  * Get addons by category
  */
-export function getAddonsByCategory(category: AddonCategory): ContainerAddon[] {
-  const rows = db.query(`
-    SELECT * FROM container_addons 
-    WHERE category = $category
-    ORDER BY sort_order ASC
-  `).all({ $category: category }) as ContainerAddonRow[];
+export async function getAddonsByCategory(category: AddonCategory): Promise<ContainerAddon[]> {
+  const rows = await db
+    .select()
+    .from(containerAddons)
+    .where(eq(containerAddons.category, category))
+    .orderBy(asc(containerAddons.sortOrder));
   
   return rows.map(rowToContainerAddon);
 }
@@ -107,17 +95,14 @@ export function getAddonsByCategory(category: AddonCategory): ContainerAddon[] {
 /**
  * Get addons by IDs
  */
-export function getAddonsByIds(ids: string[]): ContainerAddon[] {
+export async function getAddonsByIds(ids: string[]): Promise<ContainerAddon[]> {
   if (ids.length === 0) return [];
   
-  const placeholders = ids.map((_, i) => `$id${i}`).join(', ');
-  const params = Object.fromEntries(ids.map((id, i) => [`$id${i}`, id]));
-  
-  const rows = db.query(`
-    SELECT * FROM container_addons 
-    WHERE id IN (${placeholders})
-    ORDER BY sort_order ASC
-  `).all(params) as ContainerAddonRow[];
+  const rows = await db
+    .select()
+    .from(containerAddons)
+    .where(inArray(containerAddons.id, ids))
+    .orderBy(asc(containerAddons.sortOrder));
   
   return rows.map(rowToContainerAddon);
 }
@@ -125,12 +110,12 @@ export function getAddonsByIds(ids: string[]): ContainerAddon[] {
 /**
  * Get addons that don't require GPU
  */
-export function getNonGpuAddons(): ContainerAddon[] {
-  const rows = db.query(`
-    SELECT * FROM container_addons 
-    WHERE requires_gpu = 0
-    ORDER BY sort_order ASC
-  `).all() as ContainerAddonRow[];
+export async function getNonGpuAddons(): Promise<ContainerAddon[]> {
+  const rows = await db
+    .select()
+    .from(containerAddons)
+    .where(eq(containerAddons.requiresGpu, false))
+    .orderBy(asc(containerAddons.sortOrder));
   
   return rows.map(rowToContainerAddon);
 }

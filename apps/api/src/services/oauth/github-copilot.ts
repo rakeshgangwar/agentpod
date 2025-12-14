@@ -11,9 +11,12 @@
  * Reference: https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow
  */
 
-import { db } from '../../db/index.ts';
+import { db } from '../../db/drizzle';
+import { oauthState } from '../../db/schema/providers';
+import { eq, lt, or, and, inArray } from 'drizzle-orm';
 import { createLogger } from '../../utils/logger.ts';
 import { saveOAuthToken } from '../../models/provider-credentials.ts';
+import { syncAuthJsonForUser } from '../config-sync.ts';
 
 const log = createLogger('github-copilot-oauth');
 
@@ -64,30 +67,16 @@ interface TokenResponse {
   error_description?: string;
 }
 
-// Database row type
-interface OAuthStateRow {
-  id: string;
-  provider_id: string;
-  device_code: string;
-  user_code: string;
-  verification_uri: string;
-  interval_seconds: number;
-  expires_at: string;
-  status: string;
-  error_message: string | null;
-  created_at: string;
-}
-
 // =============================================================================
 // Service
 // =============================================================================
 
 export const githubCopilotOAuth = {
   /**
-   * Initialize a new device flow authentication
+   * Initialize a new device flow authentication for a user
    */
-  async initDeviceFlow(): Promise<DeviceFlowInit> {
-    log.info('Initiating GitHub Copilot device flow');
+  async initDeviceFlow(userId: string): Promise<DeviceFlowInit> {
+    log.info('Initiating GitHub Copilot device flow', { userId });
 
     // Request device code from GitHub
     const response = await fetch(DEVICE_CODE_URL, {
@@ -117,23 +106,20 @@ export const githubCopilotOAuth = {
     const id = crypto.randomUUID();
 
     // Store in database
-    db.query(`
-      INSERT INTO oauth_state (
-        id, provider_id, device_code, user_code, verification_uri, 
-        interval_seconds, expires_at, status
-      )
-      VALUES ($id, $providerId, $deviceCode, $userCode, $verificationUri, $interval, $expiresAt, 'pending')
-    `).run({
-      $id: id,
-      $providerId: 'github-copilot',
-      $deviceCode: data.device_code,
-      $userCode: data.user_code,
-      $verificationUri: data.verification_uri,
-      $interval: data.interval,
-      $expiresAt: expiresAt.toISOString(),
+    await db.insert(oauthState).values({
+      id,
+      userId,
+      providerId: 'github-copilot',
+      deviceCode: data.device_code,
+      userCode: data.user_code,
+      verificationUri: data.verification_uri,
+      intervalSeconds: data.interval,
+      expiresAt,
+      status: 'pending',
+      createdAt: new Date(),
     });
 
-    log.info('Device flow initiated', { id, userCode: data.user_code });
+    log.info('Device flow initiated', { id, userId, userCode: data.user_code });
 
     return {
       id,
@@ -147,15 +133,21 @@ export const githubCopilotOAuth = {
   /**
    * Poll for the access token (called by client periodically)
    */
-  async pollToken(stateId: string): Promise<DeviceFlowStatus> {
-    log.debug('Polling for token', { stateId });
+  async pollToken(stateId: string, userId: string): Promise<DeviceFlowStatus> {
+    log.debug('Polling for token', { stateId, userId });
 
     // Get OAuth state from database
-    const state = db.query(`
-      SELECT * FROM oauth_state WHERE id = $id
-    `).get({ $id: stateId }) as OAuthStateRow | null;
+    const [state] = await db.select()
+      .from(oauthState)
+      .where(eq(oauthState.id, stateId));
 
     if (!state) {
+      return { status: 'error', error: 'Invalid state ID' };
+    }
+
+    // Verify this state belongs to the requesting user
+    if (state.userId !== userId) {
+      log.warn('User attempted to poll OAuth state that does not belong to them', { stateId, userId, stateUserId: state.userId });
       return { status: 'error', error: 'Invalid state ID' };
     }
 
@@ -165,9 +157,8 @@ export const githubCopilotOAuth = {
     }
 
     // Check if expired
-    const expiresAt = new Date(state.expires_at);
-    if (Date.now() > expiresAt.getTime()) {
-      this.updateState(stateId, 'expired');
+    if (Date.now() > state.expiresAt.getTime()) {
+      await this.updateState(stateId, 'expired');
       return { status: 'expired', error: 'Device flow expired' };
     }
 
@@ -181,7 +172,7 @@ export const githubCopilotOAuth = {
         },
         body: new URLSearchParams({
           client_id: GITHUB_COPILOT_CLIENT_ID,
-          device_code: state.device_code,
+          device_code: state.deviceCode,
           grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
         }),
       });
@@ -201,30 +192,36 @@ export const githubCopilotOAuth = {
             return { status: 'pending' };
 
           case 'expired_token':
-            this.updateState(stateId, 'expired');
+            await this.updateState(stateId, 'expired');
             return { status: 'expired', error: 'Device code expired' };
 
           case 'access_denied':
-            this.updateState(stateId, 'error', 'User denied access');
+            await this.updateState(stateId, 'error', 'User denied access');
             return { status: 'error', error: 'User denied access' };
 
           default:
-            this.updateState(stateId, 'error', data.error_description || data.error);
+            await this.updateState(stateId, 'error', data.error_description || data.error);
             return { status: 'error', error: data.error_description || data.error };
         }
       }
 
       if (data.access_token) {
-        // Success! Save the token
+        // Success! Save the token for this user
         await saveOAuthToken({
+          userId,
           providerId: 'github-copilot',
           accessToken: data.access_token,
           oauthProvider: 'github',
           scopes: data.scope?.split(' ') || SCOPES,
         });
 
-        this.updateState(stateId, 'completed');
-        log.info('GitHub Copilot OAuth completed successfully');
+        await this.updateState(stateId, 'completed');
+        log.info('GitHub Copilot OAuth completed successfully', { userId });
+
+        // Fire and forget: sync auth to running containers
+        syncAuthJsonForUser(userId).catch(err => {
+          log.warn('Failed to sync auth after OAuth', { userId, error: err instanceof Error ? err.message : err });
+        });
 
         return { status: 'completed' };
       }
@@ -240,47 +237,59 @@ export const githubCopilotOAuth = {
   /**
    * Get the current status of an OAuth flow
    */
-  getFlowStatus(stateId: string): DeviceFlowStatus | null {
-    const state = db.query(`
-      SELECT status, error_message, expires_at FROM oauth_state WHERE id = $id
-    `).get({ $id: stateId }) as Pick<OAuthStateRow, 'status' | 'error_message' | 'expires_at'> | null;
+  async getFlowStatus(stateId: string): Promise<DeviceFlowStatus | null> {
+    const [state] = await db.select({
+      status: oauthState.status,
+      errorMessage: oauthState.errorMessage,
+      expiresAt: oauthState.expiresAt,
+    })
+      .from(oauthState)
+      .where(eq(oauthState.id, stateId));
 
     if (!state) {
       return null;
     }
 
     // Check if expired
-    const expiresAt = new Date(state.expires_at);
-    if (Date.now() > expiresAt.getTime() && state.status === 'pending') {
-      this.updateState(stateId, 'expired');
+    if (Date.now() > state.expiresAt.getTime() && state.status === 'pending') {
+      await this.updateState(stateId, 'expired');
       return { status: 'expired', error: 'Device flow expired' };
     }
 
     return {
       status: state.status as DeviceFlowStatus['status'],
-      error: state.error_message || undefined,
+      error: state.errorMessage || undefined,
     };
   },
 
   /**
    * Cancel an OAuth flow
    */
-  cancelFlow(stateId: string): void {
-    db.query(`DELETE FROM oauth_state WHERE id = $id`).run({ $id: stateId });
+  async cancelFlow(stateId: string): Promise<void> {
+    await db.delete(oauthState).where(eq(oauthState.id, stateId));
     log.info('OAuth flow cancelled', { stateId });
   },
 
   /**
    * Clean up expired OAuth states
    */
-  cleanupExpired(): number {
-    const result = db.query(`
-      DELETE FROM oauth_state 
-      WHERE expires_at < datetime('now') 
-      OR (status IN ('completed', 'expired', 'error') AND created_at < datetime('now', '-1 hour'))
-    `).run();
+  async cleanupExpired(): Promise<number> {
+    const now = new Date();
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
-    const deleted = (result as unknown as { changes: number }).changes;
+    const result = await db.delete(oauthState)
+      .where(
+        or(
+          lt(oauthState.expiresAt, now),
+          and(
+            inArray(oauthState.status, ['completed', 'expired', 'error']),
+            lt(oauthState.createdAt, oneHourAgo)
+          )
+        )
+      )
+      .returning({ id: oauthState.id });
+
+    const deleted = result.length;
     if (deleted > 0) {
       log.info('Cleaned up expired OAuth states', { count: deleted });
     }
@@ -290,15 +299,12 @@ export const githubCopilotOAuth = {
   /**
    * Update OAuth state in database
    */
-  updateState(stateId: string, status: string, errorMessage?: string): void {
-    db.query(`
-      UPDATE oauth_state 
-      SET status = $status, error_message = $errorMessage 
-      WHERE id = $id
-    `).run({
-      $id: stateId,
-      $status: status,
-      $errorMessage: errorMessage || null,
-    });
+  async updateState(stateId: string, status: string, errorMessage?: string): Promise<void> {
+    await db.update(oauthState)
+      .set({
+        status: status as 'pending' | 'completed' | 'expired' | 'error',
+        errorMessage: errorMessage || null,
+      })
+      .where(eq(oauthState.id, stateId));
   },
 };

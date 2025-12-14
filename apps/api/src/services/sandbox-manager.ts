@@ -17,7 +17,9 @@
 
 import { nanoid } from "nanoid";
 import { config } from "../config.ts";
-import { db } from "../db/index.ts";
+import { db } from "../db/drizzle";
+import { settings } from "../db/schema/settings";
+import { eq } from "drizzle-orm";
 import { DockerOrchestrator } from "./orchestrator/docker.ts";
 import { FileSystemGitBackend } from "./git/filesystem.ts";
 import {
@@ -167,9 +169,10 @@ export class SandboxManager {
 
     try {
       // Check if migration is pending
-      const result = db.query<{ value: string }, []>(
-        "SELECT value FROM settings WHERE key = 'docker_sandbox_migration_pending'"
-      ).get();
+      const [result] = await db
+        .select()
+        .from(settings)
+        .where(eq(settings.key, 'docker_sandbox_migration_pending'));
 
       if (result?.value !== 'true') {
         return; // Migration already done or not needed
@@ -179,9 +182,10 @@ export class SandboxManager {
       await this.migrateDockerSandboxesToDb();
 
       // Mark migration as complete
-      db.run(
-        "UPDATE settings SET value = 'false', updated_at = datetime('now') WHERE key = 'docker_sandbox_migration_pending'"
-      );
+      await db
+        .update(settings)
+        .set({ value: 'false', updatedAt: new Date() })
+        .where(eq(settings.key, 'docker_sandbox_migration_pending'));
       log.info("Docker-to-DB sandbox migration complete");
     } catch (error) {
       log.error("Docker-to-DB migration failed", { error });
@@ -207,11 +211,11 @@ export class SandboxManager {
       }
 
       // Check if already in database
-      const existing = SandboxModel.getSandboxById(sandboxId);
+      const existing = await SandboxModel.getSandboxById(sandboxId);
       if (existing) {
         // Update container info if changed
         if (existing.containerId !== dockerSandbox.containerId || existing.status !== dockerStatusToDbStatus(dockerSandbox.status)) {
-          SandboxModel.updateSandbox(sandboxId, {
+          await SandboxModel.updateSandbox(sandboxId, {
             containerId: dockerSandbox.containerId,
             containerName: labels["agentpod.sandbox.name"],
             status: dockerStatusToDbStatus(dockerSandbox.status),
@@ -225,7 +229,7 @@ export class SandboxManager {
 
       // Create new DB record from Docker labels
       try {
-        SandboxModel.createSandbox({
+        await SandboxModel.createSandbox({
           id: sandboxId,
           userId,
           name: labels["agentpod.sandbox.name"] ?? `Sandbox ${sandboxId}`,
@@ -239,7 +243,7 @@ export class SandboxManager {
         });
 
         // Update with container runtime info
-        SandboxModel.updateSandbox(sandboxId, {
+        await SandboxModel.updateSandbox(sandboxId, {
           containerId: dockerSandbox.containerId,
           containerName: labels["agentpod.sandbox.name"],
           status: dockerStatusToDbStatus(dockerSandbox.status),
@@ -289,7 +293,7 @@ export class SandboxManager {
           // Sync status if different
           const currentDbStatus = dockerStatusToDbStatus(dockerSandbox.status);
           if (dbSandbox.status !== currentDbStatus) {
-            SandboxModel.updateSandboxStatus(dbSandbox.id, currentDbStatus);
+            await SandboxModel.updateSandboxStatus(dbSandbox.id, currentDbStatus);
             sandbox.status = currentDbStatus;
           }
 
@@ -297,7 +301,7 @@ export class SandboxManager {
           if (dockerSandbox.urls.opencode !== dbSandbox.opencodeUrl ||
               dockerSandbox.urls.vnc !== dbSandbox.vncUrl ||
               dockerSandbox.urls.codeServer !== dbSandbox.codeServerUrl) {
-            SandboxModel.updateSandbox(dbSandbox.id, {
+            await SandboxModel.updateSandbox(dbSandbox.id, {
               opencodeUrl: dockerSandbox.urls.opencode,
               vncUrl: dockerSandbox.urls.vnc,
               codeServerUrl: dockerSandbox.urls.codeServer,
@@ -339,7 +343,7 @@ export class SandboxManager {
 
     // Generate unique sandbox ID and slug
     const sandboxId = nanoid(12);
-    const slug = SandboxModel.generateUniqueSlug(userId, name);
+    const slug = await SandboxModel.generateUniqueSlug(userId, name);
     const repoName = `${slug}-${sandboxId}`;
 
     log.info("Creating sandbox", { sandboxId, name, slug, githubUrl, userId });
@@ -373,7 +377,7 @@ export class SandboxManager {
     // Step 2: Create DB record (before Docker container)
     let dbSandbox: DbSandbox;
     try {
-      dbSandbox = SandboxModel.createSandbox({
+      dbSandbox = await SandboxModel.createSandbox({
         id: sandboxId,
         userId,
         name,
@@ -463,7 +467,7 @@ export class SandboxManager {
 
     // Step 5: Inject OpenCode configuration
     try {
-      const authJson = await buildOpenCodeAuthJson();
+      const authJson = await buildOpenCodeAuthJson(userId);
       if (authJson && authJson !== "{}") {
         containerSpec.env = {
           ...containerSpec.env,
@@ -472,7 +476,7 @@ export class SandboxManager {
         log.debug("Injected OpenCode auth configuration");
       }
 
-      const userConfig = getUserOpencodeFullConfig(userId);
+      const userConfig = await getUserOpencodeFullConfig(userId);
       if (userConfig) {
         containerSpec.env = {
           ...containerSpec.env,
@@ -506,17 +510,17 @@ export class SandboxManager {
     let dockerSandbox: DockerSandbox;
     try {
       log.info("Creating container", { sandboxId, image: containerSpec.image });
-      SandboxModel.updateSandboxStatus(sandboxId, 'starting');
+      await SandboxModel.updateSandboxStatus(sandboxId, 'starting');
       dockerSandbox = await this.orchestrator.createSandbox(containerSpec);
       log.info("Container created", { sandboxId, containerId: dockerSandbox.containerId });
     } catch (error) {
       // Update DB status to error, cleanup repository
       log.error("Failed to create container", { error });
-      SandboxModel.updateSandboxStatus(sandboxId, 'error', error instanceof Error ? error.message : "Container creation failed");
+      await SandboxModel.updateSandboxStatus(sandboxId, 'error', error instanceof Error ? error.message : "Container creation failed");
       
       try {
         await this.gitBackend.deleteRepo(repoName);
-        SandboxModel.deleteSandbox(sandboxId);
+        await SandboxModel.deleteSandbox(sandboxId);
       } catch (cleanupError) {
         log.warn("Failed to cleanup after container creation failure", { cleanupError });
       }
@@ -524,7 +528,7 @@ export class SandboxManager {
     }
 
     // Step 7: Update DB with container info
-    SandboxModel.updateSandbox(sandboxId, {
+    await SandboxModel.updateSandbox(sandboxId, {
       containerId: dockerSandbox.containerId,
       containerName: dockerSandbox.name,
       status: dockerStatusToDbStatus(dockerSandbox.status),
@@ -537,7 +541,7 @@ export class SandboxManager {
     if (autoStart) {
       try {
         await this.orchestrator.startSandbox(sandboxId);
-        SandboxModel.updateSandboxStatus(sandboxId, 'running');
+        await SandboxModel.updateSandboxStatus(sandboxId, 'running');
         log.info("Container started", { sandboxId });
         
         // Start sync service for this sandbox
@@ -547,16 +551,36 @@ export class SandboxManager {
           log.warn("Failed to start sync for sandbox", { sandboxId, error: syncError });
           // Don't fail the creation if sync fails
         }
-      } catch (error) {
-        log.warn("Failed to auto-start container", { sandboxId, error });
-        SandboxModel.updateSandboxStatus(sandboxId, 'error', 'Failed to auto-start');
+      } catch (error: unknown) {
+        // Check if container is already started (304 status code)
+        const errObj = error as Record<string, unknown> | null;
+        const isAlreadyStarted = errObj && (
+          errObj.statusCode === 304 ||
+          (typeof errObj.reason === 'string' && errObj.reason.includes('already started'))
+        );
+        
+        if (isAlreadyStarted) {
+          // Container already running, this is fine
+          log.info("Container already started", { sandboxId });
+          await SandboxModel.updateSandboxStatus(sandboxId, 'running');
+          
+          // Start sync service for this sandbox
+          try {
+            await getOpenCodeSyncService().startSync(sandboxId);
+          } catch (syncError) {
+            log.warn("Failed to start sync for sandbox", { sandboxId, error: syncError });
+          }
+        } else {
+          log.warn("Failed to auto-start container", { sandboxId, error });
+          await SandboxModel.updateSandboxStatus(sandboxId, 'error', 'Failed to auto-start');
+        }
       }
     } else {
-      SandboxModel.updateSandboxStatus(sandboxId, 'stopped');
+      await SandboxModel.updateSandboxStatus(sandboxId, 'stopped');
     }
 
     // Get final sandbox state
-    const finalSandbox = SandboxModel.getSandboxById(sandboxId);
+    const finalSandbox = await SandboxModel.getSandboxById(sandboxId);
     if (!finalSandbox) {
       throw new Error("Sandbox created but not found in database");
     }
@@ -572,17 +596,17 @@ export class SandboxManager {
     await this.checkAndRunMigration();
     log.info("Starting sandbox", { sandboxId });
 
-    const dbSandbox = SandboxModel.getSandboxById(sandboxId);
+    const dbSandbox = await SandboxModel.getSandboxById(sandboxId);
     if (!dbSandbox) {
       throw new Error(`Sandbox not found: ${sandboxId}`);
     }
 
-    SandboxModel.updateSandboxStatus(sandboxId, 'starting');
+    await SandboxModel.updateSandboxStatus(sandboxId, 'starting');
     
     try {
       await this.orchestrator.startSandbox(sandboxId);
-      SandboxModel.updateSandboxStatus(sandboxId, 'running');
-      SandboxModel.touchSandbox(sandboxId);
+      await SandboxModel.updateSandboxStatus(sandboxId, 'running');
+      await SandboxModel.touchSandbox(sandboxId);
       
       // Start sync service for this sandbox
       try {
@@ -592,7 +616,7 @@ export class SandboxManager {
         // Don't fail the start if sync fails
       }
     } catch (error) {
-      SandboxModel.updateSandboxStatus(sandboxId, 'error', error instanceof Error ? error.message : 'Start failed');
+      await SandboxModel.updateSandboxStatus(sandboxId, 'error', error instanceof Error ? error.message : 'Start failed');
       throw error;
     }
   }
@@ -604,7 +628,7 @@ export class SandboxManager {
     await this.checkAndRunMigration();
     log.info("Stopping sandbox", { sandboxId, timeout });
 
-    const dbSandbox = SandboxModel.getSandboxById(sandboxId);
+    const dbSandbox = await SandboxModel.getSandboxById(sandboxId);
     if (!dbSandbox) {
       throw new Error(`Sandbox not found: ${sandboxId}`);
     }
@@ -617,13 +641,13 @@ export class SandboxManager {
       // Don't fail the stop if sync stop fails
     }
 
-    SandboxModel.updateSandboxStatus(sandboxId, 'stopping');
+    await SandboxModel.updateSandboxStatus(sandboxId, 'stopping');
     
     try {
       await this.orchestrator.stopSandbox(sandboxId, timeout);
-      SandboxModel.updateSandboxStatus(sandboxId, 'stopped');
+      await SandboxModel.updateSandboxStatus(sandboxId, 'stopped');
     } catch (error) {
-      SandboxModel.updateSandboxStatus(sandboxId, 'error', error instanceof Error ? error.message : 'Stop failed');
+      await SandboxModel.updateSandboxStatus(sandboxId, 'error', error instanceof Error ? error.message : 'Stop failed');
       throw error;
     }
   }
@@ -635,19 +659,19 @@ export class SandboxManager {
     await this.checkAndRunMigration();
     log.info("Restarting sandbox", { sandboxId });
 
-    const dbSandbox = SandboxModel.getSandboxById(sandboxId);
+    const dbSandbox = await SandboxModel.getSandboxById(sandboxId);
     if (!dbSandbox) {
       throw new Error(`Sandbox not found: ${sandboxId}`);
     }
 
-    SandboxModel.updateSandboxStatus(sandboxId, 'starting');
+    await SandboxModel.updateSandboxStatus(sandboxId, 'starting');
     
     try {
       await this.orchestrator.restartSandbox(sandboxId, timeout);
-      SandboxModel.updateSandboxStatus(sandboxId, 'running');
-      SandboxModel.touchSandbox(sandboxId);
+      await SandboxModel.updateSandboxStatus(sandboxId, 'running');
+      await SandboxModel.touchSandbox(sandboxId);
     } catch (error) {
-      SandboxModel.updateSandboxStatus(sandboxId, 'error', error instanceof Error ? error.message : 'Restart failed');
+      await SandboxModel.updateSandboxStatus(sandboxId, 'error', error instanceof Error ? error.message : 'Restart failed');
       throw error;
     }
   }
@@ -659,12 +683,12 @@ export class SandboxManager {
     await this.checkAndRunMigration();
     log.info("Pausing sandbox", { sandboxId });
 
-    if (!SandboxModel.getSandboxById(sandboxId)) {
+    if (!(await SandboxModel.getSandboxById(sandboxId))) {
       throw new Error(`Sandbox not found: ${sandboxId}`);
     }
 
     await this.orchestrator.pauseSandbox(sandboxId);
-    SandboxModel.updateSandboxStatus(sandboxId, 'stopped');
+    await SandboxModel.updateSandboxStatus(sandboxId, 'stopped');
   }
 
   /**
@@ -674,14 +698,14 @@ export class SandboxManager {
     await this.checkAndRunMigration();
     log.info("Unpausing sandbox", { sandboxId });
 
-    const dbSandbox = SandboxModel.getSandboxById(sandboxId);
+    const dbSandbox = await SandboxModel.getSandboxById(sandboxId);
     if (!dbSandbox) {
       throw new Error(`Sandbox not found: ${sandboxId}`);
     }
 
     await this.orchestrator.unpauseSandbox(sandboxId);
-    SandboxModel.updateSandboxStatus(sandboxId, 'running');
-    SandboxModel.touchSandbox(sandboxId);
+    await SandboxModel.updateSandboxStatus(sandboxId, 'running');
+    await SandboxModel.touchSandbox(sandboxId);
   }
 
   /**
@@ -705,7 +729,7 @@ export class SandboxManager {
     }
 
     // Get sandbox from DB (source of truth)
-    const dbSandbox = SandboxModel.getSandboxById(sandboxId);
+    const dbSandbox = await SandboxModel.getSandboxById(sandboxId);
     const repoName = dbSandbox?.repoName;
 
     // Delete container
@@ -728,7 +752,7 @@ export class SandboxManager {
 
     // Delete from database
     if (dbSandbox) {
-      SandboxModel.deleteSandbox(sandboxId);
+      await SandboxModel.deleteSandbox(sandboxId);
       log.info("Sandbox DB record deleted", { sandboxId });
     }
   }
@@ -743,7 +767,7 @@ export class SandboxManager {
   async getSandbox(sandboxId: string): Promise<Sandbox | null> {
     await this.checkAndRunMigration();
     
-    const dbSandbox = SandboxModel.getSandboxById(sandboxId);
+    const dbSandbox = await SandboxModel.getSandboxById(sandboxId);
     if (!dbSandbox) return null;
 
     return this.enrichSandboxWithDocker(dbSandbox);
@@ -755,7 +779,7 @@ export class SandboxManager {
   async getSandboxInfo(sandboxId: string): Promise<SandboxInfo | null> {
     await this.checkAndRunMigration();
     
-    const dbSandbox = SandboxModel.getSandboxById(sandboxId);
+    const dbSandbox = await SandboxModel.getSandboxById(sandboxId);
     if (!dbSandbox) return null;
 
     const sandbox = await this.enrichSandboxWithDocker(dbSandbox);
@@ -773,7 +797,7 @@ export class SandboxManager {
     }
 
     // Update last accessed
-    SandboxModel.touchSandbox(sandboxId);
+    await SandboxModel.touchSandbox(sandboxId);
 
     return { sandbox, repository, config: sandboxConfig };
   }
@@ -790,9 +814,9 @@ export class SandboxManager {
     let dbSandboxes: DbSandbox[];
 
     if (filter?.userId) {
-      dbSandboxes = SandboxModel.listSandboxesByUserId(filter.userId);
+      dbSandboxes = await SandboxModel.listSandboxesByUserId(filter.userId);
     } else {
-      dbSandboxes = SandboxModel.listAllSandboxes();
+      dbSandboxes = await SandboxModel.listAllSandboxes();
     }
 
     // Filter by status if provided
@@ -815,7 +839,7 @@ export class SandboxManager {
   async getSandboxStatus(sandboxId: string) {
     await this.checkAndRunMigration();
     
-    const dbSandbox = SandboxModel.getSandboxById(sandboxId);
+    const dbSandbox = await SandboxModel.getSandboxById(sandboxId);
     if (!dbSandbox) {
       throw new Error(`Sandbox not found: ${sandboxId}`);
     }
@@ -830,7 +854,7 @@ export class SandboxManager {
   async getSandboxStats(sandboxId: string): Promise<SandboxStats> {
     await this.checkAndRunMigration();
     
-    const dbSandbox = SandboxModel.getSandboxById(sandboxId);
+    const dbSandbox = await SandboxModel.getSandboxById(sandboxId);
     if (!dbSandbox) {
       throw new Error(`Sandbox not found: ${sandboxId}`);
     }
@@ -847,7 +871,7 @@ export class SandboxManager {
   ): Promise<string> {
     await this.checkAndRunMigration();
     
-    const dbSandbox = SandboxModel.getSandboxById(sandboxId);
+    const dbSandbox = await SandboxModel.getSandboxById(sandboxId);
     if (!dbSandbox) {
       throw new Error(`Sandbox not found: ${sandboxId}`);
     }
@@ -883,7 +907,7 @@ export class SandboxManager {
   ) {
     await this.checkAndRunMigration();
     
-    const dbSandbox = SandboxModel.getSandboxById(sandboxId);
+    const dbSandbox = await SandboxModel.getSandboxById(sandboxId);
     if (!dbSandbox) {
       throw new Error(`Sandbox not found: ${sandboxId}`);
     }
@@ -901,7 +925,7 @@ export class SandboxManager {
   async getRepository(sandboxId: string): Promise<Repository | null> {
     await this.checkAndRunMigration();
     
-    const dbSandbox = SandboxModel.getSandboxById(sandboxId);
+    const dbSandbox = await SandboxModel.getSandboxById(sandboxId);
     if (!dbSandbox) return null;
 
     return this.gitBackend.getRepo(dbSandbox.repoName);
@@ -984,21 +1008,6 @@ export class SandboxManager {
    * Get Docker image for a flavor
    */
   private getImageForFlavor(flavor: string): string {
-    // In development mode, use the AgentPod base image which has OpenCode pre-installed
-    if (config.nodeEnv === "development") {
-      // Use codeopen-js:dev for development
-      // Build it with: docker build -t codeopen-js:dev docker/flavors/js
-      const devImage = "codeopen-js:dev";
-      
-      log.debug("Using development image", { 
-        flavor, 
-        image: devImage,
-      });
-      
-      return devImage;
-    }
-
-    // Production: use registry images
     const flavorImages: Record<string, string> = {
       js: "codeopen-js",
       python: "codeopen-python",
@@ -1009,6 +1018,21 @@ export class SandboxManager {
     };
 
     const imageName = flavorImages[flavor] ?? flavorImages.fullstack;
+
+    // In development mode, use local images with :latest or :dev tag
+    if (config.nodeEnv === "development") {
+      // Try local image with version tag first, fallback to latest
+      const devImage = `${imageName}:${config.registry.version}`;
+      
+      log.debug("Using development image", { 
+        flavor, 
+        image: devImage,
+      });
+      
+      return devImage;
+    }
+
+    // Production: use registry images
     return `${config.registry.url}/${config.registry.owner}/${imageName}:${config.registry.version}`;
   }
 

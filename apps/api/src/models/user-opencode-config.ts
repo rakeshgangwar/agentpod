@@ -7,7 +7,9 @@
  * - OPENCODE_CONFIG_DIR: Points to user's config directory (agents, commands, etc.)
  */
 
-import { db } from '../db/index.ts';
+import { db } from '../db/drizzle';
+import { userOpencodeConfig, userOpencodeFiles } from '../db/schema/settings';
+import { eq, and } from 'drizzle-orm';
 import { createLogger } from '../utils/logger.ts';
 
 const log = createLogger('user-opencode-config');
@@ -108,90 +110,91 @@ export interface UserOpencodeFullConfig {
 /**
  * Get user's OpenCode config (settings + AGENTS.md)
  */
-export function getUserOpencodeConfig(userId: string): UserOpencodeConfig | null {
-  const row = db.query<{
-    id: string;
-    user_id: string;
-    settings: string;
-    agents_md: string | null;
-    created_at: string;
-    updated_at: string;
-  }, [string]>(
-    'SELECT * FROM user_opencode_config WHERE user_id = ?'
-  ).get(userId);
+export async function getUserOpencodeConfig(userId: string): Promise<UserOpencodeConfig | null> {
+  const [row] = await db.select()
+    .from(userOpencodeConfig)
+    .where(eq(userOpencodeConfig.userId, userId));
 
   if (!row) return null;
 
   return {
     id: row.id,
-    userId: row.user_id,
+    userId: row.userId,
     settings: JSON.parse(row.settings || '{}'),
-    agentsMd: row.agents_md ?? undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    agentsMd: row.agentsMd ?? undefined,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
   };
 }
 
 /**
  * Create or update user's OpenCode config
  */
-export function upsertUserOpencodeConfig(
+export async function upsertUserOpencodeConfig(
   userId: string,
   settings: OpencodeSettings,
   agentsMd?: string
-): UserOpencodeConfig {
-  const existing = getUserOpencodeConfig(userId);
-  const now = new Date().toISOString();
+): Promise<UserOpencodeConfig> {
+  const existing = await getUserOpencodeConfig(userId);
+  const now = new Date();
 
   if (existing) {
-    db.run(
-      `UPDATE user_opencode_config 
-       SET settings = ?, agents_md = ?, updated_at = ? 
-       WHERE user_id = ?`,
-      [JSON.stringify(settings), agentsMd ?? null, now, userId]
-    );
+    await db.update(userOpencodeConfig)
+      .set({
+        settings: JSON.stringify(settings),
+        agentsMd: agentsMd ?? null,
+        updatedAt: now,
+      })
+      .where(eq(userOpencodeConfig.userId, userId));
     log.info('Updated user OpenCode config', { userId });
   } else {
     const id = crypto.randomUUID();
-    db.run(
-      `INSERT INTO user_opencode_config (id, user_id, settings, agents_md, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, userId, JSON.stringify(settings), agentsMd ?? null, now, now]
-    );
+    await db.insert(userOpencodeConfig)
+      .values({
+        id,
+        userId,
+        settings: JSON.stringify(settings),
+        agentsMd: agentsMd ?? null,
+        createdAt: now,
+        updatedAt: now,
+      });
     log.info('Created user OpenCode config', { userId });
   }
 
-  return getUserOpencodeConfig(userId)!;
+  return (await getUserOpencodeConfig(userId))!;
 }
 
 /**
  * Update only the settings portion
  */
-export function updateUserOpencodeSettings(
+export async function updateUserOpencodeSettings(
   userId: string,
   settings: OpencodeSettings
-): UserOpencodeConfig {
-  const existing = getUserOpencodeConfig(userId);
+): Promise<UserOpencodeConfig> {
+  const existing = await getUserOpencodeConfig(userId);
   return upsertUserOpencodeConfig(userId, settings, existing?.agentsMd);
 }
 
 /**
  * Update only the AGENTS.md portion
  */
-export function updateUserAgentsMd(
+export async function updateUserAgentsMd(
   userId: string,
   agentsMd: string
-): UserOpencodeConfig {
-  const existing = getUserOpencodeConfig(userId);
+): Promise<UserOpencodeConfig> {
+  const existing = await getUserOpencodeConfig(userId);
   return upsertUserOpencodeConfig(userId, existing?.settings ?? {}, agentsMd);
 }
 
 /**
  * Delete user's OpenCode config
  */
-export function deleteUserOpencodeConfig(userId: string): boolean {
-  const result = db.run('DELETE FROM user_opencode_config WHERE user_id = ?', [userId]);
-  if (result.changes > 0) {
+export async function deleteUserOpencodeConfig(userId: string): Promise<boolean> {
+  const result = await db.delete(userOpencodeConfig)
+    .where(eq(userOpencodeConfig.userId, userId))
+    .returning({ id: userOpencodeConfig.id });
+  
+  if (result.length > 0) {
     log.info('Deleted user OpenCode config', { userId });
     return true;
   }
@@ -205,125 +208,129 @@ export function deleteUserOpencodeConfig(userId: string): boolean {
 /**
  * List all files for a user
  */
-export function listUserOpencodeFiles(
+export async function listUserOpencodeFiles(
   userId: string,
   type?: 'agent' | 'command' | 'tool' | 'plugin'
-): UserOpencodeFile[] {
-  let query = 'SELECT * FROM user_opencode_files WHERE user_id = ?';
-  const params: (string)[] = [userId];
+): Promise<UserOpencodeFile[]> {
+  let query = db.select()
+    .from(userOpencodeFiles)
+    .where(eq(userOpencodeFiles.userId, userId))
+    .orderBy(userOpencodeFiles.type, userOpencodeFiles.name);
 
-  if (type) {
-    query += ' AND type = ?';
-    params.push(type);
-  }
-
-  query += ' ORDER BY type, name';
-
-  const rows = db.query<{
-    id: string;
-    user_id: string;
-    type: string;
-    name: string;
-    extension: string;
-    content: string;
-    created_at: string;
-    updated_at: string;
-  }, (string)[]>(query).all(...params);
+  const rows = type
+    ? await db.select()
+        .from(userOpencodeFiles)
+        .where(and(
+          eq(userOpencodeFiles.userId, userId),
+          eq(userOpencodeFiles.type, type)
+        ))
+        .orderBy(userOpencodeFiles.type, userOpencodeFiles.name)
+    : await query;
 
   return rows.map(row => ({
     id: row.id,
-    userId: row.user_id,
+    userId: row.userId,
     type: row.type as 'agent' | 'command' | 'tool' | 'plugin',
     name: row.name,
     extension: row.extension as 'md' | 'ts' | 'js',
     content: row.content,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
   }));
 }
 
 /**
  * Get a specific file
  */
-export function getUserOpencodeFile(
+export async function getUserOpencodeFile(
   userId: string,
   type: string,
   name: string
-): UserOpencodeFile | null {
-  const row = db.query<{
-    id: string;
-    user_id: string;
-    type: string;
-    name: string;
-    extension: string;
-    content: string;
-    created_at: string;
-    updated_at: string;
-  }, [string, string, string]>(
-    'SELECT * FROM user_opencode_files WHERE user_id = ? AND type = ? AND name = ?'
-  ).get(userId, type, name);
+): Promise<UserOpencodeFile | null> {
+  const [row] = await db.select()
+    .from(userOpencodeFiles)
+    .where(and(
+      eq(userOpencodeFiles.userId, userId),
+      eq(userOpencodeFiles.type, type as 'agent' | 'command' | 'tool' | 'plugin'),
+      eq(userOpencodeFiles.name, name)
+    ));
 
   if (!row) return null;
 
   return {
     id: row.id,
-    userId: row.user_id,
+    userId: row.userId,
     type: row.type as 'agent' | 'command' | 'tool' | 'plugin',
     name: row.name,
     extension: row.extension as 'md' | 'ts' | 'js',
     content: row.content,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
   };
 }
 
 /**
  * Create or update a file
  */
-export function upsertUserOpencodeFile(
+export async function upsertUserOpencodeFile(
   userId: string,
   type: 'agent' | 'command' | 'tool' | 'plugin',
   name: string,
   extension: 'md' | 'ts' | 'js',
   content: string
-): UserOpencodeFile {
-  const existing = getUserOpencodeFile(userId, type, name);
-  const now = new Date().toISOString();
+): Promise<UserOpencodeFile> {
+  const existing = await getUserOpencodeFile(userId, type, name);
+  const now = new Date();
 
   if (existing) {
-    db.run(
-      `UPDATE user_opencode_files 
-       SET extension = ?, content = ?, updated_at = ? 
-       WHERE user_id = ? AND type = ? AND name = ?`,
-      [extension, content, now, userId, type, name]
-    );
+    await db.update(userOpencodeFiles)
+      .set({
+        extension,
+        content,
+        updatedAt: now,
+      })
+      .where(and(
+        eq(userOpencodeFiles.userId, userId),
+        eq(userOpencodeFiles.type, type),
+        eq(userOpencodeFiles.name, name)
+      ));
     log.info('Updated user OpenCode file', { userId, type, name });
   } else {
     const id = crypto.randomUUID();
-    db.run(
-      `INSERT INTO user_opencode_files (id, user_id, type, name, extension, content, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, userId, type, name, extension, content, now, now]
-    );
+    await db.insert(userOpencodeFiles)
+      .values({
+        id,
+        userId,
+        type,
+        name,
+        extension,
+        content,
+        createdAt: now,
+        updatedAt: now,
+      });
     log.info('Created user OpenCode file', { userId, type, name });
   }
 
-  return getUserOpencodeFile(userId, type, name)!;
+  return (await getUserOpencodeFile(userId, type, name))!;
 }
 
 /**
  * Delete a file
  */
-export function deleteUserOpencodeFile(
+export async function deleteUserOpencodeFile(
   userId: string,
   type: string,
   name: string
-): boolean {
-  const result = db.run(
-    'DELETE FROM user_opencode_files WHERE user_id = ? AND type = ? AND name = ?',
-    [userId, type, name]
-  );
-  if (result.changes > 0) {
+): Promise<boolean> {
+  const result = await db.delete(userOpencodeFiles)
+    .where(and(
+      eq(userOpencodeFiles.userId, userId),
+      eq(userOpencodeFiles.type, type as 'agent' | 'command' | 'tool' | 'plugin'),
+      eq(userOpencodeFiles.name, name)
+    ))
+    .returning({ id: userOpencodeFiles.id });
+  
+  if (result.length > 0) {
     log.info('Deleted user OpenCode file', { userId, type, name });
     return true;
   }
@@ -333,32 +340,35 @@ export function deleteUserOpencodeFile(
 /**
  * Delete all files of a type
  */
-export function deleteUserOpencodeFilesByType(
+export async function deleteUserOpencodeFilesByType(
   userId: string,
   type: string
-): number {
-  const result = db.run(
-    'DELETE FROM user_opencode_files WHERE user_id = ? AND type = ?',
-    [userId, type]
-  );
-  if (result.changes > 0) {
-    log.info('Deleted user OpenCode files', { userId, type, count: result.changes });
+): Promise<number> {
+  const result = await db.delete(userOpencodeFiles)
+    .where(and(
+      eq(userOpencodeFiles.userId, userId),
+      eq(userOpencodeFiles.type, type as 'agent' | 'command' | 'tool' | 'plugin')
+    ))
+    .returning({ id: userOpencodeFiles.id });
+  
+  if (result.length > 0) {
+    log.info('Deleted user OpenCode files', { userId, type, count: result.length });
   }
-  return result.changes;
+  return result.length;
 }
 
 /**
  * Delete all files for a user
  */
-export function deleteAllUserOpencodeFiles(userId: string): number {
-  const result = db.run(
-    'DELETE FROM user_opencode_files WHERE user_id = ?',
-    [userId]
-  );
-  if (result.changes > 0) {
-    log.info('Deleted all user OpenCode files', { userId, count: result.changes });
+export async function deleteAllUserOpencodeFiles(userId: string): Promise<number> {
+  const result = await db.delete(userOpencodeFiles)
+    .where(eq(userOpencodeFiles.userId, userId))
+    .returning({ id: userOpencodeFiles.id });
+  
+  if (result.length > 0) {
+    log.info('Deleted all user OpenCode files', { userId, count: result.length });
   }
-  return result.changes;
+  return result.length;
 }
 
 // =============================================================================
@@ -369,9 +379,9 @@ export function deleteAllUserOpencodeFiles(userId: string): number {
  * Get full user config (settings + files) for container startup
  * This is what the entrypoint script fetches
  */
-export function getUserOpencodeFullConfig(userId: string): UserOpencodeFullConfig {
-  const config = getUserOpencodeConfig(userId);
-  const files = listUserOpencodeFiles(userId);
+export async function getUserOpencodeFullConfig(userId: string): Promise<UserOpencodeFullConfig> {
+  const config = await getUserOpencodeConfig(userId);
+  const files = await listUserOpencodeFiles(userId);
 
   return {
     settings: config?.settings ?? {},
@@ -403,8 +413,8 @@ export function getDefaultOpencodeSettings(): OpencodeSettings {
 /**
  * Initialize config for a new user with defaults
  */
-export function initializeUserOpencodeConfig(userId: string): UserOpencodeConfig {
-  const existing = getUserOpencodeConfig(userId);
+export async function initializeUserOpencodeConfig(userId: string): Promise<UserOpencodeConfig> {
+  const existing = await getUserOpencodeConfig(userId);
   if (existing) return existing;
 
   return upsertUserOpencodeConfig(userId, getDefaultOpencodeSettings());

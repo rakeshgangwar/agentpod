@@ -8,6 +8,13 @@
       "when": 1765703179849,
       "tag": "0000_magenta_thaddeus_ross",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1765721721669,
+      "tag": "0001_long_wilson_fisk",
+      "breakpoints": true
     }
   ]
 }

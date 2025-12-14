@@ -212,7 +212,7 @@ export function createActivityLoggerMiddleware(options: ActivityLoggerOptions = 
         userAgent,
       };
 
-      createActivityLog(input);
+      await createActivityLog(input);
       log.debug("Logged activity", { action, entityType: entity.type, entityId: entity.id, userId });
     } catch (error) {
       log.error("Failed to log activity", { action, error });
@@ -234,13 +234,13 @@ export const activityLoggerMiddleware = createActivityLoggerMiddleware();
  * Manually log an activity
  * Use this in route handlers for complex actions
  */
-export function logActivity(
+export async function logActivity(
   c: { get: (key: string) => unknown; req: { header: (name: string) => string | undefined } },
   action: ActivityAction,
   entityType?: EntityType,
   entityId?: string,
   metadata?: Record<string, unknown>
-): void {
+): Promise<void> {
   // Get user info from context (auth middleware sets 'user' directly)
   const user = c.get("user") as { id?: string } | undefined;
   const userId = user?.id && user.id !== "anonymous" ? user.id : undefined;
@@ -248,7 +248,7 @@ export function logActivity(
   const userAgent = c.req.header("user-agent");
 
   try {
-    createActivityLog({
+    await createActivityLog({
       userId,
       action,
       entityType,

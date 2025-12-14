@@ -7,7 +7,9 @@
  * - acp_gateway: Multi-agent sessions via ACP Gateway
  */
 
-import { db } from '../db/index.ts';
+import { db } from '../db/drizzle';
+import { chatSessions } from '../db/schema/chat';
+import { eq, and, sql, desc } from 'drizzle-orm';
 import { createLogger } from '../utils/logger.ts';
 
 const log = createLogger('chat-session-model');
@@ -72,27 +74,8 @@ export interface UpdateChatSessionInput {
   lastSyncedAt?: string;
 }
 
-// Database row type
-interface ChatSessionRow {
-  id: string;
-  sandbox_id: string;
-  user_id: string;
-  source: string;
-  opencode_session_id: string | null;
-  acp_session_id: string | null;
-  acp_agent_id: string | null;
-  title: string | null;
-  status: string;
-  message_count: number;
-  user_message_count: number;
-  assistant_message_count: number;
-  total_input_tokens: number;
-  total_output_tokens: number;
-  last_message_at: string | null;
-  last_synced_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
+// Database row type from Drizzle schema
+type ChatSessionRow = typeof chatSessions.$inferSelect;
 
 // =============================================================================
 // Helpers
@@ -101,23 +84,23 @@ interface ChatSessionRow {
 function rowToChatSession(row: ChatSessionRow): ChatSession {
   return {
     id: row.id,
-    sandboxId: row.sandbox_id,
-    userId: row.user_id,
+    sandboxId: row.sandboxId,
+    userId: row.userId,
     source: row.source as ChatSessionSource,
-    opencodeSessionId: row.opencode_session_id ?? undefined,
-    acpSessionId: row.acp_session_id ?? undefined,
-    acpAgentId: row.acp_agent_id ?? undefined,
+    opencodeSessionId: row.opencodeSessionId ?? undefined,
+    acpSessionId: row.acpSessionId ?? undefined,
+    acpAgentId: row.acpAgentId ?? undefined,
     title: row.title ?? undefined,
-    status: row.status as ChatSessionStatus,
-    messageCount: row.message_count,
-    userMessageCount: row.user_message_count,
-    assistantMessageCount: row.assistant_message_count,
-    totalInputTokens: row.total_input_tokens,
-    totalOutputTokens: row.total_output_tokens,
-    lastMessageAt: row.last_message_at ?? undefined,
-    lastSyncedAt: row.last_synced_at ?? undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    status: (row.status ?? 'active') as ChatSessionStatus,
+    messageCount: row.messageCount ?? 0,
+    userMessageCount: row.userMessageCount ?? 0,
+    assistantMessageCount: row.assistantMessageCount ?? 0,
+    totalInputTokens: row.totalInputTokens ?? 0,
+    totalOutputTokens: row.totalOutputTokens ?? 0,
+    lastMessageAt: row.lastMessageAt?.toISOString() ?? undefined,
+    lastSyncedAt: row.lastSyncedAt?.toISOString() ?? undefined,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
   };
 }
 
@@ -128,40 +111,40 @@ function rowToChatSession(row: ChatSessionRow): ChatSession {
 /**
  * Create a new chat session
  */
-export function createChatSession(input: CreateChatSessionInput): ChatSession {
+export async function createChatSession(input: CreateChatSessionInput): Promise<ChatSession> {
   const id = crypto.randomUUID();
-  const now = new Date().toISOString();
+  const now = new Date();
   
-  db.run(
-    `INSERT INTO chat_sessions (
-      id, sandbox_id, user_id, source, opencode_session_id, acp_session_id,
-      acp_agent_id, title, status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
-    [
-      id,
-      input.sandboxId,
-      input.userId,
-      input.source,
-      input.opencodeSessionId ?? null,
-      input.acpSessionId ?? null,
-      input.acpAgentId ?? null,
-      input.title ?? null,
-      now,
-      now,
-    ]
-  );
+  await db.insert(chatSessions).values({
+    id,
+    sandboxId: input.sandboxId,
+    userId: input.userId,
+    source: input.source,
+    opencodeSessionId: input.opencodeSessionId ?? null,
+    acpSessionId: input.acpSessionId ?? null,
+    acpAgentId: input.acpAgentId ?? null,
+    title: input.title ?? null,
+    status: 'active',
+    messageCount: 0,
+    userMessageCount: 0,
+    assistantMessageCount: 0,
+    totalInputTokens: 0,
+    totalOutputTokens: 0,
+    createdAt: now,
+    updatedAt: now,
+  });
   
   log.info('Created chat session', { sessionId: id, sandboxId: input.sandboxId, source: input.source });
-  return getChatSessionById(id)!;
+  return (await getChatSessionById(id))!;
 }
 
 /**
  * Get a chat session by ID
  */
-export function getChatSessionById(id: string): ChatSession | null {
-  const row = db.query<ChatSessionRow, [string]>(
-    'SELECT * FROM chat_sessions WHERE id = ?'
-  ).get(id);
+export async function getChatSessionById(id: string): Promise<ChatSession | null> {
+  const [row] = await db.select()
+    .from(chatSessions)
+    .where(eq(chatSessions.id, id));
   
   return row ? rowToChatSession(row) : null;
 }
@@ -169,13 +152,16 @@ export function getChatSessionById(id: string): ChatSession | null {
 /**
  * Get a chat session by OpenCode session ID
  */
-export function getChatSessionByOpencodeId(
+export async function getChatSessionByOpencodeId(
   sandboxId: string,
   opencodeSessionId: string
-): ChatSession | null {
-  const row = db.query<ChatSessionRow, [string, string]>(
-    'SELECT * FROM chat_sessions WHERE sandbox_id = ? AND opencode_session_id = ?'
-  ).get(sandboxId, opencodeSessionId);
+): Promise<ChatSession | null> {
+  const [row] = await db.select()
+    .from(chatSessions)
+    .where(and(
+      eq(chatSessions.sandboxId, sandboxId),
+      eq(chatSessions.opencodeSessionId, opencodeSessionId)
+    ));
   
   return row ? rowToChatSession(row) : null;
 }
@@ -183,13 +169,16 @@ export function getChatSessionByOpencodeId(
 /**
  * Get a chat session by ACP session ID
  */
-export function getChatSessionByAcpId(
+export async function getChatSessionByAcpId(
   sandboxId: string,
   acpSessionId: string
-): ChatSession | null {
-  const row = db.query<ChatSessionRow, [string, string]>(
-    'SELECT * FROM chat_sessions WHERE sandbox_id = ? AND acp_session_id = ?'
-  ).get(sandboxId, acpSessionId);
+): Promise<ChatSession | null> {
+  const [row] = await db.select()
+    .from(chatSessions)
+    .where(and(
+      eq(chatSessions.sandboxId, sandboxId),
+      eq(chatSessions.acpSessionId, acpSessionId)
+    ));
   
   return row ? rowToChatSession(row) : null;
 }
@@ -197,122 +186,97 @@ export function getChatSessionByAcpId(
 /**
  * List all chat sessions for a sandbox
  */
-export function listChatSessionsBySandboxId(
+export async function listChatSessionsBySandboxId(
   sandboxId: string,
   options?: { status?: ChatSessionStatus; limit?: number; offset?: number }
-): ChatSession[] {
-  let query = 'SELECT * FROM chat_sessions WHERE sandbox_id = ?';
-  const params: (string | number)[] = [sandboxId];
-  
-  if (options?.status) {
-    query += ' AND status = ?';
-    params.push(options.status);
-  }
-  
-  query += ' ORDER BY last_message_at DESC NULLS LAST, created_at DESC';
+): Promise<ChatSession[]> {
+  let query = db.select()
+    .from(chatSessions)
+    .where(options?.status 
+      ? and(eq(chatSessions.sandboxId, sandboxId), eq(chatSessions.status, options.status))
+      : eq(chatSessions.sandboxId, sandboxId))
+    .orderBy(desc(chatSessions.lastMessageAt), desc(chatSessions.createdAt));
   
   if (options?.limit) {
-    query += ' LIMIT ?';
-    params.push(options.limit);
-    
+    query = query.limit(options.limit) as typeof query;
     if (options?.offset) {
-      query += ' OFFSET ?';
-      params.push(options.offset);
+      query = query.offset(options.offset) as typeof query;
     }
   }
   
-  const rows = db.query<ChatSessionRow, (string | number)[]>(query).all(...params);
+  const rows = await query;
   return rows.map(rowToChatSession);
 }
 
 /**
  * List all chat sessions for a user
  */
-export function listChatSessionsByUserId(
+export async function listChatSessionsByUserId(
   userId: string,
   options?: { status?: ChatSessionStatus; limit?: number; offset?: number }
-): ChatSession[] {
-  let query = 'SELECT * FROM chat_sessions WHERE user_id = ?';
-  const params: (string | number)[] = [userId];
-  
-  if (options?.status) {
-    query += ' AND status = ?';
-    params.push(options.status);
-  }
-  
-  query += ' ORDER BY last_message_at DESC NULLS LAST, created_at DESC';
+): Promise<ChatSession[]> {
+  let query = db.select()
+    .from(chatSessions)
+    .where(options?.status 
+      ? and(eq(chatSessions.userId, userId), eq(chatSessions.status, options.status))
+      : eq(chatSessions.userId, userId))
+    .orderBy(desc(chatSessions.lastMessageAt), desc(chatSessions.createdAt));
   
   if (options?.limit) {
-    query += ' LIMIT ?';
-    params.push(options.limit);
-    
+    query = query.limit(options.limit) as typeof query;
     if (options?.offset) {
-      query += ' OFFSET ?';
-      params.push(options.offset);
+      query = query.offset(options.offset) as typeof query;
     }
   }
   
-  const rows = db.query<ChatSessionRow, (string | number)[]>(query).all(...params);
+  const rows = await query;
   return rows.map(rowToChatSession);
 }
 
 /**
  * Update a chat session
  */
-export function updateChatSession(id: string, input: UpdateChatSessionInput): ChatSession | null {
-  const existing = getChatSessionById(id);
+export async function updateChatSession(id: string, input: UpdateChatSessionInput): Promise<ChatSession | null> {
+  const existing = await getChatSessionById(id);
   if (!existing) return null;
   
-  const updates: string[] = [];
-  const values: (string | number | null)[] = [];
+  const updates: Partial<typeof chatSessions.$inferInsert> = {
+    updatedAt: new Date(),
+  };
   
   if (input.title !== undefined) {
-    updates.push('title = ?');
-    values.push(input.title ?? null);
+    updates.title = input.title ?? null;
   }
   if (input.status !== undefined) {
-    updates.push('status = ?');
-    values.push(input.status);
+    updates.status = input.status;
   }
   if (input.messageCount !== undefined) {
-    updates.push('message_count = ?');
-    values.push(input.messageCount);
+    updates.messageCount = input.messageCount;
   }
   if (input.userMessageCount !== undefined) {
-    updates.push('user_message_count = ?');
-    values.push(input.userMessageCount);
+    updates.userMessageCount = input.userMessageCount;
   }
   if (input.assistantMessageCount !== undefined) {
-    updates.push('assistant_message_count = ?');
-    values.push(input.assistantMessageCount);
+    updates.assistantMessageCount = input.assistantMessageCount;
   }
   if (input.totalInputTokens !== undefined) {
-    updates.push('total_input_tokens = ?');
-    values.push(input.totalInputTokens);
+    updates.totalInputTokens = input.totalInputTokens;
   }
   if (input.totalOutputTokens !== undefined) {
-    updates.push('total_output_tokens = ?');
-    values.push(input.totalOutputTokens);
+    updates.totalOutputTokens = input.totalOutputTokens;
   }
   if (input.lastMessageAt !== undefined) {
-    updates.push('last_message_at = ?');
-    values.push(input.lastMessageAt ?? null);
+    updates.lastMessageAt = input.lastMessageAt ? new Date(input.lastMessageAt) : null;
   }
   if (input.lastSyncedAt !== undefined) {
-    updates.push('last_synced_at = ?');
-    values.push(input.lastSyncedAt ?? null);
+    updates.lastSyncedAt = input.lastSyncedAt ? new Date(input.lastSyncedAt) : null;
   }
   
-  if (updates.length === 0) return existing;
+  if (Object.keys(updates).length === 1) return existing; // Only updatedAt
   
-  updates.push('updated_at = ?');
-  values.push(new Date().toISOString());
-  values.push(id);
-  
-  db.run(
-    `UPDATE chat_sessions SET ${updates.join(', ')} WHERE id = ?`,
-    values
-  );
+  await db.update(chatSessions)
+    .set(updates)
+    .where(eq(chatSessions.id, id));
   
   log.debug('Updated chat session', { sessionId: id, updates: Object.keys(input) });
   return getChatSessionById(id);
@@ -321,53 +285,68 @@ export function updateChatSession(id: string, input: UpdateChatSessionInput): Ch
 /**
  * Increment message counts
  */
-export function incrementMessageCount(
+export async function incrementMessageCount(
   id: string,
   role: 'user' | 'assistant',
   inputTokens?: number,
   outputTokens?: number
-): void {
-  const roleColumn = role === 'user' ? 'user_message_count' : 'assistant_message_count';
-  const now = new Date().toISOString();
+): Promise<void> {
+  const now = new Date();
   
-  db.run(
-    `UPDATE chat_sessions SET 
-      message_count = message_count + 1,
-      ${roleColumn} = ${roleColumn} + 1,
-      total_input_tokens = total_input_tokens + ?,
-      total_output_tokens = total_output_tokens + ?,
-      last_message_at = ?,
-      updated_at = ?
-    WHERE id = ?`,
-    [inputTokens ?? 0, outputTokens ?? 0, now, now, id]
-  );
+  if (role === 'user') {
+    await db.update(chatSessions)
+      .set({
+        messageCount: sql`${chatSessions.messageCount} + 1`,
+        userMessageCount: sql`${chatSessions.userMessageCount} + 1`,
+        totalInputTokens: sql`${chatSessions.totalInputTokens} + ${inputTokens ?? 0}`,
+        totalOutputTokens: sql`${chatSessions.totalOutputTokens} + ${outputTokens ?? 0}`,
+        lastMessageAt: now,
+        updatedAt: now,
+      })
+      .where(eq(chatSessions.id, id));
+  } else {
+    await db.update(chatSessions)
+      .set({
+        messageCount: sql`${chatSessions.messageCount} + 1`,
+        assistantMessageCount: sql`${chatSessions.assistantMessageCount} + 1`,
+        totalInputTokens: sql`${chatSessions.totalInputTokens} + ${inputTokens ?? 0}`,
+        totalOutputTokens: sql`${chatSessions.totalOutputTokens} + ${outputTokens ?? 0}`,
+        lastMessageAt: now,
+        updatedAt: now,
+      })
+      .where(eq(chatSessions.id, id));
+  }
 }
 
 /**
  * Update last synced timestamp
  */
-export function touchChatSessionSync(id: string): void {
-  const now = new Date().toISOString();
-  db.run(
-    'UPDATE chat_sessions SET last_synced_at = ?, updated_at = ? WHERE id = ?',
-    [now, now, id]
-  );
+export async function touchChatSessionSync(id: string): Promise<void> {
+  const now = new Date();
+  await db.update(chatSessions)
+    .set({
+      lastSyncedAt: now,
+      updatedAt: now,
+    })
+    .where(eq(chatSessions.id, id));
 }
 
 /**
  * Archive a chat session (soft delete)
  */
-export function archiveChatSession(id: string): ChatSession | null {
+export async function archiveChatSession(id: string): Promise<ChatSession | null> {
   return updateChatSession(id, { status: 'archived' });
 }
 
 /**
  * Delete a chat session (hard delete)
  */
-export function deleteChatSession(id: string): boolean {
-  const result = db.run('DELETE FROM chat_sessions WHERE id = ?', [id]);
+export async function deleteChatSession(id: string): Promise<boolean> {
+  const result = await db.delete(chatSessions)
+    .where(eq(chatSessions.id, id))
+    .returning({ id: chatSessions.id });
   
-  if (result.changes > 0) {
+  if (result.length > 0) {
     log.info('Deleted chat session', { sessionId: id });
     return true;
   }
@@ -377,13 +356,15 @@ export function deleteChatSession(id: string): boolean {
 /**
  * Delete all chat sessions for a sandbox
  */
-export function deleteChatSessionsBySandboxId(sandboxId: string): number {
-  const result = db.run('DELETE FROM chat_sessions WHERE sandbox_id = ?', [sandboxId]);
+export async function deleteChatSessionsBySandboxId(sandboxId: string): Promise<number> {
+  const result = await db.delete(chatSessions)
+    .where(eq(chatSessions.sandboxId, sandboxId))
+    .returning({ id: chatSessions.id });
   
-  if (result.changes > 0) {
-    log.info('Deleted sandbox chat sessions', { sandboxId, count: result.changes });
+  if (result.length > 0) {
+    log.info('Deleted sandbox chat sessions', { sandboxId, count: result.length });
   }
-  return result.changes;
+  return result.length;
 }
 
 // =============================================================================
@@ -394,13 +375,13 @@ export function deleteChatSessionsBySandboxId(sandboxId: string): number {
  * Get or create a chat session by OpenCode session ID
  * Used during sync to ensure we have a local record
  */
-export function getOrCreateOpencodeSession(
+export async function getOrCreateOpencodeSession(
   sandboxId: string,
   userId: string,
   opencodeSessionId: string,
   title?: string
-): ChatSession {
-  const existing = getChatSessionByOpencodeId(sandboxId, opencodeSessionId);
+): Promise<ChatSession> {
+  const existing = await getChatSessionByOpencodeId(sandboxId, opencodeSessionId);
   if (existing) return existing;
   
   return createChatSession({
@@ -416,14 +397,14 @@ export function getOrCreateOpencodeSession(
  * Get or create a chat session by ACP session ID
  * Used during sync to ensure we have a local record
  */
-export function getOrCreateAcpSession(
+export async function getOrCreateAcpSession(
   sandboxId: string,
   userId: string,
   acpSessionId: string,
   acpAgentId?: string,
   title?: string
-): ChatSession {
-  const existing = getChatSessionByAcpId(sandboxId, acpSessionId);
+): Promise<ChatSession> {
+  const existing = await getChatSessionByAcpId(sandboxId, acpSessionId);
   if (existing) return existing;
   
   return createChatSession({
@@ -439,35 +420,28 @@ export function getOrCreateAcpSession(
 /**
  * Get session statistics for a sandbox
  */
-export function getChatSessionStats(sandboxId: string): {
+export async function getChatSessionStats(sandboxId: string): Promise<{
   total: number;
   active: number;
   archived: number;
   totalMessages: number;
   totalTokens: number;
-} {
-  const result = db.query<{
-    total: number;
-    active: number;
-    archived: number;
-    total_messages: number;
-    total_tokens: number;
-  }, [string]>(`
-    SELECT 
-      COUNT(*) as total,
-      SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
-      SUM(CASE WHEN status = 'archived' THEN 1 ELSE 0 END) as archived,
-      SUM(message_count) as total_messages,
-      SUM(total_input_tokens + total_output_tokens) as total_tokens
-    FROM chat_sessions 
-    WHERE sandbox_id = ?
-  `).get(sandboxId);
+}> {
+  const [result] = await db.select({
+    total: sql<number>`COUNT(*)`,
+    active: sql<number>`SUM(CASE WHEN ${chatSessions.status} = 'active' THEN 1 ELSE 0 END)`,
+    archived: sql<number>`SUM(CASE WHEN ${chatSessions.status} = 'archived' THEN 1 ELSE 0 END)`,
+    totalMessages: sql<number>`SUM(${chatSessions.messageCount})`,
+    totalTokens: sql<number>`SUM(${chatSessions.totalInputTokens} + ${chatSessions.totalOutputTokens})`,
+  })
+    .from(chatSessions)
+    .where(eq(chatSessions.sandboxId, sandboxId));
   
   return {
-    total: result?.total ?? 0,
-    active: result?.active ?? 0,
-    archived: result?.archived ?? 0,
-    totalMessages: result?.total_messages ?? 0,
-    totalTokens: result?.total_tokens ?? 0,
+    total: Number(result?.total ?? 0),
+    active: Number(result?.active ?? 0),
+    archived: Number(result?.archived ?? 0),
+    totalMessages: Number(result?.totalMessages ?? 0),
+    totalTokens: Number(result?.totalTokens ?? 0),
   };
 }

@@ -290,7 +290,7 @@ class OpenCodeSyncService {
   private async handleEvent(sandboxId: string, event: OpenCodeEvent): Promise<void> {
     log.debug('Received SSE event', { sandboxId, type: event.type });
 
-    const sandbox = SandboxModel.getSandboxById(sandboxId);
+    const sandbox = await SandboxModel.getSandboxById(sandboxId);
     if (!sandbox) {
       log.warn('Sandbox not found for event', { sandboxId });
       return;
@@ -340,7 +340,7 @@ class OpenCodeSyncService {
     const { id: opencodeSessionId, title } = event.properties.info;
 
     // Get or create local session
-    ChatSessionModel.getOrCreateOpencodeSession(
+    await ChatSessionModel.getOrCreateOpencodeSession(
       sandbox.id,
       sandbox.userId,
       opencodeSessionId,
@@ -356,10 +356,10 @@ class OpenCodeSyncService {
   ): Promise<void> {
     const { id: opencodeSessionId, title } = event.properties.info;
 
-    const session = ChatSessionModel.getChatSessionByOpencodeId(sandbox.id, opencodeSessionId);
+    const session = await ChatSessionModel.getChatSessionByOpencodeId(sandbox.id, opencodeSessionId);
     if (!session) {
       // Create if doesn't exist
-      ChatSessionModel.getOrCreateOpencodeSession(
+      await ChatSessionModel.getOrCreateOpencodeSession(
         sandbox.id,
         sandbox.userId,
         opencodeSessionId,
@@ -370,10 +370,10 @@ class OpenCodeSyncService {
 
     // Update title if changed
     if (title && title !== session.title) {
-      ChatSessionModel.updateChatSession(session.id, { title });
+      await ChatSessionModel.updateChatSession(session.id, { title });
     }
 
-    ChatSessionModel.touchChatSessionSync(session.id);
+    await ChatSessionModel.touchChatSessionSync(session.id);
     log.debug('Synced session updated', { sandboxId: sandbox.id, sessionId: session.id });
   }
 
@@ -388,10 +388,10 @@ class OpenCodeSyncService {
       return;
     }
 
-    const session = ChatSessionModel.getChatSessionByOpencodeId(sandbox.id, opencodeSessionId);
+    const session = await ChatSessionModel.getChatSessionByOpencodeId(sandbox.id, opencodeSessionId);
     if (session) {
       // Soft delete (archive)
-      ChatSessionModel.archiveChatSession(session.id);
+      await ChatSessionModel.archiveChatSession(session.id);
       log.info('Archived deleted session', { sandboxId: sandbox.id, sessionId: session.id });
     }
   }
@@ -403,21 +403,21 @@ class OpenCodeSyncService {
     const { sessionID: opencodeSessionId, id: messageId, role, ...rest } = event.properties.info;
 
     // Ensure session exists
-    const session = ChatSessionModel.getOrCreateOpencodeSession(
+    const session = await ChatSessionModel.getOrCreateOpencodeSession(
       sandbox.id,
       sandbox.userId,
       opencodeSessionId
     );
 
     // Check if message already exists
-    const existing = ChatMessageModel.getChatMessageByExternalId(session.id, messageId);
+    const existing = await ChatMessageModel.getChatMessageByExternalId(session.id, messageId);
     if (existing) {
       log.debug('Message already exists, skipping', { sessionId: session.id, messageId });
       return;
     }
 
     // Create message
-    ChatMessageModel.createChatMessage({
+    await ChatMessageModel.createChatMessage({
       sessionId: session.id,
       externalMessageId: messageId,
       role: role as ChatMessageModel.MessageRole,
@@ -426,7 +426,7 @@ class OpenCodeSyncService {
     });
 
     // Update session counts
-    ChatSessionModel.incrementMessageCount(session.id, role === 'user' ? 'user' : 'assistant');
+    await ChatSessionModel.incrementMessageCount(session.id, role === 'user' ? 'user' : 'assistant');
 
     log.debug('Synced message created', { sessionId: session.id, messageId, role });
   }
@@ -438,25 +438,25 @@ class OpenCodeSyncService {
     const { sessionID: opencodeSessionId, id: messageId, role, ...metadata } = event.properties.info;
 
     // Ensure session exists (create if needed)
-    const session = ChatSessionModel.getOrCreateOpencodeSession(
+    const session = await ChatSessionModel.getOrCreateOpencodeSession(
       sandbox.id,
       sandbox.userId,
       opencodeSessionId
     );
 
-    const message = ChatMessageModel.getChatMessageByExternalId(session.id, messageId);
+    const message = await ChatMessageModel.getChatMessageByExternalId(session.id, messageId);
     if (!message) {
       // Message doesn't exist yet - create it with metadata
       // This can happen if we missed the message.created event
       if (role) {
-        const newMessage = ChatMessageModel.createChatMessage({
+        await ChatMessageModel.createChatMessage({
           sessionId: session.id,
           externalMessageId: messageId,
           role: role as ChatMessageModel.MessageRole,
           content: { metadata }, // Store metadata separately, parts will come from part.updated or full sync
           status: 'streaming',
         });
-        ChatSessionModel.incrementMessageCount(session.id, role === 'user' ? 'user' : 'assistant');
+        await ChatSessionModel.incrementMessageCount(session.id, role === 'user' ? 'user' : 'assistant');
         log.debug('Created message from update event', { sessionId: session.id, messageId, role });
       } else {
         log.warn('Message not found and no role in update event', { sessionId: session.id, messageId });
@@ -478,7 +478,7 @@ class OpenCodeSyncService {
     // Determine status based on finish field
     const isComplete = !!metadata.finish;
     
-    ChatMessageModel.updateChatMessage(message.id, {
+    await ChatMessageModel.updateChatMessage(message.id, {
       content: mergedContent,
       status: isComplete ? 'complete' : message.status,
       completedAt: isComplete ? new Date().toISOString() : undefined,
@@ -494,14 +494,14 @@ class OpenCodeSyncService {
     const { sessionID: opencodeSessionId, messageID: messageId, type: partType, text } = event.properties.part;
 
     // Ensure session exists
-    const session = ChatSessionModel.getOrCreateOpencodeSession(
+    const session = await ChatSessionModel.getOrCreateOpencodeSession(
       sandbox.id,
       sandbox.userId,
       opencodeSessionId
     );
 
     // Find the message and update its content with the part
-    const message = ChatMessageModel.getChatMessageByExternalId(session.id, messageId);
+    const message = await ChatMessageModel.getChatMessageByExternalId(session.id, messageId);
     if (message && partType === 'text' && text) {
       // Get existing content or initialize
       const existingContent = (message.content as Record<string, unknown>) || {};
@@ -521,7 +521,7 @@ class OpenCodeSyncService {
         updatedParts.push({ type: 'text', text });
       }
       
-      ChatMessageModel.updateChatMessage(message.id, {
+      await ChatMessageModel.updateChatMessage(message.id, {
         content: { ...existingContent, parts: updatedParts },
       });
       
@@ -551,7 +551,7 @@ class OpenCodeSyncService {
    * Run periodically as a backup to SSE events
    */
   async fullSync(sandboxId: string): Promise<void> {
-    const sandbox = SandboxModel.getSandboxById(sandboxId);
+    const sandbox = await SandboxModel.getSandboxById(sandboxId);
     if (!sandbox) {
       log.warn('Sandbox not found for full sync', { sandboxId });
       return;
@@ -570,7 +570,7 @@ class OpenCodeSyncService {
 
       for (const opcSession of opencodeSessions) {
         // Get or create local session
-        const localSession = ChatSessionModel.getOrCreateOpencodeSession(
+        const localSession = await ChatSessionModel.getOrCreateOpencodeSession(
           sandbox.id,
           sandbox.userId,
           opcSession.id,
@@ -579,7 +579,7 @@ class OpenCodeSyncService {
 
         // Update title if changed
         if (opcSession.title && opcSession.title !== localSession.title) {
-          ChatSessionModel.updateChatSession(localSession.id, { title: opcSession.title });
+          await ChatSessionModel.updateChatSession(localSession.id, { title: opcSession.title });
         }
 
         // Sync messages for this session
@@ -619,7 +619,7 @@ class OpenCodeSyncService {
         const { info, parts } = msg;
 
         // Get or create message
-        const existing = ChatMessageModel.getChatMessageByExternalId(localSessionId, info.id);
+        const existing = await ChatMessageModel.getChatMessageByExternalId(localSessionId, info.id);
 
         // Extract model info from assistant messages if available
         // The Message type varies, so we use type assertion to access optional fields
@@ -635,14 +635,14 @@ class OpenCodeSyncService {
         if (existing) {
           // Always update content to ensure we have the latest parts
           // This ensures SSE-created messages get their full parts from the API
-          ChatMessageModel.updateChatMessage(existing.id, {
+          await ChatMessageModel.updateChatMessage(existing.id, {
             content,
             status: 'complete',
             completedAt: existing.completedAt || new Date().toISOString(),
           });
         } else {
           // Create new message
-          ChatMessageModel.createChatMessage({
+          await ChatMessageModel.createChatMessage({
             sessionId: localSessionId,
             externalMessageId: info.id,
             role: info.role as ChatMessageModel.MessageRole,
@@ -662,7 +662,7 @@ class OpenCodeSyncService {
       }
 
       // Update session stats
-      ChatSessionModel.updateChatSession(localSessionId, {
+      await ChatSessionModel.updateChatSession(localSessionId, {
         messageCount: messages.length,
         userMessageCount: userCount,
         assistantMessageCount: assistantCount,
@@ -684,7 +684,7 @@ class OpenCodeSyncService {
    * Manually trigger a full sync for a session
    */
   async syncSession(sandboxId: string, sessionId: string): Promise<void> {
-    const session = ChatSessionModel.getChatSessionById(sessionId);
+    const session = await ChatSessionModel.getChatSessionById(sessionId);
     if (!session || !session.opencodeSessionId) {
       throw new Error('Session not found or not an OpenCode session');
     }
@@ -714,7 +714,7 @@ export function getOpenCodeSyncService(): OpenCodeSyncService {
  * Called on API startup
  */
 export async function startSyncForRunningSandboxes(): Promise<void> {
-  const runningBoxes = SandboxModel.listSandboxesByStatus('running');
+  const runningBoxes = await SandboxModel.listSandboxesByStatus('running');
   const syncService = getOpenCodeSyncService();
 
   log.info('Starting sync for running sandboxes', { count: runningBoxes.length });
@@ -741,14 +741,14 @@ export function stopAllSync(): void {
  * Called after sending a message to capture both user message and AI response
  */
 export async function syncSessionMessages(sandboxId: string, opcodeSessionId: string): Promise<void> {
-  const sandbox = SandboxModel.getSandboxById(sandboxId);
+  const sandbox = await SandboxModel.getSandboxById(sandboxId);
   if (!sandbox) {
     log.warn('Sandbox not found for message sync', { sandboxId });
     return;
   }
 
   // Get or create the local session
-  const localSession = ChatSessionModel.getOrCreateOpencodeSession(
+  const localSession = await ChatSessionModel.getOrCreateOpencodeSession(
     sandbox.id,
     sandbox.userId,
     opcodeSessionId

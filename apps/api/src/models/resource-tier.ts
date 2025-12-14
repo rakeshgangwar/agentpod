@@ -2,9 +2,13 @@
  * Resource Tier Model
  * Defines available resource tiers with CPU, memory, and storage limits
  * Replaces the old container-tier model with a more granular resource allocation
+ * 
+ * MIGRATED: Now uses PostgreSQL via Drizzle ORM
  */
 
-import { db } from '../db/index.ts';
+import { db } from '../db/drizzle';
+import { resourceTiers } from '../db/schema/containers';
+import { eq, asc } from 'drizzle-orm';
 
 // =============================================================================
 // Types
@@ -20,84 +24,89 @@ export interface ResourceTier {
   priceMonthly: number;          // Price per month in USD
   isDefault: boolean;            // Default tier for new projects
   sortOrder: number;             // Display order
-  createdAt: string;
-  updatedAt: string;
-}
-
-// Database row type (sqlite uses 0/1 for booleans)
-interface ResourceTierRow {
-  id: string;
-  name: string;
-  description: string | null;
-  cpu_cores: number;
-  memory_gb: number;
-  storage_gb: number;
-  price_monthly: number;
-  is_default: number;
-  sort_order: number;
-  created_at: string;
-  updated_at: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // =============================================================================
-// Helpers
-// =============================================================================
-
-function rowToResourceTier(row: ResourceTierRow): ResourceTier {
-  return {
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    cpuCores: row.cpu_cores,
-    memoryGb: row.memory_gb,
-    storageGb: row.storage_gb,
-    priceMonthly: row.price_monthly,
-    isDefault: row.is_default === 1,
-    sortOrder: row.sort_order,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
-
-// =============================================================================
-// CRUD Operations
+// CRUD Operations (Async)
 // =============================================================================
 
 /**
  * Get all resource tiers, ordered by sort_order
  */
-export function getAllResourceTiers(): ResourceTier[] {
-  const rows = db.query(`
-    SELECT * FROM resource_tiers 
-    ORDER BY sort_order ASC
-  `).all() as ResourceTierRow[];
+export async function getAllResourceTiers(): Promise<ResourceTier[]> {
+  const rows = await db
+    .select()
+    .from(resourceTiers)
+    .orderBy(asc(resourceTiers.sortOrder));
   
-  return rows.map(rowToResourceTier);
+  return rows.map(row => ({
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    cpuCores: row.cpuCores,
+    memoryGb: row.memoryGb,
+    storageGb: row.storageGb,
+    priceMonthly: row.priceMonthly,
+    isDefault: row.isDefault,
+    sortOrder: row.sortOrder,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  }));
 }
 
 /**
  * Get a resource tier by ID
  */
-export function getResourceTierById(id: string): ResourceTier | null {
-  const row = db.query(`
-    SELECT * FROM resource_tiers 
-    WHERE id = $id
-  `).get({ $id: id }) as ResourceTierRow | null;
+export async function getResourceTierById(id: string): Promise<ResourceTier | null> {
+  const [row] = await db
+    .select()
+    .from(resourceTiers)
+    .where(eq(resourceTiers.id, id));
   
-  return row ? rowToResourceTier(row) : null;
+  if (!row) return null;
+  
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    cpuCores: row.cpuCores,
+    memoryGb: row.memoryGb,
+    storageGb: row.storageGb,
+    priceMonthly: row.priceMonthly,
+    isDefault: row.isDefault,
+    sortOrder: row.sortOrder,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
 }
 
 /**
  * Get the default resource tier
  */
-export function getDefaultResourceTier(): ResourceTier | null {
-  const row = db.query(`
-    SELECT * FROM resource_tiers 
-    WHERE is_default = 1
-    LIMIT 1
-  `).get() as ResourceTierRow | null;
+export async function getDefaultResourceTier(): Promise<ResourceTier | null> {
+  const [row] = await db
+    .select()
+    .from(resourceTiers)
+    .where(eq(resourceTiers.isDefault, true))
+    .limit(1);
   
-  return row ? rowToResourceTier(row) : null;
+  if (!row) return null;
+  
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    cpuCores: row.cpuCores,
+    memoryGb: row.memoryGb,
+    storageGb: row.storageGb,
+    priceMonthly: row.priceMonthly,
+    isDefault: row.isDefault,
+    sortOrder: row.sortOrder,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
 }
 
 // =============================================================================

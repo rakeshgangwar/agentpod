@@ -81,19 +81,19 @@ const BASE_PORTS = [80];
 /**
  * Resolve container configuration to a specific Docker image
  */
-export function resolveImage(options: ResolveImageOptions = {}): ImageResolution {
+export async function resolveImage(options: ResolveImageOptions = {}): Promise<ImageResolution> {
   const warnings: string[] = [];
   
   // Get resource tier
   let resourceTier: ResourceTier | null = null;
   if (options.resourceTierId) {
-    resourceTier = getResourceTierById(options.resourceTierId);
+    resourceTier = await getResourceTierById(options.resourceTierId);
     if (!resourceTier) {
       warnings.push(`Resource tier '${options.resourceTierId}' not found, using default`);
     }
   }
   if (!resourceTier) {
-    resourceTier = getDefaultResourceTier();
+    resourceTier = await getDefaultResourceTier();
   }
   if (!resourceTier) {
     throw new Error('No default resource tier configured');
@@ -102,13 +102,13 @@ export function resolveImage(options: ResolveImageOptions = {}): ImageResolution
   // Get flavor
   let flavor: ContainerFlavor | null = null;
   if (options.flavorId) {
-    flavor = getFlavorById(options.flavorId);
+    flavor = await getFlavorById(options.flavorId);
     if (!flavor) {
       warnings.push(`Flavor '${options.flavorId}' not found, using default`);
     }
   }
   if (!flavor) {
-    flavor = getDefaultFlavor();
+    flavor = await getDefaultFlavor();
   }
   if (!flavor) {
     throw new Error('No default flavor configured');
@@ -116,7 +116,7 @@ export function resolveImage(options: ResolveImageOptions = {}): ImageResolution
   
   // Get addons
   const addonIds = options.addonIds || [];
-  const addons = getAddonsByIds(addonIds);
+  const addons = await getAddonsByIds(addonIds);
   
   if (addons.length !== addonIds.length) {
     const foundIds = addons.map(a => a.id);
@@ -162,13 +162,13 @@ export function resolveImage(options: ResolveImageOptions = {}): ImageResolution
 /**
  * Validate container configuration
  */
-export function validateContainerConfig(options: ResolveImageOptions): ValidationResult {
+export async function validateContainerConfig(options: ResolveImageOptions): Promise<ValidationResult> {
   const errors: string[] = [];
   const warnings: string[] = [];
   
   // Validate resource tier
   if (options.resourceTierId) {
-    const tier = getResourceTierById(options.resourceTierId);
+    const tier = await getResourceTierById(options.resourceTierId);
     if (!tier) {
       errors.push(`Resource tier '${options.resourceTierId}' not found`);
     }
@@ -177,17 +177,17 @@ export function validateContainerConfig(options: ResolveImageOptions): Validatio
   // Validate flavor
   let flavor: ContainerFlavor | null = null;
   if (options.flavorId) {
-    flavor = getFlavorById(options.flavorId);
+    flavor = await getFlavorById(options.flavorId);
     if (!flavor) {
       errors.push(`Flavor '${options.flavorId}' not found`);
     }
   } else {
-    flavor = getDefaultFlavor();
+    flavor = await getDefaultFlavor();
   }
   
   // Validate addons
   if (options.addonIds && options.addonIds.length > 0) {
-    const addons = getAddonsByIds(options.addonIds);
+    const addons = await getAddonsByIds(options.addonIds);
     
     // Check for missing addons
     const foundIds = addons.map(a => a.id);

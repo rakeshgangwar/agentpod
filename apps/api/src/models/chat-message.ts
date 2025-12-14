@@ -4,7 +4,9 @@
  * Supports streaming status and token tracking
  */
 
-import { db } from '../db/index.ts';
+import { db } from '../db/drizzle';
+import { chatMessages } from '../db/schema/chat';
+import { eq, and, sql, asc, desc } from 'drizzle-orm';
 import { createLogger } from '../utils/logger.ts';
 
 const log = createLogger('chat-message-model');
@@ -76,26 +78,8 @@ export interface UpdateChatMessageInput {
   completedAt?: string;
 }
 
-// Database row type
-interface ChatMessageRow {
-  id: string;
-  session_id: string;
-  external_message_id: string | null;
-  role: string;
-  content: string;
-  tool_calls: string | null;
-  tool_results: string | null;
-  thinking: string | null;
-  model_provider: string | null;
-  model_id: string | null;
-  agent_id: string | null;
-  input_tokens: number | null;
-  output_tokens: number | null;
-  status: string;
-  error_message: string | null;
-  created_at: string;
-  completed_at: string | null;
-}
+// Database row type from Drizzle schema
+type ChatMessageRow = typeof chatMessages.$inferSelect;
 
 // =============================================================================
 // Helpers
@@ -104,22 +88,22 @@ interface ChatMessageRow {
 function rowToChatMessage(row: ChatMessageRow): ChatMessage {
   return {
     id: row.id,
-    sessionId: row.session_id,
-    externalMessageId: row.external_message_id ?? undefined,
+    sessionId: row.sessionId,
+    externalMessageId: row.externalMessageId ?? undefined,
     role: row.role as MessageRole,
-    content: JSON.parse(row.content),
-    toolCalls: row.tool_calls ? JSON.parse(row.tool_calls) : undefined,
-    toolResults: row.tool_results ? JSON.parse(row.tool_results) : undefined,
+    content: row.content ? JSON.parse(row.content) : '',
+    toolCalls: row.toolCalls ? JSON.parse(row.toolCalls) : undefined,
+    toolResults: row.toolResults ? JSON.parse(row.toolResults) : undefined,
     thinking: row.thinking ? JSON.parse(row.thinking) : undefined,
-    modelProvider: row.model_provider ?? undefined,
-    modelId: row.model_id ?? undefined,
-    agentId: row.agent_id ?? undefined,
-    inputTokens: row.input_tokens ?? undefined,
-    outputTokens: row.output_tokens ?? undefined,
-    status: row.status as MessageStatus,
-    errorMessage: row.error_message ?? undefined,
-    createdAt: row.created_at,
-    completedAt: row.completed_at ?? undefined,
+    modelProvider: row.modelProvider ?? undefined,
+    modelId: row.modelId ?? undefined,
+    agentId: row.agentId ?? undefined,
+    inputTokens: row.inputTokens ?? undefined,
+    outputTokens: row.outputTokens ?? undefined,
+    status: (row.status ?? 'complete') as MessageStatus,
+    errorMessage: row.errorMessage ?? undefined,
+    createdAt: row.createdAt.toISOString(),
+    completedAt: row.completedAt?.toISOString() ?? undefined,
   };
 }
 
@@ -146,46 +130,39 @@ function safeStringify(value: unknown): string {
 /**
  * Create a new chat message
  */
-export function createChatMessage(input: CreateChatMessageInput): ChatMessage {
+export async function createChatMessage(input: CreateChatMessageInput): Promise<ChatMessage> {
   const id = crypto.randomUUID();
-  const now = new Date().toISOString();
+  const now = new Date();
   
-  db.run(
-    `INSERT INTO chat_messages (
-      id, session_id, external_message_id, role, content, tool_calls,
-      tool_results, thinking, model_provider, model_id, agent_id,
-      input_tokens, output_tokens, status, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      id,
-      input.sessionId,
-      input.externalMessageId ?? null,
-      input.role,
-      safeStringify(input.content),
-      input.toolCalls ? safeStringify(input.toolCalls) : null,
-      input.toolResults ? safeStringify(input.toolResults) : null,
-      input.thinking ? safeStringify(input.thinking) : null,
-      input.modelProvider ?? null,
-      input.modelId ?? null,
-      input.agentId ?? null,
-      input.inputTokens ?? null,
-      input.outputTokens ?? null,
-      input.status ?? 'complete',
-      now,
-    ]
-  );
+  await db.insert(chatMessages).values({
+    id,
+    sessionId: input.sessionId,
+    externalMessageId: input.externalMessageId ?? null,
+    role: input.role,
+    content: safeStringify(input.content),
+    toolCalls: input.toolCalls ? safeStringify(input.toolCalls) : null,
+    toolResults: input.toolResults ? safeStringify(input.toolResults) : null,
+    thinking: input.thinking ? safeStringify(input.thinking) : null,
+    modelProvider: input.modelProvider ?? null,
+    modelId: input.modelId ?? null,
+    agentId: input.agentId ?? null,
+    inputTokens: input.inputTokens ?? null,
+    outputTokens: input.outputTokens ?? null,
+    status: input.status ?? 'complete',
+    createdAt: now,
+  });
   
   log.debug('Created chat message', { messageId: id, sessionId: input.sessionId, role: input.role });
-  return getChatMessageById(id)!;
+  return (await getChatMessageById(id))!;
 }
 
 /**
  * Get a chat message by ID
  */
-export function getChatMessageById(id: string): ChatMessage | null {
-  const row = db.query<ChatMessageRow, [string]>(
-    'SELECT * FROM chat_messages WHERE id = ?'
-  ).get(id);
+export async function getChatMessageById(id: string): Promise<ChatMessage | null> {
+  const [row] = await db.select()
+    .from(chatMessages)
+    .where(eq(chatMessages.id, id));
   
   return row ? rowToChatMessage(row) : null;
 }
@@ -193,13 +170,16 @@ export function getChatMessageById(id: string): ChatMessage | null {
 /**
  * Get a chat message by external message ID
  */
-export function getChatMessageByExternalId(
+export async function getChatMessageByExternalId(
   sessionId: string,
   externalMessageId: string
-): ChatMessage | null {
-  const row = db.query<ChatMessageRow, [string, string]>(
-    'SELECT * FROM chat_messages WHERE session_id = ? AND external_message_id = ?'
-  ).get(sessionId, externalMessageId);
+): Promise<ChatMessage | null> {
+  const [row] = await db.select()
+    .from(chatMessages)
+    .where(and(
+      eq(chatMessages.sessionId, sessionId),
+      eq(chatMessages.externalMessageId, externalMessageId)
+    ));
   
   return row ? rowToChatMessage(row) : null;
 }
@@ -207,40 +187,37 @@ export function getChatMessageByExternalId(
 /**
  * List messages for a session (paginated)
  */
-export function listChatMessagesBySessionId(
+export async function listChatMessagesBySessionId(
   sessionId: string,
   options?: { limit?: number; offset?: number; order?: 'asc' | 'desc' }
-): ChatMessage[] {
-  let query = 'SELECT * FROM chat_messages WHERE session_id = ?';
-  const params: (string | number)[] = [sessionId];
-  
+): Promise<ChatMessage[]> {
   const order = options?.order ?? 'asc';
-  query += ` ORDER BY created_at ${order.toUpperCase()}`;
+  
+  let query = db.select()
+    .from(chatMessages)
+    .where(eq(chatMessages.sessionId, sessionId))
+    .orderBy(order === 'asc' ? asc(chatMessages.createdAt) : desc(chatMessages.createdAt));
   
   if (options?.limit) {
-    query += ' LIMIT ?';
-    params.push(options.limit);
-    
+    query = query.limit(options.limit) as typeof query;
     if (options?.offset) {
-      query += ' OFFSET ?';
-      params.push(options.offset);
+      query = query.offset(options.offset) as typeof query;
     }
   }
   
-  const rows = db.query<ChatMessageRow, (string | number)[]>(query).all(...params);
+  const rows = await query;
   return rows.map(rowToChatMessage);
 }
 
 /**
  * Get the most recent messages for a session
  */
-export function getRecentMessages(sessionId: string, limit: number = 10): ChatMessage[] {
-  const rows = db.query<ChatMessageRow, [string, number]>(
-    `SELECT * FROM chat_messages 
-     WHERE session_id = ? 
-     ORDER BY created_at DESC 
-     LIMIT ?`
-  ).all(sessionId, limit);
+export async function getRecentMessages(sessionId: string, limit: number = 10): Promise<ChatMessage[]> {
+  const rows = await db.select()
+    .from(chatMessages)
+    .where(eq(chatMessages.sessionId, sessionId))
+    .orderBy(desc(chatMessages.createdAt))
+    .limit(limit);
   
   // Reverse to get chronological order
   return rows.reverse().map(rowToChatMessage);
@@ -249,58 +226,45 @@ export function getRecentMessages(sessionId: string, limit: number = 10): ChatMe
 /**
  * Update a chat message
  */
-export function updateChatMessage(id: string, input: UpdateChatMessageInput): ChatMessage | null {
-  const existing = getChatMessageById(id);
+export async function updateChatMessage(id: string, input: UpdateChatMessageInput): Promise<ChatMessage | null> {
+  const existing = await getChatMessageById(id);
   if (!existing) return null;
   
-  const updates: string[] = [];
-  const values: (string | number | null)[] = [];
+  const updates: Partial<typeof chatMessages.$inferInsert> = {};
   
   if (input.content !== undefined) {
-    updates.push('content = ?');
-    values.push(safeStringify(input.content));
+    updates.content = safeStringify(input.content);
   }
   if (input.toolCalls !== undefined) {
-    updates.push('tool_calls = ?');
-    values.push(input.toolCalls ? safeStringify(input.toolCalls) : null);
+    updates.toolCalls = input.toolCalls ? safeStringify(input.toolCalls) : null;
   }
   if (input.toolResults !== undefined) {
-    updates.push('tool_results = ?');
-    values.push(input.toolResults ? safeStringify(input.toolResults) : null);
+    updates.toolResults = input.toolResults ? safeStringify(input.toolResults) : null;
   }
   if (input.thinking !== undefined) {
-    updates.push('thinking = ?');
-    values.push(input.thinking ? safeStringify(input.thinking) : null);
+    updates.thinking = input.thinking ? safeStringify(input.thinking) : null;
   }
   if (input.inputTokens !== undefined) {
-    updates.push('input_tokens = ?');
-    values.push(input.inputTokens ?? null);
+    updates.inputTokens = input.inputTokens ?? null;
   }
   if (input.outputTokens !== undefined) {
-    updates.push('output_tokens = ?');
-    values.push(input.outputTokens ?? null);
+    updates.outputTokens = input.outputTokens ?? null;
   }
   if (input.status !== undefined) {
-    updates.push('status = ?');
-    values.push(input.status);
+    updates.status = input.status;
   }
   if (input.errorMessage !== undefined) {
-    updates.push('error_message = ?');
-    values.push(input.errorMessage ?? null);
+    updates.errorMessage = input.errorMessage ?? null;
   }
   if (input.completedAt !== undefined) {
-    updates.push('completed_at = ?');
-    values.push(input.completedAt ?? null);
+    updates.completedAt = input.completedAt ? new Date(input.completedAt) : null;
   }
   
-  if (updates.length === 0) return existing;
+  if (Object.keys(updates).length === 0) return existing;
   
-  values.push(id);
-  
-  db.run(
-    `UPDATE chat_messages SET ${updates.join(', ')} WHERE id = ?`,
-    values
-  );
+  await db.update(chatMessages)
+    .set(updates)
+    .where(eq(chatMessages.id, id));
   
   log.debug('Updated chat message', { messageId: id, updates: Object.keys(input) });
   return getChatMessageById(id);
@@ -309,11 +273,11 @@ export function updateChatMessage(id: string, input: UpdateChatMessageInput): Ch
 /**
  * Mark message as complete
  */
-export function completeMessage(
+export async function completeMessage(
   id: string,
   inputTokens?: number,
   outputTokens?: number
-): ChatMessage | null {
+): Promise<ChatMessage | null> {
   return updateChatMessage(id, {
     status: 'complete',
     completedAt: new Date().toISOString(),
@@ -325,10 +289,10 @@ export function completeMessage(
 /**
  * Mark message as error
  */
-export function errorMessage(id: string, errorMessage: string): ChatMessage | null {
+export async function errorMessage(id: string, errorMsg: string): Promise<ChatMessage | null> {
   return updateChatMessage(id, {
     status: 'error',
-    errorMessage,
+    errorMessage: errorMsg,
     completedAt: new Date().toISOString(),
   });
 }
@@ -336,10 +300,12 @@ export function errorMessage(id: string, errorMessage: string): ChatMessage | nu
 /**
  * Delete a chat message
  */
-export function deleteChatMessage(id: string): boolean {
-  const result = db.run('DELETE FROM chat_messages WHERE id = ?', [id]);
+export async function deleteChatMessage(id: string): Promise<boolean> {
+  const result = await db.delete(chatMessages)
+    .where(eq(chatMessages.id, id))
+    .returning({ id: chatMessages.id });
   
-  if (result.changes > 0) {
+  if (result.length > 0) {
     log.debug('Deleted chat message', { messageId: id });
     return true;
   }
@@ -349,13 +315,15 @@ export function deleteChatMessage(id: string): boolean {
 /**
  * Delete all messages for a session
  */
-export function deleteChatMessagesBySessionId(sessionId: string): number {
-  const result = db.run('DELETE FROM chat_messages WHERE session_id = ?', [sessionId]);
+export async function deleteChatMessagesBySessionId(sessionId: string): Promise<number> {
+  const result = await db.delete(chatMessages)
+    .where(eq(chatMessages.sessionId, sessionId))
+    .returning({ id: chatMessages.id });
   
-  if (result.changes > 0) {
-    log.debug('Deleted session messages', { sessionId, count: result.changes });
+  if (result.length > 0) {
+    log.debug('Deleted session messages', { sessionId, count: result.length });
   }
-  return result.changes;
+  return result.length;
 }
 
 // =============================================================================
@@ -366,13 +334,13 @@ export function deleteChatMessagesBySessionId(sessionId: string): number {
  * Get or create a message by external ID
  * Used during sync to ensure we have a local record
  */
-export function getOrCreateMessage(
+export async function getOrCreateMessage(
   sessionId: string,
   externalMessageId: string,
   role: MessageRole,
   content: unknown
-): ChatMessage {
-  const existing = getChatMessageByExternalId(sessionId, externalMessageId);
+): Promise<ChatMessage> {
+  const existing = await getChatMessageByExternalId(sessionId, externalMessageId);
   if (existing) return existing;
   
   return createChatMessage({
@@ -386,28 +354,27 @@ export function getOrCreateMessage(
 /**
  * Get message count for a session
  */
-export function getMessageCount(sessionId: string): number {
-  const result = db.query<{ count: number }, [string]>(
-    'SELECT COUNT(*) as count FROM chat_messages WHERE session_id = ?'
-  ).get(sessionId);
+export async function getMessageCount(sessionId: string): Promise<number> {
+  const [result] = await db.select({ count: sql<number>`COUNT(*)` })
+    .from(chatMessages)
+    .where(eq(chatMessages.sessionId, sessionId));
   
-  return result?.count ?? 0;
+  return Number(result?.count ?? 0);
 }
 
 /**
  * Get total tokens for a session
  */
-export function getSessionTokens(sessionId: string): { input: number; output: number } {
-  const result = db.query<{ input_total: number; output_total: number }, [string]>(
-    `SELECT 
-      COALESCE(SUM(input_tokens), 0) as input_total,
-      COALESCE(SUM(output_tokens), 0) as output_total
-    FROM chat_messages 
-    WHERE session_id = ?`
-  ).get(sessionId);
+export async function getSessionTokens(sessionId: string): Promise<{ input: number; output: number }> {
+  const [result] = await db.select({
+    inputTotal: sql<number>`COALESCE(SUM(${chatMessages.inputTokens}), 0)`,
+    outputTotal: sql<number>`COALESCE(SUM(${chatMessages.outputTokens}), 0)`,
+  })
+    .from(chatMessages)
+    .where(eq(chatMessages.sessionId, sessionId));
   
   return {
-    input: result?.input_total ?? 0,
-    output: result?.output_total ?? 0,
+    input: Number(result?.inputTotal ?? 0),
+    output: Number(result?.outputTotal ?? 0),
   };
 }

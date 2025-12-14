@@ -20,11 +20,11 @@ export const flavorsRouter = new Hono();
 // GET /flavors
 // =============================================================================
 // List all available container flavors
-flavorsRouter.get('/', (c) => {
+flavorsRouter.get('/', async (c) => {
   log.info('Listing all container flavors');
   
   try {
-    const flavors = getAllFlavors();
+    const flavors = await getAllFlavors();
     
     // Transform for API response
     const response = flavors.map(flavor => ({
@@ -48,11 +48,11 @@ flavorsRouter.get('/', (c) => {
 // GET /flavors/default
 // =============================================================================
 // Get the default container flavor
-flavorsRouter.get('/default', (c) => {
+flavorsRouter.get('/default', async (c) => {
   log.info('Getting default container flavor');
   
   try {
-    const flavor = getDefaultFlavor();
+    const flavor = await getDefaultFlavor();
     
     if (!flavor) {
       return c.json({ error: 'No default flavor configured' }, 404);
@@ -76,12 +76,12 @@ flavorsRouter.get('/default', (c) => {
 // GET /flavors/by-language/:language
 // =============================================================================
 // Get flavors that support a specific language
-flavorsRouter.get('/by-language/:language', (c) => {
+flavorsRouter.get('/by-language/:language', async (c) => {
   const language = c.req.param('language');
   log.info('Getting flavors by language', { language });
   
   try {
-    const flavors = getFlavorsByLanguage(language);
+    const flavors = await getFlavorsByLanguage(language);
     
     if (flavors.length === 0) {
       return c.json({ 
@@ -111,12 +111,12 @@ flavorsRouter.get('/by-language/:language', (c) => {
 // GET /flavors/:id
 // =============================================================================
 // Get a specific container flavor by ID
-flavorsRouter.get('/:id', (c) => {
+flavorsRouter.get('/:id', async (c) => {
   const flavorId = c.req.param('id');
   log.info('Getting container flavor', { flavorId });
   
   try {
-    const flavor = getFlavorById(flavorId);
+    const flavor = await getFlavorById(flavorId);
     
     if (!flavor) {
       return c.json({ error: 'Container flavor not found' }, 404);

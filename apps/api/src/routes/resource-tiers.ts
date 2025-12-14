@@ -1,6 +1,8 @@
 /**
  * Resource Tiers API Routes
  * Endpoints for listing available resource tiers (CPU, memory, storage)
+ * 
+ * MIGRATED: Now uses async model functions with PostgreSQL
  */
 
 import { Hono } from 'hono';
@@ -20,11 +22,11 @@ export const resourceTiersRouter = new Hono();
 // GET /resource-tiers
 // =============================================================================
 // List all available resource tiers
-resourceTiersRouter.get('/', (c) => {
+resourceTiersRouter.get('/', async (c) => {
   log.info('Listing all resource tiers');
   
   try {
-    const tiers = getAllResourceTiers();
+    const tiers = await getAllResourceTiers();
     
     // Transform for API response
     const response = tiers.map(tier => ({
@@ -52,11 +54,11 @@ resourceTiersRouter.get('/', (c) => {
 // GET /resource-tiers/default
 // =============================================================================
 // Get the default resource tier
-resourceTiersRouter.get('/default', (c) => {
+resourceTiersRouter.get('/default', async (c) => {
   log.info('Getting default resource tier');
   
   try {
-    const tier = getDefaultResourceTier();
+    const tier = await getDefaultResourceTier();
     
     if (!tier) {
       return c.json({ error: 'No default tier configured' }, 404);
@@ -84,12 +86,12 @@ resourceTiersRouter.get('/default', (c) => {
 // GET /resource-tiers/:id
 // =============================================================================
 // Get a specific resource tier by ID
-resourceTiersRouter.get('/:id', (c) => {
+resourceTiersRouter.get('/:id', async (c) => {
   const tierId = c.req.param('id');
   log.info('Getting resource tier', { tierId });
   
   try {
-    const tier = getResourceTierById(tierId);
+    const tier = await getResourceTierById(tierId);
     
     if (!tier) {
       return c.json({ error: 'Resource tier not found' }, 404);

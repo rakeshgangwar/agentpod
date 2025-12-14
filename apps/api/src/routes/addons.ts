@@ -26,11 +26,11 @@ export const addonsRouter = new Hono();
 // GET /addons
 // =============================================================================
 // List all available container addons
-addonsRouter.get('/', (c) => {
+addonsRouter.get('/', async (c) => {
   log.info('Listing all container addons');
   
   try {
-    const addons = getAllAddons();
+    const addons = await getAllAddons();
     
     // Transform for API response
     const response = addons.map(addon => ({
@@ -57,11 +57,11 @@ addonsRouter.get('/', (c) => {
 // GET /addons/non-gpu
 // =============================================================================
 // Get addons that don't require GPU
-addonsRouter.get('/non-gpu', (c) => {
+addonsRouter.get('/non-gpu', async (c) => {
   log.info('Getting non-GPU addons');
   
   try {
-    const addons = getNonGpuAddons();
+    const addons = await getNonGpuAddons();
     
     const response = addons.map(addon => ({
       id: addon.id,
@@ -87,7 +87,7 @@ addonsRouter.get('/non-gpu', (c) => {
 // GET /addons/by-category/:category
 // =============================================================================
 // Get addons by category
-addonsRouter.get('/by-category/:category', (c) => {
+addonsRouter.get('/by-category/:category', async (c) => {
   const category = c.req.param('category') as AddonCategory;
   log.info('Getting addons by category', { category });
   
@@ -100,7 +100,7 @@ addonsRouter.get('/by-category/:category', (c) => {
   }
   
   try {
-    const addons = getAddonsByCategory(category);
+    const addons = await getAddonsByCategory(category);
     
     const response = addons.map(addon => ({
       id: addon.id,
@@ -139,7 +139,7 @@ addonsRouter.post('/validate', async (c) => {
     const { flavorId, addonIds, hasGpu = false } = body;
     
     // Get flavor (default if not specified)
-    let flavor = flavorId ? getFlavorById(flavorId) : getDefaultFlavor();
+    let flavor = flavorId ? await getFlavorById(flavorId) : await getDefaultFlavor();
     if (!flavor) {
       return c.json({ 
         valid: false,
@@ -149,7 +149,7 @@ addonsRouter.post('/validate', async (c) => {
     }
     
     // Get addons
-    const addons = getAddonsByIds(addonIds || []);
+    const addons = await getAddonsByIds(addonIds || []);
     
     // Check for missing addons
     const foundIds = addons.map(a => a.id);
@@ -194,12 +194,12 @@ addonsRouter.post('/validate', async (c) => {
 // GET /addons/:id
 // =============================================================================
 // Get a specific container addon by ID
-addonsRouter.get('/:id', (c) => {
+addonsRouter.get('/:id', async (c) => {
   const addonId = c.req.param('id');
   log.info('Getting container addon', { addonId });
   
   try {
-    const addon = getAddonById(addonId);
+    const addon = await getAddonById(addonId);
     
     if (!addon) {
       return c.json({ error: 'Container addon not found' }, 404);

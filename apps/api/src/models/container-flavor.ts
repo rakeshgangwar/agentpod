@@ -1,9 +1,13 @@
 /**
  * Container Flavor Model
  * Language/framework-specific container images
+ * 
+ * MIGRATED: Now uses PostgreSQL via Drizzle ORM
  */
 
-import { db } from '../db/index.ts';
+import { db } from '../db/drizzle';
+import { containerFlavors } from '../db/schema/containers';
+import { eq, asc, ilike } from 'drizzle-orm';
 
 // =============================================================================
 // Types
@@ -18,63 +22,50 @@ export interface ContainerFlavor {
   isDefault: boolean;            // Default flavor for new projects
   enabled: boolean;              // Whether the flavor is available for selection
   sortOrder: number;             // Display order
-  createdAt: string;
-  updatedAt: string;
-}
-
-// Database row type
-interface ContainerFlavorRow {
-  id: string;
-  name: string;
-  description: string | null;
-  languages: string;             // JSON array string
-  image_size_mb: number | null;
-  is_default: number;
-  enabled: number;
-  sort_order: number;
-  created_at: string;
-  updated_at: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // =============================================================================
 // Helpers
 // =============================================================================
 
-function rowToContainerFlavor(row: ContainerFlavorRow): ContainerFlavor {
-  let languages: string[] = [];
+function parseLanguages(languages: string): string[] {
   try {
-    languages = JSON.parse(row.languages);
+    return JSON.parse(languages);
   } catch {
-    languages = [];
+    return [];
   }
+}
 
+function rowToContainerFlavor(row: typeof containerFlavors.$inferSelect): ContainerFlavor {
   return {
     id: row.id,
     name: row.name,
     description: row.description,
-    languages,
-    imageSizeMb: row.image_size_mb,
-    isDefault: row.is_default === 1,
-    enabled: row.enabled === 1,
-    sortOrder: row.sort_order,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    languages: parseLanguages(row.languages),
+    imageSizeMb: row.imageSizeMb,
+    isDefault: row.isDefault,
+    enabled: row.enabled,
+    sortOrder: row.sortOrder,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   };
 }
 
 // =============================================================================
-// CRUD Operations
+// CRUD Operations (Async)
 // =============================================================================
 
 /**
  * Get all enabled container flavors, ordered by sort_order
  */
-export function getAllFlavors(): ContainerFlavor[] {
-  const rows = db.query(`
-    SELECT * FROM container_flavors 
-    WHERE enabled = 1
-    ORDER BY sort_order ASC
-  `).all() as ContainerFlavorRow[];
+export async function getAllFlavors(): Promise<ContainerFlavor[]> {
+  const rows = await db
+    .select()
+    .from(containerFlavors)
+    .where(eq(containerFlavors.enabled, true))
+    .orderBy(asc(containerFlavors.sortOrder));
   
   return rows.map(rowToContainerFlavor);
 }
@@ -82,11 +73,11 @@ export function getAllFlavors(): ContainerFlavor[] {
 /**
  * Get all container flavors including disabled ones
  */
-export function getAllFlavorsIncludingDisabled(): ContainerFlavor[] {
-  const rows = db.query(`
-    SELECT * FROM container_flavors 
-    ORDER BY sort_order ASC
-  `).all() as ContainerFlavorRow[];
+export async function getAllFlavorsIncludingDisabled(): Promise<ContainerFlavor[]> {
+  const rows = await db
+    .select()
+    .from(containerFlavors)
+    .orderBy(asc(containerFlavors.sortOrder));
   
   return rows.map(rowToContainerFlavor);
 }
@@ -94,11 +85,11 @@ export function getAllFlavorsIncludingDisabled(): ContainerFlavor[] {
 /**
  * Get a container flavor by ID
  */
-export function getFlavorById(id: string): ContainerFlavor | null {
-  const row = db.query(`
-    SELECT * FROM container_flavors 
-    WHERE id = $id
-  `).get({ $id: id }) as ContainerFlavorRow | null;
+export async function getFlavorById(id: string): Promise<ContainerFlavor | null> {
+  const [row] = await db
+    .select()
+    .from(containerFlavors)
+    .where(eq(containerFlavors.id, id));
   
   return row ? rowToContainerFlavor(row) : null;
 }
@@ -106,12 +97,12 @@ export function getFlavorById(id: string): ContainerFlavor | null {
 /**
  * Get the default container flavor
  */
-export function getDefaultFlavor(): ContainerFlavor | null {
-  const row = db.query(`
-    SELECT * FROM container_flavors 
-    WHERE is_default = 1
-    LIMIT 1
-  `).get() as ContainerFlavorRow | null;
+export async function getDefaultFlavor(): Promise<ContainerFlavor | null> {
+  const [row] = await db
+    .select()
+    .from(containerFlavors)
+    .where(eq(containerFlavors.isDefault, true))
+    .limit(1);
   
   return row ? rowToContainerFlavor(row) : null;
 }
@@ -119,12 +110,12 @@ export function getDefaultFlavor(): ContainerFlavor | null {
 /**
  * Get flavors that support a specific language
  */
-export function getFlavorsByLanguage(language: string): ContainerFlavor[] {
-  const rows = db.query(`
-    SELECT * FROM container_flavors 
-    WHERE languages LIKE $pattern
-    ORDER BY sort_order ASC
-  `).all({ $pattern: `%"${language}"%` }) as ContainerFlavorRow[];
+export async function getFlavorsByLanguage(language: string): Promise<ContainerFlavor[]> {
+  const rows = await db
+    .select()
+    .from(containerFlavors)
+    .where(ilike(containerFlavors.languages, `%"${language}"%`))
+    .orderBy(asc(containerFlavors.sortOrder));
   
   return rows.map(rowToContainerFlavor);
 }
