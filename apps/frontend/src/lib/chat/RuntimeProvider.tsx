@@ -67,6 +67,16 @@ interface RuntimeProviderProps {
   children: ReactNode;
   /** Render prop to pass the send with attachments handler to children */
   renderWithAttachmentHandler?: (handler: (text: string, attachments: AttachedFile[]) => Promise<void>) => ReactNode;
+  /** 
+   * Pending message to send automatically when the provider is ready.
+   * Used for programmatic message sending (e.g., onboarding auto-start).
+   */
+  pendingMessage?: {
+    text: string;
+    agent?: string;
+  };
+  /** Called when the pending message has been sent */
+  onPendingMessageSent?: () => void;
 }
 
 // Tool call status for tracking state
@@ -91,6 +101,7 @@ interface InternalMessage {
     args: Record<string, unknown>;
     result?: unknown;
     status?: ToolCallStatus;
+    error?: string; // Error message when status is "error"
   }>;
   files: InternalFilePart[];
   createdAt?: Date;
@@ -132,7 +143,7 @@ function convertOpenCodeMessage(msg: Message): InternalMessage {
       });
     }
     // Handle "tool" format (current OpenCode format)
-    // Structure: { type: "tool", callID, tool, state: { status, input, output, ... } }
+    // Structure: { type: "tool", callID, tool, state: { status, input, output, error, ... } }
     else if (part.type === "tool" && part.callID && part.state) {
       const callID = part.callID;
       const toolName = part.tool || "unknown";
@@ -140,13 +151,16 @@ function convertOpenCodeMessage(msg: Message): InternalMessage {
       const status = state.status as ToolCallStatus | undefined;
       const input = state.input ?? {};
       const output = state.output;
+      const error = state.error as string | undefined;
       
       internal.toolCalls.set(callID, {
         toolCallId: callID,
         toolName,
         args: input,
-        result: status === "completed" || status === "error" ? output : undefined,
+        // For error status, use error message; for completed, use output
+        result: status === "completed" ? output : status === "error" ? (error || output) : undefined,
         status: status,
+        error: error,
       });
     }
     // Warn about unhandled tool parts
@@ -194,9 +208,10 @@ function convertToThreadMessage(msg: InternalMessage): ThreadMessageLike {
     // so assistant-ui knows the tool is no longer running
     let result = tc.result;
     if (tc.status === "error" && result === undefined) {
-      result = { error: "Tool execution failed or was rejected" };
+      result = { error: tc.error || "Tool execution failed or was rejected" };
     }
     
+    // Include status and error info for proper UI rendering
     (content as unknown[]).push({
       type: "tool-call",
       toolCallId: tc.toolCallId,
@@ -204,6 +219,9 @@ function convertToThreadMessage(msg: InternalMessage): ThreadMessageLike {
       args: tc.args,
       argsText: JSON.stringify(tc.args),
       result: result,
+      // Custom fields for error handling in ToolCallPart
+      status: tc.status,
+      error: tc.error,
     });
   }
   
@@ -224,7 +242,7 @@ function convertToThreadMessage(msg: InternalMessage): ThreadMessageLike {
  * Inner runtime component that has access to the permission context.
  * This is where all the SSE handling and runtime logic lives.
  */
-function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selectedModel, selectedAgent, onSessionModelDetected, onSessionAgentDetected, children }: RuntimeProviderProps) {
+function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selectedModel, selectedAgent, onSessionModelDetected, onSessionAgentDetected, pendingMessage, onPendingMessageSent, children }: RuntimeProviderProps) {
   // Internal message state (mutable, managed by us)
   const [internalMessages, setInternalMessages] = useState<InternalMessage[]>([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -233,6 +251,9 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
   
   // Session state
   const [sessionId, setSessionId] = useState<string | null>(initialSessionId ?? null);
+  
+  // Track if pending message has been processed
+  const pendingMessageProcessedRef = useRef(false);
   
   // Stream reference for SSE
   const streamRef = useRef<OpenCodeStream | null>(null);
@@ -303,15 +324,30 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
           }
         }
         
-        // Detect agent from the last user message that has agent info
+        // Detect agent from messages
+        // Priority: 1) user message agent field, 2) assistant message mode field
         if (onSessionAgentDetected) {
-          // Find the last user message with agent field
+          let agentDetected = false;
+          
+          // First try: Find the last user message with agent field
           for (let i = opencodeMessages.length - 1; i >= 0; i--) {
             const msg = opencodeMessages[i];
             // Agent is typically set on user messages (the request specifies which agent to use)
             if (msg.info.role === "user" && msg.info.agent) {
               onSessionAgentDetected(msg.info.agent);
+              agentDetected = true;
               break;
+            }
+          }
+          
+          // Fallback: Check assistant message mode field (e.g., "manage", "build")
+          if (!agentDetected) {
+            for (let i = opencodeMessages.length - 1; i >= 0; i--) {
+              const msg = opencodeMessages[i];
+              if (msg.info.role === "assistant" && msg.info.mode) {
+                onSessionAgentDetected(msg.info.mode);
+                break;
+              }
             }
           }
         }
@@ -477,13 +513,16 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
               const status = state?.status as ToolCallStatus | undefined;
               const input = (state?.input as Record<string, unknown>) ?? {};
               const output = state?.output;
+              const error = state?.error as string | undefined;
               
               newMessage.toolCalls.set(callID, {
                 toolCallId: callID,
                 toolName,
                 args: input,
-                result: status === "completed" || status === "error" ? output : undefined,
+                // For error status, use error message; for completed, use output
+                result: status === "completed" ? output : status === "error" ? (error || output) : undefined,
                 status: status,
+                error: error,
               });
             }
           }
@@ -525,7 +564,7 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
           }
 
           // Handle "tool" format (from SSE stream)
-          // Format: { type: "tool", callID, tool, state: { input, status, output, ... } }
+          // Format: { type: "tool", callID, tool, state: { input, status, output, error, ... } }
           if (part.type === "tool") {
             const callID = part.callID as string | undefined;
             const toolName = (part.tool as string | undefined) || "unknown";
@@ -535,13 +574,16 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
               const status = state?.status as ToolCallStatus | undefined;
               const input = (state?.input as Record<string, unknown>) ?? {};
               const output = state?.output;
+              const error = state?.error as string | undefined;
               
               updated.toolCalls.set(callID, {
                 toolCallId: callID,
                 toolName,
                 args: input,
-                result: status === "completed" || status === "error" ? output : undefined,
+                // For error status, use error message; for completed, use output
+                result: status === "completed" ? output : status === "error" ? (error || output) : undefined,
                 status: status,
+                error: error,
               });
             }
           }
@@ -780,6 +822,59 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
     }
   }, [projectId, sessionId, selectedModel, selectedAgent]);
 
+  // Handle pending message (for programmatic message sending like onboarding)
+  useEffect(() => {
+    // Only process if:
+    // 1. We have a pending message
+    // 2. We haven't already processed it
+    // 3. We're not loading
+    // 4. We have a session
+    // 5. SSE stream is connected
+    if (
+      pendingMessage &&
+      !pendingMessageProcessedRef.current &&
+      !isLoading &&
+      sessionId &&
+      streamRef.current?.isConnected
+    ) {
+      pendingMessageProcessedRef.current = true;
+      
+      console.log("[RuntimeProvider] Processing pending message:", pendingMessage.text.slice(0, 50));
+      
+      // Use the agent from pendingMessage if specified, otherwise use selectedAgent
+      const agentToUse = pendingMessage.agent || selectedAgent;
+      
+      // Add optimistic user message
+      const userMessageId = `user-${Date.now()}`;
+      setInternalMessages((prev) => [
+        ...prev,
+        {
+          id: userMessageId,
+          role: "user" as const,
+          text: pendingMessage.text,
+          toolCalls: new Map(),
+          files: [],
+          createdAt: new Date(),
+        },
+      ]);
+      
+      setIsRunning(true);
+      setError(null);
+      
+      // Send the message
+      sandboxOpencodeSendMessage(projectId, sessionId, pendingMessage.text, selectedModel, agentToUse)
+        .then(() => {
+          console.log("[RuntimeProvider] Pending message sent successfully");
+          onPendingMessageSent?.();
+        })
+        .catch((err) => {
+          console.error("[RuntimeProvider] Failed to send pending message:", err);
+          setError(err instanceof Error ? err.message : "Failed to send message");
+          setIsRunning(false);
+        });
+    }
+  }, [pendingMessage, isLoading, sessionId, selectedModel, selectedAgent, onPendingMessageSent, projectId]);
+
   // Convert internal messages to ThreadMessageLike for the runtime
   const threadMessages = internalMessages.map(convertToThreadMessage);
 
@@ -842,7 +937,7 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
  * This includes the Permission system for human-in-the-loop approvals,
  * with a PermissionBar sticky at the bottom of the chat.
  */
-export function RuntimeProvider({ projectId, sessionId, selectedModel, selectedAgent, onSessionModelDetected, onSessionAgentDetected, children }: RuntimeProviderProps) {
+export function RuntimeProvider({ projectId, sessionId, selectedModel, selectedAgent, onSessionModelDetected, onSessionAgentDetected, pendingMessage, onPendingMessageSent, children }: RuntimeProviderProps) {
   return (
     <PermissionProvider projectId={projectId}>
       <RuntimeProviderInner
@@ -852,6 +947,8 @@ export function RuntimeProvider({ projectId, sessionId, selectedModel, selectedA
         selectedAgent={selectedAgent}
         onSessionModelDetected={onSessionModelDetected}
         onSessionAgentDetected={onSessionAgentDetected}
+        pendingMessage={pendingMessage}
+        onPendingMessageSent={onPendingMessageSent}
       >
         {children}
       </RuntimeProviderInner>

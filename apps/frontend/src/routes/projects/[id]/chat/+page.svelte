@@ -1,5 +1,7 @@
 <script lang="ts">
   import { page } from "$app/stores";
+  import { onMount } from "svelte";
+  import { untrack } from "svelte";
   import { sveltify } from "svelte-preprocess-react";
   import { RuntimeProvider } from "$lib/chat/RuntimeProvider";
   import { ChatThread } from "$lib/chat/ChatThread";
@@ -19,13 +21,12 @@
   } from "$lib/api/tauri";
   import { confirm } from "@tauri-apps/plugin-dialog";
   import { toast } from "svelte-sonner";
-  import {
+import {
     onboarding,
     fetchOnboardingSession,
     startOnboarding,
     skipOnboarding,
     clearError,
-    sendOnboardingMessage,
   } from "$lib/stores/onboarding.svelte";
 
   // File finder wrapper for ChatThread (uses sandboxId, same as projectId in URL)
@@ -108,7 +109,11 @@
   // Track which session's agent we've loaded to avoid re-detecting
   let agentLoadedForSession = $state<string | null>(null);
   
+  // Pending onboarding message to send via RuntimeProvider
+  let pendingOnboardingMessage = $state<{ text: string; agent?: string } | undefined>(undefined);
+  
   // Reset agent when session changes so it can be detected from the new session's messages
+  // For child sessions, use the agent extracted from the session title
   $effect(() => {
     if (selectedSessionId && selectedSessionId !== agentLoadedForSession) {
       // New session selected, reset agent to allow detection
@@ -116,11 +121,20 @@
       agentLoadedForSession = null;
     }
   });
+
+  // For child sessions, set agent from title immediately when session data is available
+  $effect(() => {
+    if (isChildSession && childSessionAgent && agentLoadedForSession !== selectedSessionId) {
+      selectedAgent = childSessionAgent;
+      agentLoadedForSession = selectedSessionId;
+    }
+  });
   
   // Callback when RuntimeProvider detects agent from existing session messages
   function handleSessionAgentDetected(agent: string) {
     // Only update if we haven't already loaded agent for this session
-    if (selectedSessionId && agentLoadedForSession !== selectedSessionId) {
+    // and it's not a child session (child sessions get agent from title)
+    if (selectedSessionId && agentLoadedForSession !== selectedSessionId && !isChildSession) {
       selectedAgent = agent;
       agentLoadedForSession = selectedSessionId;
     }
@@ -129,9 +143,12 @@
   // Load sessions and onboarding status when project changes
   $effect(() => {
     if (projectId) {
-      loadSessions();
-      // Fetch onboarding status for this sandbox
-      fetchOnboardingSession(projectId);
+      // Use untrack to prevent state updates inside these async functions
+      // from causing the effect to re-run
+      untrack(() => {
+        loadSessions();
+        fetchOnboardingSession(projectId);
+      });
     }
   });
 
@@ -139,25 +156,29 @@
   async function handleStartOnboarding() {
     const success = await startOnboarding(projectId);
     if (success) {
-      // Auto-trigger the onboarding agent by sending a message
+      // Set pending message to be sent by RuntimeProvider when it's ready
       if (selectedSessionId) {
-        const messageSent = await sendOnboardingMessage(projectId, selectedSessionId);
-        if (messageSent) {
-          toast.info("Setup started", {
-            description: "The onboarding assistant is ready to help configure your workspace.",
-          });
-        } else {
-          // If message failed, fall back to manual trigger
-          toast.info("Setup ready", {
-            description: "Type @onboarding in the chat to start the guided setup.",
-          });
-        }
+        const onboardingAgent = "manage";
+        pendingOnboardingMessage = {
+          text: "Start the workspace setup and help me configure this project.",
+          agent: onboardingAgent,
+        };
+        // Update the agent dropdown to reflect the agent being used
+        selectedAgent = onboardingAgent;
+        toast.info("Setup started", {
+          description: "The onboarding assistant is ready to help configure your workspace.",
+        });
       } else {
         toast.info("Setup ready", {
-          description: "Create a session and type @onboarding to start the guided setup.",
+          description: "Create a session first, then click 'Start Setup' again.",
         });
       }
     }
+  }
+  
+  // Callback when pending onboarding message has been sent
+  function handlePendingOnboardingMessageSent() {
+    pendingOnboardingMessage = undefined;
   }
 
   async function handleSkipOnboarding() {
@@ -249,6 +270,93 @@
     // Fallback to truncated ID
     return `Session ${session.id.slice(-6)}`;
   }
+
+  // Hierarchical session organization
+  // Top-level sessions are those without a parentID
+  let topLevelSessions = $derived(
+    sessions.filter(s => !s.parentID)
+  );
+
+  // Get the currently selected session object
+  let selectedSession = $derived(
+    selectedSessionId ? sessions.find(s => s.id === selectedSessionId) : undefined
+  );
+
+  // Check if current session is a child (subagent) session
+  let isChildSession = $derived(!!selectedSession?.parentID);
+
+  // Extract agent from session title pattern like "... (@agentname subagent)"
+  // Returns undefined if no agent pattern found
+  function extractAgentFromTitle(title?: string): string | undefined {
+    if (!title) return undefined;
+    // Match pattern like (@onboarding subagent) or (@build) at end of title
+    const match = title.match(/@(\w+)(?:\s+subagent)?\s*\)?$/i);
+    return match?.[1]?.toLowerCase();
+  }
+
+  // For child sessions, extract agent from title
+  let childSessionAgent = $derived(
+    isChildSession ? extractAgentFromTitle(selectedSession?.title) : undefined
+  );
+
+  // Map of parent session ID to its child sessions
+  let childSessionsMap = $derived(
+    sessions.reduce((acc, s) => {
+      if (s.parentID) {
+        if (!acc[s.parentID]) {
+          acc[s.parentID] = [];
+        }
+        acc[s.parentID].push(s);
+      }
+      return acc;
+    }, {} as Record<string, Session[]>)
+  );
+
+  // Track which parent sessions are expanded (show children)
+  let expandedSessions = $state<Set<string>>(new Set());
+
+  function toggleSessionExpanded(sessionId: string) {
+    if (expandedSessions.has(sessionId)) {
+      expandedSessions = new Set([...expandedSessions].filter(id => id !== sessionId));
+    } else {
+      expandedSessions = new Set([...expandedSessions, sessionId]);
+    }
+  }
+
+  function hasChildren(sessionId: string): boolean {
+    return (childSessionsMap[sessionId]?.length ?? 0) > 0;
+  }
+
+  function getChildCount(sessionId: string): number {
+    return childSessionsMap[sessionId]?.length ?? 0;
+  }
+
+  // Get child sessions for the currently selected session (for ChatThread to match task tool calls)
+  let currentSessionChildren = $derived(
+    selectedSessionId 
+      ? (childSessionsMap[selectedSessionId] ?? []).map(s => ({
+          id: s.id,
+          title: s.title,
+          createdAt: s.time?.created,
+        }))
+      : []
+  );
+
+  // Auto-expand parent when selecting a child session
+  $effect(() => {
+    if (selectedSessionId) {
+      const selectedSession = sessions.find(s => s.id === selectedSessionId);
+      if (selectedSession?.parentID && !expandedSessions.has(selectedSession.parentID)) {
+        expandedSessions = new Set([...expandedSessions, selectedSession.parentID]);
+      }
+    }
+  });
+
+  // Handler for navigating to a session from chat (e.g., clicking on task tool result)
+  function handleSessionSelect(sessionId: string) {
+    selectedSessionId = sessionId;
+    // The $effect above will auto-expand the parent if needed
+  }
 </script>
 
 {#if projectId}
@@ -285,45 +393,115 @@
           </div>
         {:else}
           <div class="p-2 space-y-1">
-            {#each sessions as session (session.id)}
-              <div
-                class="w-full text-left p-2 rounded-md text-sm transition-colors group cursor-pointer
-                  {selectedSessionId === session.id
-                    ? 'bg-primary text-primary-foreground'
-                    : 'hover:bg-muted'}"
-                onclick={() => (selectedSessionId = session.id)}
-                onkeydown={(e) => e.key === 'Enter' && (selectedSessionId = session.id)}
-                role="button"
-                tabindex="0"
-              >
-                <div class="flex items-start justify-between gap-2">
-                  <div class="min-w-0 flex-1">
-                    <div class="font-medium truncate">
-                      {getSessionTitle(session)}
+            {#each topLevelSessions as session (session.id)}
+              <!-- Parent/Top-level Session -->
+              <div>
+                <div
+                  class="w-full text-left p-2 rounded-md text-sm transition-colors group cursor-pointer
+                    {selectedSessionId === session.id
+                      ? 'bg-primary text-primary-foreground'
+                      : 'hover:bg-muted'}"
+                  onclick={() => (selectedSessionId = session.id)}
+                  onkeydown={(e) => e.key === 'Enter' && (selectedSessionId = session.id)}
+                  role="button"
+                  tabindex="0"
+                >
+                  <div class="flex items-start justify-between gap-2">
+                    <!-- Expand/Collapse button for sessions with children -->
+                    {#if hasChildren(session.id)}
+                      <button
+                        class="p-0.5 -ml-1 rounded hover:bg-black/10 dark:hover:bg-white/10 flex-shrink-0 mt-0.5
+                          {selectedSessionId === session.id ? 'text-primary-foreground' : 'text-muted-foreground'}"
+                        onclick={(e) => {
+                          e.stopPropagation();
+                          toggleSessionExpanded(session.id);
+                        }}
+                        title={expandedSessions.has(session.id) ? "Collapse" : "Expand"}
+                      >
+                        <span class="text-xs inline-block transition-transform {expandedSessions.has(session.id) ? 'rotate-90' : ''}">
+                          ▶
+                        </span>
+                      </button>
+                    {/if}
+                    <div class="min-w-0 flex-1">
+                      <div class="font-medium truncate flex items-center gap-1">
+                        {getSessionTitle(session)}
+                        {#if hasChildren(session.id)}
+                          <span class="text-xs opacity-60">({getChildCount(session.id)})</span>
+                        {/if}
+                      </div>
+                      <div
+                        class="text-xs truncate
+                          {selectedSessionId === session.id
+                            ? 'text-primary-foreground/70'
+                            : 'text-muted-foreground'}"
+                      >
+                        {formatDate(session.time?.updated || session.time?.created)}
+                      </div>
                     </div>
-                    <div
-                      class="text-xs truncate
+                    <button
+                      class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/20 text-xs
                         {selectedSessionId === session.id
-                          ? 'text-primary-foreground/70'
-                          : 'text-muted-foreground'}"
+                          ? 'text-primary-foreground hover:text-destructive'
+                          : 'text-muted-foreground hover:text-destructive'}"
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        deleteSession(session.id);
+                      }}
+                      title="Delete session"
                     >
-                      {formatDate(session.time?.updated || session.time?.created)}
-                    </div>
+                      ✕
+                    </button>
                   </div>
-                  <button
-                    class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/20 text-xs
-                      {selectedSessionId === session.id
-                        ? 'text-primary-foreground hover:text-destructive'
-                        : 'text-muted-foreground hover:text-destructive'}"
-                    onclick={(e) => {
-                      e.stopPropagation();
-                      deleteSession(session.id);
-                    }}
-                    title="Delete session"
-                  >
-                    ✕
-                  </button>
                 </div>
+
+                <!-- Child Sessions (nested) -->
+                {#if hasChildren(session.id) && expandedSessions.has(session.id)}
+                  <div class="ml-3 pl-2 border-l border-muted-foreground/20 space-y-1 mt-1">
+                    {#each childSessionsMap[session.id] as childSession (childSession.id)}
+                      <div
+                        class="w-full text-left p-2 rounded-md text-sm transition-colors group cursor-pointer
+                          {selectedSessionId === childSession.id
+                            ? 'bg-primary text-primary-foreground'
+                            : 'hover:bg-muted'}"
+                        onclick={() => (selectedSessionId = childSession.id)}
+                        onkeydown={(e) => e.key === 'Enter' && (selectedSessionId = childSession.id)}
+                        role="button"
+                        tabindex="0"
+                      >
+                        <div class="flex items-start justify-between gap-2">
+                          <div class="min-w-0 flex-1">
+                            <div class="font-medium truncate flex items-center gap-1">
+                              <span class="text-xs opacity-60">↳</span>
+                              {getSessionTitle(childSession)}
+                            </div>
+                            <div
+                              class="text-xs truncate
+                                {selectedSessionId === childSession.id
+                                  ? 'text-primary-foreground/70'
+                                  : 'text-muted-foreground'}"
+                            >
+                              {formatDate(childSession.time?.updated || childSession.time?.created)}
+                            </div>
+                          </div>
+                          <button
+                            class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/20 text-xs
+                              {selectedSessionId === childSession.id
+                                ? 'text-primary-foreground hover:text-destructive'
+                                : 'text-muted-foreground hover:text-destructive'}"
+                            onclick={(e) => {
+                              e.stopPropagation();
+                              deleteSession(childSession.id);
+                            }}
+                            title="Delete session"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    {/each}
+                  </div>
+                {/if}
               </div>
             {/each}
           </div>
@@ -364,7 +542,11 @@
                 {projectId}
                 bind:selectedAgent
                 compact={true}
+                disabled={isChildSession}
               />
+              {#if isChildSession}
+                <span class="text-xs text-muted-foreground italic">(subagent)</span>
+              {/if}
             </div>
           </div>
         </div>
@@ -392,6 +574,8 @@
             {selectedAgent}
             onSessionModelDetected={handleSessionModelDetected}
             onSessionAgentDetected={handleSessionAgentDetected}
+            pendingMessage={pendingOnboardingMessage}
+            onPendingMessageSent={handlePendingOnboardingMessageSent}
           >
             <react.ChatThread 
               {projectId} 
@@ -399,6 +583,8 @@
               onFilePickerRequest={handleFilePickerRequest}
               {pendingFilePath}
               onPendingFilePathClear={clearPendingFilePath}
+              onSessionSelect={handleSessionSelect}
+              childSessions={currentSessionChildren}
             />
           </react.RuntimeProvider>
         {/key}
@@ -414,10 +600,6 @@
         </div>
       {/if}
     </div>
-  </div>
-{:else}
-  <div class="flex items-center justify-center h-[calc(100vh-200px)]">
-    <p class="text-muted-foreground">Loading...</p>
   </div>
 {/if}
 

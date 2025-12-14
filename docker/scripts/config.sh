@@ -32,7 +32,8 @@ export FLAVORS=("js" "python" "go" "rust" "fullstack" "polyglot")
 export DEFAULT_FLAVOR="fullstack"
 
 # Build platform
-export BUILD_PLATFORM="${BUILD_PLATFORM:-linux/amd64}"
+# Default to native platform for better performance (especially on Apple Silicon)
+export BUILD_PLATFORM="${BUILD_PLATFORM:-linux/$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')}"
 
 # Image naming convention: codeopen-{flavor}:{version}
 # Returns local name by default, or registry-prefixed name if CONTAINER_REGISTRY is set

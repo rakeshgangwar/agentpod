@@ -23,6 +23,40 @@
     }
   }
 
+  // Download the current file
+  function downloadFile() {
+    if (!selectedFile) return;
+    
+    let blob: Blob;
+    const mimeType = getMimeType(selectedFile.name);
+    
+    // For binary files, use the raw base64 content and decode to proper binary
+    if (isBinaryFile(selectedFile.name) && rawBase64Content) {
+      const binaryData = base64ToArrayBuffer(rawBase64Content);
+      blob = new Blob([binaryData], { type: mimeType });
+    } else if (fileContent?.content) {
+      // For text files, use the decoded content
+      blob = new Blob([fileContent.content], { type: mimeType });
+    } else {
+      return;
+    }
+    
+    const url = URL.createObjectURL(blob);
+    
+    // Create a temporary link and trigger download
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = selectedFile.name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Clean up the URL object
+    URL.revokeObjectURL(url);
+    
+    toast.success(`Downloaded ${selectedFile.name}`);
+  }
+
   // Navigate to chat with file reference
   function useInChat() {
     if (selectedFile && projectId) {
@@ -40,6 +74,7 @@
 
   let selectedFile = $state<FileNode | null>(null);
   let fileContent = $state<FileContent | null>(null);
+  let rawBase64Content = $state<string | null>(null); // Store original base64 for binary downloads
   let isLoadingContent = $state(false);
   let contentError = $state<string | null>(null);
 
@@ -67,6 +102,62 @@
       // If decoding fails, return original (might already be plain text)
       return encoded;
     }
+  }
+
+  /**
+   * Decode base64 to ArrayBuffer for Blob creation
+   * This is needed for downloading binary files like PDFs, images, etc.
+   */
+  function base64ToArrayBuffer(base64: string): ArrayBuffer {
+    const binaryString = atob(base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer as ArrayBuffer;
+  }
+
+  /**
+   * Check if a file is likely binary based on extension
+   */
+  function isBinaryFile(filename: string): boolean {
+    const ext = filename.split(".").pop()?.toLowerCase();
+    const binaryExtensions = [
+      "pdf", "png", "jpg", "jpeg", "gif", "webp", "ico", "svg",
+      "zip", "tar", "gz", "rar", "7z",
+      "exe", "dll", "so", "dylib",
+      "woff", "woff2", "ttf", "otf", "eot",
+      "mp3", "mp4", "wav", "ogg", "webm", "avi", "mov",
+      "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+      "bin", "dat", "db", "sqlite"
+    ];
+    return binaryExtensions.includes(ext || "");
+  }
+
+  /**
+   * Get MIME type for file based on extension
+   */
+  function getMimeType(filename: string): string {
+    const ext = filename.split(".").pop()?.toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      "pdf": "application/pdf",
+      "png": "image/png",
+      "jpg": "image/jpeg",
+      "jpeg": "image/jpeg",
+      "gif": "image/gif",
+      "webp": "image/webp",
+      "svg": "image/svg+xml",
+      "ico": "image/x-icon",
+      "zip": "application/zip",
+      "json": "application/json",
+      "html": "text/html",
+      "css": "text/css",
+      "js": "application/javascript",
+      "ts": "application/typescript",
+      "md": "text/markdown",
+      "txt": "text/plain",
+    };
+    return mimeTypes[ext || ""] || "application/octet-stream";
   }
 
   /**
@@ -121,14 +212,18 @@
     isLoadingContent = true;
     contentError = null;
     fileContent = null;
+    rawBase64Content = null;
 
     try {
       // projectId is actually sandboxId in v2 API
       const response = await sandboxOpencodeGetFileContent(projectId, node.path);
       
-      // OpenCode API returns base64 encoded content - decode it
+      // OpenCode API returns base64 encoded content - decode it for display
       let content = response.content;
       if (content && isBase64(content)) {
+        // Store raw base64 for binary file downloads
+        rawBase64Content = content;
+        // Decode for text display (this corrupts binary files, but we use rawBase64Content for downloads)
         content = decodeBase64(content);
       }
       
@@ -367,6 +462,15 @@
               title="Copy file content to clipboard"
             >
               Copy Content
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onclick={downloadFile}
+              disabled={!fileContent?.content}
+              title="Download file"
+            >
+              Download
             </Button>
           </div>
         </div>

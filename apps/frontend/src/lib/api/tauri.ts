@@ -212,6 +212,8 @@ export interface Session {
   version?: string;
   projectID?: string;
   directory?: string;
+  /** Parent session ID - set when this session was spawned as a child (e.g., via task tool) */
+  parentID?: string;
   title?: string;
   time?: SessionTime;
   status?: string;
@@ -281,6 +283,7 @@ export interface ToolState {
   status?: string;
   input?: Record<string, unknown>;
   output?: unknown;
+  error?: string; // Error message when status is "error"
   title?: string;
   metadata?: Record<string, unknown>;
   time?: PartTime;

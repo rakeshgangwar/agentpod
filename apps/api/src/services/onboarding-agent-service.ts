@@ -300,15 +300,11 @@ export class OnboardingAgentService {
 
   /**
    * Generate custom agent files based on project requirements.
+   * Note: manage and onboarding agents are now GLOBAL (in ~/.config/opencode/agent/)
+   * and are set up by the container entrypoint, not generated per-project.
    */
   async generateCustomAgents(input: ConfigGenerationInput): Promise<GeneratedAgentFile[]> {
     const agents: GeneratedAgentFile[] = [];
-
-    // Always generate workspace agent for post-onboarding
-    agents.push({
-      filename: "workspace.md",
-      content: this.generateWorkspaceAgentContent(input),
-    });
 
     // Generate reviewer agent for projects with testing
     if (input.requirements.testingFramework) {
@@ -321,54 +317,8 @@ export class OnboardingAgentService {
     return agents;
   }
 
-  /**
-   * Generate workspace agent content.
-   */
-  private generateWorkspaceAgentContent(input: ConfigGenerationInput): string {
-    return this.generateAgentMarkdown({
-      description: "Helps maintain and update your workspace configuration",
-      mode: "subagent",
-      model: "anthropic/claude-sonnet-4-20250514",
-      tools: {
-        write: true,
-        edit: true,
-        read: true,
-        glob: true,
-        grep: true,
-        bash: false,
-        agentpod_knowledge_search_knowledge: true,
-        agentpod_knowledge_get_project_template: true,
-        agentpod_knowledge_get_agent_pattern: true,
-      },
-      content: `You are the workspace assistant for ${input.requirements.projectName || "this project"}.
-
-Your role is to help users manage and maintain their development environment configuration.
-
-## Capabilities
-
-You can help users:
-- Add new custom agents to the workspace
-- Add new slash commands
-- Update opencode.json settings
-- Change AI models or providers
-- Re-configure the workspace for different project types
-- Answer questions about the current configuration
-
-## Guidelines
-
-1. Always explain changes before making them
-2. Back up existing configuration when making major changes
-3. Validate configuration changes before applying
-4. Provide clear documentation for any new agents or commands you create
-
-## Available Knowledge Base Tools
-
-Use the AgentPod knowledge base tools to find templates and patterns:
-- \`search_knowledge\`: Search for relevant documentation
-- \`get_project_template\`: Get templates for specific project types
-- \`get_agent_pattern\`: Get patterns for specific agent roles`,
-    });
-  }
+  // Note: generateWorkspaceAgentContent removed - manage agent is now GLOBAL
+  // and defined in docker/base/scripts/agents/manage.md
 
   /**
    * Generate code reviewer agent content.
@@ -548,24 +498,18 @@ After running tests:
 
   /**
    * Generate files to inject into sandbox.
+   * Note: manage and onboarding agents are now GLOBAL and set up by the container entrypoint.
+   * This function only returns project-specific files (opencode.json, AGENTS.md, custom agents).
    */
   async generateInjectedFiles(input: ConfigGenerationInput): Promise<OnboardingInjectedFiles> {
     const config = await this.generateConfig(input);
 
-    // Generate onboarding agent
-    const onboardingAgent = {
-      path: ".opencode/agent/onboarding.md",
-      content: this.generateOnboardingAgentContent(input),
-    };
-
-    // Add workspace agent
-    const workspaceAgent = config.customAgents.find((a) => a.filename === "workspace.md");
-    const agents = [
-      onboardingAgent,
-      ...(workspaceAgent
-        ? [{ path: ".opencode/agent/workspace.md", content: workspaceAgent.content }]
-        : []),
-    ];
+    // Custom agents go in project-level .opencode/agent/
+    // Note: manage and onboarding are GLOBAL (set up by container), not included here
+    const agents = config.customAgents.map((agent) => ({
+      path: `.opencode/agent/${agent.filename}`,
+      content: agent.content,
+    }));
 
     return {
       opencodeJson: JSON.stringify(config.opencodeJson, null, 2),
@@ -574,68 +518,8 @@ After running tests:
     };
   }
 
-  /**
-   * Generate onboarding agent content.
-   */
-  private generateOnboardingAgentContent(input: ConfigGenerationInput): string {
-    return this.generateAgentMarkdown({
-      description: "Helps set up your workspace through conversational interview",
-      mode: "subagent",
-      model: "anthropic/claude-sonnet-4-20250514",
-      tools: {
-        write: true,
-        edit: true,
-        read: true,
-        glob: true,
-        grep: true,
-        bash: false,
-        agentpod_knowledge_search_knowledge: true,
-        agentpod_knowledge_get_project_template: true,
-        agentpod_knowledge_get_agent_pattern: true,
-        agentpod_knowledge_get_command_template: true,
-        agentpod_knowledge_list_project_types: true,
-        agentpod_knowledge_get_available_models: true,
-        agentpod_knowledge_get_provider_setup_guide: true,
-      },
-      content: `You are the onboarding assistant for AgentPod.
-
-Your role is to help users set up their development workspace through a friendly conversation.
-
-## Goals
-
-1. Understand the user's project type and requirements
-2. Configure the appropriate AI model and provider
-3. Set up helpful agents and commands for their workflow
-4. Generate appropriate AGENTS.md instructions
-
-## Interview Process
-
-1. **Welcome**: Greet the user and explain what you'll help them with
-2. **Project Type**: Ask about their project type (web app, API, CLI, etc.)
-3. **Technology Stack**: Learn about languages, frameworks, and tools
-4. **Preferences**: Ask about coding style and AI assistant preferences
-5. **Configuration**: Generate and apply the configuration
-
-## Available Tools
-
-Use the knowledge base to find templates and patterns:
-- \`search_knowledge\`: Search documentation
-- \`get_project_template\`: Get project templates
-- \`get_agent_pattern\`: Get agent definitions
-- \`get_command_template\`: Get command definitions
-- \`list_project_types\`: List available project types
-- \`get_available_models\`: Get available AI models
-- \`get_provider_setup_guide\`: Get provider setup help
-
-## Guidelines
-
-- Be friendly and helpful
-- Ask one or two questions at a time
-- Provide suggestions based on common patterns
-- Explain your configuration choices
-- Allow users to customize any recommendations`,
-    });
-  }
+  // Note: generateOnboardingAgentContent removed - onboarding agent is now GLOBAL
+  // and defined in docker/base/scripts/agents/onboarding.md
 
   // ===========================================================================
   // Markdown Parsing/Generation Helpers

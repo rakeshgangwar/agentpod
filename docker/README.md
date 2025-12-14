@@ -148,6 +148,7 @@ docker compose logs -f api
 |----------|-------------|
 | `OPENCODE_AUTH_JSON` | LLM provider credentials (JSON) |
 | `OPENCODE_CONFIG_JSON` | OpenCode configuration (JSON) |
+| `AGENT_MODEL` | Model for AgentPod agents (e.g., `copilot/gpt-4o`). If not set, agents use global/default model |
 
 ### Legacy Variables (Deprecated)
 

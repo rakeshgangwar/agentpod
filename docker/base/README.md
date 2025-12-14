@@ -28,6 +28,7 @@ Foundation layer for all CodeOpen container flavors.
 | `WORKSPACE` | /home/developer/workspace | Project workspace |
 | `OPENCODE_AUTH_JSON` | - | LLM provider credentials |
 | `OPENCODE_CONFIG_JSON` | - | OpenCode configuration |
+| `AGENT_MODEL` | - | Model for AgentPod agents (e.g., `copilot/gpt-4o`, `anthropic/claude-sonnet-4-20250514`) |
 | `FORGEJO_REPO_URL` | - | Git repository to clone |
 | `FORGEJO_USER` | - | Git authentication username |
 | `FORGEJO_TOKEN` | - | Git authentication token |

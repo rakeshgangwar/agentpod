@@ -38,6 +38,8 @@ echo "=============================================="
 #                           Used for flavor-specific AGENTS.md in workspace
 #   OPENCODE_PORT         - Port for OpenCode server (default: 4096)
 #   OPENCODE_HOST         - Host for OpenCode server (default: 0.0.0.0)
+#   AGENT_MODEL           - Model for AgentPod agents (e.g., copilot/gpt-4o)
+#                           If not set, agents use global/default model
 #
 # Other:
 #   ACP_GATEWAY_PORT      - Port for ACP Gateway (default: 4097)
@@ -243,12 +245,15 @@ setup_user_config() {
 }
 
 # =============================================================================
-# Setup Onboarding Agents
+# Setup Onboarding Agents (Global)
 # =============================================================================
-# Sets up onboarding-related agents in the workspace:
-#   - .opencode/agent/onboarding.md (for initial setup)
-#   - .opencode/agent/workspace.md (for ongoing workspace management)
+# Sets up AgentPod system agents in the GLOBAL config directory:
+#   - ~/.config/opencode/agent/manage.md (primary agent - Tab accessible)
+#   - ~/.config/opencode/agent/onboarding.md (subagent - invoked by manage)
 # These agents connect to the Management API's knowledge base MCP endpoint.
+#
+# The agents are GLOBAL (not project-level) so they persist across all
+# sandboxes and workspaces.
 #
 # Environment Variables:
 #   ONBOARDING_MODE        - If "true", onboarding agent is active
@@ -257,71 +262,88 @@ setup_user_config() {
 #   MANAGEMENT_API_URL     - URL of Management API (for MCP endpoint)
 # =============================================================================
 setup_onboarding_agents() {
-    echo "Setting up onboarding agents..."
+    echo "Setting up global AgentPod agents..."
     
-    # Create the .opencode/agent directory
-    AGENT_DIR="$WORKSPACE/.opencode/agent"
-    mkdir -p "$AGENT_DIR"
+    # Create the GLOBAL agent directory (~/.config/opencode/agent/)
+    GLOBAL_AGENT_DIR="$OPENCODE_CONFIG_DIR/agent"
+    mkdir -p "$GLOBAL_AGENT_DIR"
     
-    # Check if we have an onboarding agent file in /opt/agentpod/scripts/agents
+    # Source files for agents
+    MANAGE_SRC="/opt/agentpod/scripts/agents/manage.md"
     ONBOARDING_SRC="/opt/agentpod/scripts/agents/onboarding.md"
-    WORKSPACE_SRC="/opt/agentpod/scripts/agents/workspace.md"
     
-    # Copy onboarding agent if source exists
+    # Copy manage agent (primary agent - Tab accessible)
+    if [ -f "$MANAGE_SRC" ]; then
+        echo "  Installing manage agent (primary) to $GLOBAL_AGENT_DIR/manage.md"
+        cp "$MANAGE_SRC" "$GLOBAL_AGENT_DIR/manage.md"
+    else
+        echo "  Warning: Manage agent not found at $MANAGE_SRC"
+    fi
+    
+    # Copy onboarding agent (subagent - invoked by manage)
     if [ -f "$ONBOARDING_SRC" ]; then
-        echo "  Installing onboarding agent from $ONBOARDING_SRC"
-        cp "$ONBOARDING_SRC" "$AGENT_DIR/onboarding.md"
+        echo "  Installing onboarding agent (subagent) to $GLOBAL_AGENT_DIR/onboarding.md"
+        cp "$ONBOARDING_SRC" "$GLOBAL_AGENT_DIR/onboarding.md"
     else
         echo "  Warning: Onboarding agent not found at $ONBOARDING_SRC"
     fi
     
-    # Copy workspace agent if source exists
-    if [ -f "$WORKSPACE_SRC" ]; then
-        echo "  Installing workspace agent from $WORKSPACE_SRC"
-        cp "$WORKSPACE_SRC" "$AGENT_DIR/workspace.md"
-    else
-        echo "  Warning: Workspace agent not found at $WORKSPACE_SRC"
-    fi
-    
-    # Update opencode.json to include MCP configuration for knowledge base
-    if [ -n "$MANAGEMENT_API_URL" ] && [ -f "$WORKSPACE/opencode.json" ]; then
-        echo "  Configuring MCP connection to knowledge base..."
+    # Update GLOBAL opencode.json to include MCP configuration for knowledge base
+    # This goes in ~/.config/opencode/opencode.json, not the project-level config
+    if [ -n "$MANAGEMENT_API_URL" ]; then
+        echo "  Configuring MCP connection to knowledge base in global config..."
         
-        # Read current config
-        CURRENT_CONFIG=$(cat "$WORKSPACE/opencode.json")
+        GLOBAL_CONFIG_FILE="$OPENCODE_CONFIG_DIR/opencode.json"
         
-        # Check if mcp section already exists
-        if echo "$CURRENT_CONFIG" | jq -e '.mcp' > /dev/null 2>&1; then
-            # Add agentpod_knowledge to existing mcp section
-            UPDATED_CONFIG=$(echo "$CURRENT_CONFIG" | jq --arg url "${MANAGEMENT_API_URL}/api/mcp/knowledge" '
-                .mcp.agentpod_knowledge = {
-                    "type": "remote",
-                    "url": $url,
-                    "headers": {
-                        "Authorization": "Bearer {env:AGENTPOD_API_TOKEN}"
-                    }
-                }
-            ')
+        # Read current config or create empty object
+        if [ -f "$GLOBAL_CONFIG_FILE" ]; then
+            CURRENT_CONFIG=$(cat "$GLOBAL_CONFIG_FILE")
         else
-            # Add new mcp section with agentpod_knowledge
-            UPDATED_CONFIG=$(echo "$CURRENT_CONFIG" | jq --arg url "${MANAGEMENT_API_URL}/api/mcp/knowledge" '
-                . + {
-                    "mcp": {
-                        "agentpod_knowledge": {
-                            "type": "remote",
-                            "url": $url,
-                            "headers": {
-                                "Authorization": "Bearer {env:AGENTPOD_API_TOKEN}"
-                            }
-                        }
-                    }
-                }
-            ')
+            CURRENT_CONFIG="{}"
         fi
         
+        # Add/update MCP configuration
+        UPDATED_CONFIG=$(echo "$CURRENT_CONFIG" | jq --arg url "${MANAGEMENT_API_URL}/api/mcp/knowledge" '
+            .mcp.agentpod_knowledge = {
+                "type": "remote",
+                "url": $url,
+                "headers": {
+                    "Authorization": "Bearer {env:AGENTPOD_API_TOKEN}"
+                }
+            }
+        ')
+        
         # Write updated config
-        echo "$UPDATED_CONFIG" > "$WORKSPACE/opencode.json"
-        echo "  MCP configuration added to opencode.json"
+        echo "$UPDATED_CONFIG" > "$GLOBAL_CONFIG_FILE"
+        echo "  MCP configuration added to global opencode.json"
+    fi
+    
+    # Configure agent models from environment variable
+    # AGENT_MODEL can be set to override the default model for all agents
+    # Format: provider/model (e.g., "copilot/gpt-4o", "anthropic/claude-sonnet-4-20250514")
+    if [ -n "$AGENT_MODEL" ]; then
+        echo "  Configuring agent models: $AGENT_MODEL"
+        
+        GLOBAL_CONFIG_FILE="$OPENCODE_CONFIG_DIR/opencode.json"
+        
+        # Read current config or create empty object
+        if [ -f "$GLOBAL_CONFIG_FILE" ]; then
+            CURRENT_CONFIG=$(cat "$GLOBAL_CONFIG_FILE")
+        else
+            CURRENT_CONFIG="{}"
+        fi
+        
+        # Add agent model configuration for manage and onboarding agents
+        UPDATED_CONFIG=$(echo "$CURRENT_CONFIG" | jq --arg model "$AGENT_MODEL" '
+            .agent.manage.model = $model |
+            .agent.onboarding.model = $model
+        ')
+        
+        # Write updated config
+        echo "$UPDATED_CONFIG" > "$GLOBAL_CONFIG_FILE"
+        echo "  Agent model configuration added to global opencode.json"
+    else
+        echo "  No AGENT_MODEL set, agents will use default/global model"
     fi
     
     # Set onboarding environment variables for OpenCode
@@ -333,9 +355,10 @@ setup_onboarding_agents() {
     fi
     
     # Set ownership
-    chown -R developer:developer "$AGENT_DIR" 2>/dev/null || true
+    chown -R developer:developer "$GLOBAL_AGENT_DIR" 2>/dev/null || true
+    chown developer:developer "$OPENCODE_CONFIG_DIR/opencode.json" 2>/dev/null || true
     
-    echo "  Onboarding agents setup complete."
+    echo "  Global AgentPod agents setup complete."
 }
 
 # =============================================================================

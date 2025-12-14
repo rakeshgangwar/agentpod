@@ -5,7 +5,7 @@
  * Styled to match our shadcn-based design system.
  */
 
-import { type FC, type PropsWithChildren, useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { type FC, type PropsWithChildren, useState, useRef, useCallback, useEffect, useMemo, createContext, useContext } from "react";
 import {
   ThreadPrimitive,
   MessagePrimitive,
@@ -20,6 +20,26 @@ import { CommandPicker, type Command } from "./CommandPicker";
 import { FilePicker } from "./FilePicker";
 import { FileAttachmentButton, FileAttachmentPreview, type AttachedFile } from "./FileAttachment";
 import { useAttachments } from "./RuntimeProvider";
+
+/**
+ * Child session info for matching task tools to their spawned sessions
+ */
+export interface ChildSessionInfo {
+  id: string;
+  title?: string;
+  createdAt?: number;
+}
+
+/**
+ * Context for session navigation from tool calls (e.g., navigating to child sessions from task tools)
+ */
+interface SessionNavigationContextValue {
+  onSessionSelect?: (sessionId: string) => void;
+  /** Child sessions of the current session, used to match task tool calls to their spawned sessions */
+  childSessions?: ChildSessionInfo[];
+}
+
+const SessionNavigationContext = createContext<SessionNavigationContextValue>({});
 
 /**
  * Markdown component overrides with assistant-ui classes for proper styling
@@ -190,9 +210,85 @@ function UserTextPart() {
 /**
  * ToolCallPart component renders a tool call with its status
  * Props are passed by assistant-ui via ToolCallMessagePartProps
+ * 
+ * Special handling for "task" tool: Shows a navigation link to view the child session
+ * Since task tool results don't contain the session ID, we match by description to child sessions
+ * 
+ * Error handling: Detects error status from result.error or result object structure
  */
 function ToolCallPart({ toolName, args, result }: ToolCallMessagePartProps) {
+  const { onSessionSelect, childSessions } = useContext(SessionNavigationContext);
+  
+  // Detect completion and error states
   const isComplete = result !== undefined;
+  
+  // Check for error state - result can be { error: "message" } or just the error string
+  const isError = isComplete && (
+    (typeof result === "object" && result !== null && "error" in result) ||
+    (typeof result === "string" && result.toLowerCase().includes("error"))
+  );
+  
+  // Extract error message if present
+  const errorMessage = isError 
+    ? (typeof result === "object" && result !== null && "error" in result
+        ? (result as { error: string }).error
+        : typeof result === "string" ? result : "Tool execution failed")
+    : undefined;
+  
+  // Check if this is a task tool that spawned a child session
+  const isTaskTool = toolName === "task";
+  let childSessionId: string | undefined;
+  
+  if (isTaskTool) {
+    // First try to get session ID from result (in case OpenCode returns it)
+    if (result && typeof result === "object") {
+      const resultObj = result as Record<string, unknown>;
+      childSessionId = (
+        resultObj.sessionId as string | undefined ||
+        resultObj.session_id as string | undefined ||
+        resultObj.sessionID as string | undefined ||
+        (resultObj.session as { id?: string } | undefined)?.id
+      );
+    }
+    
+    // If not in result, try to match by description to child sessions
+    // Child session titles typically contain the task description
+    if (!childSessionId && childSessions && childSessions.length > 0 && args) {
+      const taskArgs = args as { description?: string; subagent_type?: string };
+      const description = taskArgs.description;
+      const subagentType = taskArgs.subagent_type;
+      
+      if (description || subagentType) {
+        // Find child session whose title contains the description or subagent type
+        const matchedSession = childSessions.find(session => {
+          if (!session.title) return false;
+          const titleLower = session.title.toLowerCase();
+          
+          // Match by description in title
+          if (description && titleLower.includes(description.toLowerCase())) {
+            return true;
+          }
+          
+          // Match by subagent type (e.g., "@onboarding subagent" in title)
+          if (subagentType && titleLower.includes(`@${subagentType}`)) {
+            return true;
+          }
+          
+          return false;
+        });
+        
+        if (matchedSession) {
+          childSessionId = matchedSession.id;
+        }
+      }
+    }
+  }
+  
+  const handleNavigateToSession = useCallback(() => {
+    if (childSessionId && onSessionSelect) {
+      onSessionSelect(childSessionId);
+    }
+  }, [childSessionId, onSessionSelect]);
   
   // Stringify the result for display
   const resultDisplay = result === undefined 
@@ -203,15 +299,44 @@ function ToolCallPart({ toolName, args, result }: ToolCallMessagePartProps) {
         ? result 
         : JSON.stringify(result, null, 2);
   
+  // Determine status indicator styling
+  const statusIndicatorClass = isError 
+    ? 'bg-red-500' 
+    : isComplete 
+      ? 'bg-green-500' 
+      : 'bg-yellow-500 animate-pulse';
+  
+  const statusText = isError 
+    ? 'failed' 
+    : isComplete 
+      ? 'completed' 
+      : 'running...';
+  
   return (
-    <div className="my-2 rounded-lg border border-border bg-muted/50 overflow-hidden w-full min-w-0">
-      <div className="flex items-center gap-2 px-3 py-2 bg-muted border-b border-border">
-        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isComplete ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
+    <div className={`my-2 rounded-lg border overflow-hidden w-full min-w-0 ${isError ? 'border-red-500/50 bg-red-500/10' : 'border-border bg-muted/50'}`}>
+      <div className={`flex items-center gap-2 px-3 py-2 border-b ${isError ? 'bg-red-500/20 border-red-500/30' : 'bg-muted border-border'}`}>
+        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${statusIndicatorClass}`} />
         <span className="font-mono text-sm font-medium truncate">{toolName}</span>
-        <span className="text-xs text-muted-foreground flex-shrink-0">
-          {isComplete ? 'completed' : 'running...'}
+        <span className={`text-xs flex-shrink-0 ${isError ? 'text-red-500 font-medium' : 'text-muted-foreground'}`}>
+          {statusText}
         </span>
+        {/* Show navigation link for task tool with child session */}
+        {isTaskTool && childSessionId && onSessionSelect && (
+          <button
+            onClick={handleNavigateToSession}
+            className="ml-auto text-xs text-primary hover:text-primary/80 hover:underline flex items-center gap-1 flex-shrink-0"
+          >
+            View Session
+            <span>→</span>
+          </button>
+        )}
       </div>
+      {/* Show error message prominently if there's an error */}
+      {isError && errorMessage && (
+        <div className="px-3 py-2 text-sm text-red-500 bg-red-500/5 border-b border-red-500/20">
+          <span className="font-medium">Error:</span> {errorMessage}
+        </div>
+      )}
       <details className="group">
         <summary className="px-3 py-2 text-xs text-muted-foreground cursor-pointer hover:bg-muted/50">
           {isComplete ? 'Show details' : 'Show arguments'}
@@ -225,7 +350,7 @@ function ToolCallPart({ toolName, args, result }: ToolCallMessagePartProps) {
           </div>
           <div className="min-w-0">
             <span className="text-xs font-medium text-muted-foreground">Result:</span>
-            <pre className="mt-1 text-xs bg-background rounded p-2 overflow-x-auto max-h-32 whitespace-pre-wrap break-all">
+            <pre className={`mt-1 text-xs rounded p-2 overflow-x-auto max-h-32 whitespace-pre-wrap break-all ${isError ? 'bg-red-500/10 text-red-400' : 'bg-background'}`}>
               {resultDisplay}
             </pre>
           </div>
@@ -695,6 +820,10 @@ export interface ChatThreadProps {
   pendingFilePath?: string | null;
   /** Callback to clear pending file path after it's been processed */
   onPendingFilePathClear?: () => void;
+  /** Callback when user clicks to navigate to a child session (from task tool call) */
+  onSessionSelect?: (sessionId: string) => void;
+  /** Child sessions of the current session, used to match task tool calls to their spawned sessions */
+  childSessions?: ChildSessionInfo[];
 }
 
 /**
@@ -707,37 +836,44 @@ export function ChatThread({
   onFilePickerRequest, 
   pendingFilePath, 
   onPendingFilePathClear,
+  onSessionSelect,
+  childSessions,
 }: ChatThreadProps) {
+  // Memoize the context value to prevent unnecessary re-renders
+  const sessionNavigationValue = useMemo(() => ({ onSessionSelect, childSessions }), [onSessionSelect, childSessions]);
+  
   return (
-    <ThreadPrimitive.Root className="flex flex-col h-full">
-      <ThreadPrimitive.Viewport className="flex-1 overflow-y-auto">
-        <ThreadPrimitive.Empty>
-          <EmptyState />
-        </ThreadPrimitive.Empty>
-        
-        <div className="p-4">
-          <ThreadPrimitive.Messages
-            components={{
-              UserMessage,
-              AssistantMessage,
-            }}
-          />
+    <SessionNavigationContext.Provider value={sessionNavigationValue}>
+      <ThreadPrimitive.Root className="flex flex-col h-full">
+        <ThreadPrimitive.Viewport className="flex-1 overflow-y-auto">
+          <ThreadPrimitive.Empty>
+            <EmptyState />
+          </ThreadPrimitive.Empty>
           
-          {/* Show loading indicator when waiting for assistant response */}
-          <LoadingIndicator />
-        </div>
+          <div className="p-4">
+            <ThreadPrimitive.Messages
+              components={{
+                UserMessage,
+                AssistantMessage,
+              }}
+            />
+            
+            {/* Show loading indicator when waiting for assistant response */}
+            <LoadingIndicator />
+          </div>
+          
+          <ThreadPrimitive.ViewportFooter />
+        </ThreadPrimitive.Viewport>
         
-        <ThreadPrimitive.ViewportFooter />
-      </ThreadPrimitive.Viewport>
-      
-      <Composer 
-        projectId={projectId} 
-        findFiles={findFiles} 
-        onFilePickerRequest={onFilePickerRequest}
-        pendingFilePath={pendingFilePath}
-        onPendingFilePathClear={onPendingFilePathClear}
-      />
-    </ThreadPrimitive.Root>
+        <Composer 
+          projectId={projectId} 
+          findFiles={findFiles} 
+          onFilePickerRequest={onFilePickerRequest}
+          pendingFilePath={pendingFilePath}
+          onPendingFilePathClear={onPendingFilePathClear}
+        />
+      </ThreadPrimitive.Root>
+    </SessionNavigationContext.Provider>
   );
 }
 

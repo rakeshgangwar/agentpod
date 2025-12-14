@@ -1,7 +1,6 @@
 ---
 description: Helps set up your workspace through conversational interview
 mode: subagent
-model: anthropic/claude-sonnet-4-20250514
 temperature: 0.3
 tools:
   write: true
@@ -10,12 +9,12 @@ tools:
   glob: true
   grep: true
   list: true
-  bash: false
-  webfetch: false
+  bash: true
+  webfetch: true
   agentpod_knowledge_*: true
 permission:
-  bash: deny
-  webfetch: deny
+  bash: ask
+  webfetch: ask
 ---
 
 # Onboarding Agent
@@ -111,7 +110,7 @@ Based on gathered information, generate:
    - How to use custom commands (/test, etc.)
    - How to modify configurations later
 3. **Offer to adjust** anything before completing
-4. **Complete onboarding** and introduce them to the `@workspace` agent for future changes
+4. **Complete onboarding** and let them know they can Tab to the `manage` agent for future changes
 
 ## Knowledge Base Tools
 
@@ -132,8 +131,6 @@ Use these tools to provide accurate, up-to-date information:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "anthropic/claude-sonnet-4-20250514",
-  "small_model": "anthropic/claude-haiku",
   "mcp": {
     "agentpod_knowledge": {
       "type": "remote",
@@ -222,7 +219,7 @@ permission:
 4. **Explain decisions** - Tell users why you're recommending something
 5. **Allow customization** - Offer to adjust any generated configuration
 6. **Keep agentpod_knowledge MCP** - This connection is required for workspace maintenance
-7. **Create workspace agent** - Always ensure `.opencode/agent/workspace.md` exists for post-onboarding help
+7. **Return to manage agent** - After setup is complete, let the user know they can Tab to `manage` for future configuration changes
 
 ## Example Conversation
 

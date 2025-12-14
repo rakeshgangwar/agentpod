@@ -26,6 +26,9 @@ pub struct Session {
     pub project_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub directory: Option<String>,
+    /// Parent session ID - set when this session was spawned as a child (e.g., via task tool)
+    #[serde(rename = "parentID", skip_serializing_if = "Option::is_none")]
+    pub parent_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
