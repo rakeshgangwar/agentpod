@@ -70,21 +70,34 @@ if [ ! -f "$FLAVOR_DIR/Dockerfile" ]; then
     exit 1
 fi
 
-# Determine base image
-BASE_IMG="${CUSTOM_BASE:-${REGISTRY_URL}/codeopen-base:latest}"
+# Determine base image (with or without registry prefix)
+if [ -n "$CUSTOM_BASE" ]; then
+    BASE_IMG="$CUSTOM_BASE"
+elif [ -n "$CONTAINER_REGISTRY" ]; then
+    BASE_IMG="${CONTAINER_REGISTRY}/codeopen-base:latest"
+else
+    BASE_IMG="codeopen-base:latest"
+fi
+
+# Determine flavor image name
+if [ -n "$CONTAINER_REGISTRY" ]; then
+    IMAGE_NAME="${CONTAINER_REGISTRY}/codeopen-${FLAVOR}"
+    REGISTRY_DISPLAY="$CONTAINER_REGISTRY"
+else
+    IMAGE_NAME="codeopen-${FLAVOR}"
+    REGISTRY_DISPLAY="local"
+fi
 
 echo "=============================================="
 echo "  CodeOpen Flavor Build: $FLAVOR"
 echo "=============================================="
 echo "  Version:  $CONTAINER_VERSION"
-echo "  Registry: $REGISTRY_URL"
+echo "  Registry: $REGISTRY_DISPLAY"
 echo "  Base:     $BASE_IMG"
 echo "  Platform: $BUILD_PLATFORM"
 echo "  Cache:    ${NO_CACHE:-enabled}"
 echo "=============================================="
 echo ""
-
-IMAGE_NAME="${REGISTRY_URL}/codeopen-${FLAVOR}"
 
 echo "Building codeopen-${FLAVOR}..."
 
@@ -103,10 +116,14 @@ echo "Built: $IMAGE_NAME:latest"
 echo ""
 
 if [ "$PUSH" = "yes" ]; then
-    echo "Pushing images..."
-    docker push "$IMAGE_NAME:$CONTAINER_VERSION"
-    docker push "$IMAGE_NAME:latest"
-    echo "Pushed successfully."
+    if [ -z "$CONTAINER_REGISTRY" ]; then
+        echo "Warning: CONTAINER_REGISTRY not set, skipping push"
+    else
+        echo "Pushing images..."
+        docker push "$IMAGE_NAME:$CONTAINER_VERSION"
+        docker push "$IMAGE_NAME:latest"
+        echo "Pushed successfully."
+    fi
 fi
 
 echo ""

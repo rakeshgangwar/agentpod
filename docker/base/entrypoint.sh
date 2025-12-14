@@ -243,6 +243,102 @@ setup_user_config() {
 }
 
 # =============================================================================
+# Setup Onboarding Agents
+# =============================================================================
+# Sets up onboarding-related agents in the workspace:
+#   - .opencode/agent/onboarding.md (for initial setup)
+#   - .opencode/agent/workspace.md (for ongoing workspace management)
+# These agents connect to the Management API's knowledge base MCP endpoint.
+#
+# Environment Variables:
+#   ONBOARDING_MODE        - If "true", onboarding agent is active
+#   ONBOARDING_SESSION_ID  - Session ID for tracking onboarding progress
+#   AGENTPOD_API_TOKEN     - Auth token for MCP server
+#   MANAGEMENT_API_URL     - URL of Management API (for MCP endpoint)
+# =============================================================================
+setup_onboarding_agents() {
+    echo "Setting up onboarding agents..."
+    
+    # Create the .opencode/agent directory
+    AGENT_DIR="$WORKSPACE/.opencode/agent"
+    mkdir -p "$AGENT_DIR"
+    
+    # Check if we have an onboarding agent file in /opt/agentpod/scripts/agents
+    ONBOARDING_SRC="/opt/agentpod/scripts/agents/onboarding.md"
+    WORKSPACE_SRC="/opt/agentpod/scripts/agents/workspace.md"
+    
+    # Copy onboarding agent if source exists
+    if [ -f "$ONBOARDING_SRC" ]; then
+        echo "  Installing onboarding agent from $ONBOARDING_SRC"
+        cp "$ONBOARDING_SRC" "$AGENT_DIR/onboarding.md"
+    else
+        echo "  Warning: Onboarding agent not found at $ONBOARDING_SRC"
+    fi
+    
+    # Copy workspace agent if source exists
+    if [ -f "$WORKSPACE_SRC" ]; then
+        echo "  Installing workspace agent from $WORKSPACE_SRC"
+        cp "$WORKSPACE_SRC" "$AGENT_DIR/workspace.md"
+    else
+        echo "  Warning: Workspace agent not found at $WORKSPACE_SRC"
+    fi
+    
+    # Update opencode.json to include MCP configuration for knowledge base
+    if [ -n "$MANAGEMENT_API_URL" ] && [ -f "$WORKSPACE/opencode.json" ]; then
+        echo "  Configuring MCP connection to knowledge base..."
+        
+        # Read current config
+        CURRENT_CONFIG=$(cat "$WORKSPACE/opencode.json")
+        
+        # Check if mcp section already exists
+        if echo "$CURRENT_CONFIG" | jq -e '.mcp' > /dev/null 2>&1; then
+            # Add agentpod_knowledge to existing mcp section
+            UPDATED_CONFIG=$(echo "$CURRENT_CONFIG" | jq --arg url "${MANAGEMENT_API_URL}/api/mcp/knowledge" '
+                .mcp.agentpod_knowledge = {
+                    "type": "remote",
+                    "url": $url,
+                    "headers": {
+                        "Authorization": "Bearer {env:AGENTPOD_API_TOKEN}"
+                    }
+                }
+            ')
+        else
+            # Add new mcp section with agentpod_knowledge
+            UPDATED_CONFIG=$(echo "$CURRENT_CONFIG" | jq --arg url "${MANAGEMENT_API_URL}/api/mcp/knowledge" '
+                . + {
+                    "mcp": {
+                        "agentpod_knowledge": {
+                            "type": "remote",
+                            "url": $url,
+                            "headers": {
+                                "Authorization": "Bearer {env:AGENTPOD_API_TOKEN}"
+                            }
+                        }
+                    }
+                }
+            ')
+        fi
+        
+        # Write updated config
+        echo "$UPDATED_CONFIG" > "$WORKSPACE/opencode.json"
+        echo "  MCP configuration added to opencode.json"
+    fi
+    
+    # Set onboarding environment variables for OpenCode
+    if [ "$ONBOARDING_MODE" = "true" ]; then
+        echo "  Onboarding mode is ACTIVE"
+        echo "  Session ID: ${ONBOARDING_SESSION_ID:-not set}"
+    else
+        echo "  Onboarding mode is inactive (normal operation)"
+    fi
+    
+    # Set ownership
+    chown -R developer:developer "$AGENT_DIR" 2>/dev/null || true
+    
+    echo "  Onboarding agents setup complete."
+}
+
+# =============================================================================
 # Setup Project Config
 # =============================================================================
 # Sets up project-level configuration in the workspace:
@@ -797,6 +893,9 @@ setup_user_config
 
 # Setup project-level config (opencode.json, flavor-specific AGENTS.md)
 setup_project_config
+
+# Setup onboarding agents (from /opt/agentpod/scripts/agents/)
+setup_onboarding_agents
 
 # Install addons (based on ADDON_IDS env var)
 install_addons

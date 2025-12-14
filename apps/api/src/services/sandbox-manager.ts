@@ -33,6 +33,7 @@ import { getUserOpencodeFullConfig } from "../models/user-opencode-config.ts";
 import * as SandboxModel from "../models/sandbox.ts";
 import type { Sandbox as DbSandbox, SandboxStatus as DbSandboxStatus } from "../models/sandbox.ts";
 import { getOpenCodeSyncService } from "./sync/opencode-sync.ts";
+import { onboardingService } from "./onboarding-service.ts";
 
 const log = createLogger("sandbox-manager");
 
@@ -396,6 +397,20 @@ export class SandboxManager {
       throw new Error(`Failed to create sandbox: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
 
+    // Step 2.5: Create onboarding session for new sandbox
+    let onboardingSessionId: string | undefined;
+    try {
+      const session = await onboardingService.create({
+        userId,
+        sandboxId,
+      });
+      onboardingSessionId = session.id;
+      log.info("Created onboarding session", { sandboxId, sessionId: session.id });
+    } catch (error) {
+      log.warn("Failed to create onboarding session", { sandboxId, error });
+      // Don't fail sandbox creation if onboarding session fails
+    }
+
     // Step 3: Load or detect configuration
     const configResult = await loadOrDetectConfig(repository.path);
     if (!configResult.valid) {
@@ -471,6 +486,20 @@ export class SandboxManager {
       }
     } catch (configError) {
       log.warn("Failed to build OpenCode config, continuing without it", { error: configError });
+    }
+
+    // Step 5.5: Add onboarding environment variables
+    if (onboardingSessionId) {
+      containerSpec.env = {
+        ...containerSpec.env,
+        ONBOARDING_MODE: "true",
+        ONBOARDING_SESSION_ID: onboardingSessionId,
+        MANAGEMENT_API_URL: config.publicUrl,
+      };
+      log.debug("Added onboarding environment variables", {
+        sessionId: onboardingSessionId,
+        apiUrl: config.publicUrl,
+      });
     }
 
     // Step 6: Create the Docker container

@@ -10,6 +10,9 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { onboardingService } from "../services/onboarding-service";
 import { modelSelectionService } from "../services/model-selection-service";
+import { onboardingAgentService } from "../services/onboarding-agent-service";
+import { SandboxOnboardingService } from "../services/sandbox-onboarding-service";
+import { getSandboxManager } from "../services/sandbox-manager";
 import { db } from "../db/drizzle";
 import { sandboxes } from "../db/schema/sandboxes";
 import { eq } from "drizzle-orm";
@@ -407,6 +410,176 @@ export const onboardingRoutes = new Hono()
     } catch (error) {
       log.error("Failed to reset onboarding", { error });
       return c.json({ error: "Failed to reset onboarding" }, 500);
+    }
+  })
+
+  /**
+   * POST /api/onboarding/:id/apply
+   * Apply onboarding configuration to the linked sandbox.
+   * Writes opencode.json, AGENTS.md, and agent files to the sandbox.
+   * Query params:
+   * - reload: boolean - Whether to signal OpenCode to reload config (default: true)
+   */
+  .post("/:id/apply", async (c) => {
+    try {
+      const id = c.req.param("id");
+      const reloadParam = c.req.query("reload");
+      const shouldReload = reloadParam !== "false"; // Default to true
+
+      // Get sandbox onboarding service (initialized lazily)
+      const sandboxManager = getSandboxManager();
+      const sandboxOnboardingService = new SandboxOnboardingService(
+        sandboxManager,
+        onboardingAgentService,
+        onboardingService
+      );
+
+      // Apply the config
+      const result = await sandboxOnboardingService.applyOnboardingSession(id);
+
+      if (!result.success) {
+        return c.json({ 
+          error: result.error || "Failed to apply configuration",
+          filesWritten: result.filesWritten 
+        }, 500);
+      }
+
+      // Optionally signal OpenCode to reload
+      const session = await onboardingService.getById(id);
+      if (shouldReload && session?.sandboxId) {
+        try {
+          await sandboxOnboardingService.signalOpenCodeReload(session.sandboxId);
+        } catch (reloadError) {
+          log.debug("Failed to signal OpenCode reload (may not be running)", { reloadError });
+        }
+      }
+
+      return c.json({ 
+        success: true,
+        filesWritten: result.filesWritten,
+        session: await onboardingService.getById(id)
+      });
+    } catch (error) {
+      log.error("Failed to apply onboarding config", { error });
+      const message = error instanceof Error ? error.message : "Failed to apply configuration";
+      return c.json({ error: message }, 500);
+    }
+  })
+
+  /**
+   * POST /api/onboarding/:id/link
+   * Link an onboarding session to a sandbox.
+   * This allows a session created without a sandbox to be linked later.
+   */
+  .post("/:id/link", zValidator("json", z.object({ sandboxId: z.string() })), async (c) => {
+    try {
+      const id = c.req.param("id");
+      const { sandboxId } = c.req.valid("json");
+      const userId = getUserId(c);
+
+      // Validate sandbox exists
+      const exists = await sandboxExists(sandboxId);
+      if (!exists) {
+        return c.json({ error: `Sandbox not found: ${sandboxId}` }, 404);
+      }
+
+      // Get sandbox onboarding service
+      const sandboxManager = getSandboxManager();
+      const sandboxOnboardingService = new SandboxOnboardingService(
+        sandboxManager,
+        onboardingAgentService,
+        onboardingService
+      );
+
+      // Link the session to the sandbox
+      await sandboxOnboardingService.linkSessionToSandbox(id, sandboxId);
+
+      // Return updated session
+      const session = await onboardingService.getById(id);
+      return c.json({ session });
+    } catch (error) {
+      log.error("Failed to link session to sandbox", { error });
+      const message = error instanceof Error ? error.message : "Failed to link session to sandbox";
+      return c.json({ error: message }, 500);
+    }
+  })
+
+  /**
+   * GET /api/onboarding/:id/config
+   * Get the currently applied configuration from the sandbox.
+   * Returns null if no config has been applied.
+   */
+  .get("/:id/config", async (c) => {
+    try {
+      const id = c.req.param("id");
+      
+      // Get session
+      const session = await onboardingService.getById(id);
+      if (!session) {
+        return c.json({ error: `Onboarding session not found: ${id}` }, 404);
+      }
+
+      if (!session.sandboxId) {
+        return c.json({ error: "Session has no associated sandbox" }, 400);
+      }
+
+      // Get sandbox onboarding service
+      const sandboxManager = getSandboxManager();
+      const sandboxOnboardingService = new SandboxOnboardingService(
+        sandboxManager,
+        onboardingAgentService,
+        onboardingService
+      );
+
+      // Get applied config
+      const appliedConfig = await sandboxOnboardingService.getAppliedConfig(session.sandboxId);
+
+      return c.json({ 
+        config: appliedConfig,
+        session 
+      });
+    } catch (error) {
+      log.error("Failed to get applied config", { error });
+      return c.json({ error: "Failed to get applied configuration" }, 500);
+    }
+  })
+
+  /**
+   * GET /api/onboarding/:id/validate-sandbox
+   * Validate that the linked sandbox is ready for onboarding config application.
+   */
+  .get("/:id/validate-sandbox", async (c) => {
+    try {
+      const id = c.req.param("id");
+      
+      // Get session
+      const session = await onboardingService.getById(id);
+      if (!session) {
+        return c.json({ error: `Onboarding session not found: ${id}` }, 404);
+      }
+
+      if (!session.sandboxId) {
+        return c.json({ 
+          valid: false, 
+          errors: ["Session has no associated sandbox"] 
+        });
+      }
+
+      // Get sandbox onboarding service
+      const sandboxManager = getSandboxManager();
+      const sandboxOnboardingService = new SandboxOnboardingService(
+        sandboxManager,
+        onboardingAgentService,
+        onboardingService
+      );
+
+      // Validate sandbox
+      const validation = await sandboxOnboardingService.validateSandboxForOnboarding(session.sandboxId);
+
+      return c.json(validation);
+    } catch (error) {
+      log.error("Failed to validate sandbox", { error });
+      return c.json({ error: "Failed to validate sandbox" }, 500);
     }
   })
 

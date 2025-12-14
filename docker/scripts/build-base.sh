@@ -25,17 +25,24 @@ for arg in "$@"; do
     esac
 done
 
+# Determine image name (with or without registry prefix)
+if [ -n "$CONTAINER_REGISTRY" ]; then
+    IMAGE_NAME="${CONTAINER_REGISTRY}/codeopen-base"
+    REGISTRY_DISPLAY="$CONTAINER_REGISTRY"
+else
+    IMAGE_NAME="codeopen-base"
+    REGISTRY_DISPLAY="local"
+fi
+
 echo "=============================================="
 echo "  CodeOpen Base Image Build"
 echo "=============================================="
 echo "  Version:  $CONTAINER_VERSION"
-echo "  Registry: $REGISTRY_URL"
+echo "  Registry: $REGISTRY_DISPLAY"
 echo "  Platform: $BUILD_PLATFORM"
 echo "  Cache:    ${NO_CACHE:-enabled}"
 echo "=============================================="
 echo ""
-
-IMAGE_NAME="${REGISTRY_URL}/codeopen-base"
 
 echo "Building codeopen-base..."
 
@@ -53,10 +60,14 @@ echo "Built: $IMAGE_NAME:latest"
 echo ""
 
 if [ "$PUSH" = "yes" ]; then
-    echo "Pushing images..."
-    docker push "$IMAGE_NAME:$CONTAINER_VERSION"
-    docker push "$IMAGE_NAME:latest"
-    echo "Pushed successfully."
+    if [ -z "$CONTAINER_REGISTRY" ]; then
+        echo "Warning: CONTAINER_REGISTRY not set, skipping push"
+    else
+        echo "Pushing images..."
+        docker push "$IMAGE_NAME:$CONTAINER_VERSION"
+        docker push "$IMAGE_NAME:latest"
+        echo "Pushed successfully."
+    fi
 fi
 
 echo ""
