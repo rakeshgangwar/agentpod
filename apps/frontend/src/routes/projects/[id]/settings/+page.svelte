@@ -94,7 +94,7 @@
     
     <div class="grid gap-3">
       <!-- Homepage URL -->
-      {#if sandbox?.urls.homepage}
+      {#if sandbox?.urls?.homepage}
         <div class="flex items-center justify-between p-3 bg-muted/50 rounded">
           <div class="min-w-0 flex-1">
             <div class="font-medium">Homepage URL</div>
@@ -102,7 +102,7 @@
               {sandbox.urls.homepage}
             </div>
           </div>
-          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls.homepage, "Homepage", "opencode")}>
+          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls?.homepage, "Homepage", "opencode")}>
             Open
           </Button>
         </div>
@@ -113,11 +113,11 @@
         <div class="min-w-0 flex-1">
           <div class="font-medium">OpenCode API</div>
           <div class="text-sm text-muted-foreground truncate">
-            {sandbox?.urls.opencode ?? "Not configured"}
+            {sandbox?.urls?.opencode ?? "Not configured"}
           </div>
         </div>
-        {#if sandbox?.urls.opencode}
-          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls.opencode, "OpenCode", "opencode")}>
+        {#if sandbox?.urls?.opencode}
+          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls?.opencode, "OpenCode", "opencode")}>
             Open
           </Button>
         {/if}
@@ -128,18 +128,18 @@
         <div class="min-w-0 flex-1">
           <div class="font-medium">Code Server</div>
           <div class="text-sm text-muted-foreground truncate">
-            {sandbox?.urls.codeServer ?? "Not configured"}
+            {sandbox?.urls?.codeServer ?? "Not configured"}
           </div>
         </div>
-        {#if sandbox?.urls.codeServer}
-          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls.codeServer, "Code Server", "code-server")}>
+        {#if sandbox?.urls?.codeServer}
+          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls?.codeServer, "Code Server", "code-server")}>
             Open
           </Button>
         {/if}
       </div>
 
       <!-- VNC/Desktop (only show if available) -->
-      {#if sandbox?.urls.vnc}
+      {#if sandbox?.urls?.vnc}
         <div class="flex items-center justify-between p-3 bg-muted/50 rounded">
           <div class="min-w-0 flex-1">
             <div class="font-medium">Desktop (VNC)</div>
@@ -147,7 +147,7 @@
               {sandbox.urls.vnc}
             </div>
           </div>
-          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls.vnc, "Desktop", "vnc")}>
+          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls?.vnc, "Desktop", "vnc")}>
             Open
           </Button>
         </div>
@@ -296,18 +296,18 @@
     <div class="border rounded-lg p-4 space-y-3">
       <h3 class="font-medium">Quick Actions</h3>
       <div class="flex flex-wrap gap-2">
-        {#if sandbox.urls.opencode}
-          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls.opencode, "OpenCode", "opencode")}>
+        {#if sandbox.urls?.opencode}
+          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls?.opencode, "OpenCode", "opencode")}>
             Open OpenCode
           </Button>
         {/if}
-        {#if sandbox.urls.codeServer}
-          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls.codeServer, "Code Server", "code-server")}>
+        {#if sandbox.urls?.codeServer}
+          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls?.codeServer, "Code Server", "code-server")}>
             Open Code Server
           </Button>
         {/if}
-        {#if sandbox.urls.vnc}
-          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls.vnc, "Desktop", "vnc")}>
+        {#if sandbox.urls?.vnc}
+          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls?.vnc, "Desktop", "vnc")}>
             Open Desktop
           </Button>
         {/if}

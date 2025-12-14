@@ -42,11 +42,11 @@ export const sandboxes = {
   get count() { return sandboxesList.length; },
   get dockerHealthy() { return dockerHealthy; },
   
-  // Derived getters
+  // Derived getters - use API status values: created, starting, running, stopping, stopped, error
   get running() { return sandboxesList.filter(s => s.status === "running"); },
-  get stopped() { return sandboxesList.filter(s => s.status === "exited"); },
-  get paused() { return sandboxesList.filter(s => s.status === "paused"); },
-  get restarting() { return sandboxesList.filter(s => s.status === "restarting"); },
+  get stopped() { return sandboxesList.filter(s => s.status === "stopped"); },
+  get starting() { return sandboxesList.filter(s => s.status === "starting"); },
+  get stopping() { return sandboxesList.filter(s => s.status === "stopping"); },
 };
 
 // =============================================================================

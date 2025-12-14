@@ -145,7 +145,7 @@
           </div>
         </div>
         <div class="flex gap-2">
-          {#if sandbox.status === "exited" || sandbox.status === "created"}
+          {#if sandbox.status === "stopped" || sandbox.status === "created"}
             <Button size="sm" onclick={() => startSandbox(sandbox.id)}>
               Start
             </Button>
@@ -153,9 +153,9 @@
             <Button size="sm" variant="secondary" onclick={() => stopSandbox(sandbox.id)}>
               Stop
             </Button>
-          {:else if sandbox.status === "paused"}
-            <Button size="sm" onclick={() => startSandbox(sandbox.id)}>
-              Resume
+          {:else if sandbox.status === "starting" || sandbox.status === "stopping"}
+            <Button size="sm" disabled={true}>
+              {sandbox.status === "starting" ? "Starting..." : "Stopping..."}
             </Button>
           {/if}
           <Button size="sm" variant="outline" onclick={() => showRestartDialog = true}>

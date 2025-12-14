@@ -204,11 +204,11 @@ function ToolCallPart({ toolName, args, result }: ToolCallMessagePartProps) {
         : JSON.stringify(result, null, 2);
   
   return (
-    <div className="my-2 rounded-lg border border-border bg-muted/50 overflow-hidden">
+    <div className="my-2 rounded-lg border border-border bg-muted/50 overflow-hidden w-full min-w-0">
       <div className="flex items-center gap-2 px-3 py-2 bg-muted border-b border-border">
-        <span className={`w-2 h-2 rounded-full ${isComplete ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
-        <span className="font-mono text-sm font-medium">{toolName}</span>
-        <span className="text-xs text-muted-foreground">
+        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isComplete ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
+        <span className="font-mono text-sm font-medium truncate">{toolName}</span>
+        <span className="text-xs text-muted-foreground flex-shrink-0">
           {isComplete ? 'completed' : 'running...'}
         </span>
       </div>
@@ -216,16 +216,16 @@ function ToolCallPart({ toolName, args, result }: ToolCallMessagePartProps) {
         <summary className="px-3 py-2 text-xs text-muted-foreground cursor-pointer hover:bg-muted/50">
           {isComplete ? 'Show details' : 'Show arguments'}
         </summary>
-        <div className="px-3 py-2 space-y-2">
-          <div>
+        <div className="px-3 py-2 space-y-2 min-w-0">
+          <div className="min-w-0">
             <span className="text-xs font-medium text-muted-foreground">Arguments:</span>
-            <pre className="mt-1 text-xs bg-background rounded p-2 overflow-auto max-h-32">
+            <pre className="mt-1 text-xs bg-background rounded p-2 overflow-x-auto max-h-32 whitespace-pre-wrap break-all">
               {JSON.stringify(args, null, 2)}
             </pre>
           </div>
-          <div>
+          <div className="min-w-0">
             <span className="text-xs font-medium text-muted-foreground">Result:</span>
-            <pre className="mt-1 text-xs bg-background rounded p-2 overflow-auto max-h-32">
+            <pre className="mt-1 text-xs bg-background rounded p-2 overflow-x-auto max-h-32 whitespace-pre-wrap break-all">
               {resultDisplay}
             </pre>
           </div>
@@ -328,8 +328,8 @@ function AssistantMessage() {
   if (!hasContent) return null;
   
   return (
-    <MessagePrimitive.Root className="flex justify-start mb-4">
-      <div className="max-w-[80%] rounded-lg px-4 py-2 bg-muted">
+    <MessagePrimitive.Root className="flex justify-start mb-4 min-w-0 w-full">
+      <div className="max-w-[80%] min-w-0 rounded-lg px-4 py-2 bg-muted overflow-hidden">
         <MessagePrimitive.Content
           components={{
             Text: TextPart,

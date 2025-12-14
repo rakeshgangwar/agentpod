@@ -198,6 +198,24 @@ impl ApiClient {
                 .json::<T>()
                 .await
                 .map_err(|e| AppError::ApiError(format!("Failed to parse response: {}", e)))
+        } else if status == reqwest::StatusCode::UNAUTHORIZED {
+            // 401 Unauthorized - session expired or invalid
+            let error_text = response
+                .json::<ErrorResponse>()
+                .await
+                .map(|e| e.error)
+                .unwrap_or_else(|_| "Session expired or invalid".to_string());
+            
+            Err(AppError::Unauthorized(error_text))
+        } else if status == reqwest::StatusCode::FORBIDDEN {
+            // 403 Forbidden - also treat as unauthorized
+            let error_text = response
+                .json::<ErrorResponse>()
+                .await
+                .map(|e| e.error)
+                .unwrap_or_else(|_| "Access forbidden".to_string());
+            
+            Err(AppError::Unauthorized(error_text))
         } else {
             let error_text = response
                 .json::<ErrorResponse>()

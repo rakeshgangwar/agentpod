@@ -946,8 +946,8 @@ export default {
                   <p class="text-xs text-muted-foreground">Stopped</p>
                 </div>
                 <div class="text-center p-3 bg-yellow-500/10 rounded-lg">
-                  <p class="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{sandboxes.paused.length}</p>
-                  <p class="text-xs text-muted-foreground">Paused</p>
+                  <p class="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{sandboxes.starting.length + sandboxes.stopping.length}</p>
+                  <p class="text-xs text-muted-foreground">Transitioning</p>
                 </div>
               </div>
             </Card.Content>

@@ -68,13 +68,13 @@
     goto(`/projects/${sandboxId}`);
   }
 
-  // Extract project name from sandbox labels or name
-  function getSandboxDisplayName(sandbox: { name: string; labels: Record<string, string> }): string {
-    return sandbox.labels["agentpod.sandbox.name"] || sandbox.name;
+  // Extract project name from sandbox - use name field directly, fallback to labels
+  function getSandboxDisplayName(sandbox: { name: string; labels?: Record<string, string> }): string {
+    return sandbox.labels?.["agentpod.sandbox.name"] || sandbox.name;
   }
 
-  function getSandboxSlug(sandbox: { labels: Record<string, string> }): string {
-    return sandbox.labels["agentpod.sandbox.slug"] || "";
+  function getSandboxSlug(sandbox: { slug?: string; labels?: Record<string, string> }): string {
+    return sandbox.slug || sandbox.labels?.["agentpod.sandbox.slug"] || "";
   }
 </script>
 
@@ -200,7 +200,7 @@
               </p>
             </Card.Content>
             <Card.Footer class="flex flex-wrap gap-2 relative z-10">
-              {#if sandbox.status === "exited" || sandbox.status === "created"}
+              {#if sandbox.status === "stopped" || sandbox.status === "created"}
                 <Button 
                   size="sm" 
                   onclick={(e: MouseEvent) => { e.stopPropagation(); startSandbox(sandbox.id); }}
@@ -217,13 +217,12 @@
                 >
                   Stop
                 </Button>
-              {:else if sandbox.status === "paused"}
+              {:else if sandbox.status === "starting" || sandbox.status === "stopping"}
                 <Button 
                   size="sm" 
-                  onclick={(e: MouseEvent) => { e.stopPropagation(); startSandbox(sandbox.id); }}
-                  disabled={sandboxes.isLoading}
+                  disabled={true}
                 >
-                  Resume
+                  {sandbox.status === "starting" ? "Starting..." : "Stopping..."}
                 </Button>
               {/if}
               <Button 

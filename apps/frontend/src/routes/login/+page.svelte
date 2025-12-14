@@ -18,8 +18,10 @@
   let password = $state("");
   let name = $state("");
 
-  // Determine current step
-  let step = $derived<"setup" | "login">(connection.isConnected ? "login" : "setup");
+  // Determine current step - wait for connection to be initialized
+  let step = $derived<"setup" | "login">(
+    connection.isConnected && connection.apiUrl ? "login" : "setup"
+  );
 
   async function handleSetup(e: Event) {
     e.preventDefault();

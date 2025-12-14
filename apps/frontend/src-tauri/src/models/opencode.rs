@@ -259,6 +259,9 @@ pub struct SendMessageInput {
     /// Optional model selection - if not provided, uses the default model
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<ModelSelection>,
+    /// Optional agent to use for this message (e.g., "onboarding", "plan", "build")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent: Option<String>,
 }
 
 // =============================================================================
@@ -315,8 +318,8 @@ pub struct AppInfo {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OpenCodeHealth {
     pub healthy: bool,
-    #[serde(rename = "projectId")]
-    pub project_id: String,
+    #[serde(default)]
+    pub status: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
