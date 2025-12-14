@@ -10,9 +10,9 @@ Step-by-step guide to implementing the Onboarding Agent System for AgentPod.
 |-------|--------|-----------------|-------|
 | **Phase 1** | **COMPLETED** | Dec 14, 2024 | PostgreSQL + Drizzle schema ready |
 | **Phase 2** | **COMPLETED** | Dec 14, 2024 | Services, types, & knowledge base seeded |
-| **Phase 3** | Pending | - | MCP Server & API Routes |
-| **Phase 4** | Pending | - | Container Integration |
-| **Phase 5** | Pending | - | Frontend & Polish |
+| **Phase 3** | **COMPLETED** | Dec 14, 2024 | MCP Server & API Routes implemented |
+| **Phase 4** | **COMPLETED** | Dec 14, 2024 | Container Integration with E2E tests |
+| **Phase 5** | **COMPLETED** | Dec 14, 2024 | Frontend Integration with Onboarding Banner |
 
 ### Phase 1 Completed Tasks
 
@@ -110,6 +110,119 @@ apps/api/
         ├── knowledge-service.ts         # Knowledge document CRUD + search
         ├── onboarding-service.ts        # Onboarding session management
         └── model-selection-service.ts   # Model recommendation service
+```
+
+### Phase 3 Completed Tasks
+
+- [x] Create MCP Knowledge endpoint (`apps/api/src/routes/mcp-knowledge.ts`)
+  - [x] Implement 7 MCP tools: search_knowledge, get_project_template, get_agent_pattern, get_command_template, list_project_types, get_available_models, get_provider_setup_guide
+  - [x] Add tools/list and tools/call handlers
+  - [x] Bearer token authentication
+- [x] Create Onboarding API routes (`apps/api/src/routes/onboarding.ts`)
+  - [x] GET /api/onboarding/:id - Get session by ID
+  - [x] GET /api/onboarding/sandbox/:sandboxId - Get session by sandbox
+  - [x] POST /api/onboarding/start - Start onboarding
+  - [x] POST /api/onboarding/:id/skip - Skip onboarding
+  - [x] POST /api/onboarding/:id/complete - Complete onboarding
+  - [x] POST /api/onboarding/apply - Apply config to sandbox
+  - [x] POST /api/onboarding/link - Link sandbox to session
+  - [x] GET /api/onboarding/config/:sandboxId - Get config for sandbox
+  - [x] POST /api/onboarding/validate-sandbox - Validate sandbox setup
+
+### Phase 4 Completed Tasks
+
+- [x] Create agent definitions
+  - [x] `docker/base/scripts/agents/onboarding.md` - Onboarding agent template
+  - [x] `docker/base/scripts/agents/workspace.md` - Workspace agent template
+- [x] Update container entrypoint (`docker/base/entrypoint.sh`)
+  - [x] Add `setup_onboarding_agents()` function
+  - [x] Configure MCP server in opencode.json with API token
+  - [x] Install agents when ONBOARDING_MODE=true
+- [x] Update sandbox manager (`apps/api/src/services/sandbox-manager.ts`)
+  - [x] Auto-create onboarding session on sandbox creation
+  - [x] Inject ONBOARDING_MODE, ONBOARDING_SESSION_ID, AGENTPOD_API_TOKEN env vars
+- [x] Create sandbox-onboarding-service (`apps/api/src/services/sandbox-onboarding-service.ts`)
+- [x] Add E2E tests (`apps/api/tests/e2e/`)
+  - [x] Docker client helper for real container testing
+  - [x] Container startup with onboarding env vars
+  - [x] Agent installation verification
+  - [x] MCP configuration in opencode.json
+  - [x] Container-to-host MCP communication
+  - [x] All 7 MCP tools tested from inside container
+  - [x] Error handling tests
+- [x] Add shell script for quick E2E verification (`scripts/test-onboarding-e2e.sh`)
+
+### Phase 5 Completed Tasks
+
+- [x] Create Onboarding API client (`apps/frontend/src/lib/api/onboarding.ts`)
+  - [x] Types: OnboardingSession, OnboardingStatus, OnboardingRequirements, GeneratedConfig
+  - [x] Functions: getOnboardingSession, createOnboardingSession, startOnboarding, skipOnboarding, completeOnboarding, applyOnboardingConfig, resetOnboarding
+  - [x] Authentication with Bearer token from authGetToken
+- [x] Create Onboarding Store (`apps/frontend/src/lib/stores/onboarding.svelte.ts`)
+  - [x] Svelte 5 runes-based state management
+  - [x] Session map with loading/error states per sandbox
+  - [x] Reactive getters: getSession, getStatus, needsOnboarding, isInProgress, isComplete
+  - [x] Actions: fetchOnboardingSession, startOnboarding, skipOnboarding, completeOnboarding, resetOnboarding
+- [x] Create Onboarding Banner component (`apps/frontend/src/lib/components/onboarding-banner.svelte`)
+  - [x] Welcome state with "Start Setup" and "Skip" buttons
+  - [x] In-progress state with spinner and status message
+  - [x] Failed state with error display and retry button
+  - [x] Follows design language (gradients, icons, spacing)
+- [x] Integrate banner into Chat page (`apps/frontend/src/routes/projects/[id]/chat/+page.svelte`)
+  - [x] Import onboarding store and banner component
+  - [x] Fetch onboarding status on project load
+  - [x] Display banner between model selector and chat thread
+  - [x] Add toast notifications for start/skip actions
+
+### Files Created in Phase 5
+
+```
+apps/frontend/src/
+├── lib/
+│   ├── api/
+│   │   └── onboarding.ts                  # HTTP client for onboarding API
+│   ├── stores/
+│   │   └── onboarding.svelte.ts           # Svelte 5 onboarding store
+│   └── components/
+│       └── onboarding-banner.svelte       # Welcome/progress banner component
+└── routes/
+    └── projects/
+        └── [id]/
+            └── chat/
+                └── +page.svelte           # Updated with onboarding integration
+```
+
+### Files Created in Phase 3
+
+```
+apps/api/
+└── src/
+    └── routes/
+        └── mcp-knowledge.ts               # MCP endpoint with 7 tools
+```
+
+### Files Created in Phase 4
+
+```
+apps/api/
+├── src/
+│   └── services/
+│       └── sandbox-onboarding-service.ts  # Sandbox-onboarding integration
+└── tests/
+    └── e2e/
+        ├── helpers/
+        │   └── docker.ts                  # E2E Docker client helper
+        └── onboarding-flow.test.ts        # E2E test suite
+
+docker/base/
+├── entrypoint.sh                          # Updated with setup_onboarding_agents()
+└── scripts/
+    └── agents/
+        ├── onboarding.md                  # Onboarding agent template
+        └── workspace.md                   # Workspace agent template
+
+scripts/
+└── test-onboarding-e2e.sh                 # Quick E2E verification script
 ```
 
 ---
