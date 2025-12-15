@@ -23,7 +23,7 @@
   <!-- Sliding indicator -->
   <div 
     class="theme-toggle-indicator"
-    style="transform: translateX({activeIndex * 100}%)"
+    style="--active-index: {activeIndex}"
   ></div>
   
   {#each modeOptions as option}
@@ -54,13 +54,15 @@
     position: absolute;
     left: 3px;
     top: 3px;
-    width: calc((100% - 6px - 4px) / 3);
+    width: 28px;
     height: calc(100% - 6px);
     background: var(--cyber-cyan);
     opacity: 0.2;
     border-radius: 6px;
     transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     pointer-events: none;
+    /* Calculate position: each button is 28px wide + 2px gap */
+    transform: translateX(calc(var(--active-index) * (28px + 2px)));
   }
 
   .theme-toggle-button {
