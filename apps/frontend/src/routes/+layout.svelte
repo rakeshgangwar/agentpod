@@ -13,17 +13,15 @@
   let currentPath = $state("/");
 
   // Public routes that don't require authentication
-  const publicRoutes = ["/login"];
+  const publicRoutes = ["/login", "/setup"];
 
   // Derived: check if current route is public
   let isPublicRoute = $derived(publicRoutes.some(route => currentPath.startsWith(route)));
 
   // Derived: should we show the loading spinner?
-  // Show loading if initializing OR if we need to redirect (not authenticated and not on public route)
-  let shouldShowLoading = $derived(
-    isInitializing || 
-    (!isPublicRoute && auth.isInitialized && !auth.isAuthenticated)
-  );
+  // Only show loading during initial app startup
+  // Don't show loading during redirects (e.g., after logout) - just let the redirect happen
+  let shouldShowLoading = $derived(isInitializing);
 
   onMount(async () => {
     // Get current path

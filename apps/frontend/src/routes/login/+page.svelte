@@ -5,6 +5,7 @@
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
+  import { Circle } from "@lucide/svelte";
 
   // Form state
   let apiUrl = $state("http://localhost:3001");
@@ -178,7 +179,7 @@
             <!-- Connection Info -->
             <div class="p-3 rounded border border-border/30 bg-background/30">
               <div class="flex items-center gap-2 text-sm font-mono">
-                <span class="text-[var(--cyber-emerald)]">●</span>
+                <Circle class="h-2.5 w-2.5 text-[var(--cyber-emerald)] fill-current" />
                 <span class="text-muted-foreground">connected:</span>
                 <span class="text-foreground truncate">{connection.apiUrl}</span>
               </div>
