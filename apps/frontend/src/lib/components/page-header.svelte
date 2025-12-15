@@ -132,12 +132,12 @@
             <div class="flex items-center gap-3 overflow-hidden">
               <!-- Icon in expanded mode -->
               {#if icon}
-                <div class="flex items-center justify-center w-10 h-10 rounded-lg border border-[var(--cyber-cyan)]/30 bg-[var(--cyber-cyan)]/5 shrink-0">
+                <div class="flex items-center justify-center shrink-0 text-[var(--cyber-cyan)]">
                   {#if typeof icon === "string"}
-                    <span class="text-xl">{icon}</span>
+                    <span class="text-2xl">{icon}</span>
                   {:else}
                     {@const IconComponent = icon}
-                    <IconComponent class="h-5 w-5 text-[var(--cyber-cyan)]" />
+                    <IconComponent class="h-6 w-6" />
                   {/if}
                 </div>
               {/if}
@@ -152,7 +152,7 @@
               {/if}
             </div>
             {#if subtitle}
-              <p class="text-xs font-mono text-muted-foreground truncate mt-0.5 {icon ? 'ml-[52px]' : ''}">
+              <p class="text-xs font-mono text-muted-foreground truncate mt-0.5 {icon ? 'ml-9' : ''}">
                 {subtitle}
               </p>
             {/if}
@@ -180,14 +180,14 @@
             <!-- Icon or fallback to title -->
             {#if icon}
               <div 
-                class="flex items-center justify-center w-8 h-8 rounded border border-[var(--cyber-cyan)]/30 bg-[var(--cyber-cyan)]/5"
+                class="flex items-center justify-center text-[var(--cyber-cyan)]"
                 title={title}
               >
                 {#if typeof icon === "string"}
-                  <span class="text-lg">{icon}</span>
+                  <span class="text-xl">{icon}</span>
                 {:else}
                   {@const IconComponent = icon}
-                  <IconComponent class="h-5 w-5 text-[var(--cyber-cyan)]" />
+                  <IconComponent class="h-5 w-5" />
                 {/if}
               </div>
             {:else}

@@ -295,8 +295,8 @@
                   <!-- Project Icon -->
                   {#if getSandboxIcon(sandbox)}
                     {@const IconComponent = getSandboxIcon(sandbox)}
-                    <div class="shrink-0 w-9 h-9 rounded-lg bg-[var(--cyber-cyan)]/10 border border-[var(--cyber-cyan)]/20 flex items-center justify-center group-hover:bg-[var(--cyber-cyan)]/20 transition-colors">
-                      <IconComponent class="w-5 h-5 text-[var(--cyber-cyan)]" />
+                    <div class="shrink-0 text-[var(--cyber-cyan)]">
+                      <IconComponent class="w-6 h-6" />
                     </div>
                   {/if}
                   <div class="min-w-0 flex-1">
