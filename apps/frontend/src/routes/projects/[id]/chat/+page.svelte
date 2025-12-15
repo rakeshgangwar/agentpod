@@ -610,7 +610,7 @@ import {
   {:else}
     <div class="flex h-[calc(100vh-140px)] min-h-[500px] animate-fade-in">
     <!-- Session Sidebar -->
-    <aside class="w-64 border-r border-border/30 bg-background/50 backdrop-blur-sm flex flex-col
+    <aside class="w-64 border-r border-border/30 bg-background/50 backdrop-blur-sm flex flex-col animate-fade-in-up stagger-1
                   {sidebarCollapsed ? 'hidden sm:flex' : 'flex'}">
       <!-- Sidebar Header -->
       <div class="p-3 border-b border-border/30">
@@ -783,7 +783,7 @@ import {
     </button>
 
     <!-- Chat Area -->
-    <div class="flex-1 flex flex-col min-w-0">
+    <div class="flex-1 flex flex-col min-w-0 animate-fade-in-up stagger-2">
       {#if selectedSessionId}
         <!-- Model & Agent Selector Header -->
         <div class="border-b border-border/30 px-4 py-2.5 flex items-center justify-between bg-background/50 backdrop-blur-sm">

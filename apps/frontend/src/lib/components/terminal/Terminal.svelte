@@ -212,7 +212,7 @@
     border-radius: 4px;
     overflow: hidden;
     position: relative;
-    border: 1px solid oklch(0.85 0.15 192 / 0.2);
+    border: 1px solid color-mix(in oklch, var(--cyber-cyan) 20%, transparent);
   }
 
   .terminal-container::before {
@@ -225,8 +225,8 @@
     background: linear-gradient(
       90deg,
       transparent,
-      oklch(0.85 0.15 192) 20%,
-      oklch(0.85 0.15 192) 80%,
+      var(--cyber-cyan) 20%,
+      var(--cyber-cyan) 80%,
       transparent
     );
     opacity: 0.5;
@@ -252,15 +252,15 @@
   }
 
   .terminal-container :global(.xterm-viewport::-webkit-scrollbar-track) {
-    background: oklch(0.15 0.02 265 / 0.5);
+    background: hsl(var(--background) / 0.5);
   }
 
   .terminal-container :global(.xterm-viewport::-webkit-scrollbar-thumb) {
-    background: oklch(0.85 0.15 192 / 0.3);
+    background: color-mix(in oklch, var(--cyber-cyan) 30%, transparent);
     border-radius: 4px;
   }
 
   .terminal-container :global(.xterm-viewport::-webkit-scrollbar-thumb:hover) {
-    background: oklch(0.85 0.15 192 / 0.5);
+    background: color-mix(in oklch, var(--cyber-cyan) 50%, transparent);
   }
 </style>

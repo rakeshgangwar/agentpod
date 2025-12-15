@@ -253,8 +253,8 @@
         </h3>
         <span class="px-2 py-0.5 rounded text-xs font-mono" 
               style="color: {getStatusColor(sandbox?.status)}; 
-                     background: {getStatusColor(sandbox?.status)}10; 
-                     border: 1px solid {getStatusColor(sandbox?.status)}30;">
+                     background: color-mix(in oklch, {getStatusColor(sandbox?.status)} 10%, transparent); 
+                     border: 1px solid color-mix(in oklch, {getStatusColor(sandbox?.status)} 30%, transparent);">
           {sandbox?.status ?? "Unknown"}
         </span>
       </div>
@@ -412,8 +412,8 @@
             <div class="font-mono text-xs uppercase tracking-wider text-muted-foreground">Status</div>
             <span class="inline-block mt-0.5 px-2 py-0.5 rounded text-xs font-mono"
                   style="color: {sandboxInfo.repository.isDirty ? 'var(--cyber-amber)' : 'var(--cyber-emerald)'}; 
-                         background: {sandboxInfo.repository.isDirty ? 'var(--cyber-amber)' : 'var(--cyber-emerald)'}10; 
-                         border: 1px solid {sandboxInfo.repository.isDirty ? 'var(--cyber-amber)' : 'var(--cyber-emerald)'}30;">
+                         background: color-mix(in oklch, {sandboxInfo.repository.isDirty ? 'var(--cyber-amber)' : 'var(--cyber-emerald)'} 10%, transparent); 
+                         border: 1px solid color-mix(in oklch, {sandboxInfo.repository.isDirty ? 'var(--cyber-amber)' : 'var(--cyber-emerald)'} 30%, transparent);">
               {sandboxInfo.repository.isDirty ? "Modified" : "Clean"}
             </span>
           </div>

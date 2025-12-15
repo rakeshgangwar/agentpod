@@ -183,7 +183,7 @@
     gap: 0.5rem;
     padding: 0.5rem 0.75rem;
     background: linear-gradient(180deg, rgba(13, 13, 20, 0.95) 0%, rgba(20, 20, 30, 0.9) 100%);
-    border-bottom: 1px solid oklch(0.85 0.15 192 / 0.2);
+    border-bottom: 1px solid color-mix(in oklch, var(--cyber-cyan) 20%, transparent);
     position: relative;
   }
 
@@ -194,7 +194,7 @@
     left: 0;
     right: 0;
     height: 1px;
-    background: linear-gradient(90deg, transparent, oklch(0.85 0.15 192 / 0.5) 20%, oklch(0.85 0.15 192 / 0.5) 80%, transparent);
+    background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--cyber-cyan) 50%, transparent) 20%, color-mix(in oklch, var(--cyber-cyan) 50%, transparent) 80%, transparent);
   }
 
   .tabs {
@@ -229,17 +229,17 @@
   }
 
   .tab:hover {
-    background: oklch(0.85 0.15 192 / 0.08);
-    border-color: oklch(0.85 0.15 192 / 0.3);
-    color: oklch(0.85 0.15 192);
+    background: color-mix(in oklch, var(--cyber-cyan) 8%, transparent);
+    border-color: color-mix(in oklch, var(--cyber-cyan) 30%, transparent);
+    color: var(--cyber-cyan);
   }
 
   .tab.active {
-    background: oklch(0.85 0.15 192 / 0.12);
-    border-color: oklch(0.85 0.15 192 / 0.5);
-    color: oklch(0.85 0.15 192);
-    box-shadow: 0 0 12px oklch(0.85 0.15 192 / 0.15),
-                inset 0 1px 0 oklch(0.85 0.15 192 / 0.1);
+    background: color-mix(in oklch, var(--cyber-cyan) 12%, transparent);
+    border-color: color-mix(in oklch, var(--cyber-cyan) 50%, transparent);
+    color: var(--cyber-cyan);
+    box-shadow: 0 0 12px color-mix(in oklch, var(--cyber-cyan) 15%, transparent),
+                inset 0 1px 0 color-mix(in oklch, var(--cyber-cyan) 10%, transparent);
   }
 
   .tab.active::before {
@@ -249,17 +249,17 @@
     left: 0;
     right: 0;
     height: 1px;
-    background: linear-gradient(90deg, transparent, oklch(0.85 0.15 192) 50%, transparent);
+    background: linear-gradient(90deg, transparent, var(--cyber-cyan) 50%, transparent);
   }
 
   .tab.error {
-    color: oklch(0.7 0.2 20);
-    border-color: oklch(0.7 0.2 20 / 0.3);
+    color: var(--cyber-red);
+    border-color: color-mix(in oklch, var(--cyber-red) 30%, transparent);
   }
 
   .tab.error.active {
-    background: oklch(0.7 0.2 20 / 0.1);
-    border-color: oklch(0.7 0.2 20 / 0.5);
+    background: color-mix(in oklch, var(--cyber-red) 10%, transparent);
+    border-color: color-mix(in oklch, var(--cyber-red) 50%, transparent);
   }
 
   .tab-label {
@@ -284,8 +284,8 @@
 
   .close-btn:hover {
     opacity: 1;
-    background: oklch(0.7 0.2 20 / 0.2);
-    color: oklch(0.7 0.2 20);
+    background: color-mix(in oklch, var(--cyber-red) 20%, transparent);
+    color: var(--cyber-red);
   }
 
   .new-terminal-btn {
@@ -308,13 +308,13 @@
     padding: 2rem;
     text-align: center;
     color: hsl(var(--muted-foreground));
-    background: radial-gradient(ellipse at center, oklch(0.85 0.15 192 / 0.03) 0%, transparent 70%);
+    background: radial-gradient(ellipse at center, color-mix(in oklch, var(--cyber-cyan) 3%, transparent) 0%, transparent 70%);
   }
 
   .empty-icon {
     margin-bottom: 1.5rem;
-    color: oklch(0.85 0.15 192 / 0.4);
-    filter: drop-shadow(0 0 8px oklch(0.85 0.15 192 / 0.3));
+    color: color-mix(in oklch, var(--cyber-cyan) 40%, transparent);
+    filter: drop-shadow(0 0 8px color-mix(in oklch, var(--cyber-cyan) 30%, transparent));
   }
 
   .empty-title {
@@ -323,7 +323,7 @@
     font-family: var(--font-mono), ui-monospace, monospace;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    color: oklch(0.85 0.15 192);
+    color: var(--cyber-cyan);
     margin-bottom: 0.5rem;
   }
 
@@ -338,10 +338,10 @@
     margin-top: 1rem;
     font-size: 0.75rem;
     font-family: var(--font-mono), ui-monospace, monospace;
-    color: oklch(0.7 0.2 20);
+    color: var(--cyber-red);
     padding: 0.5rem 1rem;
-    background: oklch(0.7 0.2 20 / 0.1);
-    border: 1px solid oklch(0.7 0.2 20 / 0.3);
+    background: color-mix(in oklch, var(--cyber-red) 10%, transparent);
+    border: 1px solid color-mix(in oklch, var(--cyber-red) 30%, transparent);
     border-radius: 4px;
   }
 
@@ -354,7 +354,7 @@
     height: 100%;
     padding: 2rem;
     background: linear-gradient(180deg, rgba(13, 13, 20, 0.98) 0%, rgba(30, 15, 15, 0.95) 100%);
-    border: 1px solid oklch(0.7 0.2 20 / 0.3);
+    border: 1px solid color-mix(in oklch, var(--cyber-red) 30%, transparent);
     position: relative;
   }
 
@@ -362,7 +362,7 @@
     content: '';
     position: absolute;
     inset: 0;
-    background: radial-gradient(ellipse at center, oklch(0.7 0.2 20 / 0.05) 0%, transparent 70%);
+    background: radial-gradient(ellipse at center, color-mix(in oklch, var(--cyber-red) 5%, transparent) 0%, transparent 70%);
     pointer-events: none;
   }
 

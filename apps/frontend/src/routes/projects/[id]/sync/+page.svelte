@@ -215,7 +215,7 @@
                                 rounded border border-[var(--cyber-emerald)]/20 text-sm">
                       <span class="font-mono text-xs truncate">{file.path}</span>
                       <span class="px-1.5 py-0.5 rounded text-xs font-mono"
-                            style="color: {badge.color}; background: {badge.color}10; border: 1px solid {badge.color}30;">
+                            style="color: {badge.color}; background: color-mix(in oklch, {badge.color} 10%, transparent); border: 1px solid color-mix(in oklch, {badge.color} 30%, transparent);">
                         {badge.text}
                       </span>
                     </div>
@@ -237,7 +237,7 @@
                                 rounded border border-[var(--cyber-amber)]/20 text-sm">
                       <span class="font-mono text-xs truncate">{file.path}</span>
                       <span class="px-1.5 py-0.5 rounded text-xs font-mono"
-                            style="color: {badge.color}; background: {badge.color}10; border: 1px solid {badge.color}30;">
+                            style="color: {badge.color}; background: color-mix(in oklch, {badge.color} 10%, transparent); border: 1px solid color-mix(in oklch, {badge.color} 30%, transparent);">
                         {badge.text}
                       </span>
                     </div>

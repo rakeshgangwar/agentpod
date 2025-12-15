@@ -497,12 +497,12 @@ export default {
 
   <!-- Scrollable content area -->
   <div class="flex-1 overflow-y-auto">
-    <div class="container mx-auto px-4 py-6 max-w-6xl space-y-6">
+    <div class="container mx-auto px-4 py-6 max-w-6xl space-y-6 animate-fade-in">
     <!-- Tab Content -->
     {#if activeTab === "connection"}
         <div class="grid gap-6 md:grid-cols-2">
           <!-- Connection Status -->
-          <div class="cyber-card corner-accent overflow-hidden">
+          <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-1">
             <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
               <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
                 [connection_status]
@@ -554,7 +554,7 @@ export default {
           </div>
 
           <!-- Connection Info -->
-          <div class="cyber-card corner-accent overflow-hidden">
+          <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-2">
             <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
               <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
                 [connection_details]
@@ -567,7 +567,7 @@ export default {
               <div class="p-4 bg-background/50 rounded border border-border/30 space-y-3 font-mono text-sm">
                 <div class="flex items-center justify-between">
                   <span class="text-muted-foreground">Protocol</span>
-                  <span class="px-2 py-0.5 rounded text-xs" style="color: var(--cyber-emerald); background: var(--cyber-emerald)10; border: 1px solid var(--cyber-emerald)30;">
+                  <span class="px-2 py-0.5 rounded text-xs text-[var(--cyber-emerald)] bg-[color-mix(in_oklch,var(--cyber-emerald)_10%,transparent)] border border-[color-mix(in_oklch,var(--cyber-emerald)_30%,transparent)]">
                     {connection.apiUrl?.startsWith("https") ? "HTTPS" : "HTTP"}
                   </span>
                 </div>
@@ -584,7 +584,7 @@ export default {
         </div>
     {:else if activeTab === "appearance"}
       <!-- Appearance Tab -->
-      <div class="cyber-card corner-accent overflow-hidden">
+      <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-1">
         <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
           <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
             [theme_appearance]
@@ -599,7 +599,7 @@ export default {
       </div>
     {:else if activeTab === "ai-models"}
       <!-- AI Models Tab -->
-      <div class="cyber-card corner-accent overflow-hidden">
+      <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-1">
         <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
           <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
             [ai_model_providers]
@@ -612,7 +612,7 @@ export default {
     {:else if activeTab === "opencode"}
       <!-- OpenCode Tab -->
         <!-- Permissions -->
-        <div class="cyber-card corner-accent overflow-hidden">
+        <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-1">
           <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
             <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
               [tool_permissions]
@@ -683,7 +683,7 @@ export default {
         </div>
 
         <!-- AGENTS.md Editor -->
-        <div class="cyber-card corner-accent overflow-hidden">
+        <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-2">
           <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
             <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
               [global_instructions] AGENTS.md
@@ -736,7 +736,7 @@ export default {
         </div>
 
         <!-- Config Files Management -->
-        <div class="cyber-card corner-accent overflow-hidden">
+        <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-3">
           <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm flex items-center justify-between">
             <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
               [custom_agents_commands]
@@ -902,7 +902,7 @@ export default {
       <!-- About Tab -->
       <div class="grid gap-6 md:grid-cols-2">
           <!-- Preferences -->
-          <div class="cyber-card corner-accent overflow-hidden">
+          <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-1">
             <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
               <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
                 [preferences]
@@ -986,7 +986,7 @@ export default {
           </div>
 
           <!-- Statistics -->
-          <div class="cyber-card corner-accent overflow-hidden">
+          <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-2">
             <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
               <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
                 [statistics]
@@ -1001,16 +1001,16 @@ export default {
                   <p class="text-2xl font-bold font-mono">{sandboxes.count}</p>
                   <p class="text-xs text-muted-foreground font-mono uppercase tracking-wider">Total</p>
                 </div>
-                <div class="text-center p-3 rounded border" style="background: var(--cyber-emerald)10; border-color: var(--cyber-emerald)30;">
-                  <p class="text-2xl font-bold font-mono" style="color: var(--cyber-emerald);">{sandboxes.running.length}</p>
+                <div class="text-center p-3 rounded border text-[var(--cyber-emerald)] bg-[color-mix(in_oklch,var(--cyber-emerald)_10%,transparent)] border-[color-mix(in_oklch,var(--cyber-emerald)_30%,transparent)]">
+                  <p class="text-2xl font-bold font-mono">{sandboxes.running.length}</p>
                   <p class="text-xs text-muted-foreground font-mono uppercase tracking-wider">Running</p>
                 </div>
                 <div class="text-center p-3 bg-background/50 rounded border border-border/30">
                   <p class="text-2xl font-bold font-mono">{sandboxes.stopped.length}</p>
                   <p class="text-xs text-muted-foreground font-mono uppercase tracking-wider">Stopped</p>
                 </div>
-                <div class="text-center p-3 rounded border" style="background: var(--cyber-amber)10; border-color: var(--cyber-amber)30;">
-                  <p class="text-2xl font-bold font-mono" style="color: var(--cyber-amber);">{sandboxes.starting.length + sandboxes.stopping.length}</p>
+                <div class="text-center p-3 rounded border text-[var(--cyber-amber)] bg-[color-mix(in_oklch,var(--cyber-amber)_10%,transparent)] border-[color-mix(in_oklch,var(--cyber-amber)_30%,transparent)]">
+                  <p class="text-2xl font-bold font-mono">{sandboxes.starting.length + sandboxes.stopping.length}</p>
                   <p class="text-xs text-muted-foreground font-mono uppercase tracking-wider">Transitioning</p>
                 </div>
               </div>
@@ -1018,7 +1018,7 @@ export default {
           </div>
 
           <!-- Backup & Restore -->
-          <div class="cyber-card corner-accent overflow-hidden">
+          <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-3">
             <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
               <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
                 [backup_restore]
@@ -1102,7 +1102,7 @@ export default {
           </div>
 
           <!-- App Info -->
-          <div class="cyber-card corner-accent overflow-hidden">
+          <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-4">
             <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
               <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
                 [about_codeopen]
@@ -1115,7 +1115,7 @@ export default {
               <div class="space-y-3 font-mono text-sm">
                 <div class="flex items-center justify-between">
                   <span class="text-muted-foreground">Version</span>
-                  <span class="px-2 py-0.5 rounded text-xs" style="color: var(--cyber-cyan); background: var(--cyber-cyan)10; border: 1px solid var(--cyber-cyan)30;">
+                  <span class="px-2 py-0.5 rounded text-xs text-[var(--cyber-cyan)] bg-[color-mix(in_oklch,var(--cyber-cyan)_10%,transparent)] border border-[color-mix(in_oklch,var(--cyber-cyan)_30%,transparent)]">
                     0.1.0
                   </span>
                 </div>
