@@ -52,6 +52,7 @@
   import TerminalIcon from "@lucide/svelte/icons/terminal";
   import InfoIcon from "@lucide/svelte/icons/info";
   import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
+  import SettingsIcon from "@lucide/svelte/icons/settings";
 
   // Redirect if not connected
   $effect(() => {
@@ -467,15 +468,17 @@ export default {
 </script>
 
 <div class="noise-overlay"></div>
-<main class="min-h-screen grid-bg mesh-gradient">
-  <!-- Header -->
+<main class="h-screen flex flex-col grid-bg mesh-gradient overflow-hidden">
+  <!-- Header (fixed at top) -->
   <PageHeader
     title="Settings"
+    icon={SettingsIcon}
     subtitle="Manage your connection, preferences, and AI configuration"
     tabs={settingsTabs}
     activeTab={activeTab}
     onTabChange={(tab) => activeTab = tab}
     sticky={false}
+    collapsible={true}
   >
     {#snippet leading()}
       <Button 
@@ -492,7 +495,9 @@ export default {
     {/snippet}
   </PageHeader>
 
-  <div class="container mx-auto px-4 py-6 max-w-6xl space-y-6">
+  <!-- Scrollable content area -->
+  <div class="flex-1 overflow-y-auto">
+    <div class="container mx-auto px-4 py-6 max-w-6xl space-y-6">
     <!-- Tab Content -->
     {#if activeTab === "connection"}
         <div class="grid gap-6 md:grid-cols-2">
@@ -594,7 +599,16 @@ export default {
       </div>
     {:else if activeTab === "ai-models"}
       <!-- AI Models Tab -->
-      <LlmProvidersSettings />
+      <div class="cyber-card corner-accent overflow-hidden">
+        <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+          <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+            [ai_model_providers]
+          </h3>
+        </div>
+        <div class="p-4 space-y-4">
+          <LlmProvidersSettings />
+        </div>
+      </div>
     {:else if activeTab === "opencode"}
       <!-- OpenCode Tab -->
         <!-- Permissions -->
@@ -1121,6 +1135,7 @@ export default {
           </div>
         </div>
     {/if}
+    </div>
   </div>
 </main>
 

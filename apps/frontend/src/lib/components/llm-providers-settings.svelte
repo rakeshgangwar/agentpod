@@ -180,8 +180,7 @@
   <!-- Header with Stats -->
   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
     <div>
-      <h2 class="font-mono text-lg uppercase tracking-wider text-[var(--cyber-cyan)]">[llm_providers]</h2>
-      <p class="text-sm text-muted-foreground font-mono">
+      <p class="text-xs text-muted-foreground font-mono">
         Configure AI model providers for your sandboxes
       </p>
     </div>

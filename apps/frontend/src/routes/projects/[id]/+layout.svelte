@@ -15,6 +15,7 @@
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
   import PageHeader from "$lib/components/page-header.svelte";
+  import { getProjectIcon, getSuggestedIcon } from "$lib/utils/project-icons";
 
   let { children } = $props();
 
@@ -118,6 +119,22 @@
     return sandbox.labels?.["agentpod.sandbox.name"] || sandbox.name;
   }
 
+  // Get project icon - check labels first, then auto-suggest based on name
+  function getProjectIconComponent() {
+    if (!sandbox) return undefined;
+    
+    // Check if icon is stored in labels
+    const iconId = sandbox.labels?.["agentpod.sandbox.icon"];
+    if (iconId) {
+      const storedIcon = getProjectIcon(iconId);
+      if (storedIcon) return storedIcon.component;
+    }
+    
+    // Auto-suggest based on project name
+    const suggestedIcon = getSuggestedIcon(getDisplayName());
+    return suggestedIcon.component;
+  }
+
   const tabs = [
     { id: "chat", label: "Chat" },
     { id: "files", label: "Files" },
@@ -131,11 +148,12 @@
 <!-- Noise overlay for atmosphere -->
 <div class="noise-overlay"></div>
 
-<main class="min-h-screen grid-bg">
+<main class="h-screen flex flex-col grid-bg overflow-hidden">
   {#if sandbox}
-    <!-- Header Bar -->
+    <!-- Header Bar (fixed at top) -->
     <PageHeader
       title={getDisplayName()}
+      icon={getProjectIconComponent()}
       subtitle={sandbox.image}
       status={{
         label: getStatusLabel(sandbox.status),
@@ -145,6 +163,8 @@
       tabs={tabs}
       activeTab={currentTab()}
       onTabChange={handleTabChange}
+      sticky={false}
+      collapsible={true}
     >
       {#snippet leading()}
         <Button 
@@ -236,9 +256,11 @@
       </Dialog.Content>
     </Dialog.Root>
 
-    <!-- Tab Content (children) -->
-    <div class="container mx-auto px-4 sm:px-6 py-6 max-w-7xl">
-      {@render children()}
+    <!-- Scrollable content area -->
+    <div class="flex-1 overflow-y-auto">
+      <div class="container mx-auto px-4 sm:px-6 py-6 max-w-7xl">
+        {@render children()}
+      </div>
     </div>
   {:else if sandboxes.isLoading}
     <!-- Loading State -->

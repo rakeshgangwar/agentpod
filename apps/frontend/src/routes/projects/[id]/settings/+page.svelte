@@ -3,8 +3,12 @@
   import { sandboxes, fetchSandbox, getSandboxStats } from "$lib/stores/sandboxes.svelte";
   import type { SandboxStats, SandboxInfo } from "$lib/api/tauri";
   import { Button } from "$lib/components/ui/button";
+  import { Input } from "$lib/components/ui/input";
+  import { Label } from "$lib/components/ui/label";
   import { onMount } from "svelte";
   import { openServiceWindow, type ServiceType } from "$lib/utils/service-window";
+  import ProjectIconPicker from "$lib/components/project-icon-picker.svelte";
+  import { getProjectIcon, getSuggestedIcon } from "$lib/utils/project-icons";
 
   // Get current sandbox ID from route params
   let sandboxId = $derived($page.params.id ?? "");
@@ -16,6 +20,33 @@
 
   // Get current sandbox from list (quick access)
   let sandbox = $derived(sandboxInfo?.sandbox ?? sandboxes.list.find(s => s.id === sandboxId));
+
+  // Icon selection state (read from labels or auto-suggested)
+  let selectedIconId = $state<string | null>(null);
+  
+  // Get the current icon ID for the project
+  function getCurrentIconId(): string {
+    // Use user selection if available
+    if (selectedIconId) return selectedIconId;
+    
+    // Check labels
+    const labelIcon = sandbox?.labels?.["agentpod.sandbox.icon"];
+    if (labelIcon) {
+      const icon = getProjectIcon(labelIcon);
+      if (icon) return icon.id;
+    }
+    
+    // Auto-suggest based on name
+    const suggested = getSuggestedIcon(sandbox?.name ?? "");
+    return suggested.id;
+  }
+  
+  // Handle icon selection
+  function handleIconSelect(iconId: string) {
+    selectedIconId = iconId;
+    // Note: In a future iteration, this would save to backend via labels
+    // For now, it's session-only (for demonstration purposes)
+  }
 
   // Load sandbox info on mount
   onMount(() => {
@@ -90,6 +121,54 @@
   <h2 class="text-xl font-bold">
     Settings
   </h2>
+
+  <!-- Project Info Section -->
+  <div class="cyber-card corner-accent overflow-hidden">
+    <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+      <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+        [project_info]
+      </h3>
+    </div>
+    
+    <div class="p-4 space-y-4">
+      <!-- Icon & Name -->
+      <div class="flex items-start gap-4">
+        <div class="space-y-2">
+          <Label class="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+            Icon
+          </Label>
+          <ProjectIconPicker
+            value={getCurrentIconId()}
+            onSelect={handleIconSelect}
+            size="lg"
+          />
+        </div>
+        <div class="flex-1 space-y-2">
+          <Label class="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+            Name
+          </Label>
+          <Input
+            value={sandbox?.name ?? ""}
+            disabled
+            class="font-mono bg-background/30 border-border/30 text-muted-foreground"
+          />
+          <p class="text-xs font-mono text-muted-foreground/70">
+            Project name cannot be changed after creation.
+          </p>
+        </div>
+      </div>
+      
+      <!-- Description (if any) -->
+      {#if sandbox?.description}
+        <div class="space-y-2">
+          <Label class="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+            Description
+          </Label>
+          <p class="text-sm text-muted-foreground">{sandbox.description}</p>
+        </div>
+      {/if}
+    </div>
+  </div>
 
   <!-- Service URLs Section -->
   <div class="cyber-card corner-accent overflow-hidden">

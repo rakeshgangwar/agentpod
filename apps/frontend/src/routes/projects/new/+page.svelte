@@ -10,7 +10,9 @@
   import * as Tabs from "$lib/components/ui/tabs";
   import ResourceTierSelector from "$lib/components/resource-tier-selector.svelte";
   import FlavorSelector from "$lib/components/flavor-selector.svelte";
-  import AddonSelector from "$lib/components/addon-selector.svelte";
+import AddonSelector from "$lib/components/addon-selector.svelte";
+  import ProjectIconPicker from "$lib/components/project-icon-picker.svelte";
+  import { getSuggestedIcon } from "$lib/utils/project-icons";
 
   // Redirect if not connected or not authenticated
   $effect(() => {
@@ -27,6 +29,7 @@
   // From Scratch form
   let projectName = $state("");
   let projectDescription = $state("");
+  let selectedIconId = $state("code");
   
   // GitHub Import form
   let githubUrl = $state("");
@@ -366,17 +369,34 @@
                   <Label for="project-name" class="font-mono text-xs uppercase tracking-wider text-muted-foreground">
                     Project Name *
                   </Label>
-                  <Input
-                    id="project-name"
-                    placeholder="my-awesome-project"
-                    bind:value={projectName}
-                    disabled={isSubmitting}
-                    class="font-mono bg-background/50 border-border/50 
-                           focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)]"
-                  />
-                  <p class="text-xs font-mono text-muted-foreground/70">
-                    A unique name for your project. This will be used to create the repository.
-                  </p>
+                  <div class="flex gap-3 items-start">
+                    <ProjectIconPicker
+                      value={selectedIconId}
+                      onSelect={(id) => selectedIconId = id}
+                      disabled={isSubmitting}
+                      size="md"
+                    />
+                    <div class="flex-1 space-y-2">
+                      <Input
+                        id="project-name"
+                        placeholder="my-awesome-project"
+                        bind:value={projectName}
+                        oninput={() => {
+                          // Auto-suggest icon based on project name (only if still using default)
+                          if (selectedIconId === "code" && projectName.length > 2) {
+                            const suggested = getSuggestedIcon(projectName);
+                            selectedIconId = suggested.id;
+                          }
+                        }}
+                        disabled={isSubmitting}
+                        class="font-mono bg-background/50 border-border/50 
+                               focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)]"
+                      />
+                      <p class="text-xs font-mono text-muted-foreground/70">
+                        A unique name for your project. Click the icon to customize.
+                      </p>
+                    </div>
+                  </div>
                 </div>
                 
                 <div class="space-y-2">
@@ -424,17 +444,35 @@
                   <Label for="github-url" class="font-mono text-xs uppercase tracking-wider text-muted-foreground">
                     Repository URL *
                   </Label>
-                  <Input
-                    id="github-url"
-                    placeholder="https://github.com/username/repository"
-                    bind:value={githubUrl}
-                    disabled={isSubmitting}
-                    class="font-mono bg-background/50 border-border/50 
-                           focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)]"
-                  />
-                  <p class="text-xs font-mono text-muted-foreground/70">
-                    Enter the URL of a GitHub or GitLab repository to import.
-                  </p>
+                  <div class="flex gap-3 items-start">
+                    <ProjectIconPicker
+                      value={selectedIconId}
+                      onSelect={(id) => selectedIconId = id}
+                      disabled={isSubmitting}
+                      size="md"
+                    />
+                    <div class="flex-1 space-y-2">
+                      <Input
+                        id="github-url"
+                        placeholder="https://github.com/username/repository"
+                        bind:value={githubUrl}
+                        oninput={() => {
+                          // Auto-suggest icon based on repo name (only if still using default)
+                          const repoName = extractRepoName(githubUrl);
+                          if (selectedIconId === "code" && repoName.length > 2) {
+                            const suggested = getSuggestedIcon(repoName);
+                            selectedIconId = suggested.id;
+                          }
+                        }}
+                        disabled={isSubmitting}
+                        class="font-mono bg-background/50 border-border/50 
+                               focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)]"
+                      />
+                      <p class="text-xs font-mono text-muted-foreground/70">
+                        Enter a GitHub or GitLab URL. Click the icon to customize.
+                      </p>
+                    </div>
+                  </div>
                 </div>
                 
                 {#if githubUrl && extractRepoName(githubUrl)}
