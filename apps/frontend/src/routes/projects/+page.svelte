@@ -64,7 +64,13 @@
   }
 
   function getSandboxDisplayName(sandbox: { name: string; labels?: Record<string, string> }): string {
-    return sandbox.labels?.["agentpod.sandbox.name"] || sandbox.name;
+    // Use the sandbox name directly from DB - this is the project name
+    return sandbox.name;
+  }
+
+  function getSandboxContainerName(sandbox: { containerName?: string; name: string; labels?: Record<string, string> }): string {
+    // Container name from Docker, fallback to project name
+    return sandbox.containerName || sandbox.labels?.["agentpod.sandbox.name"] || sandbox.name;
   }
 
   function getSandboxSlug(sandbox: { slug?: string; labels?: Record<string, string> }): string {
@@ -108,8 +114,7 @@
             </span>
           </div>
           
-          <h1 class="text-5xl lg:text-6xl font-bold tracking-tight glitch-hover" 
-              style="font-family: 'Space Grotesk', sans-serif;">
+          <h1 class="text-5xl lg:text-6xl font-bold tracking-tight glitch-hover">
             <span class="text-foreground">Projects</span>
             <span class="typing-cursor"></span>
           </h1>
@@ -249,7 +254,7 @@
         <div class="max-w-md mx-auto space-y-6">
           <div class="font-mono text-6xl text-[var(--cyber-cyan)]/20">[ ]</div>
           <div class="space-y-2">
-            <h2 class="text-xl font-semibold" style="font-family: 'Space Grotesk', sans-serif;">
+            <h2 class="text-xl font-semibold">
               No sandboxes initialized
             </h2>
             <p class="text-muted-foreground text-sm font-mono">
@@ -279,8 +284,7 @@
             <div class="p-5 pb-4 border-b border-border/30">
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0 flex-1">
-                  <h3 class="font-semibold text-lg truncate group-hover:text-[var(--cyber-cyan)] transition-colors"
-                      style="font-family: 'Space Grotesk', sans-serif;">
+                  <h3 class="font-semibold text-lg truncate group-hover:text-[var(--cyber-cyan)] transition-colors">
                     {getSandboxDisplayName(sandbox)}
                   </h3>
                   <p class="text-xs font-mono text-muted-foreground truncate mt-1">

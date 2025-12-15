@@ -36,12 +36,14 @@
   import { Label } from "$lib/components/ui/label";
   import { Input } from "$lib/components/ui/input";
   import { Switch } from "$lib/components/ui/switch";
-  import * as Card from "$lib/components/ui/card";
   import * as Select from "$lib/components/ui/select";
   import * as Tabs from "$lib/components/ui/tabs";
   import * as Dialog from "$lib/components/ui/dialog";
   import LlmProvidersSettings from "$lib/components/llm-providers-settings.svelte";
-  import ThemePicker from "$lib/components/theme-picker.svelte";
+  import ThemeSettings from "$lib/components/theme-settings.svelte";
+  import PageHeader from "$lib/components/page-header.svelte";
+  import type { Tab } from "$lib/components/page-header.svelte";
+  import ThemeToggle from "$lib/components/theme-toggle.svelte";
   
   // Icons
   import PlugIcon from "@lucide/svelte/icons/plug";
@@ -49,6 +51,7 @@
   import BrainIcon from "@lucide/svelte/icons/brain";
   import TerminalIcon from "@lucide/svelte/icons/terminal";
   import InfoIcon from "@lucide/svelte/icons/info";
+  import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
 
   // Redirect if not connected
   $effect(() => {
@@ -454,68 +457,44 @@ export default {
   }
 
   // Main settings tabs configuration
-  const settingsTabs = [
-    { value: "connection", label: "Connection", icon: PlugIcon },
-    { value: "appearance", label: "Appearance", icon: PaletteIcon },
-    { value: "ai-models", label: "AI Models", icon: BrainIcon },
-    { value: "opencode", label: "OpenCode", icon: TerminalIcon },
-    { value: "about", label: "About", icon: InfoIcon },
+  const settingsTabs: Tab[] = [
+    { id: "connection", label: "Connection", icon: PlugIcon },
+    { id: "appearance", label: "Appearance", icon: PaletteIcon },
+    { id: "ai-models", label: "AI Models", icon: BrainIcon },
+    { id: "opencode", label: "OpenCode", icon: TerminalIcon },
+    { id: "about", label: "About", icon: InfoIcon },
   ];
 </script>
 
 <div class="noise-overlay"></div>
 <main class="min-h-screen grid-bg mesh-gradient">
-  <div class="container mx-auto px-4 py-6 max-w-6xl space-y-6">
-    <!-- Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-in-up">
-      <div>
-        <div class="flex items-center gap-3 mb-1">
-          <div class="w-2 h-2 rounded-full bg-[var(--cyber-cyan)] animate-pulse-dot"></div>
-          <span class="text-xs font-mono uppercase tracking-widest text-[var(--cyber-cyan)]">
-            System Configuration
-          </span>
-        </div>
-        <h1 class="text-3xl font-bold tracking-tight">Settings</h1>
-        <p class="text-muted-foreground text-sm font-mono">
-          Manage your connection, preferences, and AI configuration
-        </p>
-      </div>
+  <!-- Header -->
+  <PageHeader
+    title="Settings"
+    subtitle="Manage your connection, preferences, and AI configuration"
+    tabs={settingsTabs}
+    activeTab={activeTab}
+    onTabChange={(tab) => activeTab = tab}
+    sticky={false}
+  >
+    {#snippet leading()}
       <Button 
-        variant="outline" 
+        variant="ghost" 
+        size="icon"
         onclick={() => goto("/projects")}
-        class="font-mono text-xs uppercase tracking-wider border-border/50 hover:border-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]"
+        class="h-8 w-8 border border-border/30 hover:border-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]"
       >
-        ← Back to Projects
+        <ArrowLeftIcon class="h-4 w-4" />
       </Button>
-    </div>
+    {/snippet}
+    {#snippet actions()}
+      <ThemeToggle />
+    {/snippet}
+  </PageHeader>
 
-    <!-- Main Tabs -->
-    <Tabs.Root bind:value={activeTab} class="w-full animate-fade-in-up stagger-2">
-      <!-- Terminal-style Tab Navigation -->
-      <div class="cyber-card corner-accent mb-6 overflow-hidden">
-        <div class="py-2 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
-          <span class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
-            [navigation]
-          </span>
-        </div>
-        <Tabs.List class="grid w-full grid-cols-5 bg-transparent p-1">
-          {#each settingsTabs as tab, i}
-            <Tabs.Trigger 
-              value={tab.value} 
-              class="flex items-center justify-center gap-2 py-3 font-mono text-xs uppercase tracking-wider
-                     data-[state=active]:bg-[var(--cyber-cyan)]/10 data-[state=active]:text-[var(--cyber-cyan)]
-                     data-[state=active]:border-b-2 data-[state=active]:border-[var(--cyber-cyan)]
-                     hover:bg-muted/50 transition-all rounded-none"
-            >
-              <tab.icon class="h-4 w-4" />
-              <span class="hidden sm:inline">{tab.label}</span>
-            </Tabs.Trigger>
-          {/each}
-        </Tabs.List>
-      </div>
-
-      <!-- Connection Tab -->
-      <Tabs.Content value="connection" class="space-y-6">
+  <div class="container mx-auto px-4 py-6 max-w-6xl space-y-6">
+    <!-- Tab Content -->
+    {#if activeTab === "connection"}
         <div class="grid gap-6 md:grid-cols-2">
           <!-- Connection Status -->
           <div class="cyber-card corner-accent overflow-hidden">
@@ -598,32 +577,26 @@ export default {
             </div>
           </div>
         </div>
-      </Tabs.Content>
-
+    {:else if activeTab === "appearance"}
       <!-- Appearance Tab -->
-      <Tabs.Content value="appearance" class="space-y-6">
-        <div class="cyber-card corner-accent overflow-hidden">
-          <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
-            <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
-              [theme_appearance]
-            </h3>
-          </div>
-          <div class="p-4 space-y-4">
-            <p class="text-xs text-muted-foreground font-mono">
-              Customize the look and feel of CodeOpen with theme presets
-            </p>
-            <ThemePicker />
-          </div>
+      <div class="cyber-card corner-accent overflow-hidden">
+        <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+          <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+            [theme_appearance]
+          </h3>
         </div>
-      </Tabs.Content>
-
+        <div class="p-4 space-y-4">
+          <p class="text-xs text-muted-foreground font-mono">
+            Customize the look and feel of CodeOpen with theme presets
+          </p>
+          <ThemeSettings />
+        </div>
+      </div>
+    {:else if activeTab === "ai-models"}
       <!-- AI Models Tab -->
-      <Tabs.Content value="ai-models" class="space-y-6">
-        <LlmProvidersSettings />
-      </Tabs.Content>
-
+      <LlmProvidersSettings />
+    {:else if activeTab === "opencode"}
       <!-- OpenCode Tab -->
-      <Tabs.Content value="opencode" class="space-y-6">
         <!-- Permissions -->
         <div class="cyber-card corner-accent overflow-hidden">
           <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
@@ -911,11 +884,9 @@ export default {
             </p>
           </div>
         </div>
-      </Tabs.Content>
-
+    {:else if activeTab === "about"}
       <!-- About Tab -->
-      <Tabs.Content value="about" class="space-y-6">
-        <div class="grid gap-6 md:grid-cols-2">
+      <div class="grid gap-6 md:grid-cols-2">
           <!-- Preferences -->
           <div class="cyber-card corner-accent overflow-hidden">
             <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
@@ -1149,8 +1120,7 @@ export default {
             </div>
           </div>
         </div>
-      </Tabs.Content>
-    </Tabs.Root>
+    {/if}
   </div>
 </main>
 

@@ -171,9 +171,10 @@
   .terminal-tabs {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    height: calc(100vh - 300px);
+    min-height: 400px;
     background-color: #0d0d14;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono), ui-monospace, monospace;
   }
 
   .tab-bar {
@@ -214,7 +215,7 @@
     gap: 0.5rem;
     padding: 0.5rem 0.875rem;
     font-size: 0.75rem;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono), ui-monospace, monospace;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: hsl(var(--muted-foreground));
@@ -319,7 +320,7 @@
   .empty-title {
     font-size: 0.875rem;
     font-weight: 500;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono), ui-monospace, monospace;
     text-transform: uppercase;
     letter-spacing: 0.1em;
     color: oklch(0.85 0.15 192);
@@ -328,7 +329,7 @@
 
   .empty-description {
     font-size: 0.8125rem;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono), ui-monospace, monospace;
     margin-bottom: 1.5rem;
     opacity: 0.6;
   }
@@ -336,7 +337,7 @@
   .error-message {
     margin-top: 1rem;
     font-size: 0.75rem;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono), ui-monospace, monospace;
     color: oklch(0.7 0.2 20);
     padding: 0.5rem 1rem;
     background: oklch(0.7 0.2 20 / 0.1);
@@ -367,7 +368,7 @@
 
   .error-text {
     font-size: 0.8125rem;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono), ui-monospace, monospace;
     color: hsl(var(--muted-foreground));
     text-align: center;
     max-width: 300px;

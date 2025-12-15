@@ -101,7 +101,7 @@
     <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[400px] overflow-y-auto pr-1 cyber-scrollbar">
       {#each filteredPresets as preset}
         {@const isSelected = themeStore.presetId === preset.id}
-        {@const colors = themeStore.getPreviewColors(preset.id)}
+        {@const colors = themeStore.getColorSchemePreview(preset.id)}
         <button
           type="button"
           onclick={() => handlePresetChange(preset.id)}
@@ -139,7 +139,7 @@
 
   <!-- Current Theme Info -->
   {#if themeStore.currentPreset}
-    {@const currentColors = themeStore.getPreviewColors(themeStore.presetId)}
+    {@const currentColors = themeStore.getColorSchemePreview(themeStore.presetId)}
     <div class="p-3 rounded border border-[var(--cyber-cyan)]/30 bg-[var(--cyber-cyan)]/5">
       <div class="flex items-center justify-between">
         <div>

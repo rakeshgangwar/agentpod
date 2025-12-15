@@ -2,17 +2,19 @@
   import { page } from "$app/stores";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
-  import { 
-    sandboxes, 
-    getGitStatus, 
-    getGitLog, 
-    commitChanges 
+  import {
+    sandboxes,
+    getGitStatus,
+    getGitLog,
+    commitChanges
   } from "$lib/stores/sandboxes.svelte";
   import type { GitStatusResponse, GitLogResponse, GitFileStatus } from "$lib/api/tauri";
+  import SandboxNotRunning from "$lib/components/sandbox-not-running.svelte";
   import { onMount } from "svelte";
 
   let sandboxId = $derived($page.params.id ?? "");
   let sandbox = $derived(sandboxes.list.find(s => s.id === sandboxId));
+  let isRunning = $derived(sandbox?.status === "running");
 
   // Git state
   let gitStatus = $state<GitStatusResponse | null>(null);
@@ -66,11 +68,11 @@
 
   async function handleCommit() {
     if (!sandboxId || !commitMessage.trim()) return;
-    
+
     isCommitting = true;
     commitError = null;
     commitSuccess = false;
-    
+
     try {
       const result = await commitChanges(sandboxId, commitMessage.trim());
       if (result) {
@@ -127,33 +129,39 @@
   let unstagedFiles = $derived(gitStatus?.files.filter(f => f.unstaged && f.unstaged !== " ") ?? []);
 </script>
 
-<div class="space-y-6 animate-fade-in">
-  <!-- Header -->
-  <div class="flex items-center justify-between">
-    <h2 class="text-xl font-bold" style="font-family: 'Space Grotesk', sans-serif;">
-      Git
-    </h2>
-    <Button 
-      size="sm" 
-      variant="outline" 
-      onclick={refreshGitStatus}
-      disabled={isLoadingStatus || sandbox?.status !== "running"}
-      class="h-8 px-4 font-mono text-xs uppercase tracking-wider border-border/50
-             hover:border-[var(--cyber-cyan)]/50 hover:text-[var(--cyber-cyan)]"
-    >
-      {isLoadingStatus ? "Loading..." : "↻ Refresh"}
-    </Button>
-  </div>
-
-  {#if sandbox?.status !== "running"}
-    <!-- Not Running State -->
-    <div class="cyber-card corner-accent p-12 text-center">
-      <div class="font-mono text-4xl text-[var(--cyber-amber)]/20 mb-4">⚙</div>
-      <p class="font-mono text-sm text-muted-foreground">
-        Start the sandbox to view Git status
+{#if !sandbox}
+  <!-- Loading State -->
+  <div class="h-[calc(100vh-140px)] min-h-[500px] flex items-center justify-center animate-fade-in">
+    <div class="text-center animate-fade-in-up">
+      <div class="relative mx-auto w-16 h-16">
+        <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
+        <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
+      </div>
+      <p class="mt-6 text-sm font-mono text-muted-foreground tracking-wider uppercase">
+        Loading sandbox<span class="typing-cursor"></span>
       </p>
     </div>
-  {:else}
+  </div>
+{:else if !isRunning}
+  <SandboxNotRunning {sandbox} icon="⚙" actionText="view Git status" />
+{:else}
+  <div class="space-y-6 animate-fade-in">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+      <h2 class="text-xl font-bold">
+        Git
+      </h2>
+      <Button
+        size="sm"
+        variant="outline"
+        onclick={refreshGitStatus}
+        disabled={isLoadingStatus}
+        class="h-8 px-4 font-mono text-xs uppercase tracking-wider border-border/50
+               hover:border-[var(--cyber-cyan)]/50 hover:text-[var(--cyber-cyan)]"
+      >
+        {isLoadingStatus ? "Loading..." : "↻ Refresh"}
+      </Button>
+    </div>
     <!-- Working Directory Status -->
     <div class="cyber-card corner-accent overflow-hidden">
       <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
@@ -175,7 +183,7 @@
           Current changes in your working directory
         </p>
       </div>
-      
+
       <div class="p-4">
         {#if isLoadingStatus}
           <div class="text-center py-8">
@@ -203,10 +211,10 @@
                 <div class="space-y-1">
                   {#each stagedFiles as file}
                     {@const badge = getStatusBadge(file)}
-                    <div class="flex items-center justify-between py-1.5 px-3 bg-[var(--cyber-emerald)]/5 
+                    <div class="flex items-center justify-between py-1.5 px-3 bg-[var(--cyber-emerald)]/5
                                 rounded border border-[var(--cyber-emerald)]/20 text-sm">
                       <span class="font-mono text-xs truncate">{file.path}</span>
-                      <span class="px-1.5 py-0.5 rounded text-xs font-mono" 
+                      <span class="px-1.5 py-0.5 rounded text-xs font-mono"
                             style="color: {badge.color}; background: {badge.color}10; border: 1px solid {badge.color}30;">
                         {badge.text}
                       </span>
@@ -225,10 +233,10 @@
                 <div class="space-y-1">
                   {#each unstagedFiles as file}
                     {@const badge = getStatusBadge(file)}
-                    <div class="flex items-center justify-between py-1.5 px-3 bg-[var(--cyber-amber)]/5 
+                    <div class="flex items-center justify-between py-1.5 px-3 bg-[var(--cyber-amber)]/5
                                 rounded border border-[var(--cyber-amber)]/20 text-sm">
                       <span class="font-mono text-xs truncate">{file.path}</span>
-                      <span class="px-1.5 py-0.5 rounded text-xs font-mono" 
+                      <span class="px-1.5 py-0.5 rounded text-xs font-mono"
                             style="color: {badge.color}; background: {badge.color}10; border: 1px solid {badge.color}30;">
                         {badge.text}
                       </span>
@@ -253,7 +261,7 @@
             Stage all changes and create a commit
           </p>
         </div>
-        
+
         <div class="p-4 space-y-4">
           {#if commitError}
             <div class="p-3 rounded border border-[var(--cyber-red)]/50 bg-[var(--cyber-red)]/5">
@@ -272,10 +280,10 @@
               bind:value={commitMessage}
               disabled={isCommitting}
               onkeydown={(e) => e.key === "Enter" && handleCommit()}
-              class="flex-1 h-9 font-mono text-sm bg-background/50 border-border/50 
+              class="flex-1 h-9 font-mono text-sm bg-background/50 border-border/50
                      focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)]"
             />
-            <Button 
+            <Button
               onclick={handleCommit}
               disabled={isCommitting || !commitMessage.trim()}
               class="h-9 px-4 font-mono text-xs uppercase tracking-wider
@@ -299,9 +307,9 @@
           <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
             [commit_history]
           </h3>
-          <Button 
-            size="sm" 
-            variant="ghost" 
+          <Button
+            size="sm"
+            variant="ghost"
             onclick={refreshGitLog}
             disabled={isLoadingLog}
             class="h-6 px-2 font-mono text-xs text-muted-foreground hover:text-[var(--cyber-cyan)]"
@@ -313,7 +321,7 @@
           Recent commits in this repository
         </p>
       </div>
-      
+
       <div class="p-4">
         {#if isLoadingLog}
           <div class="text-center py-8">
@@ -331,7 +339,7 @@
         {:else}
           <div class="space-y-3">
             {#each gitLog.commits.slice(0, 10) as commit, i}
-              <div class="border-l-2 border-[var(--cyber-cyan)]/30 pl-4 py-2 animate-fade-in-up" 
+              <div class="border-l-2 border-[var(--cyber-cyan)]/30 pl-4 py-2 animate-fade-in-up"
                    style="animation-delay: {i * 50}ms">
                 <div class="flex items-start justify-between gap-2">
                   <div class="min-w-0 flex-1">
@@ -351,5 +359,5 @@
         {/if}
       </div>
     </div>
-  {/if}
-</div>
+  </div>
+{/if}

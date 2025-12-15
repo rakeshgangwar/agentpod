@@ -1,5 +1,6 @@
 <script lang="ts">
   import { codeToHtml, type BundledTheme } from "shiki";
+  import { themeStore } from "$lib/themes/store.svelte";
 
   interface Props {
     code: string;
@@ -13,11 +14,15 @@
   let {
     code,
     language = "plaintext",
-    lightTheme = "github-light",
-    darkTheme = "github-dark",
+    lightTheme,
+    darkTheme,
     showLineNumbers = false,
     class: className = "",
   }: Props = $props();
+
+  // Use theme store for dynamic Shiki themes, with prop fallback
+  const effectiveLightTheme = $derived(lightTheme ?? themeStore.shikiThemes.light);
+  const effectiveDarkTheme = $derived(darkTheme ?? themeStore.shikiThemes.dark);
 
   let highlightedHtml = $state<string>("");
   let isLoading = $state(true);
@@ -38,8 +43,8 @@
       const html = await codeToHtml(code, {
         lang,
         themes: {
-          light: lightTheme,
-          dark: darkTheme,
+          light: effectiveLightTheme,
+          dark: effectiveDarkTheme,
         },
         defaultColor: false, // Let CSS handle the theme switching
       });
@@ -52,8 +57,8 @@
         const html = await codeToHtml(code, {
           lang: "plaintext",
           themes: {
-            light: lightTheme,
-            dark: darkTheme,
+            light: effectiveLightTheme,
+            dark: effectiveDarkTheme,
           },
           defaultColor: false,
         });
@@ -77,13 +82,13 @@
       .replace(/'/g, "&#039;");
   }
 
-  // Re-highlight when code or language changes
+  // Re-highlight when code, language, or theme changes
   $effect(() => {
     // Track dependencies
     code;
     language;
-    lightTheme;
-    darkTheme;
+    effectiveLightTheme;
+    effectiveDarkTheme;
     // Highlight
     highlightCode();
   });
@@ -119,8 +124,7 @@
   }
 
   .code-block :global(code) {
-    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-      "Liberation Mono", monospace;
+    font-family: var(--font-mono), ui-monospace, monospace;
   }
 
   .code-block :global(.line) {

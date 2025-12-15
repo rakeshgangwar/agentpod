@@ -69,11 +69,16 @@
   onMount(() => {
     if (!containerRef) return;
 
+    // Get the mono font from CSS variable, with fallbacks
+    const computedStyle = getComputedStyle(document.documentElement);
+    const monoFont = computedStyle.getPropertyValue('--font-mono').trim() || 'JetBrains Mono';
+    const fontFamily = `${monoFont}, Menlo, Monaco, Consolas, monospace`;
+
     // Create terminal instance
     terminal = new XTerm({
       cursorBlink: true,
       cursorStyle: "bar",
-      fontFamily: "JetBrains Mono, Menlo, Monaco, Consolas, monospace",
+      fontFamily,
       fontSize: 14,
       lineHeight: 1.2,
       theme: terminalTheme,

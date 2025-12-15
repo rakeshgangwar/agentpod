@@ -14,6 +14,7 @@
   } from "$lib/stores/sandboxes.svelte";
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
+  import PageHeader from "$lib/components/page-header.svelte";
 
   let { children } = $props();
 
@@ -89,17 +90,17 @@
     goto(`/projects/${sandboxId}/${tab}`);
   }
 
-  function getStatusClass(status: string): string {
+  function getStatusVariant(status: string): "running" | "starting" | "stopped" | "error" {
     switch (status) {
-      case "running": return "status-running";
+      case "running": return "running";
       case "starting":
-      case "stopping": return "status-starting";
+      case "stopping": return "starting";
       case "created":
-      case "stopped": return "status-stopped";
+      case "stopped": return "stopped";
       case "error":
       case "dead":
-      case "unknown": return "status-error";
-      default: return "status-stopped";
+      case "unknown": return "error";
+      default: return "stopped";
     }
   }
 
@@ -118,12 +119,12 @@
   }
 
   const tabs = [
-    { id: "chat", label: "Chat", icon: "💬" },
-    { id: "files", label: "Files", icon: "📁" },
-    { id: "logs", label: "Logs", icon: "📋" },
-    { id: "terminal", label: "Terminal", icon: "⌨" },
-    { id: "sync", label: "Git", icon: "⚙" },
-    { id: "settings", label: "Settings", icon: "🔧" },
+    { id: "chat", label: "Chat" },
+    { id: "files", label: "Files" },
+    { id: "logs", label: "Logs" },
+    { id: "terminal", label: "Terminal" },
+    { id: "sync", label: "Git" },
+    { id: "settings", label: "Settings" },
   ];
 </script>
 
@@ -133,104 +134,72 @@
 <main class="min-h-screen grid-bg">
   {#if sandbox}
     <!-- Header Bar -->
-    <header class="sticky top-0 z-40 border-b border-border/30 bg-background/80 backdrop-blur-md">
-      <div class="container mx-auto px-4 sm:px-6 max-w-7xl">
-        <!-- Top section: Name, status, actions -->
-        <div class="py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div class="flex items-center gap-4 min-w-0">
-            <!-- Back button -->
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onclick={() => goto("/projects")}
-              class="shrink-0 font-mono text-xs uppercase tracking-wider h-8 px-3"
-            >
-              &larr; Back
-            </Button>
-            
-            <div class="h-6 w-px bg-border/50 hidden sm:block"></div>
-            
-            <!-- Project name and status -->
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-3 overflow-hidden">
-                <h1 class="text-xl sm:text-2xl font-bold truncate glitch-hover" 
-                    style="font-family: 'Space Grotesk', sans-serif;">
-                  {getDisplayName()}
-                </h1>
-                <div class="status-indicator {getStatusClass(sandbox.status)} shrink-0">
-                  <span class="status-dot {sandbox.status === 'running' ? 'animate-pulse-dot' : ''}"></span>
-                  <span>{getStatusLabel(sandbox.status)}</span>
-                </div>
-              </div>
-              <p class="text-xs font-mono text-muted-foreground truncate mt-0.5">
-                {sandbox.image}
-              </p>
-            </div>
-          </div>
-          
-          <!-- Actions -->
-          <div class="flex items-center gap-2 shrink-0">
-            {#if sandbox.status === "stopped" || sandbox.status === "created"}
-              <Button 
-                size="sm" 
-                onclick={() => startSandbox(sandbox.id)}
-                class="font-mono text-xs uppercase tracking-wider h-8 px-4
-                       bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-black"
-              >
-                Start
-              </Button>
-            {:else if sandbox.status === "running"}
-              <Button 
-                size="sm" 
-                variant="secondary"
-                onclick={() => stopSandbox(sandbox.id)}
-                class="font-mono text-xs uppercase tracking-wider h-8 px-4"
-              >
-                Stop
-              </Button>
-            {:else if sandbox.status === "starting" || sandbox.status === "stopping"}
-              <Button 
-                size="sm" 
-                disabled={true}
-                class="font-mono text-xs uppercase tracking-wider h-8 px-4"
-              >
-                {sandbox.status === "starting" ? "Starting..." : "Stopping..."}
-              </Button>
-            {/if}
-            <Button 
-              size="sm" 
-              variant="outline" 
-              onclick={() => showRestartDialog = true}
-              class="font-mono text-xs uppercase tracking-wider h-8 px-4 border-border/50"
-            >
-              Restart
-            </Button>
-          </div>
-        </div>
-        
-        <!-- Tab Navigation -->
-        <nav class="flex gap-1 overflow-x-auto pb-px -mb-px scrollbar-none">
-          {#each tabs as tab}
-            <button
-              onclick={() => handleTabChange(tab.id)}
-              class="px-4 py-2.5 font-mono text-xs uppercase tracking-wider whitespace-nowrap
-                     border-b-2 transition-colors
-                     {currentTab() === tab.id 
-                       ? 'border-[var(--cyber-cyan)] text-[var(--cyber-cyan)]' 
-                       : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border/50'}"
-            >
-              {tab.label}
-            </button>
-          {/each}
-        </nav>
-      </div>
-    </header>
+    <PageHeader
+      title={getDisplayName()}
+      subtitle={sandbox.image}
+      status={{
+        label: getStatusLabel(sandbox.status),
+        variant: getStatusVariant(sandbox.status),
+        animate: sandbox.status === "running"
+      }}
+      tabs={tabs}
+      activeTab={currentTab()}
+      onTabChange={handleTabChange}
+    >
+      {#snippet leading()}
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onclick={() => goto("/projects")}
+          class="shrink-0 font-mono text-xs uppercase tracking-wider h-8 px-3"
+        >
+          &larr; Back
+        </Button>
+      {/snippet}
+      {#snippet actions()}
+        {#if sandbox.status === "stopped" || sandbox.status === "created"}
+          <Button 
+            size="sm" 
+            onclick={() => startSandbox(sandbox.id)}
+            class="font-mono text-xs uppercase tracking-wider h-8 px-4
+                   bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-black"
+          >
+            Start
+          </Button>
+        {:else if sandbox.status === "running"}
+          <Button 
+            size="sm" 
+            variant="secondary"
+            onclick={() => stopSandbox(sandbox.id)}
+            class="font-mono text-xs uppercase tracking-wider h-8 px-4"
+          >
+            Stop
+          </Button>
+        {:else if sandbox.status === "starting" || sandbox.status === "stopping"}
+          <Button 
+            size="sm" 
+            disabled={true}
+            class="font-mono text-xs uppercase tracking-wider h-8 px-4"
+          >
+            {sandbox.status === "starting" ? "Starting..." : "Stopping..."}
+          </Button>
+        {/if}
+        <Button 
+          size="sm" 
+          variant="outline" 
+          onclick={() => showRestartDialog = true}
+          class="font-mono text-xs uppercase tracking-wider h-8 px-4 border-border/50"
+        >
+          Restart
+        </Button>
+      {/snippet}
+    </PageHeader>
 
     <!-- Restart Confirmation Dialog -->
     <Dialog.Root bind:open={showRestartDialog}>
       <Dialog.Content class="cyber-card border-border/50">
         <Dialog.Header>
-          <Dialog.Title class="font-bold" style="font-family: 'Space Grotesk', sans-serif;">
+          <Dialog.Title class="font-bold font-heading">
             Restart Container
           </Dialog.Title>
           <Dialog.Description class="font-mono text-sm text-muted-foreground">

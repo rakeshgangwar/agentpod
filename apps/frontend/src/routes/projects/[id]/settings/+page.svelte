@@ -87,7 +87,7 @@
 </script>
 
 <div class="space-y-6 animate-fade-in">
-  <h2 class="text-xl font-bold" style="font-family: 'Space Grotesk', sans-serif;">
+  <h2 class="text-xl font-bold">
     Settings
   </h2>
 

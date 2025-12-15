@@ -105,7 +105,7 @@
           
           <!-- Title -->
           <div>
-            <h1 class="text-2xl sm:text-3xl font-bold tracking-tight" style="font-family: 'Space Grotesk', sans-serif;">
+            <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">
               AgentPod<span class="typing-cursor"></span>
             </h1>
             <p class="mt-2 text-sm font-mono text-muted-foreground">

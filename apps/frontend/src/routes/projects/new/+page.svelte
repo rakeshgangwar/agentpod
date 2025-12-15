@@ -271,7 +271,7 @@
         <span class="mr-1">&larr;</span> Back
       </Button>
       <div>
-        <h1 class="text-2xl font-bold glitch-hover" style="font-family: 'Space Grotesk', sans-serif;">
+        <h1 class="text-2xl font-bold glitch-hover">
           New Project
         </h1>
         <p class="font-mono text-sm text-muted-foreground">
@@ -283,7 +283,7 @@
     <!-- Creation Progress -->
     {#if isSubmitting && creationProgress.length > 0}
       <div class="cyber-card corner-accent p-6 animate-fade-in-up">
-        <h3 class="text-lg font-bold mb-4" style="font-family: 'Space Grotesk', sans-serif;">
+        <h3 class="text-lg font-bold mb-4">
           Creating Project<span class="typing-cursor"></span>
         </h3>
         

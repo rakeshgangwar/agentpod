@@ -1,6 +1,7 @@
 <script lang="ts">
   import { marked } from "marked";
   import { codeToHtml } from "shiki";
+  import { themeStore } from "$lib/themes/store.svelte";
 
   interface Props {
     content: string;
@@ -14,6 +15,9 @@
 
   let renderedHtml = $state<string>("");
   let isLoading = $state(true);
+
+  // Use theme store for dynamic Shiki themes
+  const shikiThemes = $derived(themeStore.shikiThemes);
 
   // Configure marked with custom renderer for code blocks
   async function renderMarkdown() {
@@ -41,14 +45,14 @@
         breaks: true, // Convert \n to <br>
       });
 
-      // Process code blocks with Shiki
+      // Process code blocks with Shiki using dynamic themes
       for (const block of codeBlocks) {
         try {
           const highlighted = await codeToHtml(block.code, {
             lang: normalizeLanguage(block.lang),
             themes: {
-              light: "github-light",
-              dark: "github-dark",
+              light: shikiThemes.light,
+              dark: shikiThemes.dark,
             },
             defaultColor: false,
           });
@@ -90,9 +94,10 @@
     return lang.toLowerCase() || "plaintext";
   }
 
-  // Re-render when content changes
+  // Re-render when content or theme changes
   $effect(() => {
     content;
+    shikiThemes;
     renderMarkdown();
   });
 </script>
@@ -195,7 +200,7 @@
 
   /* Inline code */
   .markdown-content :global(code) {
-    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-family: var(--font-mono), ui-monospace, monospace;
     font-size: 0.875em;
     background: var(--muted);
     padding: 0.2em 0.4em;

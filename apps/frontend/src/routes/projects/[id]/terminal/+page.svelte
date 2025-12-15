@@ -4,6 +4,7 @@
   import { TerminalTabs } from "$lib/components/terminal";
   import * as terminalStore from "$lib/stores/terminals.svelte";
   import { sandboxes } from "$lib/stores/sandboxes.svelte";
+  import SandboxNotRunning from "$lib/components/sandbox-not-running.svelte";
 
   // =============================================================================
   // State
@@ -20,7 +21,7 @@
   onMount(async () => {
     // Initialize terminal listeners when entering terminal view
     await terminalStore.initTerminalListeners();
-    
+
     // Sync terminals with backend state
     if (sandboxId) {
       await terminalStore.syncTerminals(sandboxId);
@@ -34,47 +35,30 @@
   });
 </script>
 
-<div class="h-[calc(100vh-300px)] min-h-[400px] flex flex-col animate-fade-in">
-  {#if !sandbox}
-    <!-- Loading State -->
-    <div class="flex-1 flex items-center justify-center">
-      <div class="text-center animate-fade-in-up">
-        <div class="relative mx-auto w-16 h-16">
-          <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
-          <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
-          <div class="absolute inset-0 flex items-center justify-center">
-            <div class="w-2 h-2 rounded-full bg-[var(--cyber-cyan)] animate-pulse-dot"></div>
-          </div>
-        </div>
-        <p class="mt-6 text-sm font-mono text-muted-foreground tracking-wider uppercase">
-          Loading sandbox<span class="typing-cursor"></span>
-        </p>
-      </div>
-    </div>
-  {:else if !isRunning}
-    <!-- Not Running State -->
-    <div class="flex-1 flex items-center justify-center">
-      <div class="text-center animate-fade-in-up cyber-card corner-accent p-12">
-        <div class="font-mono text-5xl text-[var(--cyber-amber)]/30 mb-6">⌨</div>
-        <h3 class="text-lg font-bold" style="font-family: 'Space Grotesk', sans-serif;">
-          Sandbox Not Running
-        </h3>
-        <p class="text-sm font-mono text-muted-foreground mt-2">
-          Start the sandbox to access the terminal
-        </p>
-        <div class="mt-4 flex items-center justify-center gap-2">
-          <span class="font-mono text-xs text-muted-foreground uppercase tracking-wider">Status:</span>
-          <span class="status-indicator status-stopped">
-            <span class="status-dot"></span>
-            <span>{sandbox.status}</span>
-          </span>
+{#if !sandbox}
+  <!-- Loading State -->
+  <div class="h-[calc(100vh-140px)] min-h-[500px] flex items-center justify-center animate-fade-in">
+    <div class="text-center animate-fade-in-up">
+      <div class="relative mx-auto w-16 h-16">
+        <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
+        <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
+        <div class="absolute inset-0 flex items-center justify-center">
+          <div class="w-2 h-2 rounded-full bg-[var(--cyber-cyan)] animate-pulse-dot"></div>
         </div>
       </div>
+      <p class="mt-6 text-sm font-mono text-muted-foreground tracking-wider uppercase">
+        Loading sandbox<span class="typing-cursor"></span>
+      </p>
     </div>
-  {:else}
-    <!-- Terminal Content -->
-    <div class="flex-1 cyber-card corner-accent overflow-hidden">
-      <TerminalTabs {sandboxId} class="h-full" />
+  </div>
+{:else if !isRunning}
+  <!-- Not Running State -->
+  <SandboxNotRunning {sandbox} icon="⌨" actionText="access the terminal" />
+{:else}
+  <!-- Terminal Content -->
+  <div class="animate-fade-in">
+    <div class="cyber-card corner-accent overflow-hidden">
+      <TerminalTabs {sandboxId} />
     </div>
-  {/if}
-</div>
+  </div>
+{/if}

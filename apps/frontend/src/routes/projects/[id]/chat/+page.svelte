@@ -10,6 +10,8 @@
   import ModelSelector from "$lib/components/model-selector.svelte";
   import AgentSelector from "$lib/components/agent-selector.svelte";
   import OnboardingBanner from "$lib/components/onboarding-banner.svelte";
+  import SandboxNotRunning from "$lib/components/sandbox-not-running.svelte";
+  import { sandboxes } from "$lib/stores/sandboxes.svelte";
 import {
     sandboxOpencodeListSessions,
     sandboxOpencodeCreateSession,
@@ -63,6 +65,10 @@ import {
   // Get project ID from route params
   let projectId = $derived($page.params.id ?? "");
 
+  // Get sandbox and check if running
+  let sandbox = $derived(projectId ? sandboxes.list.find(s => s.id === projectId) : undefined);
+  let isRunning = $derived(sandbox?.status === "running");
+
   // Check for file param in URL (from "Use in Chat" button in file browser)
   $effect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -83,10 +89,10 @@ import {
 
   // Model selection state
   let selectedModel = $state<ModelSelection | undefined>(undefined);
-  
+
   // Track which session's model we've loaded to avoid re-detecting
   let modelLoadedForSession = $state<string | null>(null);
-  
+
   // Reset model when session changes so it can be detected from the new session's messages
   $effect(() => {
     if (selectedSessionId && selectedSessionId !== modelLoadedForSession) {
@@ -95,7 +101,7 @@ import {
       modelLoadedForSession = null;
     }
   });
-  
+
   // Callback when RuntimeProvider detects model from existing session messages
   function handleSessionModelDetected(model: ModelSelection) {
     // Only update if we haven't already loaded model for this session
@@ -107,19 +113,19 @@ import {
 
   // Agent selection state
   let selectedAgent = $state<string | undefined>(undefined);
-  
+
   // Track which session's agent we've loaded to avoid re-detecting
   let agentLoadedForSession = $state<string | null>(null);
-  
+
   // Agents list (loaded at page level for keyboard shortcut cycling)
   let agents = $state<OpenCodeAgent[]>([]);
   let agentAnimationTrigger = $state(0);
-  
+
   // Filter to primary agents only
   let primaryAgents = $derived(
     agents.filter(agent => agent.mode === "primary" || agent.mode === "all")
   );
-  
+
   // Load agents when project changes
   async function loadAgents() {
     if (!projectId) return;
@@ -134,14 +140,14 @@ import {
       console.error("Failed to load agents:", err);
     }
   }
-  
+
   // Providers list (loaded at page level for keyboard shortcut model cycling)
   let providers = $state<OpenCodeProvider[]>([]);
   let modelAnimationTrigger = $state(0);
-  
+
   // Flattened list of all models for easy cycling
   let allModels = $derived(
-    providers.flatMap(provider => 
+    providers.flatMap(provider =>
       provider.models.map(model => ({
         providerId: provider.id,
         modelId: model.id,
@@ -149,7 +155,7 @@ import {
       }))
     )
   );
-  
+
   // Load providers when project changes
   async function loadProviders() {
     if (!projectId) return;
@@ -170,7 +176,7 @@ import {
   // Pending onboarding message to send via RuntimeProvider
   // Includes the target sessionId to prevent sending to wrong session
   let pendingOnboardingMessage = $state<{ text: string; agent?: string; sessionId: string } | undefined>(undefined);
-  
+
   // Reset agent when session changes so it can be detected from the new session's messages
   // For child sessions, use the agent extracted from the session title
   $effect(() => {
@@ -188,7 +194,7 @@ import {
       agentLoadedForSession = selectedSessionId;
     }
   });
-  
+
   // Callback when RuntimeProvider detects agent from existing session messages
   function handleSessionAgentDetected(agent: string) {
     // Only update if we haven't already loaded agent for this session
@@ -204,7 +210,7 @@ import {
     if (projectId) {
       // Reset banner dismissed state when project changes
       onboardingBannerDismissed = false;
-      
+
       // Use untrack to prevent state updates inside these async functions
       // from causing the effect to re-run
       untrack(() => {
@@ -223,7 +229,7 @@ import {
   async function handleStartOnboarding() {
     // Dismiss banner immediately (local state for instant UX feedback)
     onboardingBannerDismissed = true;
-    
+
     // Set pending message to be sent by RuntimeProvider when it's ready
     if (selectedSessionId) {
       const onboardingAgent = "manage";
@@ -237,7 +243,7 @@ import {
       toast.info("Setup started", {
         description: "The onboarding assistant is ready to help configure your workspace.",
       });
-      
+
       // Mark as skipped in backend (non-blocking)
       skipOnboarding(projectId);
     } else {
@@ -246,7 +252,7 @@ import {
       });
     }
   }
-  
+
   // Callback when pending onboarding message has been sent
   function handlePendingOnboardingMessageSent() {
     pendingOnboardingMessage = undefined;
@@ -255,7 +261,7 @@ import {
   async function handleSkipOnboarding() {
     // Dismiss banner immediately (local state for instant UX feedback)
     onboardingBannerDismissed = true;
-    
+
     const success = await skipOnboarding(projectId);
     if (success) {
       toast.success("Setup skipped", {
@@ -292,7 +298,7 @@ import {
       // projectId is actually sandboxId in v2 API
       const session = await sandboxOpencodeCreateSession(projectId);
       console.log("[Chat] Created new session:", session.id);
-      
+
       // Check if session was already added by SSE event (race condition)
       const alreadyExists = sessions.some(s => s.id === session.id);
       if (!alreadyExists) {
@@ -300,7 +306,7 @@ import {
       } else {
         console.log("[Chat] Session already in list from SSE event");
       }
-      
+
       // Always select the new session
       selectedSessionId = session.id;
       console.log("[Chat] Selected session:", selectedSessionId);
@@ -317,7 +323,7 @@ import {
       title: "Delete Session",
       kind: "warning",
     });
-    
+
     if (!shouldDelete) return;
 
     try {
@@ -405,12 +411,12 @@ import {
       // When collapsing, check if a child session is currently selected
       const childSessions = childSessionsMap[sessionId] ?? [];
       const isChildSelected = childSessions.some(child => child.id === selectedSessionId);
-      
+
       // If a child is selected, switch to the parent session before collapsing
       if (isChildSelected) {
         selectedSessionId = sessionId;
       }
-      
+
       expandedSessions = new Set([...expandedSessions].filter(id => id !== sessionId));
     } else {
       expandedSessions = new Set([...expandedSessions, sessionId]);
@@ -427,7 +433,7 @@ import {
 
   // Get child sessions for the currently selected session (for ChatThread to match task tool calls)
   let currentSessionChildren = $derived(
-    selectedSessionId 
+    selectedSessionId
       ? (childSessionsMap[selectedSessionId] ?? []).map(s => ({
           id: s.id,
           title: s.title,
@@ -462,12 +468,12 @@ import {
       if (sessions.some(s => s.id === newSession.id)) {
         return;
       }
-      
+
       console.log("[Chat] New session created:", newSession.id, newSession.title);
-      
+
       // Add the new session to the list
       sessions = [newSession, ...sessions];
-      
+
       // If it's a child session, auto-expand the parent
       if (newSession.parentID && !expandedSessions.has(newSession.parentID)) {
         expandedSessions = new Set([...expandedSessions, newSession.parentID]);
@@ -484,15 +490,15 @@ import {
     // Defer update to next tick to avoid race conditions with createNewSession
     setTimeout(() => {
       console.log("[Chat] Session updated:", updatedSession.id, updatedSession.title);
-      
+
       // Only update if session exists - don't add new sessions here
       // This prevents race conditions with createNewSession
       const sessionExists = sessions.some(s => s.id === updatedSession.id);
-      
+
       if (sessionExists) {
         // Update existing session
-        sessions = sessions.map(s => 
-          s.id === updatedSession.id 
+        sessions = sessions.map(s =>
+          s.id === updatedSession.id
             ? { ...s, ...updatedSession }
             : s
         );
@@ -507,16 +513,16 @@ import {
   // Agent cycling with keyboard shortcuts (Cmd+, for previous, Cmd+. for next)
   function cycleAgent(direction: 1 | -1) {
     if (primaryAgents.length === 0) return;
-    
+
     const currentIndex = primaryAgents.findIndex(a => a.name === selectedAgent);
     let newIndex: number;
-    
+
     if (currentIndex === -1) {
       newIndex = 0;
     } else {
       newIndex = (currentIndex + direction + primaryAgents.length) % primaryAgents.length;
     }
-    
+
     selectedAgent = primaryAgents[newIndex].name;
     agentAnimationTrigger++; // Trigger animation in AgentSelector
   }
@@ -524,19 +530,19 @@ import {
   // Model cycling with keyboard shortcuts (Alt+, for previous, Alt+. for next)
   function cycleModel(direction: 1 | -1) {
     if (allModels.length === 0) return;
-    
+
     // Find current model index
-    const currentIndex = allModels.findIndex(m => 
+    const currentIndex = allModels.findIndex(m =>
       m.providerId === selectedModel?.providerId && m.modelId === selectedModel?.modelId
     );
     let newIndex: number;
-    
+
     if (currentIndex === -1) {
       newIndex = 0;
     } else {
       newIndex = (currentIndex + direction + allModels.length) % allModels.length;
     }
-    
+
     const newModel = allModels[newIndex];
     selectedModel = {
       providerId: newModel.providerId,
@@ -559,14 +565,14 @@ import {
         return;
       }
     }
-    
+
     // Handle agent cycling with Cmd/Ctrl+, and Cmd/Ctrl+.
     // Only handle if we have agents and agent switching is not disabled
     if (primaryAgents.length === 0) return;
     if (isChildSession) return; // Agent switching disabled for child sessions
-    
+
     const isMeta = e.metaKey || e.ctrlKey; // Support both Mac (Cmd) and Windows/Linux (Ctrl)
-    
+
     if (isMeta && e.key === ',') {
       e.preventDefault();
       cycleAgent(-1); // Previous agent
@@ -583,7 +589,26 @@ import {
 <svelte:window on:keydown={handleGlobalKeyDown} />
 
 {#if projectId}
-  <div class="flex h-[calc(100vh-140px)] min-h-[500px] animate-fade-in">
+  {#if !sandbox}
+    <!-- Loading State -->
+    <div class="h-[calc(100vh-140px)] min-h-[500px] flex items-center justify-center animate-fade-in">
+      <div class="text-center animate-fade-in-up">
+        <div class="relative mx-auto w-16 h-16">
+          <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
+          <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
+          <div class="absolute inset-0 flex items-center justify-center">
+            <div class="w-2 h-2 rounded-full bg-[var(--cyber-cyan)] animate-pulse-dot"></div>
+          </div>
+        </div>
+        <p class="mt-6 text-sm font-mono text-muted-foreground tracking-wider uppercase">
+          Loading sandbox<span class="typing-cursor"></span>
+        </p>
+      </div>
+    </div>
+  {:else if !isRunning}
+    <SandboxNotRunning {sandbox} icon="💬" actionText="use the chat" />
+  {:else}
+    <div class="flex h-[calc(100vh-140px)] min-h-[500px] animate-fade-in">
     <!-- Session Sidebar -->
     <aside class="w-64 border-r border-border/30 bg-background/50 backdrop-blur-sm flex flex-col
                   {sidebarCollapsed ? 'hidden sm:flex' : 'flex'}">
@@ -765,7 +790,7 @@ import {
           <div class="flex items-center gap-4 flex-wrap">
             <div class="flex items-center gap-2">
               <span class="text-xs font-mono text-muted-foreground uppercase tracking-wider">Model:</span>
-              <ModelSelector 
+              <ModelSelector
                 {projectId}
                 bind:selectedModel
                 compact={true}
@@ -775,7 +800,7 @@ import {
             </div>
             <div class="flex items-center gap-2">
               <span class="text-xs font-mono text-muted-foreground uppercase tracking-wider">Agent:</span>
-              <AgentSelector 
+              <AgentSelector
                 {projectId}
                 bind:selectedAgent
                 compact={true}
@@ -788,14 +813,14 @@ import {
               {/if}
             </div>
           </div>
-          
+
           <!-- Keyboard hints -->
           <div class="hidden lg:flex items-center gap-3 text-xs font-mono text-muted-foreground/50">
             <span>Alt+,/. model</span>
             <span>Cmd+,/. agent</span>
           </div>
         </div>
-        
+
         <!-- Onboarding Banner -->
         {@const onboardingStatus = onboarding.getStatus(projectId)}
         {#if onboardingStatus && !onboarding.isComplete(projectId) && !onboardingBannerDismissed}
@@ -810,11 +835,11 @@ import {
             />
           </div>
         {/if}
-        
+
         {#key selectedSessionId}
-          <react.RuntimeProvider 
-            {projectId} 
-            sessionId={selectedSessionId} 
+          <react.RuntimeProvider
+            {projectId}
+            sessionId={selectedSessionId}
             {selectedModel}
             {selectedAgent}
             onSessionModelDetected={handleSessionModelDetected}
@@ -824,9 +849,9 @@ import {
             onSessionCreated={handleSessionCreated}
             onSessionUpdated={handleSessionUpdated}
           >
-            <react.ChatThread 
-              {projectId} 
-              {findFiles} 
+            <react.ChatThread
+              {projectId}
+              {findFiles}
               onFilePickerRequest={handleFilePickerRequest}
               {pendingFilePath}
               onPendingFilePathClear={clearPendingFilePath}
@@ -840,16 +865,16 @@ import {
         <div class="flex-1 flex items-center justify-center">
           <div class="text-center animate-fade-in-up cyber-card corner-accent p-12">
             <div class="font-mono text-4xl text-[var(--cyber-cyan)]/20 mb-4">💬</div>
-            <p class="text-lg font-medium" style="font-family: 'Space Grotesk', sans-serif;">
+            <p class="text-lg font-medium font-heading">
               No session selected
             </p>
             <p class="text-sm font-mono text-muted-foreground mt-2">
               Create a new session to start chatting
             </p>
-            <Button 
+            <Button
               class="mt-6 font-mono text-xs uppercase tracking-wider
-                     bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black" 
-              onclick={createNewSession} 
+                     bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black"
+              onclick={createNewSession}
               disabled={isCreating}
             >
               {isCreating ? "Creating..." : "+ Create Session"}
@@ -859,6 +884,7 @@ import {
       {/if}
     </div>
   </div>
+  {/if}
 {/if}
 
 <!-- File Picker Modal -->

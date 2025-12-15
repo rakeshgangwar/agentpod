@@ -7,6 +7,8 @@
   import { CodeBlock } from "$lib/components/ui/code-block";
   import { MarkdownViewer } from "$lib/components/ui/markdown";
   import { toast } from "svelte-sonner";
+  import { sandboxes, startSandbox } from "$lib/stores/sandboxes.svelte";
+  import SandboxNotRunning from "$lib/components/sandbox-not-running.svelte";
   import {
     sandboxOpencodeListFiles,
     sandboxOpencodeGetFileContent,
@@ -25,10 +27,10 @@
   // Download the current file
   function downloadFile() {
     if (!selectedFile) return;
-    
+
     let blob: Blob;
     const mimeType = getMimeType(selectedFile.name);
-    
+
     // For binary files, use the raw base64 content and decode to proper binary
     if (isBinaryFile(selectedFile.name) && rawBase64Content) {
       const binaryData = base64ToArrayBuffer(rawBase64Content);
@@ -39,9 +41,9 @@
     } else {
       return;
     }
-    
+
     const url = URL.createObjectURL(blob);
-    
+
     // Create a temporary link and trigger download
     const link = document.createElement("a");
     link.href = url;
@@ -49,10 +51,10 @@
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
+
     // Clean up the URL object
     URL.revokeObjectURL(url);
-    
+
     toast.success(`Downloaded ${selectedFile.name}`);
   }
 
@@ -65,6 +67,10 @@
   }
 
   let projectId = $derived($page.params.id ?? "");
+
+  // Sandbox state for checking if running
+  let sandbox = $derived(projectId ? sandboxes.list.find(s => s.id === projectId) : undefined);
+  let isRunning = $derived(sandbox?.status === "running");
 
   // State
   let fileTree = $state<FileNode[]>([]);
@@ -79,10 +85,10 @@
 
   // Track expanded folders
   let expandedPaths = $state<Set<string>>(new Set());
-  
+
   // Cache for folder contents (lazy loaded)
   let folderContents = $state<Map<string, FileNode[]>>(new Map());
-  
+
   // Track folders currently being loaded
   let loadingFolders = $state<Set<string>>(new Set());
 
@@ -216,7 +222,7 @@
     try {
       // projectId is actually sandboxId in v2 API
       const response = await sandboxOpencodeGetFileContent(projectId, node.path);
-      
+
       // OpenCode API returns base64 encoded content - decode it for display
       let content = response.content;
       if (content && isBase64(content)) {
@@ -225,7 +231,7 @@
         // Decode for text display (this corrupts binary files, but we use rawBase64Content for downloads)
         content = decodeBase64(content);
       }
-      
+
       fileContent = {
         ...response,
         content,
@@ -252,11 +258,11 @@
       expandedPaths = new Set(expandedPaths);
     }
   }
-  
+
   async function loadFolderContents(path: string) {
     loadingFolders.add(path);
     loadingFolders = new Set(loadingFolders);
-    
+
     try {
       // projectId is actually sandboxId in v2 API
       const contents = await sandboxOpencodeListFiles(projectId, path);
@@ -272,7 +278,7 @@
       loadingFolders = new Set(loadingFolders);
     }
   }
-  
+
   // Get children for a folder (from cache)
   function getChildren(path: string): FileNode[] {
     return folderContents.get(path) ?? [];
@@ -337,7 +343,23 @@
   }
 </script>
 
-<div class="flex h-[calc(100vh-200px)] min-h-[400px] gap-4 overflow-hidden animate-fade-in">
+{#if !sandbox}
+  <!-- Loading State -->
+  <div class="h-[calc(100vh-140px)] min-h-[500px] flex items-center justify-center animate-fade-in">
+    <div class="text-center animate-fade-in-up">
+      <div class="relative mx-auto w-16 h-16">
+        <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
+        <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
+      </div>
+      <p class="mt-6 text-sm font-mono text-muted-foreground tracking-wider uppercase">
+        Loading sandbox<span class="typing-cursor"></span>
+      </p>
+    </div>
+  </div>
+{:else if !isRunning}
+  <SandboxNotRunning {sandbox} icon="📁" actionText="browse files" />
+{:else}
+  <div class="flex h-[calc(100vh-200px)] min-h-[400px] gap-4 overflow-hidden animate-fade-in">
   <!-- File Tree Panel -->
   <div class="w-72 flex-shrink-0 flex flex-col cyber-card corner-accent overflow-hidden">
     <!-- Header -->
@@ -346,10 +368,10 @@
         <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
           [files]
         </h3>
-        <Button 
-          size="sm" 
-          variant="ghost" 
-          onclick={loadFileTree} 
+        <Button
+          size="sm"
+          variant="ghost"
+          onclick={loadFileTree}
           disabled={isLoadingTree}
           class="h-7 px-2 font-mono text-xs text-muted-foreground hover:text-[var(--cyber-cyan)]"
         >
@@ -357,7 +379,7 @@
         </Button>
       </div>
     </div>
-    
+
     <!-- File Tree Content -->
     <div class="flex-1 overflow-hidden">
       <ScrollArea class="h-full">
@@ -387,8 +409,8 @@
               <div
                 class="flex items-center gap-2 py-1.5 px-2 rounded cursor-pointer text-sm font-mono
                        transition-all group
-                  {selectedFile?.path === node.path 
-                    ? 'bg-[var(--cyber-cyan)]/10 text-[var(--cyber-cyan)] border border-[var(--cyber-cyan)]/30' 
+                  {selectedFile?.path === node.path
+                    ? 'bg-[var(--cyber-cyan)]/10 text-[var(--cyber-cyan)] border border-[var(--cyber-cyan)]/30'
                     : 'hover:bg-muted/30 border border-transparent hover:border-border/30'}
                   {node.ignored ? 'opacity-40' : ''}"
                 style="padding-left: {depth * 16 + 8}px"
@@ -446,8 +468,8 @@
               <div class="flex border border-border/50 rounded overflow-hidden">
                 <button
                   class="px-2 py-1 text-xs font-mono uppercase tracking-wider transition-colors
-                         {markdownViewMode === 'raw' 
-                           ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]' 
+                         {markdownViewMode === 'raw'
+                           ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]'
                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'}"
                   onclick={() => markdownViewMode = "raw"}
                 >
@@ -455,8 +477,8 @@
                 </button>
                 <button
                   class="px-2 py-1 text-xs font-mono uppercase tracking-wider transition-colors
-                         {markdownViewMode === 'preview' 
-                           ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]' 
+                         {markdownViewMode === 'preview'
+                           ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]'
                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'}"
                   onclick={() => markdownViewMode = "preview"}
                 >
@@ -514,7 +536,7 @@
           </div>
         </div>
       </div>
-      
+
       <!-- File Content -->
       <div class="flex-1 overflow-hidden bg-black/20">
         <ScrollArea class="h-full" orientation="both">
@@ -535,13 +557,13 @@
             </div>
           {:else if fileContent}
             {#if isMarkdownFile(selectedFile.name) && markdownViewMode === "preview"}
-              <MarkdownViewer 
+              <MarkdownViewer
                 content={fileContent.content}
                 class="h-full"
               />
             {:else}
-              <CodeBlock 
-                code={fileContent.content} 
+              <CodeBlock
+                code={fileContent.content}
                 language={getLanguage(selectedFile.name)}
                 class="h-full"
               />
@@ -554,7 +576,7 @@
       <div class="flex-1 flex items-center justify-center">
         <div class="text-center animate-fade-in-up p-8">
           <div class="font-mono text-5xl text-[var(--cyber-cyan)]/20 mb-4">○</div>
-          <p class="text-lg font-medium" style="font-family: 'Space Grotesk', sans-serif;">
+          <p class="text-lg font-medium font-heading">
             No file selected
           </p>
           <p class="text-sm font-mono text-muted-foreground mt-2">
@@ -569,3 +591,4 @@
     {/if}
   </div>
 </div>
+{/if}

@@ -1,14 +1,19 @@
 <script lang="ts">
   import { page } from "$app/stores";
-  import { getSandboxLogs } from "$lib/stores/sandboxes.svelte";
   import { Button } from "$lib/components/ui/button";
   import { Label } from "$lib/components/ui/label";
   import { Input } from "$lib/components/ui/input";
   import { CodeBlock } from "$lib/components/ui/code-block";
   import { ScrollArea } from "$lib/components/ui/scroll-area";
+  import { getSandboxLogs, sandboxes } from "$lib/stores/sandboxes.svelte";
+  import SandboxNotRunning from "$lib/components/sandbox-not-running.svelte";
 
   // Get sandbox ID from route params
   let sandboxId = $derived($page.params.id ?? "");
+
+  // Get sandbox and check if running
+  let sandbox = $derived(sandboxId ? sandboxes.list.find(s => s.id === sandboxId) : undefined);
+  let isRunning = $derived(sandbox?.status === "running");
 
   // Logs state
   let logs = $state<string>("");
@@ -21,10 +26,10 @@
   // Load logs
   async function loadLogs() {
     if (!sandboxId) return;
-    
+
     isLoading = true;
     error = null;
-    
+
     try {
       const result = await getSandboxLogs(sandboxId, lines);
       logs = result ?? "";
@@ -51,7 +56,7 @@
       clearInterval(refreshInterval);
       refreshInterval = null;
     }
-    
+
     return () => {
       if (refreshInterval) {
         clearInterval(refreshInterval);
@@ -69,7 +74,23 @@
   }
 </script>
 
-<div class="space-y-4 animate-fade-in">
+{#if !sandbox}
+  <!-- Loading State -->
+  <div class="h-[calc(100vh-140px)] min-h-[500px] flex items-center justify-center animate-fade-in">
+    <div class="text-center animate-fade-in-up">
+      <div class="relative mx-auto w-16 h-16">
+        <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
+        <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
+      </div>
+      <p class="mt-6 text-sm font-mono text-muted-foreground tracking-wider uppercase">
+        Loading sandbox<span class="typing-cursor"></span>
+      </p>
+    </div>
+  </div>
+{:else if !isRunning}
+  <SandboxNotRunning {sandbox} icon="📋" actionText="view logs" />
+{:else}
+  <div class="space-y-4 animate-fade-in">
   <!-- Controls Card -->
   <div class="cyber-card corner-accent p-4">
     <div class="flex flex-wrap items-center gap-4">
@@ -77,20 +98,20 @@
         <Label for="lines" class="font-mono text-xs uppercase tracking-wider text-muted-foreground">
           Lines:
         </Label>
-        <Input 
+        <Input
           id="lines"
-          type="number" 
-          min="1" 
+          type="number"
+          min="1"
           max="1000"
           value={lines}
           onchange={handleLinesChange}
-          class="w-24 h-8 font-mono text-sm bg-background/50 border-border/50 
+          class="w-24 h-8 font-mono text-sm bg-background/50 border-border/50
                  focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)]"
         />
       </div>
-      
-      <Button 
-        variant="outline" 
+
+      <Button
+        variant="outline"
         size="sm"
         onclick={loadLogs}
         disabled={isLoading}
@@ -99,18 +120,18 @@
       >
         {isLoading ? "Loading..." : "↻ Refresh"}
       </Button>
-      
-      <Button 
+
+      <Button
         size="sm"
         onclick={() => autoRefresh = !autoRefresh}
         class="h-8 px-4 font-mono text-xs uppercase tracking-wider
-               {autoRefresh 
-                 ? 'bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-black' 
+               {autoRefresh
+                 ? 'bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-black'
                  : 'bg-transparent border border-border/50 hover:border-[var(--cyber-emerald)]/50 hover:text-[var(--cyber-emerald)]'}"
       >
         {autoRefresh ? "● Auto ON" : "○ Auto OFF"}
       </Button>
-      
+
       {#if autoRefresh}
         <span class="text-xs font-mono text-[var(--cyber-emerald)]">
           Refreshing every 5s
@@ -134,7 +155,7 @@
         {/if}
       </div>
     </div>
-    
+
     <!-- Content -->
     <div class="bg-black/20">
       {#if error}
@@ -159,8 +180,8 @@
       {:else if logs}
         <ScrollArea class="h-[500px] w-full">
           <div class="p-1">
-            <CodeBlock 
-              code={logs} 
+            <CodeBlock
+              code={logs}
               language="log"
               class="text-xs"
             />
@@ -185,3 +206,4 @@
     Logs are retrieved from the container's stdout/stderr. Use the Restart button in the header to rebuild the container if needed.
   </p>
 </div>
+{/if}
