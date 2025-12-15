@@ -31,6 +31,7 @@ import {
   type ModelSelection,
   type PermissionRequest,
   type MessagePartInput,
+  type Session,
 } from "../api/tauri";
 import type { AttachedFile } from "./FileAttachment";
 import { PermissionProvider, usePermissions } from "./PermissionContext";
@@ -70,13 +71,19 @@ interface RuntimeProviderProps {
   /** 
    * Pending message to send automatically when the provider is ready.
    * Used for programmatic message sending (e.g., onboarding auto-start).
+   * If sessionId is provided, the message will only be sent if it matches the current session.
    */
   pendingMessage?: {
     text: string;
     agent?: string;
+    sessionId?: string; // If set, only send if this matches the current session
   };
   /** Called when the pending message has been sent */
   onPendingMessageSent?: () => void;
+  /** Called when a new session is created (e.g., child session from task tool) */
+  onSessionCreated?: (session: Session) => void;
+  /** Called when a session is updated (e.g., title changed) */
+  onSessionUpdated?: (session: Session) => void;
 }
 
 // Tool call status for tracking state
@@ -242,7 +249,7 @@ function convertToThreadMessage(msg: InternalMessage): ThreadMessageLike {
  * Inner runtime component that has access to the permission context.
  * This is where all the SSE handling and runtime logic lives.
  */
-function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selectedModel, selectedAgent, onSessionModelDetected, onSessionAgentDetected, pendingMessage, onPendingMessageSent, children }: RuntimeProviderProps) {
+function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selectedModel, selectedAgent, onSessionModelDetected, onSessionAgentDetected, pendingMessage, onPendingMessageSent, onSessionCreated, onSessionUpdated, children }: RuntimeProviderProps) {
   // Internal message state (mutable, managed by us)
   const [internalMessages, setInternalMessages] = useState<InternalMessage[]>([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -261,13 +268,17 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
   // Permission context
   const { addPermission, removePermission, clearPermissions } = usePermissions();
   
-  // Refs for permission functions to keep handleSSEEvent stable
+  // Refs for permission functions and callbacks to keep handleSSEEvent stable
   const addPermissionRef = useRef(addPermission);
   const removePermissionRef = useRef(removePermission);
+  const onSessionCreatedRef = useRef(onSessionCreated);
+  const onSessionUpdatedRef = useRef(onSessionUpdated);
   useEffect(() => {
     addPermissionRef.current = addPermission;
     removePermissionRef.current = removePermission;
-  }, [addPermission, removePermission]);
+    onSessionCreatedRef.current = onSessionCreated;
+    onSessionUpdatedRef.current = onSessionUpdated;
+  }, [addPermission, removePermission, onSessionCreated, onSessionUpdated]);
 
   // Clear permissions when session changes
   useEffect(() => {
@@ -413,6 +424,12 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
     if (event.eventType === "message.updated") {
       const info = properties?.info as Record<string, unknown> | undefined;
       if (info && typeof info.id === "string" && typeof info.role === "string") {
+        // Filter by session - only process messages for the current session
+        const messageSessionId = info.sessionID as string | undefined;
+        if (messageSessionId && messageSessionId !== sessionId) {
+          return; // Skip messages from other sessions (e.g., child sessions from task tool)
+        }
+        
         const messageId = info.id;
         const role = info.role as "user" | "assistant";
 
@@ -462,6 +479,12 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
       }
       
       if (!part) return;
+
+      // Filter by session - only process parts for the current session
+      const partSessionId = part.sessionID as string | undefined;
+      if (partSessionId && partSessionId !== sessionId) {
+        return; // Skip parts from other sessions (e.g., child sessions from task tool)
+      }
 
       setInternalMessages((prev) => {
         // Check if message exists
@@ -598,12 +621,53 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
       setIsRunning(false);
     }
 
-    // Handle session.updated for status changes
+    // Handle session.updated for status and title changes
     if (event.eventType === "session.updated") {
       const info = properties?.info as Record<string, unknown> | undefined;
-      const status = info?.status as Record<string, unknown> | undefined;
-      if (status?.type === "idle") {
-        setIsRunning(false);
+      if (info && typeof info.id === "string") {
+        const status = info?.status as Record<string, unknown> | undefined;
+        if (status?.type === "idle") {
+          setIsRunning(false);
+        }
+        
+        // Build Session object and notify parent about updates (e.g., title change)
+        const updatedSession: Session = {
+          id: info.id as string,
+          parentID: info.parentID as string | undefined,
+          title: info.title as string | undefined,
+          time: info.time as { created: number; updated: number } | undefined,
+          status: status?.type as string | undefined,
+        };
+        
+        console.log("[RuntimeProvider] Session updated:", updatedSession.id, updatedSession.title);
+        onSessionUpdatedRef.current?.(updatedSession);
+      }
+    }
+
+    // Handle session.created - new session created (e.g., child session from task tool)
+    // Only notify for child sessions (sessions with parentID) to avoid interfering
+    // with manually created sessions via the "+ New" button
+    if (event.eventType === "session.created") {
+      const info = properties?.info as Record<string, unknown> | undefined;
+      if (info && typeof info.id === "string") {
+        const parentID = info.parentID as string | undefined;
+        
+        // Only handle child sessions here - top-level sessions are handled by createNewSession
+        if (parentID) {
+          console.log("[RuntimeProvider] New child session created:", info);
+          
+          // Build Session object from the event info
+          const newSession: Session = {
+            id: info.id as string,
+            parentID: parentID,
+            title: info.title as string | undefined,
+            time: info.time as { created: number; updated: number } | undefined,
+            status: (info.status as { type?: string })?.type,
+          };
+          
+          // Notify parent component about the new session
+          onSessionCreatedRef.current?.(newSession);
+        }
       }
     }
 
@@ -632,6 +696,13 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
     // Handle message.removed - remove message from state
     if (event.eventType === "message.removed") {
       const messageId = properties?.messageID as string | undefined;
+      const removedSessionId = properties?.sessionID as string | undefined;
+      
+      // Filter by session - only process removals for the current session
+      if (removedSessionId && removedSessionId !== sessionId) {
+        return; // Skip removals from other sessions
+      }
+      
       if (messageId) {
         console.log("[RuntimeProvider] Message removed:", messageId);
         setInternalMessages((prev) => prev.filter((m) => m.id !== messageId));
@@ -830,16 +901,22 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
     // 3. We're not loading
     // 4. We have a session
     // 5. SSE stream is connected
+    // 6. If pendingMessage has a sessionId, it must match current session
     if (
       pendingMessage &&
       !pendingMessageProcessedRef.current &&
       !isLoading &&
       sessionId &&
-      streamRef.current?.isConnected
+      streamRef.current?.isConnected &&
+      (!pendingMessage.sessionId || pendingMessage.sessionId === sessionId)
     ) {
       pendingMessageProcessedRef.current = true;
       
-      console.log("[RuntimeProvider] Processing pending message:", pendingMessage.text.slice(0, 50));
+      console.log("[RuntimeProvider] Processing pending message for session:", sessionId, pendingMessage.text.slice(0, 50));
+      
+      // IMMEDIATELY notify parent to clear the pending message
+      // This prevents the message from being sent again if the component remounts
+      onPendingMessageSent?.();
       
       // Use the agent from pendingMessage if specified, otherwise use selectedAgent
       const agentToUse = pendingMessage.agent || selectedAgent;
@@ -865,7 +942,6 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
       sandboxOpencodeSendMessage(projectId, sessionId, pendingMessage.text, selectedModel, agentToUse)
         .then(() => {
           console.log("[RuntimeProvider] Pending message sent successfully");
-          onPendingMessageSent?.();
         })
         .catch((err) => {
           console.error("[RuntimeProvider] Failed to send pending message:", err);
@@ -937,7 +1013,7 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
  * This includes the Permission system for human-in-the-loop approvals,
  * with a PermissionBar sticky at the bottom of the chat.
  */
-export function RuntimeProvider({ projectId, sessionId, selectedModel, selectedAgent, onSessionModelDetected, onSessionAgentDetected, pendingMessage, onPendingMessageSent, children }: RuntimeProviderProps) {
+export function RuntimeProvider({ projectId, sessionId, selectedModel, selectedAgent, onSessionModelDetected, onSessionAgentDetected, pendingMessage, onPendingMessageSent, onSessionCreated, onSessionUpdated, children }: RuntimeProviderProps) {
   return (
     <PermissionProvider projectId={projectId}>
       <RuntimeProviderInner
@@ -949,6 +1025,8 @@ export function RuntimeProvider({ projectId, sessionId, selectedModel, selectedA
         onSessionAgentDetected={onSessionAgentDetected}
         pendingMessage={pendingMessage}
         onPendingMessageSent={onPendingMessageSent}
+        onSessionCreated={onSessionCreated}
+        onSessionUpdated={onSessionUpdated}
       >
         {children}
       </RuntimeProviderInner>
