@@ -9,6 +9,8 @@
   import { toast } from "svelte-sonner";
   import { sandboxes, startSandbox } from "$lib/stores/sandboxes.svelte";
   import SandboxNotRunning from "$lib/components/sandbox-not-running.svelte";
+  import FileIcon from "$lib/components/file-icon.svelte";
+  import { RefreshCw, Download, ChevronRight, ChevronDown, File, Folder, Loader2 } from "@lucide/svelte";
   import {
     sandboxOpencodeListFiles,
     sandboxOpencodeGetFileContent,
@@ -284,49 +286,6 @@
     return folderContents.get(path) ?? [];
   }
 
-  function getFileIcon(node: FileNode): string {
-    if (node.type === "directory") {
-      return expandedPaths.has(node.path) ? "▼" : "▶";
-    }
-
-    const ext = node.name.split(".").pop()?.toLowerCase();
-    switch (ext) {
-      case "ts":
-      case "tsx":
-        return "◆";
-      case "js":
-      case "jsx":
-        return "◇";
-      case "svelte":
-        return "●";
-      case "rs":
-        return "⚙";
-      case "json":
-        return "{}";
-      case "md":
-        return "#";
-      case "css":
-      case "scss":
-        return "◈";
-      case "html":
-        return "<>";
-      case "toml":
-      case "yaml":
-      case "yml":
-        return "≡";
-      case "png":
-      case "jpg":
-      case "jpeg":
-      case "gif":
-      case "svg":
-        return "▣";
-      case "lock":
-        return "◉";
-      default:
-        return "○";
-    }
-  }
-
   function getLanguage(filename: string): string {
     // Just return the file extension - let Shiki handle language detection
     // Shiki supports 200+ languages and knows their extensions
@@ -373,9 +332,9 @@
           variant="ghost"
           onclick={loadFileTree}
           disabled={isLoadingTree}
-          class="h-7 px-2 font-mono text-xs text-muted-foreground hover:text-[var(--cyber-cyan)]"
+          class="h-7 w-7 p-0 font-mono text-xs text-muted-foreground hover:text-[var(--cyber-cyan)]"
         >
-          {isLoadingTree ? "..." : "↻"}
+          <RefreshCw class="h-3.5 w-3.5 {isLoadingTree ? 'animate-spin' : ''}" />
         </Button>
       </div>
     </div>
@@ -419,15 +378,21 @@
                 role="button"
                 tabindex="0"
               >
-                <span class="flex-shrink-0 w-4 text-center text-xs
-                             {node.type === 'directory' ? 'text-[var(--cyber-amber)]' : 'text-muted-foreground'}
-                             {selectedFile?.path === node.path ? 'text-[var(--cyber-cyan)]' : ''}">
-                  {#if node.type === "directory" && loadingFolders.has(node.path)}
-                    <span class="inline-block animate-spin">◌</span>
-                  {:else}
-                    {getFileIcon(node)}
-                  {/if}
-                </span>
+                {#if node.type === "directory"}
+                  <span class="flex-shrink-0 w-4 flex items-center justify-center text-[var(--cyber-amber)] {selectedFile?.path === node.path ? 'text-[var(--cyber-cyan)]' : ''}">
+                    {#if loadingFolders.has(node.path)}
+                      <Loader2 class="h-3.5 w-3.5 animate-spin" />
+                    {:else if expandedPaths.has(node.path)}
+                      <ChevronDown class="h-3.5 w-3.5" />
+                    {:else}
+                      <ChevronRight class="h-3.5 w-3.5" />
+                    {/if}
+                  </span>
+                  <FileIcon filename={node.name} isDirectory={true} isExpanded={expandedPaths.has(node.path)} size="sm" />
+                {:else}
+                  <span class="flex-shrink-0 w-4"></span>
+                  <FileIcon filename={node.name} size="sm" />
+                {/if}
                 <span class="truncate text-xs">{node.name}</span>
               </div>
               {#if node.type === "directory" && expandedPaths.has(node.path)}
@@ -456,7 +421,7 @@
         <div class="flex items-center justify-between gap-4">
           <div class="min-w-0 flex-1">
             <h3 class="font-mono text-sm truncate text-foreground flex items-center gap-2">
-              <span class="text-[var(--cyber-cyan)]">{getFileIcon(selectedFile)}</span>
+              <FileIcon filename={selectedFile.name} size="sm" />
               {selectedFile.name}
             </h3>
             <p class="text-xs font-mono truncate text-muted-foreground mt-0.5">
@@ -528,10 +493,10 @@
               onclick={downloadFile}
               disabled={!fileContent?.content}
               title="Download file"
-              class="h-7 px-2 font-mono text-xs border-border/50 hover:border-[var(--cyber-magenta)]/50
+              class="h-7 w-7 p-0 font-mono text-xs border-border/50 hover:border-[var(--cyber-magenta)]/50
                      hover:text-[var(--cyber-magenta)] disabled:opacity-30"
             >
-              ↓
+              <Download class="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
@@ -575,16 +540,16 @@
       <!-- No File Selected State -->
       <div class="flex-1 flex items-center justify-center">
         <div class="text-center animate-fade-in-up p-8">
-          <div class="font-mono text-5xl text-[var(--cyber-cyan)]/20 mb-4">○</div>
+          <File class="h-12 w-12 mx-auto text-[var(--cyber-cyan)]/20 mb-4" />
           <p class="text-lg font-medium font-heading">
             No file selected
           </p>
           <p class="text-sm font-mono text-muted-foreground mt-2">
             Select a file from the tree to view its contents
           </p>
-          <div class="mt-6 flex justify-center gap-4 text-xs font-mono text-muted-foreground/50">
-            <span>▶ folder</span>
-            <span>○ file</span>
+          <div class="mt-6 flex justify-center gap-4 text-xs font-mono text-muted-foreground/50 items-center">
+            <span class="flex items-center gap-1"><Folder class="h-3 w-3" /> folder</span>
+            <span class="flex items-center gap-1"><File class="h-3 w-3" /> file</span>
           </div>
         </div>
       </div>

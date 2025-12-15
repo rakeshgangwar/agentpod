@@ -4,6 +4,8 @@
   import { Input } from "$lib/components/ui/input";
   import { ScrollArea } from "$lib/components/ui/scroll-area";
   import { Skeleton } from "$lib/components/ui/skeleton";
+  import FileIcon from "$lib/components/file-icon.svelte";
+  import { ChevronRight, ChevronDown, Loader2 } from "@lucide/svelte";
   import {
     sandboxOpencodeListFiles,
     sandboxOpencodeFindFiles,
@@ -155,31 +157,6 @@
     }
   }
 
-  function getFileIcon(node: FileNode): string {
-    if (node.type === "directory") {
-      return expandedPaths.has(node.path) ? "📂" : "📁";
-    }
-    const ext = node.name.split(".").pop()?.toLowerCase();
-    switch (ext) {
-      case "ts":
-      case "tsx":
-        return "🟦";
-      case "js":
-      case "jsx":
-        return "🟨";
-      case "svelte":
-        return "🟠";
-      case "rs":
-        return "🦀";
-      case "json":
-        return "📋";
-      case "md":
-        return "📝";
-      default:
-        return "📄";
-    }
-  }
-
   function sortNodes(nodes: FileNode[]): FileNode[] {
     return [...nodes].sort((a, b) => {
       if (a.type === "directory" && b.type !== "directory") return -1;
@@ -282,13 +259,21 @@
                 style="padding-left: {depth * 16 + 8}px"
                 onclick={() => handleNodeClick(node)}
               >
-                <span class="flex-shrink-0 text-[var(--cyber-cyan)]">
-                  {#if node.type === "directory" && loadingFolders.has(node.path)}
-                    <span class="animate-spin">*</span>
-                  {:else}
-                    {getFileIcon(node)}
-                  {/if}
-                </span>
+                {#if node.type === "directory"}
+                  <span class="flex-shrink-0 w-4 flex items-center justify-center text-[var(--cyber-amber)]">
+                    {#if loadingFolders.has(node.path)}
+                      <Loader2 class="h-3.5 w-3.5 animate-spin" />
+                    {:else if expandedPaths.has(node.path)}
+                      <ChevronDown class="h-3.5 w-3.5" />
+                    {:else}
+                      <ChevronRight class="h-3.5 w-3.5" />
+                    {/if}
+                  </span>
+                  <FileIcon filename={node.name} isDirectory={true} isExpanded={expandedPaths.has(node.path)} size="sm" />
+                {:else}
+                  <span class="flex-shrink-0 w-4"></span>
+                  <FileIcon filename={node.name} size="sm" />
+                {/if}
                 <span class="truncate">{node.name}</span>
               </button>
               {#if node.type === "directory" && expandedPaths.has(node.path)}

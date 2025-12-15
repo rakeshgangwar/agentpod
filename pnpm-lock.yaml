@@ -126,6 +126,9 @@ importers:
       marked:
         specifier: ^17.0.1
         version: 17.0.1
+      material-file-icons:
+        specifier: ^2.4.0
+        version: 2.4.0
       remark-gfm:
         specifier: ^4.0.1
         version: 4.0.1
@@ -2680,6 +2683,9 @@ packages:
     resolution: {integrity: sha512-boeBdiS0ghpWcSwoNm/jJBwdpFaMnZWRzjA6SkUMYb40SVaN1x7mmfGKp0jvexGcx+7y2La5zRZsYFZI6Qpypg==}
     engines: {node: '>= 20'}
     hasBin: true
+
+  material-file-icons@2.4.0:
+    resolution: {integrity: sha512-MgxhwBgoiNXyQdZVtXvdqP8t7Fu/Z3zW1aPeYN+UqtepzbKyf41b+Wme6DnwGk5Crt2JzmWLtl1XGE2YMooaQw==}
 
   math-intrinsics@1.1.0:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
@@ -6051,6 +6057,8 @@ snapshots:
   markdown-table@3.0.4: {}
 
   marked@17.0.1: {}
+
+  material-file-icons@2.4.0: {}
 
   math-intrinsics@1.1.0: {}
 
