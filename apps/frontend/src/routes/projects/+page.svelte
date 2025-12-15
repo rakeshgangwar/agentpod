@@ -11,6 +11,8 @@
     deleteSandbox,
     checkDockerHealth 
   } from "$lib/stores/sandboxes.svelte";
+  import { projectIcons } from "$lib/stores/project-icons.svelte";
+  import { getProjectIcon } from "$lib/utils/project-icons";
   import { Button } from "$lib/components/ui/button";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
   import { Avatar, AvatarFallback } from "$lib/components/ui/avatar";
@@ -93,6 +95,12 @@
     const parts = image.split('/');
     const name = parts[parts.length - 1];
     return name.split(':')[0];
+  }
+
+  // Get icon component for a sandbox
+  function getSandboxIcon(sandbox: { id: string; name: string }) {
+    const iconId = projectIcons.getIconId(sandbox.id, sandbox.name);
+    return getProjectIcon(iconId)?.component;
   }
 </script>
 
@@ -283,13 +291,22 @@
             <!-- Card Header -->
             <div class="p-5 pb-4 border-b border-border/30">
               <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0 flex-1">
-                  <h3 class="font-semibold text-lg truncate group-hover:text-[var(--cyber-cyan)] transition-colors">
-                    {getSandboxDisplayName(sandbox)}
-                  </h3>
-                  <p class="text-xs font-mono text-muted-foreground truncate mt-1">
-                    {getSandboxSlug(sandbox) || '---'}
-                  </p>
+                <div class="min-w-0 flex-1 flex items-center gap-3">
+                  <!-- Project Icon -->
+                  {#if getSandboxIcon(sandbox)}
+                    {@const IconComponent = getSandboxIcon(sandbox)}
+                    <div class="shrink-0 w-9 h-9 rounded-lg bg-[var(--cyber-cyan)]/10 border border-[var(--cyber-cyan)]/20 flex items-center justify-center group-hover:bg-[var(--cyber-cyan)]/20 transition-colors">
+                      <IconComponent class="w-5 h-5 text-[var(--cyber-cyan)]" />
+                    </div>
+                  {/if}
+                  <div class="min-w-0 flex-1">
+                    <h3 class="font-semibold text-lg truncate group-hover:text-[var(--cyber-cyan)] transition-colors">
+                      {getSandboxDisplayName(sandbox)}
+                    </h3>
+                    <p class="text-xs font-mono text-muted-foreground truncate mt-1">
+                      {getSandboxSlug(sandbox) || '---'}
+                    </p>
+                  </div>
                 </div>
                 
                 <!-- Status Indicator -->
