@@ -3,7 +3,8 @@
    * Agent Selector Component
    * 
    * A compact dropdown for selecting an OpenCode agent in the chat interface.
-   * Fetches available agents from the OpenCode container and filters to primary agents only.
+   * Can fetch agents internally or receive them from parent component.
+   * Supports animation trigger for keyboard shortcut feedback.
    */
   
   import { onMount } from "svelte";
@@ -20,26 +21,60 @@
     selectedAgent = $bindable<string | undefined>(undefined),
     disabled = false,
     compact = false,
+    agents: externalAgents,
+    animateTrigger = 0,
   }: {
     projectId: string;
     selectedAgent?: string;
     disabled?: boolean;
     compact?: boolean;
+    /** Optional: pass agents from parent to avoid duplicate API calls */
+    agents?: OpenCodeAgent[];
+    /** Increment to trigger animation (e.g., when agent changed via keyboard shortcut) */
+    animateTrigger?: number;
   } = $props();
   
-  // State
-  let agents = $state<OpenCodeAgent[]>([]);
+  // Internal state for when agents aren't provided externally
+  let internalAgents = $state<OpenCodeAgent[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
+  
+  // Use external agents if provided, otherwise use internal
+  let agents = $derived(externalAgents ?? internalAgents);
   
   // Filter to only primary agents
   let primaryAgents = $derived(
     agents.filter(agent => agent.mode === "primary" || agent.mode === "all")
   );
   
-  // Load agents on mount
+  // Animation state
+  let isAnimating = $state(false);
+  
+  // Trigger animation when animateTrigger changes
+  $effect(() => {
+    if (animateTrigger > 0) {
+      isAnimating = true;
+      const timeout = setTimeout(() => {
+        isAnimating = false;
+      }, 300); // Animation duration
+      return () => clearTimeout(timeout);
+    }
+  });
+  
+  // Load agents on mount (only if not provided externally)
   onMount(() => {
-    loadAgents();
+    if (!externalAgents) {
+      loadAgents();
+    } else {
+      loading = false;
+    }
+  });
+  
+  // Update loading state when external agents are provided
+  $effect(() => {
+    if (externalAgents) {
+      loading = false;
+    }
   });
   
   async function loadAgents() {
@@ -49,7 +84,7 @@
     try {
       // projectId is actually sandboxId in v2 API
       const result = await sandboxOpencodeGetAgents(projectId);
-      agents = result;
+      internalAgents = result;
       
       // Auto-select first primary agent if none selected
       if (!selectedAgent && primaryAgents.length > 0) {
@@ -106,7 +141,9 @@
     onValueChange={handleValueChange}
     {disabled}
   >
-    <Select.Trigger class={compact ? 'h-7 text-xs min-w-[100px] max-w-[150px]' : 'h-9 text-sm min-w-[120px]'}>
+    <Select.Trigger 
+      class="{compact ? 'h-7 text-xs min-w-[100px] max-w-[150px]' : 'h-9 text-sm min-w-[120px]'} {isAnimating ? 'animate-agent-switch' : ''}"
+    >
       <span class="truncate">{getDisplayName()}</span>
     </Select.Trigger>
     

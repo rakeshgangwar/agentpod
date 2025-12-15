@@ -289,4 +289,24 @@
   .aui-thread-viewport::-webkit-scrollbar-track {
     background: transparent;
   }
+
+  /* Agent switch animation (triggered by keyboard shortcut) */
+  @keyframes agent-switch {
+    0% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 oklch(var(--primary) / 0.4);
+    }
+    50% {
+      transform: scale(1.03);
+      box-shadow: 0 0 0 4px oklch(var(--primary) / 0.2);
+    }
+    100% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 oklch(var(--primary) / 0);
+    }
+  }
+
+  .animate-agent-switch {
+    animation: agent-switch 0.3s ease-out;
+  }
 }
