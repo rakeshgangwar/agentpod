@@ -749,6 +749,14 @@
 
 /* Dark mode fallback values (theme store overrides these) */
 .dark {
+  --cyber-cyan: oklch(0.85 0.15 192);
+  --cyber-cyan-dim: oklch(0.65 0.12 192);
+  --cyber-emerald: oklch(0.75 0.18 160);
+  --cyber-magenta: oklch(0.7 0.2 330);
+  --cyber-amber: oklch(0.8 0.18 85);
+  --cyber-red: oklch(0.65 0.22 25);
+  --cyber-glow: 0 0 20px oklch(0.85 0.15 192 / 0.3);
+  --cyber-glow-emerald: 0 0 20px oklch(0.75 0.18 160 / 0.3);
   --noise-opacity: 0.05;
 }
 
@@ -957,6 +965,20 @@
   animation: border-glow 3s ease-in-out infinite;
 }
 
+/* Glow sweep animation for session status indicator */
+@keyframes glow-sweep {
+  0% {
+    background-position: -100% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-glow-sweep {
+  animation: glow-sweep 3s ease-in-out infinite;
+}
+
 /* ============================================
    CYBERPUNK CARD STYLES
    ============================================ */
@@ -1059,13 +1081,17 @@
 }
 
 .status-stopped {
-  color: hsl(var(--muted-foreground));
-  background: hsl(var(--muted) / 0.5);
-  border: 1px solid hsl(var(--border));
+  color: var(--muted-foreground);
+  background: color-mix(in oklch, var(--muted-foreground) 10%, transparent);
+  border: 1px solid color-mix(in oklch, var(--muted-foreground) 30%, transparent);
+}
+
+.status-stopped .status-dot {
+  background: var(--muted-foreground);
 }
 
 .dark .status-stopped {
-  color: hsl(var(--muted-foreground));
+  color: var(--muted-foreground);
 }
 
 .status-starting, .status-stopping {
@@ -1094,6 +1120,69 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
+}
+
+/* ============================================
+   SESSION ACTIVITY INDICATORS
+   ============================================ */
+
+
+
+/* Session activity indicator badge with "working" label */
+.session-activity-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 2px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  color: var(--cyber-amber);
+  background: color-mix(in oklch, var(--cyber-amber) 10%, transparent);
+  border: 1px solid color-mix(in oklch, var(--cyber-amber) 30%, transparent);
+}
+
+.session-activity-indicator .activity-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cyber-amber);
+  box-shadow: 0 0 8px var(--cyber-amber);
+  animation: activity-pulse 1s ease-in-out infinite;
+}
+
+/* Small badge version for compact/list views */
+.session-activity-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: color-mix(in oklch, var(--cyber-amber) 15%, transparent);
+  border: 1px solid color-mix(in oklch, var(--cyber-amber) 40%, transparent);
+}
+
+.session-activity-badge .activity-dot-small {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cyber-amber);
+  box-shadow: 0 0 6px var(--cyber-amber);
+  animation: activity-pulse 1s ease-in-out infinite;
+}
+
+@keyframes activity-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.85);
+  }
 }
 
 /* ============================================
@@ -1145,11 +1234,12 @@
 
 .cyber-btn-primary {
   background: var(--cyber-cyan);
-  color: hsl(var(--background));
+  color: #000000;
+  font-weight: 600;
 }
 
 .cyber-btn-primary:hover {
-  background: color-mix(in oklch, var(--cyber-cyan) 90%, white);
+  background: color-mix(in oklch, var(--cyber-cyan) 85%, white);
   box-shadow: var(--cyber-glow);
 }
 

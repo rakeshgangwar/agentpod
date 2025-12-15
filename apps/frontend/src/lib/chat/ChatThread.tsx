@@ -19,7 +19,7 @@ import remarkGfm from "remark-gfm";
 import { CommandPicker, type Command } from "./CommandPicker";
 import { FilePicker } from "./FilePicker";
 import { FileAttachmentButton, FileAttachmentPreview, type AttachedFile } from "./FileAttachment";
-import { useAttachments } from "./RuntimeProvider";
+import { useAttachments, useSessionStatus } from "./RuntimeProvider";
 
 /**
  * Child session info for matching task tools to their spawned sessions
@@ -813,6 +813,94 @@ function LoadingIndicator() {
 }
 
 /**
+ * SessionStatusIndicator component displays a glowing separator line
+ * that indicates the current session status (idle/busy/retry).
+ * 
+ * - Idle: Static separator line
+ * - Busy: Animated cyan glow sweeping left-to-right
+ * - Retry: Shows retry countdown with warning style
+ */
+function SessionStatusIndicator() {
+  const { status, retryInfo } = useSessionStatus();
+  const [countdown, setCountdown] = useState<number | null>(null);
+  
+  // Update countdown for retry status
+  useEffect(() => {
+    if (status !== "retry" || !retryInfo) {
+      setCountdown(null);
+      return;
+    }
+    
+    const updateCountdown = () => {
+      const remaining = Math.max(0, Math.ceil((retryInfo.next - Date.now()) / 1000));
+      setCountdown(remaining);
+    };
+    
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    
+    return () => clearInterval(interval);
+  }, [status, retryInfo]);
+  
+  // Base classes for the indicator line
+  const baseClasses = "h-[2px] w-full transition-all duration-300";
+  
+  if (status === "busy") {
+    return (
+      <div className="relative overflow-hidden">
+        <div 
+          className={`${baseClasses} bg-gradient-to-r from-transparent via-[var(--cyber-cyan)] to-transparent`}
+          style={{
+            backgroundSize: "200% 100%",
+            animation: "glow-sweep 3s ease-in-out infinite",
+          }}
+        />
+        {/* Glow effect */}
+        <div 
+          className="absolute inset-0 h-[2px] blur-sm bg-gradient-to-r from-transparent via-[var(--cyber-cyan)] to-transparent opacity-50"
+          style={{
+            backgroundSize: "200% 100%",
+            animation: "glow-sweep 3s ease-in-out infinite",
+          }}
+        />
+      </div>
+    );
+  }
+  
+  if (status === "retry" && retryInfo) {
+    return (
+      <div className="flex flex-col">
+        <div className="px-4 py-1 flex items-center justify-center gap-2 bg-[var(--cyber-amber)]/10">
+          <span className="w-2 h-2 rounded-full bg-[var(--cyber-amber)] animate-pulse shadow-[0_0_6px_var(--cyber-amber)]" />
+          <span className="font-mono text-xs text-[var(--cyber-amber)]">
+            {retryInfo.message || "Retrying..."} 
+            {countdown !== null && countdown > 0 && (
+              <span className="ml-1">({countdown}s)</span>
+            )}
+            <span className="ml-1 text-[var(--cyber-amber)]/60">
+              (attempt {retryInfo.attempt})
+            </span>
+          </span>
+        </div>
+        <div 
+          className={`${baseClasses} bg-[var(--cyber-amber)]/50`}
+          style={{
+            boxShadow: "0 0 8px var(--cyber-amber)",
+          }}
+        />
+      </div>
+    );
+  }
+  
+  // Idle state - subtle separator
+  return (
+    <div 
+      className={`${baseClasses} bg-border/30`}
+    />
+  );
+}
+
+/**
  * ChatThread props
  */
 export interface ChatThreadProps {
@@ -870,6 +958,9 @@ export function ChatThread({
           
           <ThreadPrimitive.ViewportFooter />
         </ThreadPrimitive.Viewport>
+        
+        {/* Session status indicator between messages and composer */}
+        <SessionStatusIndicator />
         
         <Composer 
           projectId={projectId} 

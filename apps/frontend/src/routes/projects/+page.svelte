@@ -1,23 +1,92 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import { onMount, onDestroy } from "svelte";
   import { confirm } from "@tauri-apps/plugin-dialog";
   import { connection } from "$lib/stores/connection.svelte";
   import { auth, logout } from "$lib/stores/auth.svelte";
-  import { 
-    sandboxes, 
-    fetchSandboxes, 
-    startSandbox, 
-    stopSandbox, 
+  import {
+    sandboxes,
+    fetchSandboxes,
+    startSandbox,
+    stopSandbox,
     deleteSandbox,
-    checkDockerHealth 
+    checkDockerHealth
   } from "$lib/stores/sandboxes.svelte";
-  import { projectIcons, isAnimatedIconId, parseIconId } from "$lib/stores/project-icons.svelte";
+  import { isSandboxBusy, subscribeToActivityChanges } from "$lib/stores/session-activity.svelte";
+  import { projectIcons, parseIconId } from "$lib/stores/project-icons.svelte";
   import { getProjectIcon } from "$lib/utils/project-icons";
   import { getAnimatedIcon } from "$lib/utils/animated-icons";
   import LottieIcon from "$lib/components/lottie-icon.svelte";
   import { Button } from "$lib/components/ui/button";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
   import { Avatar, AvatarFallback } from "$lib/components/ui/avatar";
+
+  // Icons
+  import ListIcon from "@lucide/svelte/icons/list";
+  import LayoutGridIcon from "@lucide/svelte/icons/layout-grid";
+  import Grid3x3Icon from "@lucide/svelte/icons/grid-3x3";
+  import Trash2Icon from "@lucide/svelte/icons/trash-2";
+  import ArrowRightIcon from "@lucide/svelte/icons/arrow-right";
+  import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
+  import PlusIcon from "@lucide/svelte/icons/plus";
+
+  // View mode types
+  type ViewMode = "cards" | "compact" | "list";
+
+  // View mode state - persisted to localStorage
+  let viewMode = $state<ViewMode>("cards");
+  
+  // Track busy sandbox IDs - updated via subscription, not derived
+  // This avoids Svelte reactivity issues that caused cards to disappear
+  let busySandboxIds = $state<Set<string>>(new Set());
+  
+  // Helper to check if a sandbox is busy (reads from local state)
+  function checkSandboxBusy(sandboxId: string): boolean {
+    return busySandboxIds.has(sandboxId);
+  }
+  
+  // Update busy IDs from the activity store
+  function refreshBusyIds() {
+    const newBusyIds = new Set<string>();
+    for (const sandbox of sandboxes.list) {
+      if (isSandboxBusy(sandbox.id)) {
+        newBusyIds.add(sandbox.id);
+      }
+    }
+    busySandboxIds = newBusyIds;
+  }
+
+  // Load view preference on mount, with responsive defaults
+  let unsubscribeActivity: (() => void) | undefined;
+  
+  onMount(() => {
+    const saved = localStorage.getItem("projects-view-mode");
+    if (saved && ["cards", "compact", "list"].includes(saved)) {
+      viewMode = saved as ViewMode;
+    } else {
+      // Responsive defaults: compact for mobile, cards for tablet+
+      const isMobile = window.innerWidth < 768;
+      viewMode = isMobile ? "compact" : "cards";
+    }
+    
+    // Subscribe to activity changes
+    unsubscribeActivity = subscribeToActivityChanges(() => {
+      refreshBusyIds();
+    });
+    
+    // Initial refresh
+    refreshBusyIds();
+  });
+  
+  onDestroy(() => {
+    unsubscribeActivity?.();
+  });
+
+  // Save view preference when changed
+  function setViewMode(mode: ViewMode) {
+    viewMode = mode;
+    localStorage.setItem("projects-view-mode", mode);
+  }
 
   // Redirect if not connected
   $effect(() => {
@@ -27,8 +96,8 @@
   });
 
   async function handleLogout() {
-    await logout();
     goto("/login");
+    await logout();
   }
 
   // Check Docker health and load sandboxes when connected
@@ -61,20 +130,14 @@
 
   function handleSandboxClick(e: MouseEvent, sandboxId: string) {
     const target = e.target as HTMLElement;
-    if (target.closest('button')) {
+    if (target.closest("button")) {
       return;
     }
     goto(`/projects/${sandboxId}`);
   }
 
-  function getSandboxDisplayName(sandbox: { name: string; labels?: Record<string, string> }): string {
-    // Use the sandbox name directly from DB - this is the project name
+  function getSandboxDisplayName(sandbox: { name: string }): string {
     return sandbox.name;
-  }
-
-  function getSandboxContainerName(sandbox: { containerName?: string; name: string; labels?: Record<string, string> }): string {
-    // Container name from Docker, fallback to project name
-    return sandbox.containerName || sandbox.labels?.["agentpod.sandbox.name"] || sandbox.name;
   }
 
   function getSandboxSlug(sandbox: { slug?: string; labels?: Record<string, string> }): string {
@@ -83,53 +146,80 @@
 
   function formatDate(dateStr?: string): string {
     if (!dateStr) return "---";
-    return new Intl.DateTimeFormat('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    }).format(new Date(dateStr));
+  }
+
+  function formatDateShort(dateStr?: string): string {
+    if (!dateStr) return "---";
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric"
     }).format(new Date(dateStr));
   }
 
   function getImageShortName(image?: string): string {
     if (!image) return "---";
-    // Extract just the image name without registry and tag
-    const parts = image.split('/');
+    const parts = image.split("/");
     const name = parts[parts.length - 1];
-    return name.split(':')[0];
+    return name.split(":")[0];
   }
 
-  // Get icon data for a sandbox (supports both static and animated icons)
   function getSandboxIconData(sandbox: { id: string; name: string }) {
     const iconId = projectIcons.getIconId(sandbox.id, sandbox.name);
     const { isAnimated, id } = parseIconId(iconId);
-    
+
     if (isAnimated) {
       const animatedIcon = getAnimatedIcon(id);
       if (animatedIcon) {
         return { type: "animated" as const, path: animatedIcon.path };
       }
     }
-    
+
     const staticIcon = getProjectIcon(isAnimated ? "code" : id);
     if (staticIcon) {
       return { type: "static" as const, component: staticIcon.component };
     }
-    
+
     return null;
+  }
+
+  async function handleStart(e: MouseEvent, sandboxId: string) {
+    e.stopPropagation();
+    startSandbox(sandboxId);
+  }
+
+  async function handleStop(e: MouseEvent, sandboxId: string) {
+    e.stopPropagation();
+    stopSandbox(sandboxId);
+  }
+
+  async function handleDelete(e: MouseEvent, sandbox: { id: string; name: string }) {
+    e.stopPropagation();
+    const displayName = getSandboxDisplayName(sandbox);
+    const shouldDelete = await confirm(`Delete project "${displayName}"?`, {
+      title: "Confirm Delete",
+      kind: "warning",
+    });
+    if (shouldDelete) {
+      deleteSandbox(sandbox.id);
+    }
   }
 </script>
 
 <!-- Noise overlay for atmosphere -->
 <div class="noise-overlay"></div>
 
-<main class="min-h-screen grid-bg mesh-gradient">
-  <div class="container mx-auto px-6 py-8 max-w-7xl relative">
-    
-    <!-- Header Section -->
-    <header class="mb-12 animate-fade-in-up">
+<main class="h-screen flex flex-col grid-bg mesh-gradient overflow-hidden">
+  <!-- Fixed Header Section -->
+  <div class="shrink-0 px-6 pt-8 pb-6 max-w-7xl mx-auto w-full">
+    <header class="animate-fade-in-up">
       <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
-        
+
         <!-- Title Area -->
         <div class="space-y-4">
           <div class="flex items-center gap-3">
@@ -137,47 +227,75 @@
               // sandbox_controller
             </span>
           </div>
-          
+
           <h1 class="text-5xl lg:text-6xl font-bold tracking-tight glitch-hover">
             <span class="text-foreground">Projects</span>
             <span class="typing-cursor"></span>
           </h1>
-          
+
           <div class="flex flex-wrap items-center gap-4 text-sm font-mono">
-            <!-- Connection Status -->
             <div class="flex items-center gap-2 text-muted-foreground">
               <span class="text-[var(--cyber-cyan)]">@</span>
               <span class="truncate max-w-[200px]">{connection.apiUrl}</span>
             </div>
-            
-            <!-- Docker Health -->
+
             {#if sandboxes.dockerHealthy !== null}
               <div class="health-indicator {sandboxes.dockerHealthy ? 'healthy' : 'unhealthy'}">
-                <span class="status-dot {sandboxes.dockerHealthy ? 'animate-pulse-dot' : ''}" 
+                <span class="status-dot {sandboxes.dockerHealthy ? 'animate-pulse-dot' : ''}"
                       style="background: currentColor;"></span>
-                <span>docker: {sandboxes.dockerHealthy ? 'online' : 'offline'}</span>
+                <span>docker: {sandboxes.dockerHealthy ? "online" : "offline"}</span>
               </div>
             {/if}
           </div>
         </div>
-        
+
         <!-- Actions Area -->
         <div class="flex items-center gap-3">
-          <Button 
+          <!-- View Mode Toggle -->
+          {#if sandboxes.list.length > 0}
+            <div class="flex items-center border border-border/50 rounded-sm overflow-hidden">
+              <!-- List View -->
+              <button
+                onclick={() => setViewMode("list")}
+                class="p-2 h-10 w-10 flex items-center justify-center transition-colors {viewMode === 'list' ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
+                title="List view"
+              >
+                <ListIcon size={18} />
+              </button>
+              <!-- Card View -->
+              <button
+                onclick={() => setViewMode("cards")}
+                class="p-2 h-10 w-10 flex items-center justify-center border-l border-border/50 transition-colors {viewMode === 'cards' ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
+                title="Card view"
+              >
+                <LayoutGridIcon size={18} />
+              </button>
+              <!-- Compact View -->
+              <button
+                onclick={() => setViewMode("compact")}
+                class="p-2 h-10 w-10 flex items-center justify-center border-l border-border/50 transition-colors {viewMode === 'compact' ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
+                title="Compact view"
+              >
+                <Grid3x3Icon size={18} />
+              </button>
+            </div>
+          {/if}
+
+          <Button
             onclick={() => goto("/projects/new")}
             class="cyber-btn-primary px-6 h-10 font-mono text-xs uppercase tracking-wider"
           >
-            <span class="mr-2">+</span> New Project
+            <PlusIcon class="h-4 w-4 mr-2" /> New Project
           </Button>
-          
-          <Button 
-            variant="ghost" 
+
+          <Button
+            variant="ghost"
             onclick={() => goto("/settings")}
             class="font-mono text-xs uppercase tracking-wider h-10"
           >
             Settings
           </Button>
-          
+
           <!-- User Menu -->
           <DropdownMenu.Root>
             <DropdownMenu.Trigger>
@@ -211,50 +329,54 @@
         </div>
       </div>
     </header>
+  </div>
 
-    <!-- Error Display -->
-    {#if sandboxes.error}
-      <div class="mb-8 animate-fade-in-up stagger-1 cyber-card p-4 border-[var(--cyber-red)]/50">
-        <div class="flex items-center gap-3 text-[var(--cyber-red)]">
-          <span class="font-mono text-xs uppercase tracking-wider">[error]</span>
-          <span class="text-sm">{sandboxes.error}</span>
+  <!-- Scrollable Content Area -->
+  <div class="flex-1 overflow-y-auto px-6 pb-8">
+    <div class="max-w-7xl mx-auto">
+      <!-- Error Display -->
+      {#if sandboxes.error}
+        <div class="mb-8 animate-fade-in-up stagger-1 cyber-card p-4 border-[var(--cyber-red)]/50">
+          <div class="flex items-center gap-3 text-[var(--cyber-red)]">
+            <span class="font-mono text-xs uppercase tracking-wider">[error]</span>
+            <span class="text-sm">{sandboxes.error}</span>
+          </div>
         </div>
-      </div>
-    {/if}
+      {/if}
 
-    <!-- Docker Health Warning -->
-    {#if sandboxes.dockerHealthy === false}
-      <div class="mb-8 animate-fade-in-up stagger-1 cyber-card p-4 border-[var(--cyber-amber)]/50">
-        <div class="flex items-center gap-3 text-[var(--cyber-amber)]">
-          <span class="font-mono text-xs uppercase tracking-wider">[warning]</span>
-          <span class="text-sm">Docker daemon is not accessible. Please ensure Docker is running.</span>
+      <!-- Docker Health Warning -->
+      {#if sandboxes.dockerHealthy === false}
+        <div class="mb-8 animate-fade-in-up stagger-1 cyber-card p-4 border-[var(--cyber-amber)]/50">
+          <div class="flex items-center gap-3 text-[var(--cyber-amber)]">
+            <span class="font-mono text-xs uppercase tracking-wider">[warning]</span>
+            <span class="text-sm">Docker daemon is not accessible. Please ensure Docker is running.</span>
+          </div>
         </div>
-      </div>
-    {/if}
+      {/if}
 
-    <!-- Stats Bar -->
-    {#if sandboxes.list.length > 0}
-      <div class="mb-8 flex flex-wrap gap-6 text-sm font-mono animate-fade-in-up stagger-2">
-        <div class="flex items-center gap-2">
-          <span class="text-muted-foreground">total:</span>
-          <span class="text-foreground font-semibold">{sandboxes.list.length}</span>
+      <!-- Stats Bar -->
+      {#if sandboxes.list.length > 0}
+        <div class="mb-8 flex flex-wrap gap-6 text-sm font-mono animate-fade-in-up stagger-2">
+          <div class="flex items-center gap-2">
+            <span class="text-muted-foreground">total:</span>
+            <span class="text-foreground font-semibold">{sandboxes.list.length}</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-muted-foreground">running:</span>
+            <span class="text-[var(--cyber-emerald)] font-semibold">
+              {sandboxes.list.filter(s => s.status === "running").length}
+            </span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-muted-foreground">stopped:</span>
+            <span class="text-muted-foreground font-semibold">
+              {sandboxes.list.filter(s => s.status === "stopped" || s.status === "created").length}
+            </span>
+          </div>
         </div>
-        <div class="flex items-center gap-2">
-          <span class="text-muted-foreground">running:</span>
-          <span class="text-[var(--cyber-emerald)] font-semibold">
-            {sandboxes.list.filter(s => s.status === 'running').length}
-          </span>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="text-muted-foreground">stopped:</span>
-          <span class="text-muted-foreground font-semibold">
-            {sandboxes.list.filter(s => s.status === 'stopped' || s.status === 'created').length}
-          </span>
-        </div>
-      </div>
-    {/if}
+      {/if}
 
-    <!-- Projects Grid -->
+      <!-- Projects Content -->
     {#if sandboxes.isLoading && sandboxes.list.length === 0}
       <!-- Loading State -->
       <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -278,14 +400,12 @@
         <div class="max-w-md mx-auto space-y-6">
           <div class="font-mono text-6xl text-[var(--cyber-cyan)]/20">[ ]</div>
           <div class="space-y-2">
-            <h2 class="text-xl font-semibold">
-              No sandboxes initialized
-            </h2>
+            <h2 class="text-xl font-semibold">No sandboxes initialized</h2>
             <p class="text-muted-foreground text-sm font-mono">
               Create your first AI coding environment to get started.
             </p>
           </div>
-          <Button 
+          <Button
             onclick={() => goto("/projects/new")}
             class="cyber-btn-primary px-8 h-11 font-mono text-xs uppercase tracking-wider"
           >
@@ -294,150 +414,363 @@
         </div>
       </div>
     {:else}
-      <!-- Projects List -->
-      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {#each sandboxes.list as sandbox, i (sandbox.id)}
-          <div 
-            class="cyber-card corner-accent cursor-pointer group animate-fade-in-up stagger-{Math.min(i + 1, 8)}"
-            onclick={(e: MouseEvent) => handleSandboxClick(e, sandbox.id)}
-            role="button"
-            tabindex="0"
-            onkeydown={(e: KeyboardEvent) => e.key === 'Enter' && goto(`/projects/${sandbox.id}`)}
-          >
-            <!-- Card Header -->
-            <div class="p-5 pb-4 border-b border-border/30">
-              <div class="flex items-start justify-between gap-3">
-                {#snippet renderProjectIcon()}
-                  {@const iconData = getSandboxIconData(sandbox)}
-                  {#if iconData}
-                    {#if iconData.type === "animated"}
-                      <div class="shrink-0">
-                        <LottieIcon src={iconData.path} size={24} loop autoplay />
-                      </div>
-                    {:else}
-                      {@const IconComponent = iconData.component}
-                      <div class="shrink-0 text-[var(--cyber-cyan)]">
-                        <IconComponent class="w-6 h-6" />
-                      </div>
-                    {/if}
+      <!-- ============================================
+           LIST VIEW
+           ============================================ -->
+      {#if viewMode === "list"}
+        <div class="cyber-card overflow-hidden animate-fade-in-up">
+          <!-- Table Header -->
+          <div class="hidden md:grid md:grid-cols-[1fr_100px_120px_140px_140px] gap-4 px-4 py-3 border-b border-border/30 text-xs font-mono text-muted-foreground uppercase tracking-wider">
+            <div>Project</div>
+            <div>Status</div>
+            <div>Image</div>
+            <div>Created</div>
+            <div class="text-right">Actions</div>
+          </div>
+
+          <!-- Table Rows -->
+          {#each sandboxes.list as sandbox, i (sandbox.id)}
+            {@const iconData = getSandboxIconData(sandbox)}
+            {@const isBusy = checkSandboxBusy(sandbox.id)}
+            <div
+              class="grid md:grid-cols-[1fr_100px_120px_140px_140px] gap-4 px-4 py-3 border-b border-border/20 last:border-b-0 hover:bg-muted/30 cursor-pointer transition-colors group items-center {isBusy ? 'bg-[var(--cyber-amber)]/5' : ''}"
+              onclick={(e: MouseEvent) => handleSandboxClick(e, sandbox.id)}
+              role="button"
+              tabindex="0"
+              onkeydown={(e: KeyboardEvent) => e.key === "Enter" && goto(`/projects/${sandbox.id}`)}
+            >
+              <!-- Project Name -->
+              <div class="flex items-center gap-3 min-w-0">
+                {#if iconData}
+                  {#if iconData.type === "animated"}
+                    <div class="shrink-0">
+                      <LottieIcon src={iconData.path} size={20} loop autoplay />
+                    </div>
+                  {:else}
+                    {@const IconComponent = iconData.component}
+                    <div class="shrink-0 text-[var(--cyber-cyan)]">
+                      <IconComponent class="w-5 h-5" />
+                    </div>
                   {/if}
-                {/snippet}
-                <div class="min-w-0 flex-1 flex items-center gap-3">
-                  <!-- Project Icon -->
-                  {@render renderProjectIcon()}
-                  <div class="min-w-0 flex-1">
-                    <h3 class="font-semibold text-lg truncate group-hover:text-[var(--cyber-cyan)] transition-colors">
-                      {getSandboxDisplayName(sandbox)}
-                    </h3>
-                    <p class="text-xs font-mono text-muted-foreground truncate mt-1">
-                      {getSandboxSlug(sandbox) || '---'}
-                    </p>
-                  </div>
+                {/if}
+                <div class="min-w-0 flex items-center gap-2">
+                  <p class="font-medium truncate group-hover:text-[var(--cyber-cyan)] transition-colors">
+                    {getSandboxDisplayName(sandbox)}
+                  </p>
+                  {#if isBusy}
+                    <span class="session-activity-badge" title="AI is working">
+                      <span class="activity-dot-small"></span>
+                    </span>
+                  {/if}
+                  <p class="text-xs text-muted-foreground truncate font-mono md:hidden">
+                    {getSandboxSlug(sandbox) || "---"}
+                  </p>
                 </div>
-                
-                <!-- Status Indicator -->
-                <div class="status-indicator {getStatusClass(sandbox.status)}">
+              </div>
+
+              <!-- Status -->
+              <div class="flex items-center gap-2">
+                {#if isBusy}
+                  <span class="text-xs font-mono text-[var(--cyber-amber)] hidden md:inline">AI</span>
+                {/if}
+                <div class="status-indicator {getStatusClass(sandbox.status)} text-xs">
                   <span class="status-dot {sandbox.status === 'running' ? 'animate-pulse-dot' : ''}"></span>
                   <span>{getStatusLabel(sandbox.status)}</span>
                 </div>
               </div>
-            </div>
-            
-            <!-- Card Body -->
-            <div class="p-5 pt-4 space-y-4">
-              <!-- Metadata -->
-              <div class="grid grid-cols-2 gap-3 text-xs font-mono">
-                <div>
-                  <span class="text-muted-foreground block mb-1">image</span>
-                  <span class="text-foreground truncate block" title={sandbox.image}>
-                    {getImageShortName(sandbox.image)}
-                  </span>
-                </div>
-                <div>
-                  <span class="text-muted-foreground block mb-1">created</span>
-                  <span class="text-foreground">
-                    {formatDate(sandbox.createdAt)}
-                  </span>
-                </div>
+
+              <!-- Image -->
+              <div class="hidden md:block text-xs font-mono text-muted-foreground truncate" title={sandbox.image}>
+                {getImageShortName(sandbox.image)}
               </div>
-              
+
+              <!-- Created -->
+              <div class="hidden md:block text-xs font-mono text-muted-foreground">
+                {formatDate(sandbox.createdAt)}
+              </div>
+
               <!-- Actions -->
-              <div class="flex items-center gap-2 pt-2">
+              <div class="flex items-center justify-end gap-1">
                 {#if sandbox.status === "stopped" || sandbox.status === "created"}
-                  <Button 
-                    size="sm" 
-                    onclick={(e: MouseEvent) => { e.stopPropagation(); startSandbox(sandbox.id); }}
+                  <Button
+                    size="sm"
+                    onclick={(e: MouseEvent) => handleStart(e, sandbox.id)}
                     disabled={sandboxes.isLoading}
-                    class="font-mono text-xs uppercase tracking-wider h-8 px-4 bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-black"
+                    class="font-mono text-xs uppercase tracking-wider h-7 px-3 bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-black"
                   >
                     Start
                   </Button>
                 {:else if sandbox.status === "running"}
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     variant="secondary"
-                    onclick={(e: MouseEvent) => { e.stopPropagation(); stopSandbox(sandbox.id); }}
+                    onclick={(e: MouseEvent) => handleStop(e, sandbox.id)}
                     disabled={sandboxes.isLoading}
-                    class="font-mono text-xs uppercase tracking-wider h-8 px-4"
+                    class="font-mono text-xs uppercase tracking-wider h-7 px-3"
                   >
                     Stop
                   </Button>
                 {:else if sandbox.status === "starting" || sandbox.status === "stopping"}
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     disabled={true}
-                    class="font-mono text-xs uppercase tracking-wider h-8 px-4"
+                    class="font-mono text-xs uppercase tracking-wider h-7 px-3"
                   >
-                    {sandbox.status === "starting" ? "Starting..." : "Stopping..."}
+                    {sandbox.status === "starting" ? "..." : "..."}
                   </Button>
                 {/if}
-                
-                <Button 
-                  size="sm" 
+
+                <Button
+                  size="sm"
                   variant="ghost"
-                  onclick={async (e: MouseEvent) => {
-                    e.stopPropagation();
-                    const displayName = getSandboxDisplayName(sandbox);
-                    const shouldDelete = await confirm(`Delete project "${displayName}"?`, {
-                      title: "Confirm Delete",
-                      kind: "warning",
-                    });
-                    if (shouldDelete) {
-                      deleteSandbox(sandbox.id);
-                    }
-                  }}
+                  onclick={(e: MouseEvent) => handleDelete(e, sandbox)}
+                  disabled={sandboxes.isLoading}
+                  class="font-mono text-xs h-7 w-7 p-0 text-[var(--cyber-red)] hover:text-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/10"
+                >
+                  <Trash2Icon class="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          {/each}
+        </div>
+
+      <!-- ============================================
+           CARD VIEW (Original)
+           ============================================ -->
+      {:else if viewMode === "cards"}
+        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {#each sandboxes.list as sandbox, i (sandbox.id)}
+            {@const iconData = getSandboxIconData(sandbox)}
+            <div
+              class="cyber-card corner-accent cursor-pointer group animate-fade-in-up stagger-{Math.min(i + 1, 8)}"
+              onclick={(e: MouseEvent) => handleSandboxClick(e, sandbox.id)}
+              role="button"
+              tabindex="0"
+              onkeydown={(e: KeyboardEvent) => e.key === "Enter" && goto(`/projects/${sandbox.id}`)}
+            >
+              <!-- Card Header -->
+              <div class="p-5 pb-4 border-b border-border/30">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0 flex-1 flex items-center gap-3">
+                    {#if iconData}
+                      {#if iconData.type === "animated"}
+                        <div class="shrink-0">
+                          <LottieIcon src={iconData.path} size={24} loop autoplay />
+                        </div>
+                      {:else}
+                        {@const IconComponent = iconData.component}
+                        <div class="shrink-0 text-[var(--cyber-cyan)]">
+                          <IconComponent class="w-6 h-6" />
+                        </div>
+                      {/if}
+                    {/if}
+                    <div class="min-w-0 flex-1">
+                      <h3 class="font-semibold text-lg truncate group-hover:text-[var(--cyber-cyan)] transition-colors">
+                        {getSandboxDisplayName(sandbox)}
+                      </h3>
+                      <p class="text-xs font-mono text-muted-foreground truncate mt-1">
+                        {getSandboxSlug(sandbox) || "---"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div class="flex items-center gap-2">
+                    {#if checkSandboxBusy(sandbox.id)}
+                      <div class="session-activity-indicator" title="AI is working">
+                        <span class="activity-dot"></span>
+                        <span class="text-xs font-mono text-[var(--cyber-amber)]">working</span>
+                      </div>
+                    {/if}
+                    <div class="status-indicator {getStatusClass(sandbox.status)}">
+                      <span class="status-dot {sandbox.status === 'running' ? 'animate-pulse-dot' : ''}"></span>
+                      <span>{getStatusLabel(sandbox.status)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card Body -->
+              <div class="p-5 pt-4 space-y-4">
+                <div class="grid grid-cols-2 gap-3 text-xs font-mono">
+                  <div>
+                    <span class="text-muted-foreground block mb-1">image</span>
+                    <span class="text-foreground truncate block" title={sandbox.image}>
+                      {getImageShortName(sandbox.image)}
+                    </span>
+                  </div>
+                  <div>
+                    <span class="text-muted-foreground block mb-1">created</span>
+                    <span class="text-foreground">
+                      {formatDate(sandbox.createdAt)}
+                    </span>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-2 pt-2">
+                  {#if sandbox.status === "stopped" || sandbox.status === "created"}
+                    <Button
+                      size="sm"
+                      onclick={(e: MouseEvent) => handleStart(e, sandbox.id)}
+                      disabled={sandboxes.isLoading}
+                      class="font-mono text-xs uppercase tracking-wider h-8 px-4 bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-black"
+                    >
+                      Start
+                    </Button>
+                  {:else if sandbox.status === "running"}
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onclick={(e: MouseEvent) => handleStop(e, sandbox.id)}
+                      disabled={sandboxes.isLoading}
+                      class="font-mono text-xs uppercase tracking-wider h-8 px-4"
+                    >
+                      Stop
+                    </Button>
+                  {:else if sandbox.status === "starting" || sandbox.status === "stopping"}
+                    <Button
+                      size="sm"
+                      disabled={true}
+                      class="font-mono text-xs uppercase tracking-wider h-8 px-4"
+                    >
+                      {sandbox.status === "starting" ? "Starting..." : "Stopping..."}
+                    </Button>
+                  {/if}
+
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onclick={(e: MouseEvent) => handleDelete(e, sandbox)}
                   disabled={sandboxes.isLoading}
                   class="font-mono text-xs uppercase tracking-wider h-8 px-4 text-[var(--cyber-red)] hover:text-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/10"
                 >
+                  <Trash2Icon class="h-4 w-4 mr-1" />
                   Delete
                 </Button>
-                
-                <div class="flex-1"></div>
-                
-                <!-- Quick open indicator -->
-                <span class="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity font-mono">
-                  open &rarr;
-                </span>
+
+                  <div class="flex-1"></div>
+
+                  <span class="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity font-mono flex items-center gap-1">
+                    open <ArrowRightIcon class="h-3 w-3" />
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
-        {/each}
-      </div>
+          {/each}
+        </div>
+
+      <!-- ============================================
+           COMPACT VIEW
+           ============================================ -->
+      {:else if viewMode === "compact"}
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {#each sandboxes.list as sandbox, i (sandbox.id)}
+            {@const iconData = getSandboxIconData(sandbox)}
+            <div
+              class="cyber-card cursor-pointer group animate-fade-in-up stagger-{Math.min(i + 1, 8)} hover:border-[var(--cyber-cyan)]/50 transition-colors"
+              onclick={(e: MouseEvent) => handleSandboxClick(e, sandbox.id)}
+              role="button"
+              tabindex="0"
+              onkeydown={(e: KeyboardEvent) => e.key === "Enter" && goto(`/projects/${sandbox.id}`)}
+            >
+              <div class="p-4">
+                <!-- Header Row -->
+                <div class="flex items-center gap-3 mb-3">
+                  {#if iconData}
+                    {#if iconData.type === "animated"}
+                      <div class="shrink-0">
+                        <LottieIcon src={iconData.path} size={18} loop autoplay />
+                      </div>
+                    {:else}
+                      {@const IconComponent = iconData.component}
+                      <div class="shrink-0 text-[var(--cyber-cyan)]">
+                        <IconComponent class="w-[18px] h-[18px]" />
+                      </div>
+                    {/if}
+                  {/if}
+                  <h3 class="font-medium text-sm truncate flex-1 group-hover:text-[var(--cyber-cyan)] transition-colors">
+                    {getSandboxDisplayName(sandbox)}
+                  </h3>
+                  <div class="flex items-center gap-1">
+                    {#if checkSandboxBusy(sandbox.id)}
+                      <span class="session-activity-badge" title="AI is working">
+                        <span class="activity-dot-small"></span>
+                      </span>
+                    {/if}
+                    <div class="status-indicator {getStatusClass(sandbox.status)} text-xs py-0.5 px-1.5">
+                      <span class="status-dot {sandbox.status === 'running' ? 'animate-pulse-dot' : ''}" style="width: 5px; height: 5px;"></span>
+                      <span class="hidden sm:inline">{getStatusLabel(sandbox.status)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Meta Row -->
+                <div class="flex items-center justify-between text-xs font-mono text-muted-foreground mb-3">
+                  <span class="truncate" title={sandbox.image}>{getImageShortName(sandbox.image)}</span>
+                  <span>{formatDateShort(sandbox.createdAt)}</span>
+                </div>
+
+                <!-- Actions Row - shown on hover -->
+                <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {#if sandbox.status === "stopped" || sandbox.status === "created"}
+                    <Button
+                      size="sm"
+                      onclick={(e: MouseEvent) => handleStart(e, sandbox.id)}
+                      disabled={sandboxes.isLoading}
+                      class="font-mono text-xs uppercase tracking-wider h-7 px-3 flex-1 bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-black"
+                    >
+                      Start
+                    </Button>
+                  {:else if sandbox.status === "running"}
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onclick={(e: MouseEvent) => handleStop(e, sandbox.id)}
+                      disabled={sandboxes.isLoading}
+                      class="font-mono text-xs uppercase tracking-wider h-7 px-3 flex-1"
+                    >
+                      Stop
+                    </Button>
+                  {:else if sandbox.status === "starting" || sandbox.status === "stopping"}
+                    <Button
+                      size="sm"
+                      disabled={true}
+                      class="font-mono text-xs uppercase tracking-wider h-7 px-3 flex-1"
+                    >
+                      ...
+                    </Button>
+                  {/if}
+
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onclick={(e: MouseEvent) => handleDelete(e, sandbox)}
+                  disabled={sandboxes.isLoading}
+                  class="font-mono text-xs h-7 w-7 p-0 text-[var(--cyber-red)] hover:text-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/10"
+                >
+                  <Trash2Icon class="h-4 w-4" />
+                </Button>
+                </div>
+              </div>
+            </div>
+          {/each}
+        </div>
+      {/if}
     {/if}
-    
-    <!-- Footer -->
-    <footer class="mt-16 pt-8 border-t border-border/30 animate-fade-in-up" style="animation-delay: 0.5s; opacity: 0;">
-      <div class="flex flex-wrap items-center justify-between gap-4 text-xs font-mono text-muted-foreground">
-        <div class="flex items-center gap-4">
-          <span>CodeOpen v1.0</span>
-          <span class="text-border">|</span>
-          <span>AI Sandbox Environment</span>
+
+      <!-- Footer -->
+      <footer class="mt-16 pt-8 border-t border-border/30 animate-fade-in-up" style="animation-delay: 0.5s; opacity: 0;">
+        <div class="flex flex-wrap items-center justify-between gap-4 text-xs font-mono text-muted-foreground">
+          <div class="flex items-center gap-4">
+            <span>AgentPod v0.1.0</span>
+            <span class="text-border">|</span>
+            <span>AI Sandbox Environment</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-[var(--cyber-emerald)] animate-pulse-dot"></span>
+            <span>System operational</span>
+          </div>
         </div>
-        <div class="flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full bg-[var(--cyber-emerald)] animate-pulse-dot"></span>
-          <span>System operational</span>
-        </div>
-      </div>
-    </footer>
+      </footer>
+    </div>
   </div>
 </main>

@@ -36,6 +36,7 @@ import {
 import type { AttachedFile } from "./FileAttachment";
 import { PermissionProvider, usePermissions } from "./PermissionContext";
 import { PermissionBar } from "./PermissionBar";
+import { setSessionActivity } from "../stores/session-activity.svelte";
 
 /**
  * Context for file attachment sending functionality.
@@ -56,6 +57,39 @@ export function useAttachments(): AttachmentContextValue {
     throw new Error("useAttachments must be used within RuntimeProvider");
   }
   return context;
+}
+
+/**
+ * Session status types matching OpenCode's SessionStatus
+ */
+export type SessionStatusType = "idle" | "busy" | "retry";
+
+export interface RetryInfo {
+  attempt: number;
+  message: string;
+  /** Timestamp (ms) when the next retry will occur */
+  next: number;
+}
+
+/**
+ * Context for session status (busy/idle/retry state).
+ * Allows ChatThread to display status indicators.
+ */
+interface SessionStatusContextValue {
+  status: SessionStatusType;
+  retryInfo: RetryInfo | null;
+}
+
+const SessionStatusContext = createContext<SessionStatusContextValue>({
+  status: "idle",
+  retryInfo: null,
+});
+
+/**
+ * Hook to access the session status from any child component.
+ */
+export function useSessionStatus(): SessionStatusContextValue {
+  return useContext(SessionStatusContext);
 }
 
 interface RuntimeProviderProps {
@@ -255,6 +289,10 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
   const [isRunning, setIsRunning] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Session status state (idle/busy/retry)
+  const [sessionStatus, setSessionStatus] = useState<SessionStatusType>("idle");
+  const [retryInfo, setRetryInfo] = useState<RetryInfo | null>(null);
   
   // Session state
   const [sessionId, setSessionId] = useState<string | null>(initialSessionId ?? null);
@@ -619,6 +657,49 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
     // Handle session.idle - processing complete
     if (event.eventType === "session.idle") {
       setIsRunning(false);
+      setSessionStatus("idle");
+      setRetryInfo(null);
+      // Update session activity store for projects page indicator
+      setSessionActivity(projectId, false, sessionId ?? undefined);
+    }
+
+    // Handle session.status - explicit status updates (idle/busy/retry)
+    if (event.eventType === "session.status") {
+      const eventSessionId = properties?.sessionID as string | undefined;
+      const status = properties?.status as Record<string, unknown> | undefined;
+      
+      // Only process status updates for the current session
+      if (eventSessionId && eventSessionId !== sessionId) {
+        return;
+      }
+      
+      if (status) {
+        const statusType = status.type as string | undefined;
+        console.log("[RuntimeProvider] Session status:", statusType, status);
+        
+        if (statusType === "idle") {
+          setSessionStatus("idle");
+          setRetryInfo(null);
+          setIsRunning(false);
+          // Update session activity store for projects page indicator
+          setSessionActivity(projectId, false, sessionId ?? undefined);
+        } else if (statusType === "busy") {
+          setSessionStatus("busy");
+          setRetryInfo(null);
+          setIsRunning(true);
+          // Update session activity store for projects page indicator
+          setSessionActivity(projectId, true, sessionId ?? undefined);
+        } else if (statusType === "retry") {
+          setSessionStatus("retry");
+          setRetryInfo({
+            attempt: (status.attempt as number) ?? 1,
+            message: (status.message as string) ?? "Retrying...",
+            next: (status.next as number) ?? Date.now() + 5000,
+          });
+          // Keep isRunning true during retry
+          setIsRunning(true);
+        }
+      }
     }
 
     // Handle session.updated for status and title changes
@@ -790,7 +871,24 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
       return;
     }
 
+    // DUPLICATE MESSAGE PREVENTION:
+    // Check if this message text matches the last user message AND there's no
+    // assistant response after it. This prevents re-sending the same message when:
+    // 1. User navigates away during a busy session
+    // 2. User navigates back  
+    // 3. Runtime might try to re-process the last user message
+    // But still allows sending the same message if there was already a response.
+    if (internalMessages.length > 0) {
+      const lastMessage = internalMessages[internalMessages.length - 1];
+      if (lastMessage.role === "user" && lastMessage.text.trim() === textPart.text.trim()) {
+        console.warn("[RuntimeProvider] Duplicate message detected (no assistant response yet), ignoring:", textPart.text.slice(0, 50));
+        return;
+      }
+    }
+
     setIsRunning(true);
+    // Update session activity store for projects page indicator
+    setSessionActivity(projectId, true, sessionId ?? undefined);
 
     // Add user message to state immediately (optimistic update)
     const userMessageId = `user-${Date.now()}`;
@@ -813,8 +911,10 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
       console.error("[RuntimeProvider] Failed to send message:", err);
       setError(err instanceof Error ? err.message : "Failed to send message");
       setIsRunning(false);
+      // Update session activity store for projects page indicator
+      setSessionActivity(projectId, false, sessionId ?? undefined);
     }
-  }, [projectId, sessionId, selectedModel, selectedAgent]);
+  }, [projectId, sessionId, selectedModel, selectedAgent, internalMessages]);
 
   // Handle cancellation
   const onCancel = useCallback(async () => {
@@ -826,6 +926,8 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
       console.error("[RuntimeProvider] Failed to abort:", err);
     }
     setIsRunning(false);
+    // Update session activity store for projects page indicator
+    setSessionActivity(projectId, false, sessionId ?? undefined);
   }, [projectId, sessionId]);
 
   // Handle sending a message with file attachments
@@ -837,6 +939,8 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
 
     setIsRunning(true);
     setError(null);
+    // Update session activity store for projects page indicator
+    setSessionActivity(projectId, true, sessionId ?? undefined);
 
     // Convert AttachedFile[] to MessagePartInput[]
     const parts: MessagePartInput[] = [];
@@ -890,6 +994,8 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
       console.error("[RuntimeProvider] Failed to send message with attachments:", err);
       setError(err instanceof Error ? err.message : "Failed to send message");
       setIsRunning(false);
+      // Update session activity store for projects page indicator
+      setSessionActivity(projectId, false, sessionId ?? undefined);
     }
   }, [projectId, sessionId, selectedModel, selectedAgent]);
 
@@ -937,6 +1043,8 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
       
       setIsRunning(true);
       setError(null);
+      // Update session activity store for projects page indicator
+      setSessionActivity(projectId, true, sessionId ?? undefined);
       
       // Send the message
       sandboxOpencodeSendMessage(projectId, sessionId, pendingMessage.text, selectedModel, agentToUse)
@@ -947,6 +1055,8 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
           console.error("[RuntimeProvider] Failed to send pending message:", err);
           setError(err instanceof Error ? err.message : "Failed to send message");
           setIsRunning(false);
+          // Update session activity store for projects page indicator
+          setSessionActivity(projectId, false, sessionId ?? undefined);
         });
     }
   }, [pendingMessage, isLoading, sessionId, selectedModel, selectedAgent, onPendingMessageSent, projectId]);
@@ -984,36 +1094,43 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
     );
   }
 
-  // Memoize the context value to prevent unnecessary re-renders
+  // Memoize the context values to prevent unnecessary re-renders
   const attachmentContextValue: AttachmentContextValue = {
     sendWithAttachments,
+  };
+  
+  const sessionStatusContextValue: SessionStatusContextValue = {
+    status: sessionStatus,
+    retryInfo,
   };
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <AttachmentContext.Provider value={attachmentContextValue}>
-        <div className="flex flex-col flex-1 min-h-0">
-          {/* Error banner - dismissible, doesn't hide chat */}
-          {error && (
-            <div className="border-b border-[var(--cyber-red)]/30 bg-[var(--cyber-red)]/10 px-4 py-2 flex items-center justify-between gap-2 backdrop-blur-sm">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[var(--cyber-red)] animate-pulse" />
-                <span className="font-mono text-xs text-[var(--cyber-red)]">{error}</span>
+      <SessionStatusContext.Provider value={sessionStatusContextValue}>
+        <AttachmentContext.Provider value={attachmentContextValue}>
+          <div className="flex flex-col flex-1 min-h-0">
+            {/* Error banner - dismissible, doesn't hide chat */}
+            {error && (
+              <div className="border-b border-[var(--cyber-red)]/30 bg-[var(--cyber-red)]/10 px-4 py-2 flex items-center justify-between gap-2 backdrop-blur-sm">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[var(--cyber-red)] animate-pulse" />
+                  <span className="font-mono text-xs text-[var(--cyber-red)]">{error}</span>
+                </div>
+                <button
+                  onClick={() => setError(null)}
+                  className="font-mono text-xs uppercase tracking-wider px-2 py-1 rounded border border-[var(--cyber-red)]/30 text-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/10 transition-colors"
+                >
+                  Dismiss
+                </button>
               </div>
-              <button
-                onClick={() => setError(null)}
-                className="font-mono text-xs uppercase tracking-wider px-2 py-1 rounded border border-[var(--cyber-red)]/30 text-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/10 transition-colors"
-              >
-                Dismiss
-              </button>
+            )}
+            <div className="flex-1 min-h-0">
+              {children}
             </div>
-          )}
-          <div className="flex-1 min-h-0">
-            {children}
+            <PermissionBar />
           </div>
-          <PermissionBar />
-        </div>
-      </AttachmentContext.Provider>
+        </AttachmentContext.Provider>
+      </SessionStatusContext.Provider>
     </AssistantRuntimeProvider>
   );
 }
