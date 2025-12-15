@@ -10,6 +10,7 @@ import type {
   Sandbox, 
   SandboxInfo,
   SandboxWithRepo,
+  SandboxStatus,
   CreateSandboxInput, 
   Repository,
   SandboxStats,
@@ -166,11 +167,17 @@ export async function deleteSandbox(id: string): Promise<boolean> {
 export async function startSandbox(id: string): Promise<boolean> {
   isLoading = true;
   error = null;
+  
+  // Optimistic UI update - show "starting" state immediately
+  setOptimisticStatus(id, "starting");
+  
   try {
     const sandbox = await api.startSandbox(id);
     updateSandboxInList(sandbox);
     return true;
   } catch (e) {
+    // Revert to stopped state on error
+    setOptimisticStatus(id, "stopped");
     error = e instanceof Error ? e.message : "Failed to start sandbox";
     return false;
   } finally {
@@ -184,11 +191,17 @@ export async function startSandbox(id: string): Promise<boolean> {
 export async function stopSandbox(id: string): Promise<boolean> {
   isLoading = true;
   error = null;
+  
+  // Optimistic UI update - show "stopping" state immediately
+  setOptimisticStatus(id, "stopping");
+  
   try {
     const sandbox = await api.stopSandbox(id);
     updateSandboxInList(sandbox);
     return true;
   } catch (e) {
+    // Revert to running state on error
+    setOptimisticStatus(id, "running");
     error = e instanceof Error ? e.message : "Failed to stop sandbox";
     return false;
   } finally {
@@ -202,6 +215,10 @@ export async function stopSandbox(id: string): Promise<boolean> {
 export async function restartSandbox(id: string): Promise<boolean> {
   isLoading = true;
   error = null;
+  
+  // Optimistic UI update - show "starting" state (restart = stop + start)
+  setOptimisticStatus(id, "starting");
+  
   try {
     const sandbox = await api.restartSandbox(id);
     updateSandboxInList(sandbox);
@@ -378,6 +395,22 @@ export function clearError(): void {
 // =============================================================================
 // Internal Helpers
 // =============================================================================
+
+/**
+ * Set optimistic status for a sandbox (for immediate UI feedback)
+ */
+function setOptimisticStatus(id: string, status: SandboxStatus): void {
+  const index = sandboxesList.findIndex(s => s.id === id);
+  if (index !== -1) {
+    sandboxesList[index] = { ...sandboxesList[index], status };
+  }
+  if (selectedSandbox?.sandbox.id === id) {
+    selectedSandbox = {
+      ...selectedSandbox,
+      sandbox: { ...selectedSandbox.sandbox, status },
+    };
+  }
+}
 
 function updateSandboxInList(sandbox: Sandbox): void {
   const index = sandboxesList.findIndex(s => s.id === sandbox.id);
