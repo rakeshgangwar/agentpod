@@ -304,7 +304,7 @@
 
 {#if !sandbox}
   <!-- Loading State -->
-  <div class="h-[calc(100vh-140px)] min-h-[500px] flex items-center justify-center animate-fade-in">
+  <div class="h-full min-h-[400px] flex items-center justify-center animate-fade-in">
     <div class="text-center animate-fade-in-up">
       <div class="relative mx-auto w-16 h-16">
         <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
@@ -318,7 +318,7 @@
 {:else if !isRunning}
   <SandboxNotRunning {sandbox} icon="📁" actionText="browse files" />
 {:else}
-  <div class="flex h-[calc(100vh-200px)] min-h-[400px] gap-4 overflow-hidden animate-fade-in">
+  <div class="flex h-full min-h-[400px] gap-4 overflow-hidden animate-fade-in">
   <!-- File Tree Panel -->
   <div class="w-72 flex-shrink-0 flex flex-col cyber-card corner-accent overflow-hidden">
     <!-- Header -->

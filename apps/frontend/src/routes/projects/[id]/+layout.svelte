@@ -279,9 +279,9 @@
       </Dialog.Content>
     </Dialog.Root>
 
-    <!-- Scrollable content area -->
-    <div class="flex-1 overflow-y-auto">
-      <div class="container mx-auto px-4 sm:px-6 py-6 max-w-7xl">
+    <!-- Content area - fills remaining height with constrained width -->
+    <div class="flex-1 min-h-0 flex flex-col">
+      <div class="container mx-auto px-4 sm:px-6 py-6 max-w-7xl h-full flex flex-col min-h-0">
         {@render children()}
       </div>
     </div>

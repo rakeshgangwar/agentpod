@@ -592,7 +592,7 @@ import {
 {#if projectId}
   {#if !sandbox}
     <!-- Loading State -->
-    <div class="h-[calc(100vh-140px)] min-h-[500px] flex items-center justify-center animate-fade-in">
+    <div class="h-full min-h-[400px] flex items-center justify-center animate-fade-in">
       <div class="text-center animate-fade-in-up">
         <div class="relative mx-auto w-16 h-16">
           <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
@@ -609,7 +609,7 @@ import {
   {:else if !isRunning}
     <SandboxNotRunning {sandbox} icon="💬" actionText="use the chat" />
   {:else}
-    <div class="flex h-[calc(100vh-140px)] min-h-[500px] animate-fade-in">
+    <div class="flex h-full min-h-[400px] animate-fade-in">
     <!-- Session Sidebar -->
     <aside class="w-64 border-r border-border/30 bg-background/50 backdrop-blur-sm flex flex-col animate-fade-in-up stagger-1
                   {sidebarCollapsed ? 'hidden sm:flex' : 'flex'}">
