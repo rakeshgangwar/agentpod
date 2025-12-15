@@ -11,8 +11,10 @@
     deleteSandbox,
     checkDockerHealth 
   } from "$lib/stores/sandboxes.svelte";
-  import { projectIcons } from "$lib/stores/project-icons.svelte";
+  import { projectIcons, isAnimatedIconId, parseIconId } from "$lib/stores/project-icons.svelte";
   import { getProjectIcon } from "$lib/utils/project-icons";
+  import { getAnimatedIcon } from "$lib/utils/animated-icons";
+  import LottieIcon from "$lib/components/lottie-icon.svelte";
   import { Button } from "$lib/components/ui/button";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
   import { Avatar, AvatarFallback } from "$lib/components/ui/avatar";
@@ -97,10 +99,24 @@
     return name.split(':')[0];
   }
 
-  // Get icon component for a sandbox
-  function getSandboxIcon(sandbox: { id: string; name: string }) {
+  // Get icon data for a sandbox (supports both static and animated icons)
+  function getSandboxIconData(sandbox: { id: string; name: string }) {
     const iconId = projectIcons.getIconId(sandbox.id, sandbox.name);
-    return getProjectIcon(iconId)?.component;
+    const { isAnimated, id } = parseIconId(iconId);
+    
+    if (isAnimated) {
+      const animatedIcon = getAnimatedIcon(id);
+      if (animatedIcon) {
+        return { type: "animated" as const, path: animatedIcon.path };
+      }
+    }
+    
+    const staticIcon = getProjectIcon(isAnimated ? "code" : id);
+    if (staticIcon) {
+      return { type: "static" as const, component: staticIcon.component };
+    }
+    
+    return null;
   }
 </script>
 
@@ -291,14 +307,24 @@
             <!-- Card Header -->
             <div class="p-5 pb-4 border-b border-border/30">
               <div class="flex items-start justify-between gap-3">
+                {#snippet renderProjectIcon()}
+                  {@const iconData = getSandboxIconData(sandbox)}
+                  {#if iconData}
+                    {#if iconData.type === "animated"}
+                      <div class="shrink-0">
+                        <LottieIcon src={iconData.path} size={24} loop autoplay />
+                      </div>
+                    {:else}
+                      {@const IconComponent = iconData.component}
+                      <div class="shrink-0 text-[var(--cyber-cyan)]">
+                        <IconComponent class="w-6 h-6" />
+                      </div>
+                    {/if}
+                  {/if}
+                {/snippet}
                 <div class="min-w-0 flex-1 flex items-center gap-3">
                   <!-- Project Icon -->
-                  {#if getSandboxIcon(sandbox)}
-                    {@const IconComponent = getSandboxIcon(sandbox)}
-                    <div class="shrink-0 text-[var(--cyber-cyan)]">
-                      <IconComponent class="w-6 h-6" />
-                    </div>
-                  {/if}
+                  {@render renderProjectIcon()}
                   <div class="min-w-0 flex-1">
                     <h3 class="font-semibold text-lg truncate group-hover:text-[var(--cyber-cyan)] transition-colors">
                       {getSandboxDisplayName(sandbox)}

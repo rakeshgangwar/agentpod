@@ -3,6 +3,7 @@
   import type { Component } from "svelte";
   import ChevronUpIcon from "@lucide/svelte/icons/chevron-up";
   import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
+  import LottieIcon from "$lib/components/lottie-icon.svelte";
 
   // =============================================================================
   // Types
@@ -14,6 +15,12 @@
     icon?: Component | string;
   }
 
+  /** Icon can be a static component, emoji string, or animated lottie path */
+  export type PageIcon = 
+    | Component  // Lucide icon component
+    | string     // Emoji string
+    | { type: "animated"; path: string };  // Lottie animation
+
   // =============================================================================
   // Props
   // =============================================================================
@@ -21,8 +28,8 @@
   interface Props {
     /** Page title */
     title: string;
-    /** Page icon - shown in collapsed mode (Lucide component or emoji string) */
-    icon?: Component | string;
+    /** Page icon - shown in collapsed mode (Lucide component, emoji string, or animated icon) */
+    icon?: PageIcon;
     /** Optional subtitle/description */
     subtitle?: string;
     /** Optional status indicator */
@@ -60,6 +67,22 @@
     actions,
     leading,
   }: Props = $props();
+
+  // =============================================================================
+  // Icon Type Detection
+  // =============================================================================
+  
+  function isAnimatedIcon(ic: PageIcon | undefined): ic is { type: "animated"; path: string } {
+    return ic !== undefined && typeof ic === "object" && "type" in ic && ic.type === "animated";
+  }
+
+  function isComponentIcon(ic: PageIcon | undefined): ic is Component {
+    return ic !== undefined && typeof ic === "function";
+  }
+
+  function isEmojiIcon(ic: PageIcon | undefined): ic is string {
+    return ic !== undefined && typeof ic === "string";
+  }
 
   // =============================================================================
   // Collapse State
@@ -132,9 +155,11 @@
             <!-- Icon in expanded mode (centered with title + subtitle) -->
             {#if icon}
               <div class="flex items-center justify-center shrink-0 text-[var(--cyber-cyan)]">
-                {#if typeof icon === "string"}
+                {#if isAnimatedIcon(icon)}
+                  <LottieIcon src={icon.path} size={24} loop autoplay />
+                {:else if isEmojiIcon(icon)}
                   <span class="text-2xl">{icon}</span>
-                {:else}
+                {:else if isComponentIcon(icon)}
                   {@const IconComponent = icon}
                   <IconComponent class="h-6 w-6" />
                 {/if}
@@ -185,9 +210,11 @@
                 class="flex items-center justify-center text-[var(--cyber-cyan)]"
                 title={title}
               >
-                {#if typeof icon === "string"}
+                {#if isAnimatedIcon(icon)}
+                  <LottieIcon src={icon.path} size={20} loop autoplay />
+                {:else if isEmojiIcon(icon)}
                   <span class="text-xl">{icon}</span>
-                {:else}
+                {:else if isComponentIcon(icon)}
                   {@const IconComponent = icon}
                   <IconComponent class="h-5 w-5" />
                 {/if}
@@ -265,9 +292,11 @@
                 class="flex items-center justify-center w-8 h-8 rounded border border-[var(--cyber-cyan)]/30 bg-[var(--cyber-cyan)]/5"
                 title={title}
               >
-                {#if typeof icon === "string"}
+                {#if isAnimatedIcon(icon)}
+                  <LottieIcon src={icon.path} size={20} loop autoplay />
+                {:else if isEmojiIcon(icon)}
                   <span class="text-lg">{icon}</span>
-                {:else}
+                {:else if isComponentIcon(icon)}
                   {@const IconComponent = icon}
                   <IconComponent class="h-5 w-5 text-[var(--cyber-cyan)]" />
                 {/if}

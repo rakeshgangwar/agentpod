@@ -3,9 +3,13 @@
  * 
  * Persists project icon selections in localStorage so they remain
  * consistent across page navigations and sessions.
+ * 
+ * Supports both static Lucide icons and animated Lottie icons.
+ * Animated icon IDs are prefixed with "animated:" (e.g., "animated:robot-thinking")
  */
 
 import { getProjectIcon, getSuggestedIcon } from "$lib/utils/project-icons";
+import { getAnimatedIcon, isValidAnimatedIcon } from "$lib/utils/animated-icons";
 
 // =============================================================================
 // Types
@@ -14,6 +18,38 @@ import { getProjectIcon, getSuggestedIcon } from "$lib/utils/project-icons";
 interface ProjectIconsState {
   /** Map of project ID to icon ID */
   icons: Record<string, string>;
+}
+
+// =============================================================================
+// Helpers
+// =============================================================================
+
+/**
+ * Check if an icon ID refers to an animated icon
+ */
+export function isAnimatedIconId(iconId: string): boolean {
+  return iconId.startsWith("animated:");
+}
+
+/**
+ * Extract the actual icon ID without the "animated:" prefix
+ */
+export function parseIconId(iconId: string): { isAnimated: boolean; id: string } {
+  if (isAnimatedIconId(iconId)) {
+    return { isAnimated: true, id: iconId.replace("animated:", "") };
+  }
+  return { isAnimated: false, id: iconId };
+}
+
+/**
+ * Validate that an icon ID exists (either static or animated)
+ */
+function isValidIconId(iconId: string): boolean {
+  const { isAnimated, id } = parseIconId(iconId);
+  if (isAnimated) {
+    return isValidAnimatedIcon(id);
+  }
+  return getProjectIcon(id) !== undefined;
 }
 
 // =============================================================================
@@ -77,18 +113,23 @@ if (typeof window !== "undefined") {
 
 /**
  * Get the icon ID for a project
- * Returns stored icon, or suggests one based on project name
+ * Returns stored icon, or suggests one based on project name.
+ * 
+ * Supports both static and animated icons:
+ * - Static: "code", "terminal", etc.
+ * - Animated: "animated:robot-thinking", "animated:music", etc.
  */
 export function getProjectIconId(projectId: string, projectName?: string): string {
   // Check if we have a stored icon for this project
   const storedIconId = state.icons[projectId];
   if (storedIconId) {
-    // Verify the icon still exists
-    const icon = getProjectIcon(storedIconId);
-    if (icon) return storedIconId;
+    // Verify the icon still exists (works for both static and animated)
+    if (isValidIconId(storedIconId)) {
+      return storedIconId;
+    }
   }
   
-  // Fall back to suggesting based on name (deterministic)
+  // Fall back to suggesting based on name (deterministic, static icons only)
   if (projectName) {
     return getSuggestedIcon(projectName).id;
   }

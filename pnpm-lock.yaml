@@ -117,6 +117,9 @@ importers:
       better-auth:
         specifier: ^1.4.6
         version: 1.4.6(@sveltejs/kit@2.49.1(@sveltejs/vite-plugin-svelte@5.1.1(svelte@5.45.5)(vite@6.4.1(@types/node@25.0.0)(jiti@2.6.1)(lightningcss@1.30.2)))(svelte@5.45.5)(vite@6.4.1(@types/node@25.0.0)(jiti@2.6.1)(lightningcss@1.30.2)))(react-dom@19.2.1(react@19.2.1))(react@19.2.1)(svelte@5.45.5)
+      lottie-web:
+        specifier: ^5.13.0
+        version: 5.13.0
       lucide-react:
         specifier: ^0.556.0
         version: 0.556.0(react@19.2.1)
@@ -2654,6 +2657,9 @@ packages:
   loose-envify@1.4.0:
     resolution: {integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==}
     hasBin: true
+
+  lottie-web@5.13.0:
+    resolution: {integrity: sha512-+gfBXl6sxXMPe8tKQm7qzLnUy5DUPJPKIyRHwtpCpyUEYjHYRJC/5gjUvdkuO2c3JllrPtHXH5UJJK8LRYl5yQ==}
 
   lucide-react@0.556.0:
     resolution: {integrity: sha512-iOb8dRk7kLaYBZhR2VlV1CeJGxChBgUthpSP8wom9jfj79qovgG6qcSdiy6vkoREKPnbUYzJsCn4o4PtG3Iy+A==}
@@ -6029,6 +6035,8 @@ snapshots:
   loose-envify@1.4.0:
     dependencies:
       js-tokens: 4.0.0
+
+  lottie-web@5.13.0: {}
 
   lucide-react@0.556.0(react@19.2.1):
     dependencies:

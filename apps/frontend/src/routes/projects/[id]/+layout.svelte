@@ -14,9 +14,10 @@
   } from "$lib/stores/sandboxes.svelte";
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
-  import PageHeader from "$lib/components/page-header.svelte";
+  import PageHeader, { type PageIcon } from "$lib/components/page-header.svelte";
   import { getProjectIcon } from "$lib/utils/project-icons";
-  import { projectIcons } from "$lib/stores/project-icons.svelte";
+  import { getAnimatedIcon } from "$lib/utils/animated-icons";
+  import { projectIcons, isAnimatedIconId, parseIconId } from "$lib/stores/project-icons.svelte";
 
   let { children } = $props();
 
@@ -120,14 +121,24 @@
     return sandbox.labels?.["agentpod.sandbox.name"] || sandbox.name;
   }
 
-  // Get project icon - check store first, then labels, then default
-  function getProjectIconComponent() {
+  // Get project icon - supports both static and animated icons
+  function getProjectIconData(): PageIcon | undefined {
     if (!sandbox) return undefined;
     
     // Get icon ID from store (includes fallback logic)
     const iconId = projectIcons.getIconId(sandbox.id, getDisplayName());
-    const icon = getProjectIcon(iconId);
-    return icon?.component;
+    const { isAnimated, id } = parseIconId(iconId);
+    
+    if (isAnimated) {
+      const animatedIcon = getAnimatedIcon(id);
+      if (animatedIcon) {
+        return { type: "animated", path: animatedIcon.path };
+      }
+    }
+    
+    // Fall back to static icon
+    const staticIcon = getProjectIcon(isAnimated ? "code" : id);
+    return staticIcon?.component;
   }
 
   const tabs = [
@@ -148,7 +159,7 @@
     <!-- Header Bar (fixed at top) -->
     <PageHeader
       title={getDisplayName()}
-      icon={getProjectIconComponent()}
+      icon={getProjectIconData()}
       subtitle={sandbox.image}
       status={{
         label: getStatusLabel(sandbox.status),
