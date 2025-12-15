@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { toast } from "svelte-sonner";
+  import { Settings, PlusCircle } from "@lucide/svelte";
   import { 
     isPermissionGranted, 
     requestPermission, 
@@ -377,8 +378,9 @@ export default {
   }
 
   async function handleDisconnect() {
-    await disconnect();
+    // Navigate first to avoid flash of initializing screen
     goto("/setup");
+    await disconnect();
   }
 
   async function handleTestConnection() {
@@ -818,9 +820,9 @@ export default {
                                 {:else if file.type === "command"}
                                   <span class="text-[var(--cyber-magenta)]">/</span>
                                 {:else if file.type === "tool"}
-                                  <span class="text-[var(--cyber-amber)]">⚙</span>
+                                  <Settings class="h-4 w-4 text-[var(--cyber-amber)]" />
                                 {:else}
-                                  <span class="text-[var(--cyber-emerald)]">⊕</span>
+                                  <PlusCircle class="h-4 w-4 text-[var(--cyber-emerald)]" />
                                 {/if}
                               </span>
                               <div>
