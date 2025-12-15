@@ -188,6 +188,7 @@ export const defaultIconsByType: Record<string, string> = {
 
 /**
  * Get suggested icon based on project name or type
+ * Always returns a deterministic result (no randomness)
  */
 export function getSuggestedIcon(projectName: string): ProjectIcon {
   const nameLower = projectName.toLowerCase();
@@ -218,6 +219,6 @@ export function getSuggestedIcon(projectName: string): ProjectIcon {
     return getProjectIcon("gamepad")!;
   }
   
-  // Default to random icon
-  return getRandomIcon();
+  // Default to "code" icon (deterministic, not random)
+  return getProjectIcon("code")!;
 }

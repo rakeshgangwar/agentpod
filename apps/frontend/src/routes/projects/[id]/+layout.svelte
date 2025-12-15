@@ -15,7 +15,8 @@
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
   import PageHeader from "$lib/components/page-header.svelte";
-  import { getProjectIcon, getSuggestedIcon } from "$lib/utils/project-icons";
+  import { getProjectIcon } from "$lib/utils/project-icons";
+  import { projectIcons } from "$lib/stores/project-icons.svelte";
 
   let { children } = $props();
 
@@ -119,20 +120,14 @@
     return sandbox.labels?.["agentpod.sandbox.name"] || sandbox.name;
   }
 
-  // Get project icon - check labels first, then auto-suggest based on name
+  // Get project icon - check store first, then labels, then default
   function getProjectIconComponent() {
     if (!sandbox) return undefined;
     
-    // Check if icon is stored in labels
-    const iconId = sandbox.labels?.["agentpod.sandbox.icon"];
-    if (iconId) {
-      const storedIcon = getProjectIcon(iconId);
-      if (storedIcon) return storedIcon.component;
-    }
-    
-    // Auto-suggest based on project name
-    const suggestedIcon = getSuggestedIcon(getDisplayName());
-    return suggestedIcon.component;
+    // Get icon ID from store (includes fallback logic)
+    const iconId = projectIcons.getIconId(sandbox.id, getDisplayName());
+    const icon = getProjectIcon(iconId);
+    return icon?.component;
   }
 
   const tabs = [

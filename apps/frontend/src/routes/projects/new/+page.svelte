@@ -13,6 +13,7 @@
 import AddonSelector from "$lib/components/addon-selector.svelte";
   import ProjectIconPicker from "$lib/components/project-icon-picker.svelte";
   import { getSuggestedIcon } from "$lib/utils/project-icons";
+  import { projectIcons } from "$lib/stores/project-icons.svelte";
 
   // Redirect if not connected or not authenticated
   $effect(() => {
@@ -168,6 +169,8 @@ import AddonSelector from "$lib/components/addon-selector.svelte";
         
         if (result) {
           sandboxId = result.sandbox.id;
+          // Save the selected icon for this project
+          projectIcons.setIcon(sandboxId, selectedIconId);
           // Mark first step done, add second step
           creationProgress = [
             { message: "Creating repository...", done: true },
@@ -196,6 +199,8 @@ import AddonSelector from "$lib/components/addon-selector.svelte";
         
         if (result) {
           sandboxId = result.sandbox.id;
+          // Save the selected icon for this project
+          projectIcons.setIcon(sandboxId, selectedIconId);
           // Mark first step done, add second step
           creationProgress = [
             { message: "Cloning from GitHub...", done: true },

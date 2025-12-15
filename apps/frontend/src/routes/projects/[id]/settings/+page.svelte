@@ -8,7 +8,7 @@
   import { onMount } from "svelte";
   import { openServiceWindow, type ServiceType } from "$lib/utils/service-window";
   import ProjectIconPicker from "$lib/components/project-icon-picker.svelte";
-  import { getProjectIcon, getSuggestedIcon } from "$lib/utils/project-icons";
+  import { projectIcons } from "$lib/stores/project-icons.svelte";
 
   // Get current sandbox ID from route params
   let sandboxId = $derived($page.params.id ?? "");
@@ -21,31 +21,14 @@
   // Get current sandbox from list (quick access)
   let sandbox = $derived(sandboxInfo?.sandbox ?? sandboxes.list.find(s => s.id === sandboxId));
 
-  // Icon selection state (read from labels or auto-suggested)
-  let selectedIconId = $state<string | null>(null);
-  
-  // Get the current icon ID for the project
+  // Get the current icon ID for the project (from store)
   function getCurrentIconId(): string {
-    // Use user selection if available
-    if (selectedIconId) return selectedIconId;
-    
-    // Check labels
-    const labelIcon = sandbox?.labels?.["agentpod.sandbox.icon"];
-    if (labelIcon) {
-      const icon = getProjectIcon(labelIcon);
-      if (icon) return icon.id;
-    }
-    
-    // Auto-suggest based on name
-    const suggested = getSuggestedIcon(sandbox?.name ?? "");
-    return suggested.id;
+    return projectIcons.getIconId(sandboxId, sandbox?.name);
   }
   
-  // Handle icon selection
+  // Handle icon selection - save to store
   function handleIconSelect(iconId: string) {
-    selectedIconId = iconId;
-    // Note: In a future iteration, this would save to backend via labels
-    // For now, it's session-only (for demonstration purposes)
+    projectIcons.setIcon(sandboxId, iconId);
   }
 
   // Load sandbox info on mount
