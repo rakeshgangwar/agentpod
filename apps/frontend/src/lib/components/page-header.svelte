@@ -128,34 +128,36 @@
           {/if}
           
           <!-- Title and status -->
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-3 overflow-hidden">
-              <!-- Icon in expanded mode -->
-              {#if icon}
-                <div class="flex items-center justify-center shrink-0 text-[var(--cyber-cyan)]">
-                  {#if typeof icon === "string"}
-                    <span class="text-2xl">{icon}</span>
-                  {:else}
-                    {@const IconComponent = icon}
-                    <IconComponent class="h-6 w-6" />
-                  {/if}
-                </div>
-              {/if}
-              <h1 class="text-xl sm:text-2xl font-bold truncate glitch-hover">
-                {title}
-              </h1>
-              {#if status}
-                <div class="status-indicator {getStatusClass(status.variant)} shrink-0">
-                  <span class="status-dot {status.animate ? 'animate-pulse-dot' : ''}"></span>
-                  <span>{status.label}</span>
-                </div>
+          <div class="min-w-0 flex-1 flex items-center gap-3">
+            <!-- Icon in expanded mode (centered with title + subtitle) -->
+            {#if icon}
+              <div class="flex items-center justify-center shrink-0 text-[var(--cyber-cyan)]">
+                {#if typeof icon === "string"}
+                  <span class="text-2xl">{icon}</span>
+                {:else}
+                  {@const IconComponent = icon}
+                  <IconComponent class="h-6 w-6" />
+                {/if}
+              </div>
+            {/if}
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-3 overflow-hidden">
+                <h1 class="text-xl sm:text-2xl font-bold truncate glitch-hover">
+                  {title}
+                </h1>
+                {#if status}
+                  <div class="status-indicator {getStatusClass(status.variant)} shrink-0">
+                    <span class="status-dot {status.animate ? 'animate-pulse-dot' : ''}"></span>
+                    <span>{status.label}</span>
+                  </div>
+                {/if}
+              </div>
+              {#if subtitle}
+                <p class="text-xs font-mono text-muted-foreground truncate mt-0.5">
+                  {subtitle}
+                </p>
               {/if}
             </div>
-            {#if subtitle}
-              <p class="text-xs font-mono text-muted-foreground truncate mt-0.5 {icon ? 'ml-9' : ''}">
-                {subtitle}
-              </p>
-            {/if}
           </div>
         </div>
         
