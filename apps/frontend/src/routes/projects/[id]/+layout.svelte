@@ -15,6 +15,8 @@
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
   import PageHeader, { type PageIcon } from "$lib/components/page-header.svelte";
+  import ThemeToggle from "$lib/components/theme-toggle.svelte";
+  import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
   import { getProjectIcon } from "$lib/utils/project-icons";
   import { getAnimatedIcon } from "$lib/utils/animated-icons";
   import { projectIcons, isAnimatedIconId, parseIconId } from "$lib/stores/project-icons.svelte";
@@ -115,10 +117,22 @@
     }
   }
 
-  // Get display name from labels
+  // Get display name (project name from DB)
   function getDisplayName(): string {
     if (!sandbox) return "";
-    return sandbox.labels?.["agentpod.sandbox.name"] || sandbox.name;
+    return sandbox.name;
+  }
+
+  // Get subtitle with container name and image
+  function getSubtitle(): string {
+    if (!sandbox) return "";
+    const containerName = sandbox.containerName || sandbox.slug || "";
+    const image = sandbox.image || "";
+    
+    if (containerName && image) {
+      return `${containerName} | ${image}`;
+    }
+    return containerName || image;
   }
 
   // Get project icon - supports both static and animated icons
@@ -160,7 +174,7 @@
     <PageHeader
       title={getDisplayName()}
       icon={getProjectIconData()}
-      subtitle={sandbox.image}
+      subtitle={getSubtitle()}
       status={{
         label: getStatusLabel(sandbox.status),
         variant: getStatusVariant(sandbox.status),
@@ -175,11 +189,11 @@
       {#snippet leading()}
         <Button 
           variant="ghost" 
-          size="sm" 
+          size="icon"
           onclick={() => goto("/projects")}
-          class="shrink-0 font-mono text-xs uppercase tracking-wider h-8 px-3"
+          class="h-8 w-8 border border-border/30 hover:border-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]"
         >
-          &larr; Back
+          <ArrowLeftIcon class="h-4 w-4" />
         </Button>
       {/snippet}
       {#snippet actions()}
@@ -218,6 +232,9 @@
         >
           Restart
         </Button>
+        <!-- Theme Toggle -->
+        <div class="h-6 w-px bg-border/30 hidden sm:block"></div>
+        <ThemeToggle />
       {/snippet}
     </PageHeader>
 
