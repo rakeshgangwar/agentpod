@@ -402,6 +402,15 @@ import {
 
   function toggleSessionExpanded(sessionId: string) {
     if (expandedSessions.has(sessionId)) {
+      // When collapsing, check if a child session is currently selected
+      const childSessions = childSessionsMap[sessionId] ?? [];
+      const isChildSelected = childSessions.some(child => child.id === selectedSessionId);
+      
+      // If a child is selected, switch to the parent session before collapsing
+      if (isChildSelected) {
+        selectedSessionId = sessionId;
+      }
+      
       expandedSessions = new Set([...expandedSessions].filter(id => id !== sessionId));
     } else {
       expandedSessions = new Set([...expandedSessions, sessionId]);
@@ -627,6 +636,7 @@ import {
                       ? 'bg-[var(--cyber-cyan)]/10 border border-[var(--cyber-cyan)]/30'
                       : 'hover:bg-muted/50 border border-transparent'}"
                   onclick={() => (selectedSessionId = session.id)}
+                  ondblclick={() => hasChildren(session.id) && toggleSessionExpanded(session.id)}
                   onkeydown={(e) => e.key === 'Enter' && (selectedSessionId = session.id)}
                   role="button"
                   tabindex="0"
