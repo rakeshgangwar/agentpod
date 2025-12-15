@@ -18,6 +18,9 @@ import { authStoreSession, authLogout as tauriAuthLogout, authGetStatus } from "
 let currentAuthClient: ReturnType<typeof createAuthClient> | null = null;
 let currentApiUrl: string | null = null;
 
+// Store the latest bearer token captured from response headers
+let pendingBearerToken: string | null = null;
+
 /**
  * Get or create the auth client for the given API URL
  */
@@ -29,6 +32,16 @@ function getAuthClient(apiUrl?: string): ReturnType<typeof createAuthClient> {
     currentApiUrl = url;
     currentAuthClient = createAuthClient({
       baseURL: url,
+      // Capture the Bearer token from response headers
+      fetchOptions: {
+        onSuccess: (ctx) => {
+          const authToken = ctx.response.headers.get("set-auth-token");
+          if (authToken) {
+            pendingBearerToken = authToken;
+            console.debug("[Auth] Captured bearer token from response headers");
+          }
+        },
+      },
     });
   }
   
@@ -43,6 +56,16 @@ export function setAuthApiUrl(apiUrl: string) {
   currentApiUrl = apiUrl;
   currentAuthClient = createAuthClient({
     baseURL: apiUrl,
+    // Capture the Bearer token from response headers
+    fetchOptions: {
+      onSuccess: (ctx) => {
+        const authToken = ctx.response.headers.get("set-auth-token");
+        if (authToken) {
+          pendingBearerToken = authToken;
+          console.debug("[Auth] Captured bearer token from response headers");
+        }
+      },
+    },
   });
 }
 
@@ -219,13 +242,17 @@ export async function loginWithEmail(emailInput: string, password: string): Prom
       };
 
       // Store the session token for Tauri API calls
-      if (result.data.token) {
+      // Use the bearer token from response headers (captured by onSuccess callback)
+      // Fall back to result.data.token if not available
+      const tokenToStore = pendingBearerToken || result.data.token;
+      if (tokenToStore) {
         await authStoreSession(
-          result.data.token,
+          tokenToStore,
           result.data.user.id,
           result.data.user.email,
           result.data.user.name
         );
+        pendingBearerToken = null; // Clear after use
       }
     }
 
@@ -270,13 +297,17 @@ export async function signUp(emailInput: string, password: string, name: string)
       };
 
       // Store the session token for Tauri API calls
-      if (result.data.token) {
+      // Use the bearer token from response headers (captured by onSuccess callback)
+      // Fall back to result.data.token if not available
+      const tokenToStore = pendingBearerToken || result.data.token;
+      if (tokenToStore) {
         await authStoreSession(
-          result.data.token,
+          tokenToStore,
           result.data.user.id,
           result.data.user.email,
           result.data.user.name
         );
+        pendingBearerToken = null; // Clear after use
       }
     }
 

@@ -38,6 +38,7 @@
     if (path.includes("/chat")) return "chat";
     if (path.includes("/files")) return "files";
     if (path.includes("/logs")) return "logs";
+    if (path.includes("/terminal")) return "terminal";
     if (path.includes("/sync")) return "sync";
     if (path.includes("/settings")) return "settings";
     return "chat";
@@ -193,10 +194,11 @@
 
       <!-- Tabs Navigation -->
       <Tabs.Root value={currentTab()} onValueChange={handleTabChange}>
-        <Tabs.List class="grid w-full grid-cols-5 max-w-xl">
+        <Tabs.List class="grid w-full grid-cols-6 max-w-2xl">
           <Tabs.Trigger value="chat">Chat</Tabs.Trigger>
           <Tabs.Trigger value="files">Files</Tabs.Trigger>
           <Tabs.Trigger value="logs">Logs</Tabs.Trigger>
+          <Tabs.Trigger value="terminal">Terminal</Tabs.Trigger>
           <Tabs.Trigger value="sync">Git</Tabs.Trigger>
           <Tabs.Trigger value="settings">Settings</Tabs.Trigger>
         </Tabs.List>

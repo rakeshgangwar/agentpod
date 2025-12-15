@@ -263,6 +263,46 @@ export interface ExecOptions {
   privileged?: boolean;
 }
 
+/**
+ * Options for interactive terminal execution
+ */
+export interface InteractiveExecOptions {
+  /** Shell to use (defaults to /bin/bash, falls back to /bin/sh) */
+  shell?: string;
+
+  /** Initial terminal columns */
+  cols?: number;
+
+  /** Initial terminal rows */
+  rows?: number;
+
+  /** Working directory */
+  workingDir?: string;
+
+  /** User to run as */
+  user?: string;
+
+  /** Environment variables */
+  env?: Record<string, string>;
+}
+
+/**
+ * Result of an interactive exec session
+ */
+export interface InteractiveExecSession {
+  /** Bidirectional stream for stdin/stdout */
+  stream: NodeJS.ReadWriteStream;
+
+  /** Exec instance for resize operations */
+  execId: string;
+
+  /** Resize the terminal */
+  resize: (cols: number, rows: number) => Promise<void>;
+
+  /** Close the session */
+  close: () => void;
+}
+
 // ============================================================================
 // Events
 // ============================================================================

@@ -18,6 +18,8 @@ import { accountRoutes } from './routes/account.ts';
 import { sandboxRoutes, sandboxHealthRoutes } from './routes/sandboxes.ts';
 import { repoRoutes } from './routes/repos.ts';
 import { chatRoutes } from './routes/chat.ts';
+// Terminal WebSocket routes
+import { terminalRoutes, terminalWebsocket, cleanupTerminalSessions } from './routes/terminal.ts';
 // Onboarding system routes
 import { knowledgeRoutes } from './routes/knowledge.ts';
 import { onboardingRoutes } from './routes/onboarding.ts';
@@ -78,6 +80,7 @@ const app = new Hono()
   // v2 API routes (direct Docker orchestrator)
   .route('/api/v2/sandboxes', sandboxRoutes) // Sandbox management
   .route('/api/v2/sandboxes', chatRoutes) // Chat history (persisted)
+  .route('/api/v2/sandboxes', terminalRoutes) // Terminal WebSocket (interactive shell)
   .route('/api/v2/repos', repoRoutes) // Git repository management
   .route('/api/v2/health', sandboxHealthRoutes) // Health checks (includes /docker)
   // Onboarding system endpoints
@@ -104,6 +107,7 @@ startArchivalService();
 // Handle graceful shutdown
 process.on('SIGINT', () => {
   console.log('Shutting down...');
+  cleanupTerminalSessions();
   stopAllSync();
   stopArchivalService();
   process.exit(0);
@@ -111,6 +115,7 @@ process.on('SIGINT', () => {
 
 process.on('SIGTERM', () => {
   console.log('Shutting down...');
+  cleanupTerminalSessions();
   stopAllSync();
   stopArchivalService();
   process.exit(0);
@@ -163,6 +168,7 @@ console.log(`
 ║  - POST /api/v2/sandboxes/:id/exec    Execute command         ║
 ║  - GET  /api/v2/sandboxes/:id/logs    Get logs                ║
 ║  - GET  /api/v2/sandboxes/:id/stats   Get resource stats      ║
+║  - WS   /api/v2/sandboxes/:id/terminal  Interactive terminal  ║
 ╠═══════════════════════════════════════════════════════════════╣
 ║  v2 OpenCode Endpoints (per sandbox):                         ║
 ║  - GET  /api/v2/sandboxes/:id/opencode/session   List sessions║
@@ -230,4 +236,5 @@ console.log(`
 export default {
   port,
   fetch: app.fetch,
+  websocket: terminalWebsocket,
 };

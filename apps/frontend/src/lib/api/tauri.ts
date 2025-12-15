@@ -1450,3 +1450,114 @@ export async function deleteUserOpencodeFile(
 ): Promise<void> {
   return invoke("delete_user_opencode_file", { userId, fileType, name });
 }
+
+// =============================================================================
+// Terminal Types (Interactive Shell)
+// =============================================================================
+
+/** Terminal connection info returned when connecting */
+export interface TerminalConnection {
+  terminalId: string;
+  sandboxId: string;
+}
+
+/** Terminal status */
+export type TerminalStatusType = "connecting" | "connected" | "disconnected" | "error";
+
+/** Payload emitted for terminal output events */
+export interface TerminalOutputPayload {
+  terminal_id: string;
+  sandbox_id: string;
+  data: string;
+}
+
+/** Payload emitted for terminal status events */
+export interface TerminalStatusPayload {
+  terminal_id: string;
+  sandbox_id: string;
+  status: TerminalStatusType;
+  shell?: string;
+  exit_code?: number;
+  error?: string;
+}
+
+// =============================================================================
+// Terminal Commands
+// =============================================================================
+
+/**
+ * Connect to a terminal session for a sandbox.
+ * Establishes a WebSocket connection to the Management API.
+ */
+export async function terminalConnect(sandboxId: string): Promise<TerminalConnection> {
+  const result = await invoke<{ terminal_id: string; sandbox_id: string }>(
+    "terminal_connect",
+    { sandboxId }
+  );
+  // Convert snake_case from Rust to camelCase for frontend
+  return {
+    terminalId: result.terminal_id,
+    sandboxId: result.sandbox_id,
+  };
+}
+
+/**
+ * Send input data to a terminal session
+ */
+export async function terminalSendInput(terminalId: string, data: string): Promise<void> {
+  return invoke("terminal_send_input", { terminalId, data });
+}
+
+/**
+ * Resize a terminal session
+ */
+export async function terminalResize(terminalId: string, cols: number, rows: number): Promise<void> {
+  return invoke("terminal_resize", { terminalId, cols, rows });
+}
+
+/**
+ * Disconnect from a terminal session
+ */
+export async function terminalDisconnect(terminalId: string): Promise<void> {
+  return invoke("terminal_disconnect", { terminalId });
+}
+
+/**
+ * List active terminal connections for a sandbox
+ */
+export async function terminalList(sandboxId: string): Promise<string[]> {
+  return invoke<string[]>("terminal_list", { sandboxId });
+}
+
+/**
+ * Disconnect all terminals for a sandbox
+ */
+export async function terminalDisconnectAll(sandboxId: string): Promise<void> {
+  return invoke("terminal_disconnect_all", { sandboxId });
+}
+
+// =============================================================================
+// Terminal Event Listeners
+// =============================================================================
+
+/**
+ * Listen for terminal output events
+ */
+export async function onTerminalOutput(
+  callback: (payload: TerminalOutputPayload) => void
+): Promise<UnlistenFn> {
+  return listen<TerminalOutputPayload>("terminal:output", (event) => {
+    callback(event.payload);
+  });
+}
+
+/**
+ * Listen for terminal status events
+ */
+export async function onTerminalStatus(
+  callback: (payload: TerminalStatusPayload) => void
+): Promise<UnlistenFn> {
+  return listen<TerminalStatusPayload>("terminal:status", (event) => {
+    callback(event.payload);
+  });
+}

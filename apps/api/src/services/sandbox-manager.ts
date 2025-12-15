@@ -27,7 +27,7 @@ import {
   configToContainerSpec,
   createMinimalContainerSpec,
 } from "./config/index.ts";
-import type { Sandbox as DockerSandbox, SandboxConfig, SandboxStats, SandboxStatus as DockerStatus } from "./orchestrator/types.ts";
+import type { Sandbox as DockerSandbox, SandboxConfig, SandboxStats, SandboxStatus as DockerStatus, InteractiveExecOptions, InteractiveExecSession } from "./orchestrator/types.ts";
 import type { Repository } from "./git/types.ts";
 import { createLogger } from "../utils/logger.ts";
 import { buildOpenCodeAuthJson } from "../models/provider.ts";
@@ -913,6 +913,37 @@ export class SandboxManager {
     }
 
     return this.orchestrator.exec(sandboxId, command, options);
+  }
+
+  /**
+   * Start an interactive terminal session in a sandbox
+   */
+  async execInteractive(
+    sandboxId: string,
+    options?: InteractiveExecOptions
+  ): Promise<InteractiveExecSession> {
+    await this.checkAndRunMigration();
+
+    const dbSandbox = await SandboxModel.getSandboxById(sandboxId);
+    if (!dbSandbox) {
+      throw new Error(`Sandbox not found: ${sandboxId}`);
+    }
+
+    return this.orchestrator.execInteractive(sandboxId, options);
+  }
+
+  /**
+   * Detect available shell in a sandbox container
+   */
+  async detectShell(sandboxId: string): Promise<string> {
+    await this.checkAndRunMigration();
+
+    const dbSandbox = await SandboxModel.getSandboxById(sandboxId);
+    if (!dbSandbox) {
+      throw new Error(`Sandbox not found: ${sandboxId}`);
+    }
+
+    return this.orchestrator.detectShell(sandboxId);
   }
 
   // ===========================================================================

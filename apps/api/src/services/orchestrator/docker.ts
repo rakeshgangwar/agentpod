@@ -12,6 +12,8 @@ import type {
   SandboxStats,
   ExecResult,
   ExecOptions,
+  InteractiveExecOptions,
+  InteractiveExecSession,
   ImageInfo,
   ImagePullProgress,
   NetworkInfo,
@@ -380,6 +382,206 @@ export class DockerOrchestrator {
         }
       });
     });
+  }
+
+  // ===========================================================================
+  // Interactive Terminal Execution
+  // ===========================================================================
+
+  /**
+   * Start an interactive terminal session in a container
+   * Uses HTTP hijacking for bidirectional communication
+   * 
+   * NOTE: Uses raw HTTP request to work around Bun's incompatibility with
+   * dockerode's hijack mode (the 'upgrade' event is not properly handled).
+   */
+  async execInteractive(
+    id: string,
+    options?: InteractiveExecOptions
+  ): Promise<InteractiveExecSession> {
+    const container = await this.getContainer(id);
+
+    // Detect available shell if not specified
+    const shell = options?.shell ?? await this.detectShell(id);
+
+    const exec = await container.exec({
+      Cmd: [shell],
+      AttachStdin: true,
+      AttachStdout: true,
+      AttachStderr: true,
+      Tty: true,
+      Env: [
+        "TERM=xterm-256color",
+        ...(options?.env
+          ? Object.entries(options.env).map(([k, v]) => `${k}=${v}`)
+          : []),
+      ],
+      WorkingDir: options?.workingDir,
+      User: options?.user,
+    });
+
+    // Get exec ID for raw HTTP request
+    const execInfo = await exec.inspect();
+    const execId = execInfo.ID;
+
+    // Use raw HTTP to start exec with hijack - bypasses dockerode's modem
+    // which doesn't work properly with Bun's HTTP handling
+    const stream = await this.startExecRaw(execId, { stdin: true, tty: true });
+
+    // Set initial terminal size if provided
+    if (options?.cols && options?.rows) {
+      try {
+        await exec.resize({ w: options.cols, h: options.rows });
+      } catch {
+        // Ignore resize errors on startup
+      }
+    }
+
+    return {
+      stream,
+      execId,
+      resize: async (cols: number, rows: number) => {
+        try {
+          await exec.resize({ w: cols, h: rows });
+        } catch {
+          // Ignore resize errors (exec might have ended)
+        }
+      },
+      close: () => {
+        try {
+          stream.end();
+        } catch {
+          // Ignore close errors
+        }
+      },
+    };
+  }
+
+  /**
+   * Start an exec instance using raw HTTP request.
+   * This bypasses dockerode's modem which has issues with Bun's HTTP handling
+   * for the 'upgrade' event needed by hijack mode.
+   */
+  private async startExecRaw(
+    execId: string,
+    options: { stdin?: boolean; tty?: boolean }
+  ): Promise<NodeJS.ReadWriteStream> {
+    const net = await import("net");
+    const { Duplex } = await import("stream");
+
+    return new Promise((resolve, reject) => {
+      const socketPath = this.config.socketPath;
+      const body = JSON.stringify({
+        Detach: false,
+        Tty: options.tty ?? true,
+      });
+
+      const socket = net.createConnection({ path: socketPath }, () => {
+        // Send HTTP request with upgrade headers
+        const request = [
+          `POST /exec/${execId}/start HTTP/1.1`,
+          "Host: localhost",
+          "Content-Type: application/json",
+          `Content-Length: ${Buffer.byteLength(body)}`,
+          "Connection: Upgrade",
+          "Upgrade: tcp",
+          "",
+          body,
+        ].join("\r\n");
+
+        socket.write(request);
+      });
+
+      let headersParsed = false;
+      let buffer = Buffer.alloc(0);
+
+      socket.on("data", (chunk: Buffer) => {
+        if (!headersParsed) {
+          buffer = Buffer.concat([buffer, chunk]);
+          const headerEnd = buffer.indexOf("\r\n\r\n");
+          
+          if (headerEnd !== -1) {
+            const headers = buffer.subarray(0, headerEnd).toString();
+            
+            // Check for successful upgrade (101 Switching Protocols)
+            if (headers.includes("101")) {
+              headersParsed = true;
+              
+              // Get any remaining data after headers
+              const remaining = buffer.subarray(headerEnd + 4);
+              
+              // Create a duplex stream that wraps the socket
+              const duplex = new Duplex({
+                read() {},
+                write(chunk, encoding, callback) {
+                  socket.write(chunk, encoding, callback);
+                },
+                final(callback) {
+                  socket.end(callback);
+                },
+              });
+
+              // Forward socket data to duplex
+              socket.on("data", (data: Buffer) => {
+                duplex.push(data);
+              });
+
+              socket.on("end", () => {
+                duplex.push(null);
+              });
+
+              socket.on("error", (err: Error) => {
+                duplex.destroy(err);
+              });
+
+              // Push remaining data if any
+              if (remaining.length > 0) {
+                duplex.push(remaining);
+              }
+
+              resolve(duplex as unknown as NodeJS.ReadWriteStream);
+            } else {
+              // Not a successful upgrade
+              const statusLine = headers.split("\r\n")[0];
+              socket.destroy();
+              reject(new Error(`Docker exec start failed: ${statusLine}`));
+            }
+          }
+        }
+      });
+
+      socket.on("error", (err: Error) => {
+        reject(err);
+      });
+
+      socket.on("close", () => {
+        if (!headersParsed) {
+          reject(new Error("Socket closed before receiving response"));
+        }
+      });
+    });
+  }
+
+  /**
+   * Detect available shell in a container
+   * Tries bash first, then zsh, then falls back to sh
+   */
+  async detectShell(id: string): Promise<string> {
+    const shells = ["/bin/bash", "/bin/zsh", "/bin/sh"];
+
+    for (const shell of shells) {
+      try {
+        const result = await this.exec(id, ["test", "-x", shell]);
+        if (result.exitCode === 0) {
+          return shell;
+        }
+      } catch {
+        // Shell not available, try next
+      }
+    }
+
+    // Default to sh if detection fails
+    return "/bin/sh";
   }
 
   // ===========================================================================
