@@ -729,6 +729,76 @@
 }
 
 /* ============================================
+   THEME TRANSITION
+   Smooth transitions when switching themes.
+   Only transitions large surfaces (backgrounds)
+   to reduce eye strain. Text changes instantly
+   for readability.
+   ============================================ */
+
+/* Large surfaces that should transition smoothly */
+body,
+main,
+aside,
+header,
+footer,
+nav,
+section,
+article,
+.cyber-card,
+.grid-bg,
+.mesh-gradient,
+[data-slot="content"],
+[data-slot="sidebar"],
+[role="dialog"],
+[role="menu"],
+[data-radix-popper-content-wrapper] {
+  transition: 
+    background-color 0.5s ease,
+    background 0.5s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+/* Noise overlay opacity transition */
+.noise-overlay {
+  transition: opacity 0.5s ease;
+}
+
+/* Scrollbars should also transition */
+::-webkit-scrollbar-track {
+  transition: background-color 0.5s ease;
+}
+::-webkit-scrollbar-thumb {
+  transition: background-color 0.5s ease;
+}
+
+/* Respect user preference for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  body,
+  main,
+  aside,
+  header,
+  footer,
+  nav,
+  section,
+  article,
+  .cyber-card,
+  .grid-bg,
+  .mesh-gradient,
+  .noise-overlay,
+  [data-slot="content"],
+  [data-slot="sidebar"],
+  [role="dialog"],
+  [role="menu"],
+  [data-radix-popper-content-wrapper],
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-thumb {
+    transition: none;
+  }
+}
+
+/* ============================================
    TERMINAL/CYBERPUNK DESIGN SYSTEM
    ============================================ */
 
