@@ -203,9 +203,29 @@
     width: 100%;
     height: 100%;
     min-height: 200px;
-    background-color: #1e1e2e;
-    border-radius: 0.5rem;
+    background-color: #0d0d14;
+    border-radius: 4px;
     overflow: hidden;
+    position: relative;
+    border: 1px solid oklch(0.85 0.15 192 / 0.2);
+  }
+
+  .terminal-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      oklch(0.85 0.15 192) 20%,
+      oklch(0.85 0.15 192) 80%,
+      transparent
+    );
+    opacity: 0.5;
+    z-index: 1;
   }
 
   .terminal-container :global(.xterm) {
@@ -219,5 +239,23 @@
 
   .terminal-container :global(.xterm-screen) {
     height: 100% !important;
+  }
+
+  /* Cyberpunk scrollbar */
+  .terminal-container :global(.xterm-viewport::-webkit-scrollbar) {
+    width: 8px;
+  }
+
+  .terminal-container :global(.xterm-viewport::-webkit-scrollbar-track) {
+    background: oklch(0.15 0.02 265 / 0.5);
+  }
+
+  .terminal-container :global(.xterm-viewport::-webkit-scrollbar-thumb) {
+    background: oklch(0.85 0.15 192 / 0.3);
+    border-radius: 4px;
+  }
+
+  .terminal-container :global(.xterm-viewport::-webkit-scrollbar-thumb:hover) {
+    background: oklch(0.85 0.15 192 / 0.5);
   }
 </style>

@@ -463,121 +463,158 @@ export default {
   ];
 </script>
 
-<main class="container mx-auto px-4 py-6 max-w-6xl">
-  <div class="space-y-6">
+<div class="noise-overlay"></div>
+<main class="min-h-screen grid-bg mesh-gradient">
+  <div class="container mx-auto px-4 py-6 max-w-6xl space-y-6">
     <!-- Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-in-up">
       <div>
-        <h1 class="text-3xl font-bold">Settings</h1>
-        <p class="text-muted-foreground text-sm">
+        <div class="flex items-center gap-3 mb-1">
+          <div class="w-2 h-2 rounded-full bg-[var(--cyber-cyan)] animate-pulse-dot"></div>
+          <span class="text-xs font-mono uppercase tracking-widest text-[var(--cyber-cyan)]">
+            System Configuration
+          </span>
+        </div>
+        <h1 class="text-3xl font-bold tracking-tight">Settings</h1>
+        <p class="text-muted-foreground text-sm font-mono">
           Manage your connection, preferences, and AI configuration
         </p>
       </div>
-      <Button variant="ghost" onclick={() => goto("/projects")}>
-        Back to Projects
+      <Button 
+        variant="outline" 
+        onclick={() => goto("/projects")}
+        class="font-mono text-xs uppercase tracking-wider border-border/50 hover:border-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]"
+      >
+        ← Back to Projects
       </Button>
     </div>
 
     <!-- Main Tabs -->
-    <Tabs.Root bind:value={activeTab} class="w-full">
-      <Tabs.List class="grid w-full grid-cols-5 mb-6">
-        {#each settingsTabs as tab}
-          <Tabs.Trigger value={tab.value} class="flex items-center gap-2">
-            <tab.icon class="h-4 w-4" />
-            <span class="hidden sm:inline">{tab.label}</span>
-          </Tabs.Trigger>
-        {/each}
-      </Tabs.List>
+    <Tabs.Root bind:value={activeTab} class="w-full animate-fade-in-up stagger-2">
+      <!-- Terminal-style Tab Navigation -->
+      <div class="cyber-card corner-accent mb-6 overflow-hidden">
+        <div class="py-2 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+          <span class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+            [navigation]
+          </span>
+        </div>
+        <Tabs.List class="grid w-full grid-cols-5 bg-transparent p-1">
+          {#each settingsTabs as tab, i}
+            <Tabs.Trigger 
+              value={tab.value} 
+              class="flex items-center justify-center gap-2 py-3 font-mono text-xs uppercase tracking-wider
+                     data-[state=active]:bg-[var(--cyber-cyan)]/10 data-[state=active]:text-[var(--cyber-cyan)]
+                     data-[state=active]:border-b-2 data-[state=active]:border-[var(--cyber-cyan)]
+                     hover:bg-muted/50 transition-all rounded-none"
+            >
+              <tab.icon class="h-4 w-4" />
+              <span class="hidden sm:inline">{tab.label}</span>
+            </Tabs.Trigger>
+          {/each}
+        </Tabs.List>
+      </div>
 
       <!-- Connection Tab -->
       <Tabs.Content value="connection" class="space-y-6">
         <div class="grid gap-6 md:grid-cols-2">
           <!-- Connection Status -->
-          <Card.Root>
-            <Card.Header>
-              <Card.Title>Connection Status</Card.Title>
-              <Card.Description>
+          <div class="cyber-card corner-accent overflow-hidden">
+            <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+              <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+                [connection_status]
+              </h3>
+            </div>
+            <div class="p-4 space-y-4">
+              <p class="text-xs text-muted-foreground font-mono">
                 Your current API connection details
-              </Card.Description>
-            </Card.Header>
-            <Card.Content class="space-y-4">
+              </p>
               <div class="space-y-1">
-                <Label class="text-muted-foreground text-xs">API URL</Label>
-                <p class="font-mono text-sm break-all">{connection.apiUrl}</p>
+                <span class="text-[var(--cyber-cyan)] text-xs font-mono">API_URL:</span>
+                <p class="font-mono text-sm break-all bg-background/50 p-2 rounded border border-border/30">{connection.apiUrl}</p>
               </div>
               <div class="space-y-1">
-                <Label class="text-muted-foreground text-xs">Status</Label>
+                <span class="text-[var(--cyber-cyan)] text-xs font-mono">STATUS:</span>
                 <div class="flex items-center gap-2">
-                  <span class="h-2 w-2 rounded-full bg-green-500"></span>
-                  <span class="text-sm">Connected</span>
+                  <span class="status-indicator status-running">
+                    <span class="status-dot animate-pulse-dot"></span>
+                    Connected
+                  </span>
                 </div>
               </div>
               {#if testResult}
-                <div class="text-sm p-3 rounded-md {testResult.success ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-destructive/10 text-destructive'}">
+                <div class="text-sm p-3 rounded font-mono border {testResult.success ? 'bg-[var(--cyber-emerald)]/10 text-[var(--cyber-emerald)] border-[var(--cyber-emerald)]/30' : 'bg-[var(--cyber-red)]/10 text-[var(--cyber-red)] border-[var(--cyber-red)]/30'}">
                   {testResult.message}
                 </div>
               {/if}
-            </Card.Content>
-            <Card.Footer class="flex gap-2">
+            </div>
+            <div class="px-4 pb-4 flex gap-2">
               <Button 
                 variant="outline" 
                 onclick={handleTestConnection}
                 disabled={isTesting}
+                class="font-mono text-xs uppercase tracking-wider border-border/50 hover:border-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]"
               >
+                {#if isTesting}
+                  <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>
+                {/if}
                 {isTesting ? "Testing..." : "Test Connection"}
               </Button>
               <Button 
-                variant="destructive" 
+                variant="outline"
                 onclick={handleDisconnect}
+                class="font-mono text-xs uppercase tracking-wider border-[var(--cyber-red)]/50 text-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/10"
               >
                 Disconnect
               </Button>
-            </Card.Footer>
-          </Card.Root>
+            </div>
+          </div>
 
           <!-- Connection Info -->
-          <Card.Root>
-            <Card.Header>
-              <Card.Title>Connection Details</Card.Title>
-              <Card.Description>
+          <div class="cyber-card corner-accent overflow-hidden">
+            <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+              <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+                [connection_details]
+              </h3>
+            </div>
+            <div class="p-4 space-y-4">
+              <p class="text-xs text-muted-foreground font-mono">
                 Information about your management API
-              </Card.Description>
-            </Card.Header>
-            <Card.Content class="space-y-4">
-              <div class="p-4 bg-muted rounded-lg space-y-3">
+              </p>
+              <div class="p-4 bg-background/50 rounded border border-border/30 space-y-3 font-mono text-sm">
                 <div class="flex items-center justify-between">
-                  <span class="text-sm text-muted-foreground">Protocol</span>
-                  <span class="text-sm font-medium">
-                    {connection.apiUrl?.startsWith("https") ? "HTTPS (Secure)" : "HTTP"}
+                  <span class="text-muted-foreground">Protocol</span>
+                  <span class="px-2 py-0.5 rounded text-xs" style="color: var(--cyber-emerald); background: var(--cyber-emerald)10; border: 1px solid var(--cyber-emerald)30;">
+                    {connection.apiUrl?.startsWith("https") ? "HTTPS" : "HTTP"}
                   </span>
                 </div>
                 <div class="flex items-center justify-between">
-                  <span class="text-sm text-muted-foreground">Authentication</span>
-                  <span class="text-sm font-medium">Bearer Token</span>
+                  <span class="text-muted-foreground">Authentication</span>
+                  <span class="text-foreground">Bearer Token</span>
                 </div>
               </div>
-              <p class="text-xs text-muted-foreground">
-                Your connection credentials are stored securely on this device.
-                To connect a different API, disconnect first.
+              <p class="text-xs text-muted-foreground font-mono">
+                Credentials stored securely on this device. Disconnect to change API.
               </p>
-            </Card.Content>
-          </Card.Root>
+            </div>
+          </div>
         </div>
       </Tabs.Content>
 
       <!-- Appearance Tab -->
       <Tabs.Content value="appearance" class="space-y-6">
-        <Card.Root>
-          <Card.Header>
-            <Card.Title>Theme & Appearance</Card.Title>
-            <Card.Description>
+        <div class="cyber-card corner-accent overflow-hidden">
+          <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+            <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+              [theme_appearance]
+            </h3>
+          </div>
+          <div class="p-4 space-y-4">
+            <p class="text-xs text-muted-foreground font-mono">
               Customize the look and feel of CodeOpen with theme presets
-            </Card.Description>
-          </Card.Header>
-          <Card.Content>
+            </p>
             <ThemePicker />
-          </Card.Content>
-        </Card.Root>
+          </div>
+        </div>
       </Tabs.Content>
 
       <!-- AI Models Tab -->
@@ -588,29 +625,34 @@ export default {
       <!-- OpenCode Tab -->
       <Tabs.Content value="opencode" class="space-y-6">
         <!-- Permissions -->
-        <Card.Root>
-          <Card.Header>
-            <Card.Title>Tool Permissions</Card.Title>
-            <Card.Description>
+        <div class="cyber-card corner-accent overflow-hidden">
+          <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+            <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+              [tool_permissions]
+            </h3>
+          </div>
+          <div class="p-4 space-y-4">
+            <p class="text-xs text-muted-foreground font-mono">
               Control what actions OpenCode can perform without asking for permission.
               These settings apply to all your sandboxes.
-            </Card.Description>
-          </Card.Header>
-          <Card.Content class="space-y-4">
+            </p>
             {#if opencodeConfigLoading}
               <div class="flex items-center justify-center py-8">
-                <div class="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
-                <span class="ml-2 text-muted-foreground">Loading configuration...</span>
+                <div class="relative w-6 h-6">
+                  <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
+                  <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
+                </div>
+                <span class="ml-3 text-muted-foreground font-mono text-sm">Loading configuration...</span>
               </div>
             {:else if opencodeConfigError}
-              <div class="p-4 rounded-md bg-destructive/10 text-destructive">
-                <p class="font-medium">Failed to load configuration</p>
-                <p class="text-sm">{opencodeConfigError}</p>
+              <div class="p-4 rounded border bg-[var(--cyber-red)]/10 border-[var(--cyber-red)]/30 text-[var(--cyber-red)]">
+                <p class="font-mono text-sm font-medium">Failed to load configuration</p>
+                <p class="text-xs font-mono mt-1">{opencodeConfigError}</p>
                 <Button 
                   variant="outline" 
                   size="sm" 
                   onclick={loadOpencodeConfig}
-                  class="mt-2"
+                  class="mt-3 font-mono text-xs uppercase tracking-wider"
                 >
                   Retry
                 </Button>
@@ -618,10 +660,10 @@ export default {
             {:else}
               <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {#each permissionTools as tool}
-                  <div class="flex items-center justify-between p-3 border rounded-lg">
+                  <div class="flex items-center justify-between p-3 border border-border/30 rounded bg-background/50 hover:border-[var(--cyber-cyan)]/30 transition-colors">
                     <div class="space-y-0.5">
-                      <Label class="font-medium">{tool.name}</Label>
-                      <p class="text-xs text-muted-foreground">{tool.description}</p>
+                      <Label class="font-mono text-sm">{tool.name}</Label>
+                      <p class="text-xs text-muted-foreground font-mono">{tool.description}</p>
                     </div>
                     <Select.Root 
                       type="single"
@@ -631,7 +673,7 @@ export default {
                       }}
                       disabled={opencodeConfigSaving}
                     >
-                      <Select.Trigger class="w-24">
+                      <Select.Trigger class="w-24 font-mono text-xs bg-background/50 border-border/50">
                         {getPermissionLabel(permissionSettings[tool.key])}
                       </Select.Trigger>
                       <Select.Content>
@@ -644,88 +686,107 @@ export default {
                 {/each}
               </div>
               
-              <div class="p-3 bg-muted rounded-lg">
-                <p class="text-sm text-muted-foreground">
-                  <strong>Allow:</strong> Execute automatically &bull;
-                  <strong>Ask:</strong> Request permission (default) &bull;
-                  <strong>Deny:</strong> Never allow
-                </p>
+              <div class="p-3 bg-background/50 rounded border border-border/30 font-mono text-xs">
+                <span class="text-[var(--cyber-emerald)]">Allow:</span> Execute automatically · 
+                <span class="text-[var(--cyber-amber)]">Ask:</span> Request permission · 
+                <span class="text-[var(--cyber-red)]">Deny:</span> Never allow
               </div>
             {/if}
-          </Card.Content>
-        </Card.Root>
+          </div>
+        </div>
 
         <!-- AGENTS.md Editor -->
-        <Card.Root>
-          <Card.Header>
-            <Card.Title>Global Instructions (AGENTS.md)</Card.Title>
-            <Card.Description>
+        <div class="cyber-card corner-accent overflow-hidden">
+          <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+            <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+              [global_instructions] AGENTS.md
+            </h3>
+          </div>
+          <div class="p-4 space-y-4">
+            <p class="text-xs text-muted-foreground font-mono">
               Define global instructions and context for OpenCode that apply to all your sandboxes.
-            </Card.Description>
-          </Card.Header>
-          <Card.Content class="space-y-4">
+            </p>
             {#if opencodeConfigLoading}
               <div class="flex items-center justify-center py-8">
-                <div class="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
-                <span class="ml-2 text-muted-foreground">Loading...</span>
+                <div class="relative w-6 h-6">
+                  <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
+                  <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
+                </div>
+                <span class="ml-3 text-muted-foreground font-mono text-sm">Loading...</span>
               </div>
             {:else}
               <textarea 
                 bind:value={agentsMd}
                 placeholder="# My Global Instructions&#10;&#10;Add your personal coding preferences, guidelines, and context here..."
-                class="w-full h-48 p-3 text-sm font-mono border rounded-md bg-background resize-y"
+                class="w-full h-48 p-3 text-sm font-mono border border-border/50 rounded bg-background/50 resize-y
+                       focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)] focus:outline-none"
               ></textarea>
-              <p class="text-xs text-muted-foreground">
+              <p class="text-xs text-muted-foreground font-mono">
                 Use Markdown formatting. These instructions will be included in all your OpenCode sessions.
               </p>
             {/if}
-          </Card.Content>
-          <Card.Footer class="flex gap-2">
+          </div>
+          <div class="px-4 pb-4 flex gap-2">
             <Button 
               onclick={handleSaveAgentsMd}
               disabled={agentsMdSaving || agentsMd === agentsMdOriginal}
+              class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black disabled:opacity-50"
             >
+              {#if agentsMdSaving}
+                <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>
+              {/if}
               {agentsMdSaving ? "Saving..." : "Save Changes"}
             </Button>
             <Button 
               variant="outline"
               onclick={handleResetAgentsMd}
               disabled={agentsMd === agentsMdOriginal}
+              class="font-mono text-xs uppercase tracking-wider border-border/50 hover:border-[var(--cyber-amber)] hover:text-[var(--cyber-amber)]"
             >
               Discard Changes
             </Button>
-          </Card.Footer>
-        </Card.Root>
+          </div>
+        </div>
 
         <!-- Config Files Management -->
-        <Card.Root>
-          <Card.Header>
-            <div class="flex items-center justify-between">
-              <div>
-                <Card.Title>Custom Agents & Commands</Card.Title>
-                <Card.Description>
-                  Create and manage custom agents, commands, tools, and plugins.
-                </Card.Description>
-              </div>
-              <Button onclick={handleOpenNewFileDialog} size="sm">
-                + New File
-              </Button>
-            </div>
-          </Card.Header>
-          <Card.Content class="space-y-4">
+        <div class="cyber-card corner-accent overflow-hidden">
+          <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm flex items-center justify-between">
+            <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+              [custom_agents_commands]
+            </h3>
+            <Button 
+              onclick={handleOpenNewFileDialog} 
+              size="sm"
+              class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black"
+            >
+              + New File
+            </Button>
+          </div>
+          <div class="p-4 space-y-4">
+            <p class="text-xs text-muted-foreground font-mono">
+              Create and manage custom agents, commands, tools, and plugins.
+            </p>
             {#if opencodeConfigLoading}
               <div class="flex items-center justify-center py-8">
-                <div class="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
-                <span class="ml-2 text-muted-foreground">Loading files...</span>
+                <div class="relative w-6 h-6">
+                  <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
+                  <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
+                </div>
+                <span class="ml-3 text-muted-foreground font-mono text-sm">Loading files...</span>
               </div>
             {:else}
               <Tabs.Root bind:value={selectedFileType}>
-                <Tabs.List class="grid w-full grid-cols-4">
+                <Tabs.List class="grid w-full grid-cols-4 bg-background/30 border border-border/30 rounded p-1">
                   {#each fileTypeTabs as tab}
-                    <Tabs.Trigger value={tab.value}>
+                    <Tabs.Trigger 
+                      value={tab.value}
+                      class="font-mono text-xs uppercase tracking-wider py-2
+                             data-[state=active]:bg-[var(--cyber-cyan)]/10 data-[state=active]:text-[var(--cyber-cyan)]
+                             hover:bg-muted/50 transition-all rounded"
+                    >
                       {tab.label}
                       {#if getFilteredFiles(tab.value).length > 0}
-                        <span class="ml-1 text-xs bg-muted px-1.5 py-0.5 rounded-full">
+                        <span class="ml-1 text-xs bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)] px-1.5 py-0.5 rounded-full">
                           {getFilteredFiles(tab.value).length}
                         </span>
                       {/if}
@@ -735,17 +796,18 @@ export default {
                 
                 {#each fileTypeTabs as tab}
                   <Tabs.Content value={tab.value} class="mt-4">
-                    <p class="text-sm text-muted-foreground mb-3">{tab.description}</p>
+                    <p class="text-xs text-muted-foreground font-mono mb-3">{tab.description}</p>
                     
                     {#if getFilteredFiles(tab.value).length === 0}
-                      <div class="text-center py-8 border-2 border-dashed rounded-lg">
-                        <p class="text-muted-foreground">No {tab.label.toLowerCase()} yet</p>
+                      <div class="text-center py-8 border-2 border-dashed border-border/30 rounded bg-background/30">
+                        <p class="text-muted-foreground font-mono text-sm">No {tab.label.toLowerCase()} yet</p>
                         <Button 
                           variant="link" 
                           onclick={() => {
                             newFileType = tab.value;
                             handleOpenNewFileDialog();
                           }}
+                          class="text-[var(--cyber-cyan)] font-mono text-sm"
                         >
                           Create your first {tab.value}
                         </Button>
@@ -754,27 +816,29 @@ export default {
                       <div class="space-y-2">
                         {#each getFilteredFiles(tab.value) as file}
                           <div 
-                            class="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors {selectedFile?.name === file.name && selectedFile?.type === file.type ? 'bg-muted border-primary' : ''}"
+                            class="flex items-center justify-between p-3 border border-border/30 rounded bg-background/50 
+                                   hover:border-[var(--cyber-cyan)]/30 cursor-pointer transition-colors
+                                   {selectedFile?.name === file.name && selectedFile?.type === file.type ? 'border-[var(--cyber-cyan)] bg-[var(--cyber-cyan)]/5' : ''}"
                             onclick={() => handleSelectFile(file)}
                             onkeydown={(e) => e.key === 'Enter' && handleSelectFile(file)}
                             tabindex="0"
                             role="button"
                           >
                             <div class="flex items-center gap-3">
-                              <span class="text-lg">
+                              <span class="text-lg font-mono">
                                 {#if file.type === "agent"}
-                                  🤖
+                                  <span class="text-[var(--cyber-cyan)]">λ</span>
                                 {:else if file.type === "command"}
-                                  ⚡
+                                  <span class="text-[var(--cyber-magenta)]">/</span>
                                 {:else if file.type === "tool"}
-                                  🔧
+                                  <span class="text-[var(--cyber-amber)]">⚙</span>
                                 {:else}
-                                  🔌
+                                  <span class="text-[var(--cyber-emerald)]">⊕</span>
                                 {/if}
                               </span>
                               <div>
-                                <p class="font-medium">{file.name}</p>
-                                <p class="text-xs text-muted-foreground">{file.name}.{file.extension}</p>
+                                <p class="font-mono text-sm">{file.name}</p>
+                                <p class="text-xs text-muted-foreground font-mono">{file.name}.{file.extension}</p>
                               </div>
                             </div>
                             <Button 
@@ -784,7 +848,7 @@ export default {
                                 e.stopPropagation();
                                 handleDeleteFile(file);
                               }}
-                              class="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              class="font-mono text-xs text-[var(--cyber-red)] hover:text-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/10"
                             >
                               Delete
                             </Button>
@@ -795,30 +859,41 @@ export default {
                     
                     <!-- File Editor -->
                     {#if selectedFile && selectedFile.type === tab.value}
-                      <div class="mt-4 p-4 border rounded-lg bg-muted/30">
+                      <div class="mt-4 p-4 border border-[var(--cyber-cyan)]/30 rounded bg-[var(--cyber-cyan)]/5">
                         <div class="flex items-center justify-between mb-3">
-                          <h4 class="font-medium">
+                          <h4 class="font-mono text-sm text-[var(--cyber-cyan)]">
                             Editing: {selectedFile.name}.{selectedFile.extension}
                           </h4>
-                          <Button variant="ghost" size="sm" onclick={handleCloseFile}>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onclick={handleCloseFile}
+                            class="font-mono text-xs"
+                          >
                             Close
                           </Button>
                         </div>
                         <textarea 
                           bind:value={editingFileContent}
-                          class="w-full h-48 p-3 text-sm font-mono border rounded-md bg-background resize-y"
+                          class="w-full h-48 p-3 text-sm font-mono border border-border/50 rounded bg-background/50 resize-y
+                                 focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)] focus:outline-none"
                         ></textarea>
                         <div class="flex gap-2 mt-3">
                           <Button 
                             onclick={handleSaveFile}
                             disabled={fileSaving || editingFileContent === selectedFile.content}
+                            class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black disabled:opacity-50"
                           >
+                            {#if fileSaving}
+                              <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>
+                            {/if}
                             {fileSaving ? "Saving..." : "Save"}
                           </Button>
                           <Button 
                             variant="outline"
                             onclick={() => editingFileContent = selectedFile?.content || ""}
                             disabled={editingFileContent === selectedFile.content}
+                            class="font-mono text-xs uppercase tracking-wider border-border/50"
                           >
                             Reset
                           </Button>
@@ -829,31 +904,33 @@ export default {
                 {/each}
               </Tabs.Root>
             {/if}
-          </Card.Content>
-          <Card.Footer>
-            <p class="text-xs text-muted-foreground">
+          </div>
+          <div class="px-4 pb-4">
+            <p class="text-xs text-muted-foreground font-mono">
               Changes require container restart to take effect.
             </p>
-          </Card.Footer>
-        </Card.Root>
+          </div>
+        </div>
       </Tabs.Content>
 
       <!-- About Tab -->
       <Tabs.Content value="about" class="space-y-6">
         <div class="grid gap-6 md:grid-cols-2">
           <!-- Preferences -->
-          <Card.Root>
-            <Card.Header>
-              <Card.Title>Preferences</Card.Title>
-              <Card.Description>
+          <div class="cyber-card corner-accent overflow-hidden">
+            <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+              <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+                [preferences]
+              </h3>
+            </div>
+            <div class="p-4 space-y-6">
+              <p class="text-xs text-muted-foreground font-mono">
                 General application settings
-              </Card.Description>
-            </Card.Header>
-            <Card.Content class="space-y-6">
+              </p>
               <div class="flex items-center justify-between">
                 <div class="space-y-0.5">
-                  <Label for="in-app-notifications">In-App Notifications</Label>
-                  <p class="text-xs text-muted-foreground">Show toast notifications</p>
+                  <Label for="in-app-notifications" class="font-mono text-sm">In-App Notifications</Label>
+                  <p class="text-xs text-muted-foreground font-mono">Show toast notifications</p>
                 </div>
                 <Switch 
                   id="in-app-notifications"
@@ -869,8 +946,8 @@ export default {
 
               <div class="flex items-center justify-between">
                 <div class="space-y-0.5">
-                  <Label for="system-notifications">System Notifications</Label>
-                  <p class="text-xs text-muted-foreground">OS notifications when in background</p>
+                  <Label for="system-notifications" class="font-mono text-sm">System Notifications</Label>
+                  <p class="text-xs text-muted-foreground font-mono">OS notifications when in background</p>
                 </div>
                 <Switch 
                   id="system-notifications"
@@ -903,7 +980,7 @@ export default {
               </div>
 
               <div class="space-y-2">
-                <Label for="refresh-interval">Auto-refresh Interval</Label>
+                <Label for="refresh-interval" class="font-mono text-sm">Auto-refresh Interval</Label>
                 <div class="flex items-center gap-2">
                   <Input 
                     id="refresh-interval"
@@ -915,77 +992,91 @@ export default {
                       const target = e.target as HTMLInputElement;
                       setAutoRefreshInterval(parseInt(target.value) || 0);
                     }}
-                    class="w-24"
+                    class="w-24 font-mono bg-background/50 border-border/50 focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)]"
                   />
-                  <span class="text-sm text-muted-foreground">seconds (0 = disabled)</span>
+                  <span class="text-xs text-muted-foreground font-mono">seconds (0 = disabled)</span>
                 </div>
               </div>
-            </Card.Content>
-          </Card.Root>
+            </div>
+          </div>
 
           <!-- Statistics -->
-          <Card.Root>
-            <Card.Header>
-              <Card.Title>Statistics</Card.Title>
-              <Card.Description>
+          <div class="cyber-card corner-accent overflow-hidden">
+            <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+              <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+                [statistics]
+              </h3>
+            </div>
+            <div class="p-4 space-y-4">
+              <p class="text-xs text-muted-foreground font-mono">
                 Overview of your sandboxes
-              </Card.Description>
-            </Card.Header>
-            <Card.Content>
+              </p>
               <div class="grid grid-cols-2 gap-3">
-                <div class="text-center p-3 bg-muted rounded-lg">
-                  <p class="text-2xl font-bold">{sandboxes.count}</p>
-                  <p class="text-xs text-muted-foreground">Total</p>
+                <div class="text-center p-3 bg-background/50 rounded border border-border/30">
+                  <p class="text-2xl font-bold font-mono">{sandboxes.count}</p>
+                  <p class="text-xs text-muted-foreground font-mono uppercase tracking-wider">Total</p>
                 </div>
-                <div class="text-center p-3 bg-green-500/10 rounded-lg">
-                  <p class="text-2xl font-bold text-green-600 dark:text-green-400">{sandboxes.running.length}</p>
-                  <p class="text-xs text-muted-foreground">Running</p>
+                <div class="text-center p-3 rounded border" style="background: var(--cyber-emerald)10; border-color: var(--cyber-emerald)30;">
+                  <p class="text-2xl font-bold font-mono" style="color: var(--cyber-emerald);">{sandboxes.running.length}</p>
+                  <p class="text-xs text-muted-foreground font-mono uppercase tracking-wider">Running</p>
                 </div>
-                <div class="text-center p-3 bg-muted rounded-lg">
-                  <p class="text-2xl font-bold">{sandboxes.stopped.length}</p>
-                  <p class="text-xs text-muted-foreground">Stopped</p>
+                <div class="text-center p-3 bg-background/50 rounded border border-border/30">
+                  <p class="text-2xl font-bold font-mono">{sandboxes.stopped.length}</p>
+                  <p class="text-xs text-muted-foreground font-mono uppercase tracking-wider">Stopped</p>
                 </div>
-                <div class="text-center p-3 bg-yellow-500/10 rounded-lg">
-                  <p class="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{sandboxes.starting.length + sandboxes.stopping.length}</p>
-                  <p class="text-xs text-muted-foreground">Transitioning</p>
+                <div class="text-center p-3 rounded border" style="background: var(--cyber-amber)10; border-color: var(--cyber-amber)30;">
+                  <p class="text-2xl font-bold font-mono" style="color: var(--cyber-amber);">{sandboxes.starting.length + sandboxes.stopping.length}</p>
+                  <p class="text-xs text-muted-foreground font-mono uppercase tracking-wider">Transitioning</p>
                 </div>
               </div>
-            </Card.Content>
-          </Card.Root>
+            </div>
+          </div>
 
           <!-- Backup & Restore -->
-          <Card.Root>
-            <Card.Header>
-              <Card.Title>Backup & Restore</Card.Title>
-              <Card.Description>
-                Export or import your settings
-              </Card.Description>
-            </Card.Header>
-            <Card.Content class="space-y-4">
-              <p class="text-sm text-muted-foreground">
-                Export your settings for backup or transfer to another device.
+          <div class="cyber-card corner-accent overflow-hidden">
+            <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+              <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+                [backup_restore]
+              </h3>
+            </div>
+            <div class="p-4 space-y-4">
+              <p class="text-xs text-muted-foreground font-mono">
+                Export or import your settings for backup or transfer to another device.
               </p>
               
               {#if showImportDialog}
-                <div class="space-y-3 p-3 border rounded-md">
-                  <Label>Import Settings</Label>
+                <div class="space-y-3 p-3 border border-[var(--cyber-cyan)]/30 rounded bg-[var(--cyber-cyan)]/5">
+                  <Label class="font-mono text-sm text-[var(--cyber-cyan)]">Import Settings</Label>
                   <input 
                     type="file" 
                     accept=".json"
                     onchange={handleFileUpload}
-                    class="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                    class="block w-full text-sm font-mono file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 
+                           file:text-xs file:font-mono file:uppercase file:tracking-wider
+                           file:bg-[var(--cyber-cyan)] file:text-black hover:file:bg-[var(--cyber-cyan)]/90"
                   />
-                  <p class="text-xs text-muted-foreground">Or paste JSON:</p>
+                  <p class="text-xs text-muted-foreground font-mono">Or paste JSON:</p>
                   <textarea 
                     bind:value={importInput}
                     placeholder="Paste settings JSON here..."
-                    class="w-full h-20 p-2 text-xs font-mono border rounded-md bg-muted"
+                    class="w-full h-20 p-2 text-xs font-mono border border-border/50 rounded bg-background/50
+                           focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)] focus:outline-none"
                   ></textarea>
                   <div class="flex gap-2">
-                    <Button size="sm" onclick={handleImport} disabled={!importInput.trim()}>
+                    <Button 
+                      size="sm" 
+                      onclick={handleImport} 
+                      disabled={!importInput.trim()}
+                      class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black"
+                    >
                       Import
                     </Button>
-                    <Button size="sm" variant="outline" onclick={() => { showImportDialog = false; importInput = ""; }}>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onclick={() => { showImportDialog = false; importInput = ""; }}
+                      class="font-mono text-xs uppercase tracking-wider border-border/50"
+                    >
                       Cancel
                     </Button>
                   </div>
@@ -993,54 +1084,70 @@ export default {
               {/if}
               
               {#if settings.error}
-                <div class="text-sm p-3 rounded-md bg-destructive/10 text-destructive">
+                <div class="text-sm p-3 rounded font-mono border bg-[var(--cyber-red)]/10 text-[var(--cyber-red)] border-[var(--cyber-red)]/30">
                   {settings.error}
                 </div>
               {/if}
-            </Card.Content>
-            <Card.Footer class="flex flex-wrap gap-2">
-              <Button variant="outline" onclick={handleExport}>
+            </div>
+            <div class="px-4 pb-4 flex flex-wrap gap-2">
+              <Button 
+                variant="outline" 
+                onclick={handleExport}
+                class="font-mono text-xs uppercase tracking-wider border-border/50 hover:border-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]"
+              >
                 Export
               </Button>
               {#if !showImportDialog}
-                <Button variant="outline" onclick={() => showImportDialog = true}>
+                <Button 
+                  variant="outline" 
+                  onclick={() => showImportDialog = true}
+                  class="font-mono text-xs uppercase tracking-wider border-border/50 hover:border-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]"
+                >
                   Import
                 </Button>
               {/if}
-              <Button variant="ghost" onclick={handleReset}>
+              <Button 
+                variant="ghost" 
+                onclick={handleReset}
+                class="font-mono text-xs uppercase tracking-wider hover:text-[var(--cyber-amber)]"
+              >
                 Reset
               </Button>
-            </Card.Footer>
-          </Card.Root>
+            </div>
+          </div>
 
           <!-- App Info -->
-          <Card.Root>
-            <Card.Header>
-              <Card.Title>About CodeOpen</Card.Title>
-              <Card.Description>
+          <div class="cyber-card corner-accent overflow-hidden">
+            <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+              <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+                [about_codeopen]
+              </h3>
+            </div>
+            <div class="p-4 space-y-4">
+              <p class="text-xs text-muted-foreground font-mono">
                 Application information
-              </Card.Description>
-            </Card.Header>
-            <Card.Content class="space-y-4">
-              <div class="space-y-3">
+              </p>
+              <div class="space-y-3 font-mono text-sm">
                 <div class="flex items-center justify-between">
-                  <span class="text-sm text-muted-foreground">Version</span>
-                  <span class="text-sm font-mono">0.1.0</span>
+                  <span class="text-muted-foreground">Version</span>
+                  <span class="px-2 py-0.5 rounded text-xs" style="color: var(--cyber-cyan); background: var(--cyber-cyan)10; border: 1px solid var(--cyber-cyan)30;">
+                    0.1.0
+                  </span>
                 </div>
                 <div class="flex items-center justify-between">
-                  <span class="text-sm text-muted-foreground">Platform</span>
-                  <span class="text-sm font-medium">Desktop</span>
+                  <span class="text-muted-foreground">Platform</span>
+                  <span>Desktop</span>
                 </div>
                 <div class="flex items-center justify-between">
-                  <span class="text-sm text-muted-foreground">Built with</span>
-                  <span class="text-sm font-medium">Tauri + Svelte</span>
+                  <span class="text-muted-foreground">Built with</span>
+                  <span>Tauri + Svelte</span>
                 </div>
               </div>
-              <p class="text-xs text-muted-foreground pt-2 border-t">
+              <p class="text-xs text-muted-foreground font-mono pt-3 border-t border-border/30">
                 Portable Command Center for OpenCode - manage your AI-powered development environments from anywhere.
               </p>
-            </Card.Content>
-          </Card.Root>
+            </div>
+          </div>
         </div>
       </Tabs.Content>
     </Tabs.Root>
@@ -1049,16 +1156,16 @@ export default {
 
 <!-- New File Dialog -->
 <Dialog.Root bind:open={showNewFileDialog}>
-  <Dialog.Content class="sm:max-w-lg">
+  <Dialog.Content class="sm:max-w-lg cyber-card border-[var(--cyber-cyan)]/30">
     <Dialog.Header>
-      <Dialog.Title>Create New File</Dialog.Title>
-      <Dialog.Description>
+      <Dialog.Title class="font-mono text-[var(--cyber-cyan)]">[create_new_file]</Dialog.Title>
+      <Dialog.Description class="font-mono text-xs">
         Create a new {newFileType} file that will be available in all your sandboxes.
       </Dialog.Description>
     </Dialog.Header>
     <div class="space-y-4 py-4">
       <div class="space-y-2">
-        <Label for="new-file-type">Type</Label>
+        <Label for="new-file-type" class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">Type</Label>
         <Select.Root 
           type="single"
           value={newFileType}
@@ -1070,7 +1177,7 @@ export default {
             }
           }}
         >
-          <Select.Trigger class="w-full">
+          <Select.Trigger class="w-full font-mono text-sm bg-background/50 border-border/50">
             {fileTypeTabs.find(t => t.value === newFileType)?.label ?? "Agent"}
           </Select.Trigger>
           <Select.Content>
@@ -1082,24 +1189,24 @@ export default {
       </div>
       
       <div class="space-y-2">
-        <Label for="new-file-name">Name</Label>
+        <Label for="new-file-name" class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">Name</Label>
         <div class="flex items-center gap-2">
           <Input 
             id="new-file-name"
             bind:value={newFileName}
             placeholder="my-{newFileType}"
-            class="flex-1"
+            class="flex-1 font-mono bg-background/50 border-border/50 focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)]"
           />
-          <span class="text-muted-foreground">.{newFileExtension}</span>
+          <span class="text-muted-foreground font-mono text-sm">.{newFileExtension}</span>
         </div>
-        <p class="text-xs text-muted-foreground">
+        <p class="text-xs text-muted-foreground font-mono">
           Use lowercase letters, numbers, dashes, and underscores only.
         </p>
       </div>
       
       {#if newFileType === "tool" || newFileType === "plugin"}
         <div class="space-y-2">
-          <Label>Extension</Label>
+          <Label class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">Extension</Label>
           <Select.Root 
             type="single"
             value={newFileExtension}
@@ -1107,7 +1214,7 @@ export default {
               if (v) newFileExtension = v as typeof newFileExtension;
             }}
           >
-            <Select.Trigger class="w-24">
+            <Select.Trigger class="w-24 font-mono text-sm bg-background/50 border-border/50">
               .{newFileExtension}
             </Select.Trigger>
             <Select.Content>
@@ -1119,21 +1226,30 @@ export default {
       {/if}
       
       <div class="space-y-2">
-        <Label>Content</Label>
+        <Label class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">Content</Label>
         <textarea 
           bind:value={newFileContent}
-          class="w-full h-48 p-3 text-sm font-mono border rounded-md bg-background resize-y"
+          class="w-full h-48 p-3 text-sm font-mono border border-border/50 rounded bg-background/50 resize-y
+                 focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)] focus:outline-none"
         ></textarea>
       </div>
     </div>
     <Dialog.Footer>
-      <Button variant="outline" onclick={() => showNewFileDialog = false}>
+      <Button 
+        variant="outline" 
+        onclick={() => showNewFileDialog = false}
+        class="font-mono text-xs uppercase tracking-wider border-border/50"
+      >
         Cancel
       </Button>
       <Button 
         onclick={handleCreateFile}
         disabled={newFileCreating || !newFileName.trim()}
+        class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black disabled:opacity-50"
       >
+        {#if newFileCreating}
+          <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>
+        {/if}
         {newFileCreating ? "Creating..." : "Create"}
       </Button>
     </Dialog.Footer>
@@ -1142,23 +1258,30 @@ export default {
 
 <!-- Delete Confirmation Dialog -->
 <Dialog.Root bind:open={showDeleteDialog}>
-  <Dialog.Content class="sm:max-w-md">
+  <Dialog.Content class="sm:max-w-md cyber-card border-[var(--cyber-red)]/30">
     <Dialog.Header>
-      <Dialog.Title>Delete File</Dialog.Title>
-      <Dialog.Description>
+      <Dialog.Title class="font-mono text-[var(--cyber-red)]">[delete_file]</Dialog.Title>
+      <Dialog.Description class="font-mono text-xs">
         Are you sure you want to delete "{fileToDelete?.name}.{fileToDelete?.extension}"?
         This action cannot be undone.
       </Dialog.Description>
     </Dialog.Header>
     <Dialog.Footer>
-      <Button variant="outline" onclick={() => showDeleteDialog = false}>
+      <Button 
+        variant="outline" 
+        onclick={() => showDeleteDialog = false}
+        class="font-mono text-xs uppercase tracking-wider border-border/50"
+      >
         Cancel
       </Button>
       <Button 
-        variant="destructive"
         onclick={handleConfirmDelete}
         disabled={fileDeleting}
+        class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/90 text-white disabled:opacity-50"
       >
+        {#if fileDeleting}
+          <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>
+        {/if}
         {fileDeleting ? "Deleting..." : "Delete"}
       </Button>
     </Dialog.Footer>

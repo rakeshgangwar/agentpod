@@ -7,7 +7,6 @@
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
-  import * as Card from "$lib/components/ui/card";
   import * as Tabs from "$lib/components/ui/tabs";
   import ResourceTierSelector from "$lib/components/resource-tier-selector.svelte";
   import FlavorSelector from "$lib/components/flavor-selector.svelte";
@@ -256,18 +255,26 @@
   }
 </script>
 
-<main class="container mx-auto px-4 py-8 max-w-2xl">
-  <div class="space-y-6">
+<!-- Noise overlay for atmosphere -->
+<div class="noise-overlay"></div>
+
+<main class="container mx-auto px-4 py-8 max-w-2xl grid-bg min-h-screen">
+  <div class="space-y-6 animate-fade-in">
     <!-- Header -->
     <div class="flex items-center gap-4">
-      <Button variant="ghost" size="sm" onclick={handleCancel}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="m15 18-6-6 6-6"/>
-        </svg>
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        onclick={handleCancel}
+        class="font-mono text-xs uppercase tracking-wider h-8 px-3"
+      >
+        <span class="mr-1">&larr;</span> Back
       </Button>
       <div>
-        <h1 class="text-2xl font-bold">New Project</h1>
-        <p class="text-muted-foreground text-sm">
+        <h1 class="text-2xl font-bold glitch-hover" style="font-family: 'Space Grotesk', sans-serif;">
+          New Project
+        </h1>
+        <p class="font-mono text-sm text-muted-foreground">
           Create a new project or import from GitHub
         </p>
       </div>
@@ -275,59 +282,80 @@
 
     <!-- Creation Progress -->
     {#if isSubmitting && creationProgress.length > 0}
-      <Card.Root>
-        <Card.Header>
-          <Card.Title class="text-lg">Creating Project...</Card.Title>
-        </Card.Header>
-        <Card.Content>
-          <div class="space-y-3">
-            {#each creationProgress as step, i}
-              <div class="flex items-center gap-2">
-                {#if step.done}
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-green-500 flex-shrink-0">
-                    <path d="M20 6 9 17l-5-5"/>
-                  </svg>
-                {:else}
-                  <div class="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
-                {/if}
-                <span class="text-sm {step.done ? 'text-muted-foreground' : 'text-foreground'}">
-                  {step.message}
-                </span>
-              </div>
-            {/each}
-            
-            <!-- Dynamic waiting message -->
-            {#if currentProgressMessage && creationProgress.some(s => !s.done)}
-              <div class="mt-4 pt-4 border-t">
-                <div class="flex items-center gap-2 text-muted-foreground">
-                  <div class="flex space-x-1">
-                    <div class="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style="animation-delay: 0ms"></div>
-                    <div class="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style="animation-delay: 150ms"></div>
-                    <div class="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style="animation-delay: 300ms"></div>
-                  </div>
-                  <span class="text-sm italic">{currentProgressMessage}</span>
+      <div class="cyber-card corner-accent p-6 animate-fade-in-up">
+        <h3 class="text-lg font-bold mb-4" style="font-family: 'Space Grotesk', sans-serif;">
+          Creating Project<span class="typing-cursor"></span>
+        </h3>
+        
+        <div class="space-y-3">
+          {#each creationProgress as step, i}
+            <div class="flex items-center gap-3 animate-fade-in-up" style="animation-delay: {i * 100}ms">
+              {#if step.done}
+                <div class="w-5 h-5 rounded-full bg-[var(--cyber-emerald)]/20 border border-[var(--cyber-emerald)] flex items-center justify-center">
+                  <span class="text-[var(--cyber-emerald)] text-xs">✓</span>
                 </div>
+              {:else}
+                <div class="relative w-5 h-5">
+                  <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
+                  <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
+                </div>
+              {/if}
+              <span class="font-mono text-sm {step.done ? 'text-muted-foreground' : 'text-[var(--cyber-cyan)]'}">
+                {step.message}
+              </span>
+            </div>
+          {/each}
+          
+          <!-- Dynamic waiting message -->
+          {#if currentProgressMessage && creationProgress.some(s => !s.done)}
+            <div class="mt-6 pt-4 border-t border-border/30">
+              <div class="flex items-center gap-3 text-muted-foreground">
+                <div class="flex space-x-1">
+                  <div class="w-1.5 h-1.5 bg-[var(--cyber-cyan)] rounded-full animate-bounce" style="animation-delay: 0ms"></div>
+                  <div class="w-1.5 h-1.5 bg-[var(--cyber-cyan)] rounded-full animate-bounce" style="animation-delay: 150ms"></div>
+                  <div class="w-1.5 h-1.5 bg-[var(--cyber-cyan)] rounded-full animate-bounce" style="animation-delay: 300ms"></div>
+                </div>
+                <span class="text-sm font-mono italic text-[var(--cyber-cyan)]/70">{currentProgressMessage}</span>
               </div>
-            {/if}
-          </div>
-        </Card.Content>
-      </Card.Root>
+            </div>
+          {/if}
+        </div>
+      </div>
     {:else}
       <!-- Tabs Form -->
-      <Card.Root>
+      <div class="cyber-card corner-accent overflow-hidden">
         <Tabs.Root bind:value={activeTab}>
-          <Card.Header class="pb-0">
-            <Tabs.List class="grid w-full grid-cols-2">
-              <Tabs.Trigger value="scratch">From Scratch</Tabs.Trigger>
-              <Tabs.Trigger value="github">Import from GitHub</Tabs.Trigger>
+          <!-- Tab Header -->
+          <div class="border-b border-border/30 bg-background/30 backdrop-blur-sm">
+            <Tabs.List class="grid w-full grid-cols-2 p-0 h-auto bg-transparent">
+              <Tabs.Trigger 
+                value="scratch" 
+                class="py-3 px-4 font-mono text-xs uppercase tracking-wider rounded-none border-b-2 
+                       data-[state=active]:border-[var(--cyber-cyan)] data-[state=active]:text-[var(--cyber-cyan)]
+                       data-[state=inactive]:border-transparent data-[state=inactive]:text-muted-foreground
+                       hover:text-foreground transition-colors bg-transparent"
+              >
+                From Scratch
+              </Tabs.Trigger>
+              <Tabs.Trigger 
+                value="github"
+                class="py-3 px-4 font-mono text-xs uppercase tracking-wider rounded-none border-b-2 
+                       data-[state=active]:border-[var(--cyber-cyan)] data-[state=active]:text-[var(--cyber-cyan)]
+                       data-[state=inactive]:border-transparent data-[state=inactive]:text-muted-foreground
+                       hover:text-foreground transition-colors bg-transparent"
+              >
+                Import from GitHub
+              </Tabs.Trigger>
             </Tabs.List>
-          </Card.Header>
+          </div>
           
-          <Card.Content class="pt-6">
+          <!-- Tab Content -->
+          <div class="p-6">
             <!-- Error Display -->
             {#if errorMessage}
-              <div class="mb-4 text-sm text-destructive bg-destructive/10 p-3 rounded-md">
-                {errorMessage}
+              <div class="mb-4 p-3 rounded border border-[var(--cyber-red)]/50 bg-[var(--cyber-red)]/5">
+                <span class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-red)]">[error]</span>
+                <p class="text-sm text-[var(--cyber-red)] mt-1">{errorMessage}</p>
               </div>
             {/if}
             
@@ -335,30 +363,38 @@
               <!-- From Scratch Tab -->
               <Tabs.Content value="scratch" class="space-y-4 mt-0">
                 <div class="space-y-2">
-                  <Label for="project-name">Project Name *</Label>
+                  <Label for="project-name" class="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                    Project Name *
+                  </Label>
                   <Input
                     id="project-name"
                     placeholder="my-awesome-project"
                     bind:value={projectName}
                     disabled={isSubmitting}
+                    class="font-mono bg-background/50 border-border/50 
+                           focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)]"
                   />
-                  <p class="text-xs text-muted-foreground">
+                  <p class="text-xs font-mono text-muted-foreground/70">
                     A unique name for your project. This will be used to create the repository.
                   </p>
                 </div>
                 
                 <div class="space-y-2">
-                  <Label for="project-desc">Description</Label>
+                  <Label for="project-desc" class="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                    Description
+                  </Label>
                   <Input
                     id="project-desc"
                     placeholder="A brief description of your project..."
                     bind:value={projectDescription}
                     disabled={isSubmitting}
+                    class="font-mono bg-background/50 border-border/50 
+                           focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)]"
                   />
                 </div>
                 
                 <!-- Flavor selector -->
-                <div class="space-y-2 border-t pt-4">
+                <div class="space-y-2 border-t border-border/30 pt-4">
                   <FlavorSelector
                     bind:selectedFlavorId
                     disabled={isSubmitting}
@@ -366,7 +402,7 @@
                 </div>
                 
                 <!-- Resource Tier selector -->
-                <div class="space-y-2 border-t pt-4">
+                <div class="space-y-2 border-t border-border/30 pt-4">
                   <ResourceTierSelector
                     bind:selectedTierId={selectedResourceTierId}
                     disabled={isSubmitting}
@@ -374,7 +410,7 @@
                 </div>
                 
                 <!-- Addon selector -->
-                <div class="space-y-2 border-t pt-4">
+                <div class="space-y-2 border-t border-border/30 pt-4">
                   <AddonSelector
                     bind:selectedAddonIds
                     disabled={isSubmitting}
@@ -385,26 +421,31 @@
               <!-- GitHub Import Tab -->
               <Tabs.Content value="github" class="space-y-4 mt-0">
                 <div class="space-y-2">
-                  <Label for="github-url">Repository URL *</Label>
+                  <Label for="github-url" class="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                    Repository URL *
+                  </Label>
                   <Input
                     id="github-url"
                     placeholder="https://github.com/username/repository"
                     bind:value={githubUrl}
                     disabled={isSubmitting}
+                    class="font-mono bg-background/50 border-border/50 
+                           focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)]"
                   />
-                  <p class="text-xs text-muted-foreground">
+                  <p class="text-xs font-mono text-muted-foreground/70">
                     Enter the URL of a GitHub or GitLab repository to import.
                   </p>
                 </div>
                 
                 {#if githubUrl && extractRepoName(githubUrl)}
-                  <div class="text-sm text-muted-foreground bg-muted p-3 rounded-md">
-                    Project name: <span class="font-medium text-foreground">{extractRepoName(githubUrl)}</span>
+                  <div class="p-3 rounded bg-[var(--cyber-cyan)]/5 border border-[var(--cyber-cyan)]/20">
+                    <span class="font-mono text-xs text-muted-foreground">Project name: </span>
+                    <span class="font-mono text-sm text-[var(--cyber-cyan)]">{extractRepoName(githubUrl)}</span>
                   </div>
                 {/if}
                 
                 <!-- Flavor selector -->
-                <div class="space-y-2 border-t pt-4">
+                <div class="space-y-2 border-t border-border/30 pt-4">
                   <FlavorSelector
                     bind:selectedFlavorId
                     disabled={isSubmitting}
@@ -412,7 +453,7 @@
                 </div>
                 
                 <!-- Resource Tier selector -->
-                <div class="space-y-2 border-t pt-4">
+                <div class="space-y-2 border-t border-border/30 pt-4">
                   <ResourceTierSelector
                     bind:selectedTierId={selectedResourceTierId}
                     disabled={isSubmitting}
@@ -420,7 +461,7 @@
                 </div>
                 
                 <!-- Addon selector -->
-                <div class="space-y-2 border-t pt-4">
+                <div class="space-y-2 border-t border-border/30 pt-4">
                   <AddonSelector
                     bind:selectedAddonIds
                     disabled={isSubmitting}
@@ -429,23 +470,28 @@
               </Tabs.Content>
               
               <!-- Submit Button -->
-              <div class="flex gap-3 pt-4">
+              <div class="flex gap-3 pt-6 border-t border-border/30 mt-6">
                 <Button
                   type="button"
                   variant="outline"
                   onclick={handleCancel}
                   disabled={isSubmitting}
-                  class="flex-1"
+                  class="flex-1 font-mono text-xs uppercase tracking-wider border-border/50"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
                   disabled={!isFormValid || isSubmitting}
-                  class="flex-1"
+                  class="flex-1 font-mono text-xs uppercase tracking-wider
+                         bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black
+                         disabled:opacity-30"
                 >
                   {#if isSubmitting}
-                    <div class="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2"></div>
+                    <div class="relative w-4 h-4 mr-2">
+                      <div class="absolute inset-0 rounded-full border-2 border-black/20"></div>
+                      <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-black animate-spin"></div>
+                    </div>
                     Creating...
                   {:else if activeTab === "scratch"}
                     Create Project
@@ -455,14 +501,14 @@
                 </Button>
               </div>
             </form>
-          </Card.Content>
+          </div>
         </Tabs.Root>
-      </Card.Root>
+      </div>
     {/if}
     
     <!-- Help Text -->
-    <div class="text-center text-sm text-muted-foreground">
-      <p>
+    <div class="text-center">
+      <p class="text-xs font-mono text-muted-foreground/70">
         {#if activeTab === "scratch"}
           A new Git repository will be created and a sandbox container will be provisioned.
         {:else}

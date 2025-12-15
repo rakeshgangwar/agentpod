@@ -1,7 +1,6 @@
 <script lang="ts">
   import { page } from "$app/stores";
   import { goto } from "$app/navigation";
-  import * as Card from "$lib/components/ui/card";
   import { Button } from "$lib/components/ui/button";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { ScrollArea } from "$lib/components/ui/scroll-area";
@@ -281,44 +280,44 @@
 
   function getFileIcon(node: FileNode): string {
     if (node.type === "directory") {
-      return expandedPaths.has(node.path) ? "📂" : "📁";
+      return expandedPaths.has(node.path) ? "▼" : "▶";
     }
 
     const ext = node.name.split(".").pop()?.toLowerCase();
     switch (ext) {
       case "ts":
       case "tsx":
-        return "🟦";
+        return "◆";
       case "js":
       case "jsx":
-        return "🟨";
+        return "◇";
       case "svelte":
-        return "🟠";
+        return "●";
       case "rs":
-        return "🦀";
+        return "⚙";
       case "json":
-        return "📋";
+        return "{}";
       case "md":
-        return "📝";
+        return "#";
       case "css":
       case "scss":
-        return "🎨";
+        return "◈";
       case "html":
-        return "🌐";
+        return "<>";
       case "toml":
       case "yaml":
       case "yml":
-        return "⚙️";
+        return "≡";
       case "png":
       case "jpg":
       case "jpeg":
       case "gif":
       case "svg":
-        return "🖼️";
+        return "▣";
       case "lock":
-        return "🔒";
+        return "◉";
       default:
-        return "📄";
+        return "○";
     }
   }
 
@@ -338,57 +337,83 @@
   }
 </script>
 
-<div class="flex h-[calc(100vh-200px)] min-h-[400px] gap-4 overflow-hidden">
+<div class="flex h-[calc(100vh-200px)] min-h-[400px] gap-4 overflow-hidden animate-fade-in">
   <!-- File Tree Panel -->
-  <Card.Root class="w-72 flex-shrink-0 flex flex-col">
-    <Card.Header class="py-3 px-4 border-b">
+  <div class="w-72 flex-shrink-0 flex flex-col cyber-card corner-accent overflow-hidden">
+    <!-- Header -->
+    <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
       <div class="flex items-center justify-between w-full">
-        <Card.Title class="text-sm">Files</Card.Title>
-        <Button size="sm" variant="ghost" onclick={loadFileTree} disabled={isLoadingTree}>
+        <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+          [files]
+        </h3>
+        <Button 
+          size="sm" 
+          variant="ghost" 
+          onclick={loadFileTree} 
+          disabled={isLoadingTree}
+          class="h-7 px-2 font-mono text-xs text-muted-foreground hover:text-[var(--cyber-cyan)]"
+        >
           {isLoadingTree ? "..." : "↻"}
         </Button>
       </div>
-    </Card.Header>
-    <Card.Content class="flex-1 p-0 overflow-hidden">
+    </div>
+    
+    <!-- File Tree Content -->
+    <div class="flex-1 overflow-hidden">
       <ScrollArea class="h-full">
         {#if isLoadingTree}
           <div class="p-3 space-y-2">
-            {#each [1, 2, 3, 4, 5] as _}
-              <Skeleton class="h-6 w-full" />
+            {#each [1, 2, 3, 4, 5] as i}
+              <div class="animate-fade-in-up stagger-{i}">
+                <Skeleton class="h-6 w-full bg-muted/20" />
+              </div>
             {/each}
           </div>
         {:else if treeError}
-          <div class="p-3 text-sm text-destructive">{treeError}</div>
+          <div class="p-4">
+            <div class="p-3 rounded border border-[var(--cyber-red)]/50 bg-[var(--cyber-red)]/5">
+              <span class="font-mono text-xs text-[var(--cyber-red)]">[error]</span>
+              <p class="text-sm text-[var(--cyber-red)] mt-1">{treeError}</p>
+            </div>
+          </div>
         {:else if fileTree.length === 0}
-          <div class="p-3 text-sm text-muted-foreground text-center">
-            <p>No files found</p>
+          <div class="p-6 text-center">
+            <div class="font-mono text-3xl text-[var(--cyber-cyan)]/20 mb-3">[ ]</div>
+            <p class="text-sm font-mono text-muted-foreground">No files found</p>
           </div>
         {:else}
           <div class="p-2">
             {#snippet renderNode(node: FileNode, depth: number = 0)}
               <div
-                class="flex items-center gap-2 py-1 px-2 rounded cursor-pointer text-sm hover:bg-muted transition-colors
-                  {selectedFile?.path === node.path ? 'bg-primary/10 text-primary' : ''}
-                  {node.ignored ? 'opacity-50' : ''}"
+                class="flex items-center gap-2 py-1.5 px-2 rounded cursor-pointer text-sm font-mono
+                       transition-all group
+                  {selectedFile?.path === node.path 
+                    ? 'bg-[var(--cyber-cyan)]/10 text-[var(--cyber-cyan)] border border-[var(--cyber-cyan)]/30' 
+                    : 'hover:bg-muted/30 border border-transparent hover:border-border/30'}
+                  {node.ignored ? 'opacity-40' : ''}"
                 style="padding-left: {depth * 16 + 8}px"
                 onclick={() => selectFile(node)}
                 onkeydown={(e) => e.key === "Enter" && selectFile(node)}
                 role="button"
                 tabindex="0"
               >
-                <span class="flex-shrink-0">
+                <span class="flex-shrink-0 w-4 text-center text-xs
+                             {node.type === 'directory' ? 'text-[var(--cyber-amber)]' : 'text-muted-foreground'}
+                             {selectedFile?.path === node.path ? 'text-[var(--cyber-cyan)]' : ''}">
                   {#if node.type === "directory" && loadingFolders.has(node.path)}
-                    <span class="animate-spin">⏳</span>
+                    <span class="inline-block animate-spin">◌</span>
                   {:else}
                     {getFileIcon(node)}
                   {/if}
                 </span>
-                <span class="truncate">{node.name}</span>
+                <span class="truncate text-xs">{node.name}</span>
               </div>
               {#if node.type === "directory" && expandedPaths.has(node.path)}
-                {#each sortNodes(getChildren(node.path)) as child (child.path)}
-                  {@render renderNode(child, depth + 1)}
-                {/each}
+                <div class="border-l border-[var(--cyber-cyan)]/10 ml-4">
+                  {#each sortNodes(getChildren(node.path)) as child (child.path)}
+                    {@render renderNode(child, depth + 1)}
+                  {/each}
+                </div>
               {/if}
             {/snippet}
 
@@ -398,35 +423,41 @@
           </div>
         {/if}
       </ScrollArea>
-    </Card.Content>
-  </Card.Root>
+    </div>
+  </div>
 
   <!-- File Content Panel -->
-  <Card.Root class="flex-1 min-w-0 flex flex-col overflow-hidden">
+  <div class="flex-1 min-w-0 flex flex-col cyber-card corner-accent overflow-hidden">
     {#if selectedFile}
-      <Card.Header class="py-3 px-4 border-b">
-        <div class="flex items-center justify-between">
+      <!-- File Header -->
+      <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+        <div class="flex items-center justify-between gap-4">
           <div class="min-w-0 flex-1">
-            <Card.Title class="text-sm truncate">{selectedFile.name}</Card.Title>
-            <Card.Description class="text-xs truncate">
+            <h3 class="font-mono text-sm truncate text-foreground flex items-center gap-2">
+              <span class="text-[var(--cyber-cyan)]">{getFileIcon(selectedFile)}</span>
+              {selectedFile.name}
+            </h3>
+            <p class="text-xs font-mono truncate text-muted-foreground mt-0.5">
               {selectedFile.path}
-            </Card.Description>
+            </p>
           </div>
-          <div class="flex gap-2">
+          <div class="flex gap-2 flex-wrap justify-end">
             {#if isMarkdownFile(selectedFile.name)}
-              <div class="flex border rounded-md overflow-hidden">
+              <div class="flex border border-border/50 rounded overflow-hidden">
                 <button
-                  class="px-2 py-1 text-xs transition-colors {markdownViewMode === 'raw' 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'bg-muted hover:bg-muted/80'}"
+                  class="px-2 py-1 text-xs font-mono uppercase tracking-wider transition-colors
+                         {markdownViewMode === 'raw' 
+                           ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]' 
+                           : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'}"
                   onclick={() => markdownViewMode = "raw"}
                 >
                   Raw
                 </button>
                 <button
-                  class="px-2 py-1 text-xs transition-colors {markdownViewMode === 'preview' 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'bg-muted hover:bg-muted/80'}"
+                  class="px-2 py-1 text-xs font-mono uppercase tracking-wider transition-colors
+                         {markdownViewMode === 'preview' 
+                           ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]' 
+                           : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'}"
                   onclick={() => markdownViewMode = "preview"}
                 >
                   Preview
@@ -438,16 +469,20 @@
               variant="outline"
               onclick={copyPath}
               title="Copy file path to clipboard"
+              class="h-7 px-2 font-mono text-xs border-border/50 hover:border-[var(--cyber-cyan)]/50
+                     hover:text-[var(--cyber-cyan)]"
             >
-              Copy Path
+              Path
             </Button>
             <Button
               size="sm"
               variant="outline"
               onclick={useInChat}
               title="Reference this file in chat"
+              class="h-7 px-2 font-mono text-xs border-border/50 hover:border-[var(--cyber-emerald)]/50
+                     hover:text-[var(--cyber-emerald)]"
             >
-              Use in Chat
+              Chat
             </Button>
             <Button
               size="sm"
@@ -460,8 +495,10 @@
               }}
               disabled={!fileContent?.content}
               title="Copy file content to clipboard"
+              class="h-7 px-2 font-mono text-xs border-border/50 hover:border-[var(--cyber-amber)]/50
+                     hover:text-[var(--cyber-amber)] disabled:opacity-30"
             >
-              Copy Content
+              Copy
             </Button>
             <Button
               size="sm"
@@ -469,22 +506,33 @@
               onclick={downloadFile}
               disabled={!fileContent?.content}
               title="Download file"
+              class="h-7 px-2 font-mono text-xs border-border/50 hover:border-[var(--cyber-magenta)]/50
+                     hover:text-[var(--cyber-magenta)] disabled:opacity-30"
             >
-              Download
+              ↓
             </Button>
           </div>
         </div>
-      </Card.Header>
-      <Card.Content class="flex-1 p-0 overflow-hidden">
+      </div>
+      
+      <!-- File Content -->
+      <div class="flex-1 overflow-hidden bg-black/20">
         <ScrollArea class="h-full" orientation="both">
           {#if isLoadingContent}
             <div class="p-4 space-y-2">
-              {#each [1, 2, 3, 4, 5, 6, 7, 8] as _}
-                <Skeleton class="h-4 w-full" />
+              {#each [1, 2, 3, 4, 5, 6, 7, 8] as i}
+                <div class="animate-fade-in-up stagger-{i}">
+                  <Skeleton class="h-4 w-full bg-muted/20" />
+                </div>
               {/each}
             </div>
           {:else if contentError}
-            <div class="p-4 text-sm text-destructive">{contentError}</div>
+            <div class="p-4">
+              <div class="p-4 rounded border border-[var(--cyber-red)]/50 bg-[var(--cyber-red)]/5">
+                <span class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-red)]">[error]</span>
+                <p class="text-sm text-[var(--cyber-red)] mt-2">{contentError}</p>
+              </div>
+            </div>
           {:else if fileContent}
             {#if isMarkdownFile(selectedFile.name) && markdownViewMode === "preview"}
               <MarkdownViewer 
@@ -500,14 +548,24 @@
             {/if}
           {/if}
         </ScrollArea>
-      </Card.Content>
+      </div>
     {:else}
-      <Card.Content class="flex-1 flex items-center justify-center">
-        <div class="text-center text-muted-foreground">
-          <p class="text-lg">No file selected</p>
-          <p class="text-sm mt-1">Select a file from the tree to view its contents</p>
+      <!-- No File Selected State -->
+      <div class="flex-1 flex items-center justify-center">
+        <div class="text-center animate-fade-in-up p-8">
+          <div class="font-mono text-5xl text-[var(--cyber-cyan)]/20 mb-4">○</div>
+          <p class="text-lg font-medium" style="font-family: 'Space Grotesk', sans-serif;">
+            No file selected
+          </p>
+          <p class="text-sm font-mono text-muted-foreground mt-2">
+            Select a file from the tree to view its contents
+          </p>
+          <div class="mt-6 flex justify-center gap-4 text-xs font-mono text-muted-foreground/50">
+            <span>▶ folder</span>
+            <span>○ file</span>
+          </div>
         </div>
-      </Card.Content>
+      </div>
     {/if}
-  </Card.Root>
+  </div>
 </div>

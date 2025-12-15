@@ -124,21 +124,21 @@
 </script>
 
 {#if loading && !externalProviders}
-  <div class="text-xs text-muted-foreground animate-pulse px-2 py-1">
+  <div class="text-xs text-muted-foreground font-mono animate-pulse px-2 py-1">
     Loading models...
   </div>
 {:else if error}
   <Button
     variant="ghost"
     size="sm"
-    class="text-xs text-destructive"
+    class="text-xs font-mono text-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/10"
     onclick={loadProviders}
     {disabled}
   >
     Error loading - Retry
   </Button>
 {:else if providers.length === 0}
-  <div class="text-xs text-muted-foreground px-2 py-1">
+  <div class="text-xs text-muted-foreground font-mono px-2 py-1">
     No providers configured
   </div>
 {:else}
@@ -148,19 +148,19 @@
     onValueChange={handleValueChange}
     {disabled}
   >
-    <Select.Trigger class="{compact ? 'h-7 text-xs min-w-[120px] max-w-[200px]' : 'h-9 text-sm min-w-[180px]'} {isAnimating ? 'animate-agent-switch' : ''}">
+    <Select.Trigger class="font-mono {compact ? 'h-7 text-xs min-w-[120px] max-w-[200px]' : 'h-9 text-sm min-w-[180px]'} border-border/50 bg-background/50 focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)] {isAnimating ? 'animate-agent-switch' : ''}">
       <span class="truncate">{getDisplayName()}</span>
     </Select.Trigger>
     
     <Select.Portal>
-      <Select.Content>
+      <Select.Content class="font-mono border-border/50 bg-background/95 backdrop-blur-sm">
         {#each providers as provider (provider.id)}
           <Select.Group>
-            <Select.GroupHeading class="text-xs font-medium text-muted-foreground px-2 py-1">
+            <Select.GroupHeading class="text-xs font-mono uppercase tracking-wider text-[var(--cyber-cyan)] px-2 py-1">
               {provider.name}
             </Select.GroupHeading>
             {#each provider.models as model (model.id)}
-              <Select.Item value={`${provider.id}::${model.id}`} class="text-sm">
+              <Select.Item value={`${provider.id}::${model.id}`} class="text-sm font-mono">
                 {model.name}
               </Select.Item>
             {/each}

@@ -128,7 +128,7 @@ function LoadingSpinner({ className }: { className?: string }) {
       height="24"
       viewBox="0 0 24 24"
       fill="none"
-      stroke="currentColor"
+      stroke="var(--cyber-cyan)"
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -233,21 +233,21 @@ export function PermissionBar({ className }: PermissionBarProps) {
   return (
     <div
       className={`
-        border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80
-        p-4 shadow-lg animate-in slide-in-from-bottom-2 duration-200
+        border-t border-[var(--cyber-amber)]/30 bg-background/95 backdrop-blur-sm
+        p-4 shadow-[0_-4px_20px_rgba(0,0,0,0.2)] animate-in slide-in-from-bottom-2 duration-200
         ${className || ""}
       `}
     >
       {/* Error message */}
       {error && (
-        <div className="mb-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <div className="mb-3 rounded border border-[var(--cyber-red)]/30 bg-[var(--cyber-red)]/10 px-3 py-2 font-mono text-xs text-[var(--cyber-red)]">
           {error}
         </div>
       )}
 
       <div className="flex items-start gap-4">
         {/* Icon */}
-        <div className="flex-shrink-0 rounded-lg bg-amber-500/10 p-2 text-amber-600 dark:text-amber-400">
+        <div className="flex-shrink-0 rounded border border-[var(--cyber-amber)]/30 bg-[var(--cyber-amber)]/10 p-2 text-[var(--cyber-amber)]">
           {getPermissionIcon(permission.type)}
         </div>
 
@@ -255,24 +255,24 @@ export function PermissionBar({ className }: PermissionBarProps) {
         <div className="flex-1 min-w-0">
           {/* Header */}
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              {getPermissionTypeLabel(permission.type)}
+            <span className="font-mono text-xs font-medium uppercase tracking-wider text-[var(--cyber-amber)]">
+              [{getPermissionTypeLabel(permission.type)}]
             </span>
             {queueCount > 1 && (
-              <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+              <span className="rounded border border-border/30 bg-muted/50 px-2 py-0.5 font-mono text-xs text-muted-foreground">
                 +{queueCount - 1} more
               </span>
             )}
           </div>
 
           {/* Title */}
-          <h4 className="font-medium text-foreground">
+          <h4 className="font-mono text-sm font-medium text-foreground">
             {permission.title}
           </h4>
 
           {/* Pattern (if present) */}
           {pattern && (
-            <code className="mt-1 block truncate text-sm text-muted-foreground font-mono">
+            <code className="mt-1 block truncate font-mono text-xs text-[var(--cyber-cyan)]">
               {pattern}
             </code>
           )}
@@ -281,9 +281,9 @@ export function PermissionBar({ className }: PermissionBarProps) {
         {/* Actions */}
         <div className="flex-shrink-0 flex items-center gap-2">
           {permission.isResponding ? (
-            <div className="flex items-center gap-2 text-muted-foreground">
+            <div className="flex items-center gap-2 text-[var(--cyber-cyan)]">
               <LoadingSpinner className="size-4" />
-              <span className="text-sm">Processing...</span>
+              <span className="font-mono text-xs uppercase tracking-wider">Processing...</span>
             </div>
           ) : (
             <>
@@ -291,10 +291,10 @@ export function PermissionBar({ className }: PermissionBarProps) {
               <button
                 onClick={() => handleRespond("reject")}
                 className="
-                  inline-flex items-center justify-center rounded-md px-3 py-1.5
-                  text-sm font-medium
-                  bg-transparent border border-border text-muted-foreground
-                  hover:bg-destructive/10 hover:text-destructive hover:border-destructive/50
+                  inline-flex items-center justify-center rounded px-3 py-1.5
+                  font-mono text-xs uppercase tracking-wider
+                  bg-transparent border border-[var(--cyber-red)]/30 text-[var(--cyber-red)]
+                  hover:bg-[var(--cyber-red)]/10 hover:border-[var(--cyber-red)]/50
                   transition-colors
                 "
               >
@@ -305,28 +305,28 @@ export function PermissionBar({ className }: PermissionBarProps) {
               <button
                 onClick={() => handleRespond("always")}
                 className="
-                  inline-flex items-center justify-center rounded-md px-3 py-1.5
-                  text-sm font-medium
-                  bg-transparent border border-border text-foreground
-                  hover:bg-accent hover:text-accent-foreground
+                  inline-flex items-center justify-center rounded px-3 py-1.5
+                  font-mono text-xs uppercase tracking-wider
+                  bg-transparent border border-border/50 text-foreground
+                  hover:bg-muted/50 hover:border-[var(--cyber-cyan)]/30
                   transition-colors
                 "
               >
-                Always Allow
+                Always
               </button>
 
               {/* Allow Once button (primary) */}
               <button
                 onClick={() => handleRespond("once")}
                 className="
-                  inline-flex items-center justify-center rounded-md px-3 py-1.5
-                  text-sm font-medium
-                  bg-primary text-primary-foreground
-                  hover:bg-primary/90
-                  transition-colors shadow-sm
+                  inline-flex items-center justify-center rounded px-3 py-1.5
+                  font-mono text-xs uppercase tracking-wider
+                  bg-[var(--cyber-emerald)] text-black
+                  hover:bg-[var(--cyber-emerald)]/90
+                  transition-colors shadow-[0_0_12px_var(--cyber-emerald)/20]
                 "
               >
-                Allow Once
+                Allow
               </button>
             </>
           )}

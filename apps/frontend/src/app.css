@@ -121,7 +121,503 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
   }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+  }
+}
+
+/* ============================================
+   TERMINAL/CYBERPUNK DESIGN SYSTEM
+   ============================================ */
+
+/* Custom color palette for cyberpunk theme */
+:root {
+  --cyber-cyan: oklch(0.85 0.15 192);
+  --cyber-cyan-dim: oklch(0.65 0.12 192);
+  --cyber-emerald: oklch(0.75 0.18 160);
+  --cyber-magenta: oklch(0.7 0.2 330);
+  --cyber-amber: oklch(0.8 0.18 85);
+  --cyber-red: oklch(0.65 0.22 25);
+  --cyber-glow: 0 0 20px oklch(0.85 0.15 192 / 0.3);
+  --cyber-glow-emerald: 0 0 20px oklch(0.75 0.18 160 / 0.3);
+  --noise-opacity: 0.03;
+}
+
+.dark {
+  --noise-opacity: 0.05;
+}
+
+/* Noise texture overlay */
+.noise-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: var(--noise-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+}
+
+/* Grid background pattern */
+.grid-bg {
+  background-image: 
+    linear-gradient(to right, oklch(0.5 0 0 / 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(0.5 0 0 / 0.05) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.dark .grid-bg {
+  background-image: 
+    linear-gradient(to right, oklch(1 0 0 / 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(1 0 0 / 0.03) 1px, transparent 1px);
+}
+
+/* Gradient mesh background */
+.mesh-gradient {
+  background: 
+    radial-gradient(ellipse at 20% 20%, oklch(0.85 0.15 192 / 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, oklch(0.75 0.18 160 / 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, oklch(0.7 0.2 330 / 0.04) 0%, transparent 60%);
+}
+
+.dark .mesh-gradient {
+  background: 
+    radial-gradient(ellipse at 20% 20%, oklch(0.85 0.15 192 / 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, oklch(0.75 0.18 160 / 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, oklch(0.7 0.2 330 / 0.05) 0%, transparent 60%);
+}
+
+/* Scanline effect */
+.scanlines {
+  position: relative;
+}
+
+.scanlines::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    oklch(0 0 0 / 0.02) 2px,
+    oklch(0 0 0 / 0.02) 4px
+  );
+  pointer-events: none;
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+/* Staggered fade-in animation */
+@keyframes fade-in-up {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes slide-in-right {
+  0% {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s ease-out forwards;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out forwards;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.4s ease-out forwards;
+}
+
+/* Stagger delays */
+.stagger-1 { animation-delay: 0.05s; opacity: 0; }
+.stagger-2 { animation-delay: 0.1s; opacity: 0; }
+.stagger-3 { animation-delay: 0.15s; opacity: 0; }
+.stagger-4 { animation-delay: 0.2s; opacity: 0; }
+.stagger-5 { animation-delay: 0.25s; opacity: 0; }
+.stagger-6 { animation-delay: 0.3s; opacity: 0; }
+.stagger-7 { animation-delay: 0.35s; opacity: 0; }
+.stagger-8 { animation-delay: 0.4s; opacity: 0; }
+
+/* Pulse animation for status indicators */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 4px currentColor, 0 0 8px currentColor;
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 8px currentColor, 0 0 16px currentColor;
+    opacity: 0.8;
+  }
+}
+
+@keyframes pulse-dot {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.7;
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+/* Typing cursor animation */
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.typing-cursor::after {
+  content: '_';
+  animation: blink 1s step-end infinite;
+  color: var(--cyber-cyan);
+}
+
+/* Glitch effect for headers */
+@keyframes glitch {
+  0%, 90%, 100% {
+    transform: translate(0);
+    text-shadow: none;
+  }
+  92% {
+    transform: translate(-2px, 1px);
+    text-shadow: 2px 0 var(--cyber-magenta);
+  }
+  94% {
+    transform: translate(2px, -1px);
+    text-shadow: -2px 0 var(--cyber-cyan);
+  }
+  96% {
+    transform: translate(-1px, 2px);
+    text-shadow: 1px 0 var(--cyber-emerald);
+  }
+  98% {
+    transform: translate(1px, -2px);
+    text-shadow: -1px 0 var(--cyber-magenta);
+  }
+}
+
+.glitch-hover:hover {
+  animation: glitch 0.5s ease-in-out;
+}
+
+/* Border glow animation */
+@keyframes border-glow {
+  0%, 100% {
+    border-color: oklch(0.85 0.15 192 / 0.3);
+    box-shadow: 0 0 10px oklch(0.85 0.15 192 / 0.1);
+  }
+  50% {
+    border-color: oklch(0.85 0.15 192 / 0.6);
+    box-shadow: 0 0 20px oklch(0.85 0.15 192 / 0.2);
+  }
+}
+
+.animate-border-glow {
+  animation: border-glow 3s ease-in-out infinite;
+}
+
+/* ============================================
+   CYBERPUNK CARD STYLES
+   ============================================ */
+
+.cyber-card {
+  background: oklch(1 0 0 / 0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid oklch(0.5 0 0 / 0.1);
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.dark .cyber-card {
+  background: oklch(0.15 0.02 265 / 0.7);
+  border-color: oklch(1 0 0 / 0.08);
+}
+
+.cyber-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--cyber-cyan) 20%,
+    var(--cyber-cyan) 80%,
+    transparent
+  );
+  opacity: 0.5;
+}
+
+.cyber-card:hover {
+  border-color: oklch(0.85 0.15 192 / 0.3);
+  box-shadow: 
+    0 4px 24px oklch(0 0 0 / 0.1),
+    0 0 30px oklch(0.85 0.15 192 / 0.05);
+  transform: translateY(-2px);
+}
+
+.dark .cyber-card:hover {
+  border-color: oklch(0.85 0.15 192 / 0.4);
+  box-shadow: 
+    0 4px 24px oklch(0 0 0 / 0.3),
+    0 0 40px oklch(0.85 0.15 192 / 0.1);
+}
+
+/* Corner accents for cards */
+.corner-accent {
+  position: relative;
+}
+
+.corner-accent::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 24px;
+  height: 24px;
+  border-right: 2px solid var(--cyber-cyan);
+  border-bottom: 2px solid var(--cyber-cyan);
+  opacity: 0.3;
+  transition: opacity 0.3s ease;
+}
+
+.corner-accent:hover::after {
+  opacity: 0.6;
+}
+
+/* ============================================
+   STATUS INDICATORS
+   ============================================ */
+
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.status-running {
+  color: var(--cyber-emerald);
+  background: oklch(0.75 0.18 160 / 0.1);
+  border: 1px solid oklch(0.75 0.18 160 / 0.3);
+}
+
+.status-running .status-dot {
+  background: var(--cyber-emerald);
+  box-shadow: 0 0 8px var(--cyber-emerald);
+}
+
+.status-stopped {
+  color: oklch(0.6 0 0);
+  background: oklch(0.5 0 0 / 0.08);
+  border: 1px solid oklch(0.5 0 0 / 0.2);
+}
+
+.dark .status-stopped {
+  color: oklch(0.5 0 0);
+}
+
+.status-starting, .status-stopping {
+  color: var(--cyber-amber);
+  background: oklch(0.8 0.18 85 / 0.1);
+  border: 1px solid oklch(0.8 0.18 85 / 0.3);
+}
+
+.status-starting .status-dot, .status-stopping .status-dot {
+  background: var(--cyber-amber);
+  box-shadow: 0 0 8px var(--cyber-amber);
+}
+
+.status-error {
+  color: var(--cyber-red);
+  background: oklch(0.65 0.22 25 / 0.1);
+  border: 1px solid oklch(0.65 0.22 25 / 0.3);
+}
+
+.status-error .status-dot {
+  background: var(--cyber-red);
+  box-shadow: 0 0 8px var(--cyber-red);
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+/* ============================================
+   CYBER BUTTONS
+   ============================================ */
+
+.cyber-btn {
+  position: relative;
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid var(--cyber-cyan);
+  color: var(--cyber-cyan);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+}
+
+.cyber-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--cyber-cyan);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  clip-path: inherit;
+}
+
+.cyber-btn:hover {
+  color: oklch(0.1 0 0);
+  text-shadow: none;
+}
+
+.cyber-btn:hover::before {
+  opacity: 1;
+}
+
+.cyber-btn span {
+  position: relative;
+  z-index: 1;
+}
+
+.cyber-btn-primary {
+  background: var(--cyber-cyan);
+  color: oklch(0.1 0 0);
+}
+
+.cyber-btn-primary:hover {
+  background: oklch(0.9 0.15 192);
+  box-shadow: var(--cyber-glow);
+}
+
+.cyber-btn-danger {
+  border-color: var(--cyber-red);
+  color: var(--cyber-red);
+}
+
+.cyber-btn-danger::before {
+  background: var(--cyber-red);
+}
+
+/* ============================================
+   ASCII DECORATIONS
+   ============================================ */
+
+.ascii-border-top {
+  position: relative;
+}
+
+.ascii-border-top::before {
+  content: '[ ';
+  color: var(--cyber-cyan);
+  opacity: 0.5;
+}
+
+.ascii-border-top::after {
+  content: ' ]';
+  color: var(--cyber-cyan);
+  opacity: 0.5;
+}
+
+/* Terminal-style prefix */
+.terminal-prefix::before {
+  content: '>';
+  margin-right: 8px;
+  color: var(--cyber-cyan);
+  font-weight: bold;
+}
+
+/* ============================================
+   HEALTH INDICATOR
+   ============================================ */
+
+.health-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: oklch(0 0 0 / 0.03);
+  border: 1px solid oklch(0 0 0 / 0.08);
+  border-radius: 2px;
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dark .health-indicator {
+  background: oklch(1 0 0 / 0.03);
+  border-color: oklch(1 0 0 / 0.08);
+}
+
+.health-indicator.healthy {
+  color: var(--cyber-emerald);
+  border-color: oklch(0.75 0.18 160 / 0.3);
+}
+
+.health-indicator.unhealthy {
+  color: var(--cyber-red);
+  border-color: oklch(0.65 0.22 25 / 0.3);
 }
 
 /* assistant-ui custom styles */

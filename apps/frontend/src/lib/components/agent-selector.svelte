@@ -117,21 +117,21 @@
 </script>
 
 {#if loading}
-  <div class="text-xs text-muted-foreground animate-pulse px-2 py-1">
+  <div class="text-xs text-muted-foreground font-mono animate-pulse px-2 py-1">
     Loading agents...
   </div>
 {:else if error}
   <Button
     variant="ghost"
     size="sm"
-    class="text-xs text-destructive"
+    class="text-xs font-mono text-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/10"
     onclick={loadAgents}
     {disabled}
   >
     Error loading - Retry
   </Button>
 {:else if primaryAgents.length === 0}
-  <div class="text-xs text-muted-foreground px-2 py-1">
+  <div class="text-xs text-muted-foreground font-mono px-2 py-1">
     No agents configured
   </div>
 {:else}
@@ -142,20 +142,20 @@
     {disabled}
   >
     <Select.Trigger 
-      class="{compact ? 'h-7 text-xs min-w-[100px] max-w-[150px]' : 'h-9 text-sm min-w-[120px]'} {isAnimating ? 'animate-agent-switch' : ''}"
+      class="font-mono {compact ? 'h-7 text-xs min-w-[100px] max-w-[150px]' : 'h-9 text-sm min-w-[120px]'} border-border/50 bg-background/50 focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)] {isAnimating ? 'animate-agent-switch' : ''}"
     >
       <span class="truncate">{getDisplayName()}</span>
     </Select.Trigger>
     
     <Select.Portal>
-      <Select.Content>
+      <Select.Content class="font-mono border-border/50 bg-background/95 backdrop-blur-sm">
         {#each primaryAgents as agent (agent.name)}
-          <Select.Item value={agent.name} class="text-sm">
+          <Select.Item value={agent.name} class="text-sm font-mono">
             <div class="flex items-center gap-2">
               {#if agent.color}
                 <span 
-                  class="w-2 h-2 rounded-full" 
-                  style="background-color: {agent.color}"
+                  class="w-2 h-2 rounded-full shadow-[0_0_4px_currentColor]" 
+                  style="background-color: {agent.color}; color: {agent.color}"
                 ></span>
               {/if}
               <span>{agent.name.charAt(0).toUpperCase() + agent.name.slice(1)}</span>

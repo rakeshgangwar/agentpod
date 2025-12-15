@@ -190,10 +190,10 @@
 </script>
 
 <Dialog.Root bind:open onOpenChange={onOpenChange}>
-  <Dialog.Content class="max-w-2xl max-h-[80vh] flex flex-col">
+  <Dialog.Content class="max-w-2xl max-h-[80vh] flex flex-col border-[var(--cyber-cyan)]/30 bg-background/95 backdrop-blur-sm">
     <Dialog.Header>
-      <Dialog.Title>Select a File</Dialog.Title>
-      <Dialog.Description>
+      <Dialog.Title class="font-mono text-[var(--cyber-cyan)]">[select_file]</Dialog.Title>
+      <Dialog.Description class="font-mono text-sm">
         Search or browse for a file to reference in your message
       </Dialog.Description>
     </Dialog.Header>
@@ -202,14 +202,14 @@
     <div class="flex gap-2 mb-4">
       <Button
         size="sm"
-        variant={viewMode === "search" ? "default" : "outline"}
+        class="font-mono text-xs uppercase tracking-wider {viewMode === 'search' ? 'bg-[var(--cyber-cyan)] text-black hover:bg-[var(--cyber-cyan)]/90' : 'border border-border/50 bg-transparent hover:bg-[var(--cyber-cyan)]/10 hover:text-[var(--cyber-cyan)]'}"
         onclick={() => (viewMode = "search")}
       >
         Search
       </Button>
       <Button
         size="sm"
-        variant={viewMode === "browse" ? "default" : "outline"}
+        class="font-mono text-xs uppercase tracking-wider {viewMode === 'browse' ? 'bg-[var(--cyber-cyan)] text-black hover:bg-[var(--cyber-cyan)]/90' : 'border border-border/50 bg-transparent hover:bg-[var(--cyber-cyan)]/10 hover:text-[var(--cyber-cyan)]'}"
         onclick={() => (viewMode = "browse")}
       >
         Browse
@@ -225,33 +225,34 @@
           bind:value={searchQuery}
           onkeydown={handleKeyDown}
           autofocus
+          class="font-mono bg-background/50 border-border/50 focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)]"
         />
 
-        <ScrollArea class="h-[400px] border rounded-md">
+        <ScrollArea class="h-[400px] border border-border/30 rounded bg-background/30">
           {#if isSearching}
             <div class="p-4 space-y-2">
               {#each [1, 2, 3, 4, 5] as _}
-                <Skeleton class="h-8 w-full" />
+                <Skeleton class="h-8 w-full bg-[var(--cyber-cyan)]/10" />
               {/each}
             </div>
           {:else if searchResults.length === 0 && searchQuery}
-            <div class="p-4 text-center text-muted-foreground">
+            <div class="p-4 text-center text-muted-foreground font-mono">
               No files found matching "{searchQuery}"
             </div>
           {:else if searchResults.length === 0}
-            <div class="p-4 text-center text-muted-foreground">
+            <div class="p-4 text-center text-muted-foreground font-mono">
               Start typing to search for files
             </div>
           {:else}
             <div class="p-2">
               {#each searchResults as file, i}
                 <button
-                  class="w-full text-left px-3 py-2 rounded-md text-sm font-mono hover:bg-muted transition-colors flex items-center gap-2
-                    {i === selectedIndex ? 'bg-primary/10 text-primary' : ''}"
+                  class="w-full text-left px-3 py-2 rounded text-sm font-mono hover:bg-[var(--cyber-cyan)]/10 transition-colors flex items-center gap-2
+                    {i === selectedIndex ? 'bg-[var(--cyber-cyan)]/15 text-[var(--cyber-cyan)] border-l-2 border-[var(--cyber-cyan)]' : ''}"
                   onclick={() => selectFile(file)}
                   onmouseenter={() => (selectedIndex = i)}
                 >
-                  <span>📄</span>
+                  <span class="text-[var(--cyber-cyan)]">></span>
                   <span class="truncate">{file}</span>
                 </button>
               {/each}
@@ -261,29 +262,29 @@
       </div>
     {:else}
       <!-- Browse Mode -->
-      <ScrollArea class="h-[400px] border rounded-md">
+      <ScrollArea class="h-[400px] border border-border/30 rounded bg-background/30">
         {#if isLoadingTree}
           <div class="p-4 space-y-2">
             {#each [1, 2, 3, 4, 5] as _}
-              <Skeleton class="h-6 w-full" />
+              <Skeleton class="h-6 w-full bg-[var(--cyber-cyan)]/10" />
             {/each}
           </div>
         {:else if fileTree.length === 0}
-          <div class="p-4 text-center text-muted-foreground">
+          <div class="p-4 text-center text-muted-foreground font-mono">
             No files found
           </div>
         {:else}
           <div class="p-2">
             {#snippet renderNode(node: FileNode, depth: number = 0)}
               <button
-                class="w-full text-left flex items-center gap-2 py-1.5 px-2 rounded text-sm hover:bg-muted transition-colors
+                class="w-full text-left flex items-center gap-2 py-1.5 px-2 rounded text-sm font-mono hover:bg-[var(--cyber-cyan)]/10 transition-colors
                   {node.ignored ? 'opacity-50' : ''}"
                 style="padding-left: {depth * 16 + 8}px"
                 onclick={() => handleNodeClick(node)}
               >
-                <span class="flex-shrink-0">
+                <span class="flex-shrink-0 text-[var(--cyber-cyan)]">
                   {#if node.type === "directory" && loadingFolders.has(node.path)}
-                    <span class="animate-spin">⏳</span>
+                    <span class="animate-spin">*</span>
                   {:else}
                     {getFileIcon(node)}
                   {/if}
@@ -306,7 +307,12 @@
     {/if}
 
     <Dialog.Footer class="mt-4">
-      <Button variant="outline" onclick={() => onOpenChange(false)}>Cancel</Button>
+      <Button 
+        class="font-mono text-xs uppercase tracking-wider border border-border/50 bg-transparent hover:bg-muted" 
+        onclick={() => onOpenChange(false)}
+      >
+        Cancel
+      </Button>
     </Dialog.Footer>
   </Dialog.Content>
 </Dialog.Root>

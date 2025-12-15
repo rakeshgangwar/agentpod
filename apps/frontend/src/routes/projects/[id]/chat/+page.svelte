@@ -1,6 +1,5 @@
 <script lang="ts">
   import { page } from "$app/stores";
-  import { onMount } from "svelte";
   import { untrack } from "svelte";
   import { sveltify } from "svelte-preprocess-react";
   import { RuntimeProvider } from "$lib/chat/RuntimeProvider";
@@ -28,7 +27,6 @@ import {
 import {
     onboarding,
     fetchOnboardingSession,
-    startOnboarding,
     skipOnboarding,
     clearError,
   } from "$lib/stores/onboarding.svelte";
@@ -115,7 +113,6 @@ import {
   
   // Agents list (loaded at page level for keyboard shortcut cycling)
   let agents = $state<OpenCodeAgent[]>([]);
-  let agentsLoading = $state(true);
   let agentAnimationTrigger = $state(0);
   
   // Filter to primary agents only
@@ -126,7 +123,6 @@ import {
   // Load agents when project changes
   async function loadAgents() {
     if (!projectId) return;
-    agentsLoading = true;
     try {
       agents = await sandboxOpencodeGetAgents(projectId);
       // Auto-select default agent if none selected
@@ -136,14 +132,11 @@ import {
       }
     } catch (err) {
       console.error("Failed to load agents:", err);
-    } finally {
-      agentsLoading = false;
     }
   }
   
   // Providers list (loaded at page level for keyboard shortcut model cycling)
   let providers = $state<OpenCodeProvider[]>([]);
-  let providersLoading = $state(true);
   let modelAnimationTrigger = $state(0);
   
   // Flattened list of all models for easy cycling
@@ -160,7 +153,6 @@ import {
   // Load providers when project changes
   async function loadProviders() {
     if (!projectId) return;
-    providersLoading = true;
     try {
       providers = await sandboxOpencodeGetProviders(projectId);
       // Auto-select first model if none selected
@@ -172,8 +164,6 @@ import {
       }
     } catch (err) {
       console.error("Failed to load providers:", err);
-    } finally {
-      providersLoading = false;
     }
   }
 
@@ -576,52 +566,66 @@ import {
       cycleAgent(1); // Next agent
     }
   }
+
+  // Sidebar collapse state
+  let sidebarCollapsed = $state(false);
 </script>
 
 <svelte:window on:keydown={handleGlobalKeyDown} />
 
 {#if projectId}
-  <div class="flex h-[calc(100vh-200px)] min-h-[400px]">
+  <div class="flex h-[calc(100vh-140px)] min-h-[500px] animate-fade-in">
     <!-- Session Sidebar -->
-    <div class="w-64 border-r bg-muted/30 flex flex-col">
-      <!-- Header -->
-      <div class="p-3 border-b flex items-center justify-between">
-        <h3 class="font-semibold text-sm">Sessions</h3>
-        <Button
-          size="sm"
-          variant="outline"
-          onclick={createNewSession}
-          disabled={isCreating}
-        >
-          {isCreating ? "..." : "+ New"}
-        </Button>
+    <aside class="w-64 border-r border-border/30 bg-background/50 backdrop-blur-sm flex flex-col
+                  {sidebarCollapsed ? 'hidden sm:flex' : 'flex'}">
+      <!-- Sidebar Header -->
+      <div class="p-3 border-b border-border/30">
+        <div class="flex items-center justify-between gap-2">
+          <h3 class="font-mono text-xs uppercase tracking-wider text-muted-foreground">Sessions</h3>
+          <Button
+            size="sm"
+            onclick={createNewSession}
+            disabled={isCreating}
+            class="h-7 px-3 font-mono text-xs uppercase tracking-wider
+                   bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black"
+          >
+            {isCreating ? "..." : "+ New"}
+          </Button>
+        </div>
       </div>
 
       <!-- Session List -->
-      <div class="flex-1 overflow-y-auto">
+      <div class="flex-1 overflow-y-auto scrollbar-thin">
         {#if isLoading}
           <div class="p-3 space-y-2">
-            {#each [1, 2, 3] as _}
-              <Skeleton class="h-14 w-full" />
+            {#each [1, 2, 3] as i}
+              <div class="animate-fade-in-up stagger-{i}">
+                <Skeleton class="h-14 w-full bg-muted/30" />
+              </div>
             {/each}
           </div>
         {:else if error}
-          <div class="p-3 text-sm text-destructive">{error}</div>
+          <div class="p-3">
+            <div class="p-3 rounded border border-[var(--cyber-red)]/50 bg-[var(--cyber-red)]/5">
+              <span class="text-sm text-[var(--cyber-red)]">{error}</span>
+            </div>
+          </div>
         {:else if sessions.length === 0}
-          <div class="p-3 text-sm text-muted-foreground text-center">
-            <p>No sessions yet</p>
-            <p class="mt-1">Click "+ New" to start</p>
+          <div class="p-6 text-center">
+            <div class="font-mono text-3xl text-[var(--cyber-cyan)]/20 mb-3">[ ]</div>
+            <p class="text-sm font-mono text-muted-foreground">No sessions yet</p>
+            <p class="text-xs font-mono text-muted-foreground/70 mt-1">Click "+ New" to start</p>
           </div>
         {:else}
           <div class="p-2 space-y-1">
             {#each topLevelSessions as session (session.id)}
               <!-- Parent/Top-level Session -->
-              <div>
+              <div class="animate-fade-in">
                 <div
-                  class="w-full text-left p-2 rounded-md text-sm transition-colors group cursor-pointer
+                  class="w-full text-left p-2.5 rounded transition-all group cursor-pointer
                     {selectedSessionId === session.id
-                      ? 'bg-primary text-primary-foreground'
-                      : 'hover:bg-muted'}"
+                      ? 'bg-[var(--cyber-cyan)]/10 border border-[var(--cyber-cyan)]/30'
+                      : 'hover:bg-muted/50 border border-transparent'}"
                   onclick={() => (selectedSessionId = session.id)}
                   onkeydown={(e) => e.key === 'Enter' && (selectedSessionId = session.id)}
                   role="button"
@@ -632,7 +636,7 @@ import {
                     {#if hasChildren(session.id)}
                       <button
                         class="p-0.5 -ml-1 rounded hover:bg-black/10 dark:hover:bg-white/10 flex-shrink-0 mt-0.5
-                          {selectedSessionId === session.id ? 'text-primary-foreground' : 'text-muted-foreground'}"
+                          {selectedSessionId === session.id ? 'text-[var(--cyber-cyan)]' : 'text-muted-foreground'}"
                         onclick={(e) => {
                           e.stopPropagation();
                           toggleSessionExpanded(session.id);
@@ -645,26 +649,21 @@ import {
                       </button>
                     {/if}
                     <div class="min-w-0 flex-1">
-                      <div class="font-medium truncate flex items-center gap-1">
+                      <div class="font-medium text-sm truncate flex items-center gap-1
+                                  {selectedSessionId === session.id ? 'text-[var(--cyber-cyan)]' : 'text-foreground'}">
                         {getSessionTitle(session)}
                         {#if hasChildren(session.id)}
-                          <span class="text-xs opacity-60">({getChildCount(session.id)})</span>
+                          <span class="text-xs opacity-60 font-mono">({getChildCount(session.id)})</span>
                         {/if}
                       </div>
-                      <div
-                        class="text-xs truncate
-                          {selectedSessionId === session.id
-                            ? 'text-primary-foreground/70'
-                            : 'text-muted-foreground'}"
-                      >
+                      <div class="text-xs font-mono truncate text-muted-foreground mt-0.5">
                         {formatDate(session.time?.updated || session.time?.created)}
                       </div>
                     </div>
                     <button
-                      class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/20 text-xs
-                        {selectedSessionId === session.id
-                          ? 'text-primary-foreground hover:text-destructive'
-                          : 'text-muted-foreground hover:text-destructive'}"
+                      class="opacity-0 group-hover:opacity-100 p-1 rounded text-xs
+                             text-muted-foreground hover:text-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/10
+                             transition-all"
                       onclick={(e) => {
                         e.stopPropagation();
                         deleteSession(session.id);
@@ -678,13 +677,13 @@ import {
 
                 <!-- Child Sessions (nested) -->
                 {#if hasChildren(session.id) && expandedSessions.has(session.id)}
-                  <div class="ml-3 pl-2 border-l border-muted-foreground/20 space-y-1 mt-1">
+                  <div class="ml-3 pl-2 border-l border-[var(--cyber-cyan)]/20 space-y-1 mt-1">
                     {#each childSessionsMap[session.id] as childSession (childSession.id)}
                       <div
-                        class="w-full text-left p-2 rounded-md text-sm transition-colors group cursor-pointer
+                        class="w-full text-left p-2 rounded transition-all group text-sm cursor-pointer
                           {selectedSessionId === childSession.id
-                            ? 'bg-primary text-primary-foreground'
-                            : 'hover:bg-muted'}"
+                            ? 'bg-[var(--cyber-cyan)]/10 border border-[var(--cyber-cyan)]/30'
+                            : 'hover:bg-muted/50 border border-transparent'}"
                         onclick={() => (selectedSessionId = childSession.id)}
                         onkeydown={(e) => e.key === 'Enter' && (selectedSessionId = childSession.id)}
                         role="button"
@@ -692,24 +691,19 @@ import {
                       >
                         <div class="flex items-start justify-between gap-2">
                           <div class="min-w-0 flex-1">
-                            <div class="font-medium truncate flex items-center gap-1">
-                              <span class="text-xs opacity-60">↳</span>
+                            <div class="font-medium truncate flex items-center gap-1
+                                        {selectedSessionId === childSession.id ? 'text-[var(--cyber-cyan)]' : 'text-foreground'}">
+                              <span class="text-xs text-[var(--cyber-cyan)]/50">↳</span>
                               {getSessionTitle(childSession)}
                             </div>
-                            <div
-                              class="text-xs truncate
-                                {selectedSessionId === childSession.id
-                                  ? 'text-primary-foreground/70'
-                                  : 'text-muted-foreground'}"
-                            >
+                            <div class="text-xs font-mono truncate text-muted-foreground">
                               {formatDate(childSession.time?.updated || childSession.time?.created)}
                             </div>
                           </div>
                           <button
-                            class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/20 text-xs
-                              {selectedSessionId === childSession.id
-                                ? 'text-primary-foreground hover:text-destructive'
-                                : 'text-muted-foreground hover:text-destructive'}"
+                            class="opacity-0 group-hover:opacity-100 p-1 rounded text-xs
+                                   text-muted-foreground hover:text-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/10
+                                   transition-all"
                             onclick={(e) => {
                               e.stopPropagation();
                               deleteSession(childSession.id);
@@ -729,28 +723,38 @@ import {
         {/if}
       </div>
 
-      <!-- Footer with refresh -->
-      <div class="p-2 border-t">
+      <!-- Sidebar Footer -->
+      <div class="p-2 border-t border-border/30">
         <Button
           size="sm"
           variant="ghost"
-          class="w-full text-xs"
+          class="w-full h-8 font-mono text-xs text-muted-foreground hover:text-foreground"
           onclick={loadSessions}
           disabled={isLoading}
         >
-          {isLoading ? "Loading..." : "Refresh"}
+          {isLoading ? "Loading..." : "↻ Refresh"}
         </Button>
       </div>
-    </div>
+    </aside>
+
+    <!-- Mobile sidebar toggle -->
+    <button
+      class="sm:hidden fixed bottom-4 left-4 z-50 w-10 h-10 rounded-lg
+             bg-[var(--cyber-cyan)] text-black flex items-center justify-center
+             shadow-lg shadow-[var(--cyber-cyan)]/20"
+      onclick={() => sidebarCollapsed = !sidebarCollapsed}
+    >
+      {sidebarCollapsed ? '☰' : '✕'}
+    </button>
 
     <!-- Chat Area -->
-    <div class="flex-1 flex flex-col">
+    <div class="flex-1 flex flex-col min-w-0">
       {#if selectedSessionId}
         <!-- Model & Agent Selector Header -->
-        <div class="border-b px-4 py-2 flex items-center justify-between bg-muted/30">
-          <div class="flex items-center gap-4">
+        <div class="border-b border-border/30 px-4 py-2.5 flex items-center justify-between bg-background/50 backdrop-blur-sm">
+          <div class="flex items-center gap-4 flex-wrap">
             <div class="flex items-center gap-2">
-              <span class="text-xs text-muted-foreground">Model:</span>
+              <span class="text-xs font-mono text-muted-foreground uppercase tracking-wider">Model:</span>
               <ModelSelector 
                 {projectId}
                 bind:selectedModel
@@ -760,7 +764,7 @@ import {
               />
             </div>
             <div class="flex items-center gap-2">
-              <span class="text-xs text-muted-foreground">Agent:</span>
+              <span class="text-xs font-mono text-muted-foreground uppercase tracking-wider">Agent:</span>
               <AgentSelector 
                 {projectId}
                 bind:selectedAgent
@@ -770,16 +774,22 @@ import {
                 animateTrigger={agentAnimationTrigger}
               />
               {#if isChildSession}
-                <span class="text-xs text-muted-foreground italic">(subagent)</span>
+                <span class="text-xs font-mono text-[var(--cyber-amber)] italic">(subagent)</span>
               {/if}
             </div>
+          </div>
+          
+          <!-- Keyboard hints -->
+          <div class="hidden lg:flex items-center gap-3 text-xs font-mono text-muted-foreground/50">
+            <span>Alt+,/. model</span>
+            <span>Cmd+,/. agent</span>
           </div>
         </div>
         
         <!-- Onboarding Banner -->
         {@const onboardingStatus = onboarding.getStatus(projectId)}
         {#if onboardingStatus && !onboarding.isComplete(projectId) && !onboardingBannerDismissed}
-          <div class="px-4 py-2 border-b">
+          <div class="px-4 py-2 border-b border-border/30 bg-background/30">
             <OnboardingBanner
               status={onboardingStatus}
               isLoading={onboarding.isLoading(projectId)}
@@ -816,12 +826,23 @@ import {
           </react.RuntimeProvider>
         {/key}
       {:else}
+        <!-- No session selected state -->
         <div class="flex-1 flex items-center justify-center">
-          <div class="text-center text-muted-foreground">
-            <p class="text-lg">No session selected</p>
-            <p class="text-sm mt-1">Create a new session to start chatting</p>
-            <Button class="mt-4" onclick={createNewSession} disabled={isCreating}>
-              {isCreating ? "Creating..." : "Create Session"}
+          <div class="text-center animate-fade-in-up cyber-card corner-accent p-12">
+            <div class="font-mono text-4xl text-[var(--cyber-cyan)]/20 mb-4">💬</div>
+            <p class="text-lg font-medium" style="font-family: 'Space Grotesk', sans-serif;">
+              No session selected
+            </p>
+            <p class="text-sm font-mono text-muted-foreground mt-2">
+              Create a new session to start chatting
+            </p>
+            <Button 
+              class="mt-6 font-mono text-xs uppercase tracking-wider
+                     bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black" 
+              onclick={createNewSession} 
+              disabled={isCreating}
+            >
+              {isCreating ? "Creating..." : "+ Create Session"}
             </Button>
           </div>
         </div>

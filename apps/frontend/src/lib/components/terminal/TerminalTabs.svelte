@@ -100,14 +100,14 @@
       <Button
         variant="ghost"
         size="sm"
-        class="new-terminal-btn"
+        class="new-terminal-btn h-7 w-7 p-0 border border-[var(--cyber-cyan)]/30 bg-[var(--cyber-cyan)]/5 hover:bg-[var(--cyber-cyan)]/15 hover:border-[var(--cyber-cyan)]/50 transition-all"
         onclick={handleNewTerminal}
         disabled={isConnecting}
       >
         {#if isConnecting}
-          <Loader2 class="h-4 w-4 animate-spin" />
+          <Loader2 class="h-3.5 w-3.5 animate-spin text-[var(--cyber-cyan)]" />
         {:else}
-          <Plus class="h-4 w-4" />
+          <Plus class="h-3.5 w-3.5 text-[var(--cyber-cyan)]" />
         {/if}
         <span class="sr-only">New Terminal</span>
       </Button>
@@ -130,7 +130,7 @@
           Open a terminal to access the sandbox shell.
         </p>
         <Button
-          variant="default"
+          class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black px-4 py-2"
           onclick={handleNewTerminal}
           disabled={isConnecting}
         >
@@ -150,9 +150,12 @@
       <!-- Active Terminal -->
       {#if activeSession.status === "error" && activeSession.error}
         <div class="error-overlay">
-          <AlertCircle class="h-6 w-6 text-red-500" />
+          <AlertCircle class="h-6 w-6 text-[var(--cyber-red)]" />
           <p class="error-text">{activeSession.error}</p>
-          <Button variant="outline" onclick={() => handleReconnect(activeSession.terminalId)}>
+          <Button 
+            class="font-mono text-xs uppercase tracking-wider border border-[var(--cyber-cyan)]/50 bg-transparent hover:bg-[var(--cyber-cyan)]/10 text-[var(--cyber-cyan)]"
+            onclick={() => handleReconnect(activeSession.terminalId)}
+          >
             <RefreshCw class="h-4 w-4 mr-2" />
             Reconnect
           </Button>
@@ -169,53 +172,93 @@
     display: flex;
     flex-direction: column;
     height: 100%;
-    background-color: hsl(var(--background));
+    background-color: #0d0d14;
+    font-family: 'JetBrains Mono', monospace;
   }
 
   .tab-bar {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
-    padding: 0.5rem;
-    background-color: hsl(var(--muted));
-    border-bottom: 1px solid hsl(var(--border));
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: linear-gradient(180deg, rgba(13, 13, 20, 0.95) 0%, rgba(20, 20, 30, 0.9) 100%);
+    border-bottom: 1px solid oklch(0.85 0.15 192 / 0.2);
+    position: relative;
+  }
+
+  .tab-bar::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, oklch(0.85 0.15 192 / 0.5) 20%, oklch(0.85 0.15 192 / 0.5) 80%, transparent);
   }
 
   .tabs {
     display: flex;
-    gap: 0.25rem;
+    gap: 0.375rem;
     overflow-x: auto;
     flex: 1;
+    scrollbar-width: none;
+  }
+
+  .tabs::-webkit-scrollbar {
+    display: none;
   }
 
   .tab {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.375rem 0.75rem;
-    font-size: 0.875rem;
+    padding: 0.5rem 0.875rem;
+    font-size: 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
     color: hsl(var(--muted-foreground));
-    background-color: transparent;
-    border: none;
-    border-radius: 0.375rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
     cursor: pointer;
     white-space: nowrap;
-    transition: all 0.15s ease;
+    transition: all 0.2s ease;
+    position: relative;
   }
 
   .tab:hover {
-    background-color: hsl(var(--accent));
-    color: hsl(var(--accent-foreground));
+    background: oklch(0.85 0.15 192 / 0.08);
+    border-color: oklch(0.85 0.15 192 / 0.3);
+    color: oklch(0.85 0.15 192);
   }
 
   .tab.active {
-    background-color: hsl(var(--background));
-    color: hsl(var(--foreground));
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    background: oklch(0.85 0.15 192 / 0.12);
+    border-color: oklch(0.85 0.15 192 / 0.5);
+    color: oklch(0.85 0.15 192);
+    box-shadow: 0 0 12px oklch(0.85 0.15 192 / 0.15),
+                inset 0 1px 0 oklch(0.85 0.15 192 / 0.1);
+  }
+
+  .tab.active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, oklch(0.85 0.15 192) 50%, transparent);
   }
 
   .tab.error {
-    color: hsl(var(--destructive));
+    color: oklch(0.7 0.2 20);
+    border-color: oklch(0.7 0.2 20 / 0.3);
+  }
+
+  .tab.error.active {
+    background: oklch(0.7 0.2 20 / 0.1);
+    border-color: oklch(0.7 0.2 20 / 0.5);
   }
 
   .tab-label {
@@ -228,20 +271,20 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0.125rem;
+    padding: 0.25rem;
     color: inherit;
-    opacity: 0.5;
+    opacity: 0.4;
     background: transparent;
     border: none;
-    border-radius: 0.25rem;
+    border-radius: 3px;
     cursor: pointer;
-    transition: opacity 0.15s ease;
+    transition: all 0.15s ease;
   }
 
   .close-btn:hover {
     opacity: 1;
-    background-color: hsl(var(--destructive) / 0.1);
-    color: hsl(var(--destructive));
+    background: oklch(0.7 0.2 20 / 0.2);
+    color: oklch(0.7 0.2 20);
   }
 
   .new-terminal-btn {
@@ -252,6 +295,7 @@
     flex: 1;
     min-height: 0;
     position: relative;
+    background: #0d0d14;
   }
 
   .empty-state {
@@ -263,29 +307,41 @@
     padding: 2rem;
     text-align: center;
     color: hsl(var(--muted-foreground));
+    background: radial-gradient(ellipse at center, oklch(0.85 0.15 192 / 0.03) 0%, transparent 70%);
   }
 
   .empty-icon {
-    margin-bottom: 1rem;
-    opacity: 0.5;
+    margin-bottom: 1.5rem;
+    color: oklch(0.85 0.15 192 / 0.4);
+    filter: drop-shadow(0 0 8px oklch(0.85 0.15 192 / 0.3));
   }
 
   .empty-title {
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: hsl(var(--foreground));
+    font-size: 0.875rem;
+    font-weight: 500;
+    font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: oklch(0.85 0.15 192);
     margin-bottom: 0.5rem;
   }
 
   .empty-description {
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
+    font-family: 'JetBrains Mono', monospace;
     margin-bottom: 1.5rem;
+    opacity: 0.6;
   }
 
   .error-message {
     margin-top: 1rem;
-    font-size: 0.875rem;
-    color: hsl(var(--destructive));
+    font-size: 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+    color: oklch(0.7 0.2 20);
+    padding: 0.5rem 1rem;
+    background: oklch(0.7 0.2 20 / 0.1);
+    border: 1px solid oklch(0.7 0.2 20 / 0.3);
+    border-radius: 4px;
   }
 
   .error-overlay {
@@ -296,13 +352,25 @@
     gap: 1rem;
     height: 100%;
     padding: 2rem;
-    background-color: hsl(var(--muted) / 0.5);
+    background: linear-gradient(180deg, rgba(13, 13, 20, 0.98) 0%, rgba(30, 15, 15, 0.95) 100%);
+    border: 1px solid oklch(0.7 0.2 20 / 0.3);
+    position: relative;
+  }
+
+  .error-overlay::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, oklch(0.7 0.2 20 / 0.05) 0%, transparent 70%);
+    pointer-events: none;
   }
 
   .error-text {
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
+    font-family: 'JetBrains Mono', monospace;
     color: hsl(var(--muted-foreground));
     text-align: center;
     max-width: 300px;
+    line-height: 1.5;
   }
 </style>

@@ -51,11 +51,11 @@
 
 {#if showBanner}
   <!-- Welcome Banner - Shows when onboarding is pending -->
-  <div class="rounded-lg border bg-gradient-to-r from-primary/5 to-primary/10 p-4">
+  <div class="rounded border border-[var(--cyber-cyan)]/30 bg-gradient-to-r from-[var(--cyber-cyan)]/5 to-[var(--cyber-cyan)]/10 p-4">
     <div class="flex items-start gap-4">
       <!-- Icon -->
       <div class="flex-shrink-0">
-        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--cyber-cyan)]/10 border border-[var(--cyber-cyan)]/30 shadow-[0_0_12px_var(--cyber-cyan)/20]">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="20"
@@ -66,7 +66,7 @@
             stroke-width="2"
             stroke-linecap="round"
             stroke-linejoin="round"
-            class="text-primary"
+            class="text-[var(--cyber-cyan)]"
           >
             <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
             <path d="M19 3v4" />
@@ -77,14 +77,14 @@
 
       <!-- Content -->
       <div class="flex-1 min-w-0">
-        <h3 class="font-semibold text-foreground">Welcome! Let's set up your workspace</h3>
-        <p class="mt-1 text-sm text-muted-foreground">
+        <h3 class="font-mono font-semibold text-[var(--cyber-cyan)]">[welcome] Let's set up your workspace</h3>
+        <p class="mt-1 text-sm text-muted-foreground font-mono">
           I'll ask a few questions to configure your AI assistant for this project.
           This takes about 2 minutes.
         </p>
 
         {#if error}
-          <div class="mt-3 flex items-center gap-2 text-sm text-destructive bg-destructive/10 p-2 rounded">
+          <div class="mt-3 flex items-center gap-2 text-sm font-mono text-[var(--cyber-red)] bg-[var(--cyber-red)]/10 border border-[var(--cyber-red)]/30 p-2 rounded">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="16"
@@ -103,7 +103,7 @@
             <span class="flex-1">{error}</span>
             {#if onDismissError}
               <button
-                class="text-destructive/70 hover:text-destructive"
+                class="text-[var(--cyber-red)]/70 hover:text-[var(--cyber-red)]"
                 onclick={onDismissError}
                 aria-label="Dismiss error"
               >
@@ -130,6 +130,7 @@
         <div class="mt-4 flex items-center gap-3">
           <Button
             size="sm"
+            class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black"
             onclick={onStart}
             disabled={isLoading}
           >
@@ -144,7 +145,7 @@
                 stroke-width="2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
-                class="animate-spin"
+                class="animate-spin mr-2"
               >
                 <path d="M21 12a9 9 0 1 1-6.219-8.56" />
               </svg>
@@ -156,6 +157,7 @@
           <Button
             variant="ghost"
             size="sm"
+            class="font-mono text-xs uppercase tracking-wider hover:bg-[var(--cyber-cyan)]/10 hover:text-[var(--cyber-cyan)]"
             onclick={onSkip}
             disabled={isLoading}
           >
@@ -167,7 +169,7 @@
   </div>
 {:else if showInProgress}
   <!-- In Progress Banner -->
-  <div class="rounded-lg border border-primary/20 bg-primary/5 p-3">
+  <div class="rounded border border-[var(--cyber-cyan)]/30 bg-[var(--cyber-cyan)]/5 p-3">
     <div class="flex items-center gap-3">
       <div class="flex-shrink-0">
         <svg
@@ -180,7 +182,7 @@
           stroke-width="2"
           stroke-linecap="round"
           stroke-linejoin="round"
-          class="text-primary animate-pulse"
+          class="text-[var(--cyber-cyan)] animate-pulse"
         >
           <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
           <path d="M19 3v4" />
@@ -188,10 +190,10 @@
         </svg>
       </div>
       <div class="flex-1 min-w-0">
-        <p class="text-sm font-medium text-foreground">
+        <p class="text-sm font-mono font-medium text-[var(--cyber-cyan)]">
           Workspace setup in progress
         </p>
-        <p class="text-xs text-muted-foreground mt-0.5">
+        <p class="text-xs text-muted-foreground font-mono mt-0.5">
           The onboarding assistant is helping configure your project
         </p>
       </div>
@@ -199,7 +201,7 @@
   </div>
 {:else if showFailed}
   <!-- Failed Banner -->
-  <div class="rounded-lg border border-destructive/20 bg-destructive/5 p-3">
+  <div class="rounded border border-[var(--cyber-red)]/30 bg-[var(--cyber-red)]/5 p-3">
     <div class="flex items-center gap-3">
       <div class="flex-shrink-0">
         <svg
@@ -212,7 +214,7 @@
           stroke-width="2"
           stroke-linecap="round"
           stroke-linejoin="round"
-          class="text-destructive"
+          class="text-[var(--cyber-red)]"
         >
           <circle cx="12" cy="12" r="10" />
           <line x1="12" x2="12" y1="8" y2="12" />
@@ -220,17 +222,17 @@
         </svg>
       </div>
       <div class="flex-1 min-w-0">
-        <p class="text-sm font-medium text-destructive">
+        <p class="text-sm font-mono font-medium text-[var(--cyber-red)]">
           Setup failed
         </p>
         {#if error}
-          <p class="text-xs text-destructive/80 mt-0.5">
+          <p class="text-xs text-[var(--cyber-red)]/80 font-mono mt-0.5">
             {error}
           </p>
         {/if}
       </div>
       <Button
-        variant="outline"
+        class="font-mono text-xs uppercase tracking-wider border border-[var(--cyber-cyan)]/50 bg-transparent hover:bg-[var(--cyber-cyan)]/10 text-[var(--cyber-cyan)]"
         size="sm"
         onclick={onStart}
         disabled={isLoading}

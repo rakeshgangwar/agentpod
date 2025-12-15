@@ -60,10 +60,23 @@
 
 <div class="min-h-screen bg-background text-foreground">
   {#if shouldShowLoading}
-    <div class="flex items-center justify-center min-h-screen">
-      <div class="text-center">
-        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-        <p class="mt-4 text-muted-foreground">Loading...</p>
+    <!-- Cyber-styled loading state -->
+    <div class="noise-overlay"></div>
+    <div class="min-h-screen grid-bg mesh-gradient flex items-center justify-center">
+      <div class="text-center animate-fade-in-up">
+        <div class="relative">
+          <!-- Outer ring -->
+          <div class="w-16 h-16 rounded-full border-2 border-[var(--cyber-cyan)]/20 mx-auto"></div>
+          <!-- Spinning ring -->
+          <div class="absolute inset-0 w-16 h-16 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] mx-auto animate-spin"></div>
+          <!-- Center dot -->
+          <div class="absolute inset-0 flex items-center justify-center">
+            <div class="w-2 h-2 rounded-full bg-[var(--cyber-cyan)] animate-pulse-dot"></div>
+          </div>
+        </div>
+        <p class="mt-6 text-sm font-mono text-muted-foreground tracking-wider uppercase">
+          Initializing<span class="typing-cursor"></span>
+        </p>
       </div>
     </div>
   {:else}

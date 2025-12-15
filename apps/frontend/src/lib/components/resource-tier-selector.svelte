@@ -63,8 +63,8 @@
 <div class="space-y-3">
   <!-- Header -->
   <div>
-    <h3 class="text-sm font-medium">Resources</h3>
-    <p class="text-xs text-muted-foreground">
+    <h3 class="text-xs font-mono uppercase tracking-wider text-[var(--cyber-cyan)]">[resources]</h3>
+    <p class="text-xs text-muted-foreground font-mono">
       Select the compute resources for your environment
     </p>
   </div>
@@ -73,16 +73,16 @@
     <!-- Loading skeleton -->
     <div class="grid grid-cols-2 gap-2">
       {#each Array(4) as _}
-        <div class="h-20 bg-muted rounded-lg animate-pulse"></div>
+        <div class="h-20 rounded border border-[var(--cyber-cyan)]/20 bg-[var(--cyber-cyan)]/5 animate-pulse"></div>
       {/each}
     </div>
   {:else if error}
     <!-- Error state -->
-    <div class="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
+    <div class="text-sm font-mono text-[var(--cyber-red)] bg-[var(--cyber-red)]/10 border border-[var(--cyber-red)]/30 p-3 rounded">
       {error}
       <button 
         type="button" 
-        class="ml-2 underline hover:no-underline"
+        class="ml-2 underline hover:no-underline text-[var(--cyber-cyan)]"
         onclick={loadTiers}
       >
         Retry
@@ -95,19 +95,19 @@
         {@const isSelected = selectedTierId === tier.id}
         <button
           type="button"
-          class="w-full text-left p-3 rounded-lg border-2 transition-all hover:bg-muted/50
+          class="w-full text-left p-3 rounded border transition-all font-mono
             {isSelected 
-              ? 'border-primary bg-primary/5' 
-              : 'border-border hover:border-muted-foreground/30'}"
+              ? 'border-[var(--cyber-cyan)] bg-[var(--cyber-cyan)]/10 shadow-[0_0_12px_var(--cyber-cyan)/15]' 
+              : 'border-border/30 hover:border-[var(--cyber-cyan)]/50 hover:bg-[var(--cyber-cyan)]/5'}"
           onclick={() => selectTier(tier.id)}
           {disabled}
         >
           <div class="flex items-start justify-between gap-2">
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-1.5 mb-1">
-                <span class="font-medium text-sm">{tier.name}</span>
+                <span class="font-medium text-sm {isSelected ? 'text-[var(--cyber-cyan)]' : ''}">{tier.name}</span>
                 {#if tier.isDefault}
-                  <Badge variant="secondary" class="text-[10px] px-1 py-0">Default</Badge>
+                  <span class="text-[10px] px-1 py-0 rounded bg-[var(--cyber-emerald)]/10 text-[var(--cyber-emerald)] border border-[var(--cyber-emerald)]/30">Default</span>
                 {/if}
               </div>
               
@@ -126,7 +126,7 @@
                   ${tier.priceMonthly}/mo
                 </div>
               {:else}
-                <div class="text-xs text-green-600 mt-1">
+                <div class="text-xs text-[var(--cyber-emerald)] mt-1">
                   Free
                 </div>
               {/if}
@@ -134,10 +134,10 @@
             
             <!-- Selection indicator -->
             <div class="flex-shrink-0">
-              <div class="w-4 h-4 rounded-full border-2 flex items-center justify-center
-                {isSelected ? 'border-primary bg-primary' : 'border-muted-foreground/30'}">
+              <div class="w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all
+                {isSelected ? 'border-[var(--cyber-cyan)] bg-[var(--cyber-cyan)] shadow-[0_0_8px_var(--cyber-cyan)]' : 'border-muted-foreground/30'}">
                 {#if isSelected}
-                  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-primary-foreground">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-black">
                     <polyline points="20 6 9 17 4 12"></polyline>
                   </svg>
                 {/if}
@@ -150,7 +150,7 @@
     
     <!-- Empty state -->
     {#if tiers.length === 0}
-      <div class="text-sm text-muted-foreground text-center p-4 border rounded-lg">
+      <div class="text-sm text-muted-foreground font-mono text-center p-4 border border-dashed border-border/30 rounded">
         No resource tiers available
       </div>
     {/if}

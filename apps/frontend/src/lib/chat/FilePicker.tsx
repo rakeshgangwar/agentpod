@@ -135,7 +135,7 @@ export const FilePicker: FC<FilePickerProps> = ({
   return (
     <div
       ref={containerRef}
-      className="absolute z-50 w-80 max-h-64 overflow-y-auto rounded-md border border-border bg-popover shadow-lg"
+      className="absolute z-50 w-80 max-h-64 overflow-y-auto rounded border border-[var(--cyber-cyan)]/30 bg-popover/95 backdrop-blur-sm shadow-[0_4px_20px_rgba(0,0,0,0.3),0_0_30px_var(--cyber-cyan)/10]"
       style={{
         bottom: position.top,
         left: position.left,
@@ -143,38 +143,38 @@ export const FilePicker: FC<FilePickerProps> = ({
     >
       <div className="p-1">
         {isLoading ? (
-          <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-            <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2" />
-            Searching files...
+          <div className="px-2 py-4 text-center font-mono text-xs text-muted-foreground">
+            <div className="animate-spin h-4 w-4 border-2 border-[var(--cyber-cyan)] border-t-transparent rounded-full mx-auto mb-2" />
+            <span className="uppercase tracking-wider text-[var(--cyber-cyan)]">Searching files...</span>
           </div>
         ) : files.length === 0 ? (
-          <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-            {query ? `No files matching "${query}"` : "No files found"}
+          <div className="px-2 py-4 text-center font-mono text-xs text-muted-foreground">
+            {query ? <span>No files matching "<span className="text-[var(--cyber-cyan)]">{query}</span>"</span> : "No files found"}
           </div>
         ) : (
           files.map((file, index) => (
             <button
               key={file}
-              className={`w-full flex items-center gap-2 px-2 py-1.5 text-left text-sm rounded-sm transition-colors ${
+              className={`w-full flex items-center gap-2 px-2 py-1.5 text-left rounded transition-colors ${
                 index === selectedIndex
-                  ? "bg-accent text-accent-foreground"
-                  : "hover:bg-accent/50"
+                  ? "bg-[var(--cyber-cyan)]/10 text-[var(--cyber-cyan)] border-l-2 border-[var(--cyber-cyan)]"
+                  : "hover:bg-[var(--cyber-cyan)]/5 border-l-2 border-transparent"
               }`}
               onClick={() => onSelect(file)}
               onMouseEnter={() => setSelectedIndex(index)}
             >
-              <FileIcon className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+              <FileIcon className="h-4 w-4 flex-shrink-0 text-[var(--cyber-cyan)]/60" />
               <span className="font-mono text-xs truncate">{file}</span>
             </button>
           ))
         )}
       </div>
-      <div className="border-t border-border px-2 py-1.5 text-xs text-muted-foreground">
-        <kbd className="px-1 bg-muted rounded">↑↓</kbd> navigate
-        <span className="mx-2">·</span>
-        <kbd className="px-1 bg-muted rounded">Enter</kbd> select
-        <span className="mx-2">·</span>
-        <kbd className="px-1 bg-muted rounded">Esc</kbd> close
+      <div className="border-t border-border/30 px-2 py-1.5 font-mono text-xs text-muted-foreground">
+        <kbd className="px-1 bg-muted/50 rounded border border-border/30">↑↓</kbd> navigate
+        <span className="mx-2 text-[var(--cyber-cyan)]/30">·</span>
+        <kbd className="px-1 bg-muted/50 rounded border border-border/30">Enter</kbd> select
+        <span className="mx-2 text-[var(--cyber-cyan)]/30">·</span>
+        <kbd className="px-1 bg-muted/50 rounded border border-border/30">Esc</kbd> close
       </div>
     </div>
   );

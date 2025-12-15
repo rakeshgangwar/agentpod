@@ -83,10 +83,10 @@ export const FileAttachmentButton: FC<{
       onClick={onClick}
       disabled={disabled}
       className={`
-        p-2 rounded-md transition-colors
+        p-2 rounded border transition-colors
         ${hasAttachments 
-          ? "text-primary bg-primary/10" 
-          : "text-muted-foreground hover:text-foreground hover:bg-muted"
+          ? "text-[var(--cyber-cyan)] border-[var(--cyber-cyan)]/30 bg-[var(--cyber-cyan)]/10 shadow-[0_0_8px_var(--cyber-cyan)/10]" 
+          : "text-muted-foreground border-border/30 hover:text-[var(--cyber-cyan)] hover:border-[var(--cyber-cyan)]/30 hover:bg-[var(--cyber-cyan)]/5"
         }
         disabled:opacity-50 disabled:cursor-not-allowed
       `}
@@ -119,26 +119,26 @@ export const FileAttachmentPreview: FC<{
   if (attachments.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap gap-2 p-2 border-b border-border">
+    <div className="flex flex-wrap gap-2 p-2 border-b border-[var(--cyber-cyan)]/20">
       {attachments.map((file) => (
         <div
           key={file.id}
-          className="relative group flex items-center gap-2 px-2 py-1 bg-muted rounded-md text-sm"
+          className="relative group flex items-center gap-2 px-2 py-1 bg-muted/50 rounded border border-border/30 font-mono text-xs"
         >
           {file.mime.startsWith("image/") ? (
             <img
               src={file.url}
               alt={file.name}
-              className="w-8 h-8 object-cover rounded"
+              className="w-8 h-8 object-cover rounded border border-[var(--cyber-cyan)]/20"
             />
           ) : (
             <span className="text-lg">{getFileIcon(file.mime)}</span>
           )}
           <div className="flex flex-col min-w-0">
-            <span className="truncate max-w-[120px] text-xs font-medium">
+            <span className="truncate max-w-[120px] font-medium text-[var(--cyber-cyan)]">
               {file.name}
             </span>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-muted-foreground">
               {formatFileSize(file.size)}
             </span>
           </div>
@@ -147,11 +147,12 @@ export const FileAttachmentPreview: FC<{
             onClick={() => onRemove(file.id)}
             className="
               absolute -top-1 -right-1 w-4 h-4 
-              bg-destructive text-destructive-foreground 
+              bg-[var(--cyber-red)] text-black 
               rounded-full text-xs 
               opacity-0 group-hover:opacity-100 
               transition-opacity
               flex items-center justify-center
+              shadow-[0_0_6px_var(--cyber-red)/30]
             "
             title="Remove"
           >
@@ -259,7 +260,7 @@ export const FileAttachment: FC<FileAttachmentProps> = ({
 
       {/* Error message */}
       {error && (
-        <div className="text-xs text-destructive px-2 py-1">{error}</div>
+        <div className="font-mono text-xs text-[var(--cyber-red)] px-2 py-1">{error}</div>
       )}
 
       {/* Preview attached files */}

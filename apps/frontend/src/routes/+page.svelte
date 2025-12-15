@@ -20,11 +20,24 @@
   });
 </script>
 
-<main class="container mx-auto px-4 py-8 max-w-6xl">
-  <div class="flex items-center justify-center min-h-[80vh]">
-    <div class="text-center">
-      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-      <p class="mt-4 text-muted-foreground">Loading...</p>
+<!-- Noise overlay for atmosphere -->
+<div class="noise-overlay"></div>
+
+<main class="min-h-screen grid-bg mesh-gradient flex items-center justify-center">
+  <div class="text-center animate-fade-in-up">
+    <!-- Cyber loading spinner -->
+    <div class="relative mx-auto w-16 h-16">
+      <!-- Outer ring -->
+      <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
+      <!-- Spinning ring -->
+      <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
+      <!-- Center dot -->
+      <div class="absolute inset-0 flex items-center justify-center">
+        <div class="w-2 h-2 rounded-full bg-[var(--cyber-cyan)] animate-pulse-dot"></div>
+      </div>
     </div>
+    <p class="mt-6 text-sm font-mono text-muted-foreground tracking-wider uppercase">
+      Loading<span class="typing-cursor"></span>
+    </p>
   </div>
 </main>

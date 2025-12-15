@@ -1,8 +1,7 @@
 <script lang="ts">
   import { page } from "$app/stores";
   import { sandboxes, fetchSandbox, getSandboxStats } from "$lib/stores/sandboxes.svelte";
-  import type { Sandbox, SandboxStats, SandboxInfo } from "$lib/api/tauri";
-  import { Badge } from "$lib/components/ui/badge";
+  import type { SandboxStats, SandboxInfo } from "$lib/api/tauri";
   import { Button } from "$lib/components/ui/button";
   import { onMount } from "svelte";
   import { openServiceWindow, type ServiceType } from "$lib/utils/service-window";
@@ -53,13 +52,15 @@
     }
   });
 
-  function getStatusBadgeVariant(status: string | undefined): "default" | "secondary" | "destructive" | "outline" {
+  function getStatusColor(status: string | undefined): string {
     switch (status) {
-      case "running": return "default";
-      case "paused": return "secondary";
+      case "running": return "var(--cyber-emerald)";
+      case "paused": 
+      case "starting":
+      case "stopping": return "var(--cyber-amber)";
       case "exited":
-      case "dead": return "destructive";
-      default: return "outline";
+      case "dead": return "var(--cyber-red)";
+      default: return "var(--cyber-cyan)";
     }
   }
 
@@ -85,69 +86,95 @@
   }
 </script>
 
-<div class="space-y-6">
-  <h2 class="text-xl font-semibold">Sandbox Settings</h2>
+<div class="space-y-6 animate-fade-in">
+  <h2 class="text-xl font-bold" style="font-family: 'Space Grotesk', sans-serif;">
+    Settings
+  </h2>
 
   <!-- Service URLs Section -->
-  <div class="border rounded-lg p-4 space-y-4">
-    <h3 class="font-medium">Service URLs</h3>
+  <div class="cyber-card corner-accent overflow-hidden">
+    <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+      <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+        [service_urls]
+      </h3>
+    </div>
     
-    <div class="grid gap-3">
+    <div class="p-4 space-y-3">
       <!-- Homepage URL -->
       {#if sandbox?.urls?.homepage}
-        <div class="flex items-center justify-between p-3 bg-muted/50 rounded">
+        <div class="flex items-center justify-between p-3 rounded bg-background/30 border border-border/30">
           <div class="min-w-0 flex-1">
-            <div class="font-medium">Homepage URL</div>
-            <div class="text-sm text-muted-foreground truncate">
+            <div class="font-mono text-xs uppercase tracking-wider text-muted-foreground">Homepage</div>
+            <div class="text-sm font-mono truncate mt-0.5 text-foreground">
               {sandbox.urls.homepage}
             </div>
           </div>
-          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls?.homepage, "Homepage", "opencode")}>
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onclick={() => openService(sandbox?.urls?.homepage, "Homepage", "opencode")}
+            class="h-7 px-3 font-mono text-xs border-border/50 hover:border-[var(--cyber-cyan)]/50 hover:text-[var(--cyber-cyan)]"
+          >
             Open
           </Button>
         </div>
       {/if}
 
       <!-- OpenCode API -->
-      <div class="flex items-center justify-between p-3 bg-muted/50 rounded">
+      <div class="flex items-center justify-between p-3 rounded bg-background/30 border border-border/30">
         <div class="min-w-0 flex-1">
-          <div class="font-medium">OpenCode API</div>
-          <div class="text-sm text-muted-foreground truncate">
+          <div class="font-mono text-xs uppercase tracking-wider text-muted-foreground">OpenCode API</div>
+          <div class="text-sm font-mono truncate mt-0.5 {sandbox?.urls?.opencode ? 'text-foreground' : 'text-muted-foreground'}">
             {sandbox?.urls?.opencode ?? "Not configured"}
           </div>
         </div>
         {#if sandbox?.urls?.opencode}
-          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls?.opencode, "OpenCode", "opencode")}>
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onclick={() => openService(sandbox?.urls?.opencode, "OpenCode", "opencode")}
+            class="h-7 px-3 font-mono text-xs border-border/50 hover:border-[var(--cyber-cyan)]/50 hover:text-[var(--cyber-cyan)]"
+          >
             Open
           </Button>
         {/if}
       </div>
 
       <!-- Code Server -->
-      <div class="flex items-center justify-between p-3 bg-muted/50 rounded">
+      <div class="flex items-center justify-between p-3 rounded bg-background/30 border border-border/30">
         <div class="min-w-0 flex-1">
-          <div class="font-medium">Code Server</div>
-          <div class="text-sm text-muted-foreground truncate">
+          <div class="font-mono text-xs uppercase tracking-wider text-muted-foreground">Code Server</div>
+          <div class="text-sm font-mono truncate mt-0.5 {sandbox?.urls?.codeServer ? 'text-foreground' : 'text-muted-foreground'}">
             {sandbox?.urls?.codeServer ?? "Not configured"}
           </div>
         </div>
         {#if sandbox?.urls?.codeServer}
-          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls?.codeServer, "Code Server", "code-server")}>
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onclick={() => openService(sandbox?.urls?.codeServer, "Code Server", "code-server")}
+            class="h-7 px-3 font-mono text-xs border-border/50 hover:border-[var(--cyber-magenta)]/50 hover:text-[var(--cyber-magenta)]"
+          >
             Open
           </Button>
         {/if}
       </div>
 
-      <!-- VNC/Desktop (only show if available) -->
+      <!-- VNC/Desktop -->
       {#if sandbox?.urls?.vnc}
-        <div class="flex items-center justify-between p-3 bg-muted/50 rounded">
+        <div class="flex items-center justify-between p-3 rounded bg-background/30 border border-border/30">
           <div class="min-w-0 flex-1">
-            <div class="font-medium">Desktop (VNC)</div>
-            <div class="text-sm text-muted-foreground truncate">
+            <div class="font-mono text-xs uppercase tracking-wider text-muted-foreground">Desktop (VNC)</div>
+            <div class="text-sm font-mono truncate mt-0.5 text-foreground">
               {sandbox.urls.vnc}
             </div>
           </div>
-          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls?.vnc, "Desktop", "vnc")}>
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onclick={() => openService(sandbox?.urls?.vnc, "Desktop", "vnc")}
+            class="h-7 px-3 font-mono text-xs border-border/50 hover:border-[var(--cyber-amber)]/50 hover:text-[var(--cyber-amber)]"
+          >
             Open
           </Button>
         </div>
@@ -156,106 +183,139 @@
   </div>
 
   <!-- Container Status Section -->
-  <div class="border rounded-lg p-4 space-y-4">
-    <div class="flex items-center justify-between">
-      <h3 class="font-medium">Container Status</h3>
-      <Badge variant={getStatusBadgeVariant(sandbox?.status)}>
-        {sandbox?.status ?? "Unknown"}
-      </Badge>
+  <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-1">
+    <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+      <div class="flex items-center justify-between">
+        <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+          [container_status]
+        </h3>
+        <span class="px-2 py-0.5 rounded text-xs font-mono" 
+              style="color: {getStatusColor(sandbox?.status)}; 
+                     background: {getStatusColor(sandbox?.status)}10; 
+                     border: 1px solid {getStatusColor(sandbox?.status)}30;">
+          {sandbox?.status ?? "Unknown"}
+        </span>
+      </div>
     </div>
     
-    {#if sandbox?.status !== "running"}
-      <div class="text-sm text-muted-foreground p-3 bg-muted/30 rounded">
-        Start the sandbox to view resource usage.
-      </div>
-    {:else}
-      <div class="grid gap-3">
-        {#if stats}
-          <!-- CPU Usage -->
-          <div class="flex items-center justify-between p-3 bg-muted/50 rounded">
-            <div>
-              <div class="font-medium">CPU Usage</div>
-              <div class="text-sm text-muted-foreground">Current utilization</div>
-            </div>
-            <div class="text-right">
-              <div class="font-mono text-lg">{stats.cpuPercent.toFixed(1)}%</div>
-            </div>
-          </div>
-          
-          <!-- Memory Usage -->
-          <div class="flex items-center justify-between p-3 bg-muted/50 rounded">
-            <div>
-              <div class="font-medium">Memory Usage</div>
-              <div class="text-sm text-muted-foreground">
-                {formatBytes(stats.memoryUsage)} / {formatBytes(stats.memoryLimit)}
+    <div class="p-4">
+      {#if sandbox?.status !== "running"}
+        <div class="text-center py-8">
+          <div class="font-mono text-3xl text-[var(--cyber-amber)]/30 mb-3">⚡</div>
+          <p class="text-sm font-mono text-muted-foreground">
+            Start the sandbox to view resource usage
+          </p>
+        </div>
+      {:else}
+        <div class="space-y-3">
+          {#if stats}
+            <!-- CPU Usage -->
+            <div class="flex items-center justify-between p-3 rounded bg-background/30 border border-border/30">
+              <div>
+                <div class="font-mono text-xs uppercase tracking-wider text-muted-foreground">CPU Usage</div>
+                <div class="text-xs font-mono text-muted-foreground/70 mt-0.5">Current utilization</div>
+              </div>
+              <div class="text-right">
+                <div class="font-mono text-lg" style="color: {stats.cpuPercent > 80 ? 'var(--cyber-red)' : stats.cpuPercent > 50 ? 'var(--cyber-amber)' : 'var(--cyber-emerald)'}">
+                  {stats.cpuPercent.toFixed(1)}%
+                </div>
               </div>
             </div>
-            <div class="text-right">
-              <div class="font-mono text-lg">{stats.memoryPercent.toFixed(1)}%</div>
+            
+            <!-- Memory Usage -->
+            <div class="flex items-center justify-between p-3 rounded bg-background/30 border border-border/30">
+              <div>
+                <div class="font-mono text-xs uppercase tracking-wider text-muted-foreground">Memory</div>
+                <div class="text-xs font-mono text-muted-foreground/70 mt-0.5">
+                  {formatBytes(stats.memoryUsage)} / {formatBytes(stats.memoryLimit)}
+                </div>
+              </div>
+              <div class="text-right">
+                <div class="font-mono text-lg" style="color: {stats.memoryPercent > 80 ? 'var(--cyber-red)' : stats.memoryPercent > 50 ? 'var(--cyber-amber)' : 'var(--cyber-emerald)'}">
+                  {stats.memoryPercent.toFixed(1)}%
+                </div>
+              </div>
             </div>
-          </div>
 
-          <!-- Network I/O -->
-          <div class="flex items-center justify-between p-3 bg-muted/50 rounded">
-            <div>
-              <div class="font-medium">Network I/O</div>
-              <div class="text-sm text-muted-foreground">Received / Transmitted</div>
+            <!-- Network I/O -->
+            <div class="flex items-center justify-between p-3 rounded bg-background/30 border border-border/30">
+              <div>
+                <div class="font-mono text-xs uppercase tracking-wider text-muted-foreground">Network I/O</div>
+                <div class="text-xs font-mono text-muted-foreground/70 mt-0.5">Received / Transmitted</div>
+              </div>
+              <div class="text-right font-mono text-sm text-[var(--cyber-cyan)]">
+                {formatBytes(stats.networkRx)} / {formatBytes(stats.networkTx)}
+              </div>
             </div>
-            <div class="text-right font-mono text-sm">
-              <div>{formatBytes(stats.networkRx)} / {formatBytes(stats.networkTx)}</div>
-            </div>
-          </div>
 
-          <!-- Block I/O -->
-          <div class="flex items-center justify-between p-3 bg-muted/50 rounded">
-            <div>
-              <div class="font-medium">Disk I/O</div>
-              <div class="text-sm text-muted-foreground">Read / Write</div>
+            <!-- Block I/O -->
+            <div class="flex items-center justify-between p-3 rounded bg-background/30 border border-border/30">
+              <div>
+                <div class="font-mono text-xs uppercase tracking-wider text-muted-foreground">Disk I/O</div>
+                <div class="text-xs font-mono text-muted-foreground/70 mt-0.5">Read / Write</div>
+              </div>
+              <div class="text-right font-mono text-sm text-[var(--cyber-magenta)]">
+                {formatBytes(stats.blockRead)} / {formatBytes(stats.blockWrite)}
+              </div>
             </div>
-            <div class="text-right font-mono text-sm">
-              <div>{formatBytes(stats.blockRead)} / {formatBytes(stats.blockWrite)}</div>
+          {:else if isLoadingStats}
+            <div class="text-center py-6">
+              <div class="relative mx-auto w-8 h-8">
+                <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
+                <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
+              </div>
+              <p class="mt-3 text-xs font-mono text-muted-foreground">Loading stats...</p>
             </div>
-          </div>
-        {:else if isLoadingStats}
-          <div class="text-sm text-muted-foreground p-3 bg-muted/30 rounded">
-            Loading stats...
-          </div>
-        {/if}
-        
-        <Button size="sm" variant="outline" onclick={refreshStats} disabled={isLoadingStats}>
-          {isLoadingStats ? "Refreshing..." : "Refresh Stats"}
-        </Button>
-      </div>
-    {/if}
+          {/if}
+          
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onclick={refreshStats} 
+            disabled={isLoadingStats}
+            class="w-full h-8 font-mono text-xs uppercase tracking-wider border-border/50
+                   hover:border-[var(--cyber-cyan)]/50 hover:text-[var(--cyber-cyan)]"
+          >
+            {isLoadingStats ? "Refreshing..." : "↻ Refresh Stats"}
+          </Button>
+        </div>
+      {/if}
+    </div>
   </div>
 
   <!-- Container Info Section -->
-  <div class="border rounded-lg p-4 space-y-4">
-    <h3 class="font-medium">Container Info</h3>
+  <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-2">
+    <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+      <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+        [container_info]
+      </h3>
+    </div>
     
-    <div class="grid grid-cols-2 gap-4 text-sm">
-      <div>
-        <div class="text-muted-foreground">Container ID</div>
-        <div class="font-mono truncate" title={sandbox?.containerId}>
-          {sandbox?.containerId?.slice(0, 12) ?? "N/A"}
+    <div class="p-4">
+      <div class="grid grid-cols-2 gap-4 text-sm">
+        <div>
+          <div class="font-mono text-xs uppercase tracking-wider text-muted-foreground">Container ID</div>
+          <div class="font-mono truncate mt-0.5 text-[var(--cyber-cyan)]" title={sandbox?.containerId}>
+            {sandbox?.containerId?.slice(0, 12) ?? "N/A"}
+          </div>
         </div>
-      </div>
-      <div>
-        <div class="text-muted-foreground">Image</div>
-        <div class="font-mono truncate" title={sandbox?.image}>
-          {sandbox?.image ?? "N/A"}
+        <div>
+          <div class="font-mono text-xs uppercase tracking-wider text-muted-foreground">Image</div>
+          <div class="font-mono truncate mt-0.5" title={sandbox?.image}>
+            {sandbox?.image ?? "N/A"}
+          </div>
         </div>
-      </div>
-      <div>
-        <div class="text-muted-foreground">Created</div>
-        <div class="font-mono">
-          {sandbox?.createdAt ? new Date(sandbox.createdAt).toLocaleString() : "N/A"}
+        <div>
+          <div class="font-mono text-xs uppercase tracking-wider text-muted-foreground">Created</div>
+          <div class="font-mono mt-0.5">
+            {sandbox?.createdAt ? new Date(sandbox.createdAt).toLocaleString() : "N/A"}
+          </div>
         </div>
-      </div>
-      <div>
-        <div class="text-muted-foreground">Started</div>
-        <div class="font-mono">
-          {sandbox?.startedAt ? new Date(sandbox.startedAt).toLocaleString() : "N/A"}
+        <div>
+          <div class="font-mono text-xs uppercase tracking-wider text-muted-foreground">Started</div>
+          <div class="font-mono mt-0.5">
+            {sandbox?.startedAt ? new Date(sandbox.startedAt).toLocaleString() : "N/A"}
+          </div>
         </div>
       </div>
     </div>
@@ -263,29 +323,38 @@
 
   <!-- Repository Info Section -->
   {#if sandboxInfo?.repository}
-    <div class="border rounded-lg p-4 space-y-4">
-      <h3 class="font-medium">Repository Info</h3>
+    <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-3">
+      <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+        <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+          [repository_info]
+        </h3>
+      </div>
       
-      <div class="grid grid-cols-2 gap-4 text-sm">
-        <div>
-          <div class="text-muted-foreground">Name</div>
-          <div class="font-mono">{sandboxInfo.repository.name}</div>
-        </div>
-        <div>
-          <div class="text-muted-foreground">Branch</div>
-          <div class="font-mono">{sandboxInfo.repository.currentBranch}</div>
-        </div>
-        <div>
-          <div class="text-muted-foreground">Path</div>
-          <div class="font-mono truncate" title={sandboxInfo.repository.path}>
-            {sandboxInfo.repository.path}
+      <div class="p-4">
+        <div class="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <div class="font-mono text-xs uppercase tracking-wider text-muted-foreground">Name</div>
+            <div class="font-mono mt-0.5">{sandboxInfo.repository.name}</div>
           </div>
-        </div>
-        <div>
-          <div class="text-muted-foreground">Status</div>
-          <Badge variant={sandboxInfo.repository.isDirty ? "secondary" : "outline"}>
-            {sandboxInfo.repository.isDirty ? "Modified" : "Clean"}
-          </Badge>
+          <div>
+            <div class="font-mono text-xs uppercase tracking-wider text-muted-foreground">Branch</div>
+            <div class="font-mono mt-0.5 text-[var(--cyber-magenta)]">{sandboxInfo.repository.currentBranch}</div>
+          </div>
+          <div>
+            <div class="font-mono text-xs uppercase tracking-wider text-muted-foreground">Path</div>
+            <div class="font-mono truncate mt-0.5" title={sandboxInfo.repository.path}>
+              {sandboxInfo.repository.path}
+            </div>
+          </div>
+          <div>
+            <div class="font-mono text-xs uppercase tracking-wider text-muted-foreground">Status</div>
+            <span class="inline-block mt-0.5 px-2 py-0.5 rounded text-xs font-mono"
+                  style="color: {sandboxInfo.repository.isDirty ? 'var(--cyber-amber)' : 'var(--cyber-emerald)'}; 
+                         background: {sandboxInfo.repository.isDirty ? 'var(--cyber-amber)' : 'var(--cyber-emerald)'}10; 
+                         border: 1px solid {sandboxInfo.repository.isDirty ? 'var(--cyber-amber)' : 'var(--cyber-emerald)'}30;">
+              {sandboxInfo.repository.isDirty ? "Modified" : "Clean"}
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -293,24 +362,49 @@
 
   <!-- Quick Actions -->
   {#if sandbox?.status === "running"}
-    <div class="border rounded-lg p-4 space-y-3">
-      <h3 class="font-medium">Quick Actions</h3>
-      <div class="flex flex-wrap gap-2">
-        {#if sandbox.urls?.opencode}
-          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls?.opencode, "OpenCode", "opencode")}>
-            Open OpenCode
-          </Button>
-        {/if}
-        {#if sandbox.urls?.codeServer}
-          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls?.codeServer, "Code Server", "code-server")}>
-            Open Code Server
-          </Button>
-        {/if}
-        {#if sandbox.urls?.vnc}
-          <Button size="sm" variant="outline" onclick={() => openService(sandbox?.urls?.vnc, "Desktop", "vnc")}>
-            Open Desktop
-          </Button>
-        {/if}
+    <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-4">
+      <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+        <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+          [quick_actions]
+        </h3>
+      </div>
+      
+      <div class="p-4">
+        <div class="flex flex-wrap gap-2">
+          {#if sandbox.urls?.opencode}
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onclick={() => openService(sandbox?.urls?.opencode, "OpenCode", "opencode")}
+              class="h-8 px-4 font-mono text-xs uppercase tracking-wider border-border/50
+                     hover:border-[var(--cyber-cyan)]/50 hover:text-[var(--cyber-cyan)]"
+            >
+              OpenCode
+            </Button>
+          {/if}
+          {#if sandbox.urls?.codeServer}
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onclick={() => openService(sandbox?.urls?.codeServer, "Code Server", "code-server")}
+              class="h-8 px-4 font-mono text-xs uppercase tracking-wider border-border/50
+                     hover:border-[var(--cyber-magenta)]/50 hover:text-[var(--cyber-magenta)]"
+            >
+              Code Server
+            </Button>
+          {/if}
+          {#if sandbox.urls?.vnc}
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onclick={() => openService(sandbox?.urls?.vnc, "Desktop", "vnc")}
+              class="h-8 px-4 font-mono text-xs uppercase tracking-wider border-border/50
+                     hover:border-[var(--cyber-amber)]/50 hover:text-[var(--cyber-amber)]"
+            >
+              Desktop
+            </Button>
+          {/if}
+        </div>
       </div>
     </div>
   {/if}

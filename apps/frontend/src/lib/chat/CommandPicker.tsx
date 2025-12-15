@@ -121,7 +121,7 @@ export const CommandPicker: FC<CommandPickerProps> = ({
   return (
     <div
       ref={containerRef}
-      className="absolute z-50 w-64 max-h-64 overflow-y-auto rounded-md border border-border bg-popover shadow-lg"
+      className="absolute z-50 w-64 max-h-64 overflow-y-auto rounded border border-[var(--cyber-cyan)]/30 bg-popover/95 backdrop-blur-sm shadow-[0_4px_20px_rgba(0,0,0,0.3),0_0_30px_var(--cyber-cyan)/10]"
       style={{
         bottom: position.top,
         left: position.left,
@@ -131,16 +131,16 @@ export const CommandPicker: FC<CommandPickerProps> = ({
         {filteredCommands.map((command, index) => (
           <button
             key={command.name}
-            className={`w-full flex items-start gap-2 px-2 py-1.5 text-left text-sm rounded-sm transition-colors ${
+            className={`w-full flex items-start gap-2 px-2 py-1.5 text-left rounded transition-colors ${
               index === selectedIndex
-                ? "bg-accent text-accent-foreground"
-                : "hover:bg-accent/50"
+                ? "bg-[var(--cyber-cyan)]/10 border-l-2 border-[var(--cyber-cyan)]"
+                : "hover:bg-[var(--cyber-cyan)]/5 border-l-2 border-transparent"
             }`}
             onClick={() => onSelect(command)}
             onMouseEnter={() => setSelectedIndex(index)}
           >
-            <span className="font-mono text-primary">/{command.name}</span>
-            <span className="text-muted-foreground text-xs truncate flex-1">
+            <span className="font-mono text-xs text-[var(--cyber-cyan)]">/{command.name}</span>
+            <span className="font-mono text-xs text-muted-foreground truncate flex-1">
               {command.description}
             </span>
           </button>

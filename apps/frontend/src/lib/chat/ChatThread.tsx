@@ -149,7 +149,7 @@ function ImagePart({ image }: ImagePartProps) {
       <img 
         src={image} 
         alt="Attached image"
-        className="max-w-full max-h-64 rounded-lg object-contain"
+        className="max-w-full max-h-64 rounded border border-[var(--cyber-cyan)]/20 object-contain"
       />
     </div>
   );
@@ -180,7 +180,7 @@ function FilePart({ file }: FilePartProps) {
   const iconType = getFileIcon(file.mime);
   
   return (
-    <div className="my-2 inline-flex items-center gap-2 px-3 py-2 bg-background/20 rounded-lg text-sm">
+    <div className="my-2 inline-flex items-center gap-2 px-3 py-2 bg-background/30 rounded border border-[var(--cyber-cyan)]/20 font-mono text-sm">
       <span className="text-lg">
         {iconType === "pdf" && "📄"}
         {iconType === "text" && "📝"}
@@ -188,7 +188,7 @@ function FilePart({ file }: FilePartProps) {
         {iconType === "video" && "🎬"}
         {iconType === "document" && "📎"}
       </span>
-      <span className="truncate max-w-[200px]">
+      <span className="truncate max-w-[200px] text-[var(--cyber-cyan)]">
         {file.filename || "Attached file"}
       </span>
     </div>
@@ -299,12 +299,12 @@ function ToolCallPart({ toolName, args, result }: ToolCallMessagePartProps) {
         ? result 
         : JSON.stringify(result, null, 2);
   
-  // Determine status indicator styling
+  // Determine status indicator styling - using cyber colors
   const statusIndicatorClass = isError 
-    ? 'bg-red-500' 
+    ? 'bg-[var(--cyber-red)] shadow-[0_0_8px_var(--cyber-red)]' 
     : isComplete 
-      ? 'bg-green-500' 
-      : 'bg-yellow-500 animate-pulse';
+      ? 'bg-[var(--cyber-emerald)] shadow-[0_0_8px_var(--cyber-emerald)]' 
+      : 'bg-[var(--cyber-amber)] shadow-[0_0_8px_var(--cyber-amber)] animate-pulse';
   
   const statusText = isError 
     ? 'failed' 
@@ -313,18 +313,18 @@ function ToolCallPart({ toolName, args, result }: ToolCallMessagePartProps) {
       : 'running...';
   
   return (
-    <div className={`my-2 rounded-lg border overflow-hidden w-full min-w-0 ${isError ? 'border-red-500/50 bg-red-500/10' : 'border-border bg-muted/50'}`}>
-      <div className={`flex items-center gap-2 px-3 py-2 border-b ${isError ? 'bg-red-500/20 border-red-500/30' : 'bg-muted border-border'}`}>
+    <div className={`my-2 rounded border overflow-hidden w-full min-w-0 ${isError ? 'border-[var(--cyber-red)]/50 bg-[var(--cyber-red)]/5' : 'border-border/50 bg-muted/30'}`}>
+      <div className={`flex items-center gap-2 px-3 py-2 border-b ${isError ? 'bg-[var(--cyber-red)]/10 border-[var(--cyber-red)]/30' : 'bg-muted/50 border-border/30'}`}>
         <span className={`w-2 h-2 rounded-full flex-shrink-0 ${statusIndicatorClass}`} />
-        <span className="font-mono text-sm font-medium truncate">{toolName}</span>
-        <span className={`text-xs flex-shrink-0 ${isError ? 'text-red-500 font-medium' : 'text-muted-foreground'}`}>
+        <span className="font-mono text-xs font-medium truncate text-[var(--cyber-cyan)]">{toolName}</span>
+        <span className={`font-mono text-xs flex-shrink-0 uppercase tracking-wider ${isError ? 'text-[var(--cyber-red)]' : 'text-muted-foreground'}`}>
           {statusText}
         </span>
         {/* Show navigation link for task tool with child session */}
         {isTaskTool && childSessionId && onSessionSelect && (
           <button
             onClick={handleNavigateToSession}
-            className="ml-auto text-xs text-primary hover:text-primary/80 hover:underline flex items-center gap-1 flex-shrink-0"
+            className="ml-auto font-mono text-xs text-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]/80 hover:underline flex items-center gap-1 flex-shrink-0 transition-colors"
           >
             View Session
             <span>→</span>
@@ -333,24 +333,24 @@ function ToolCallPart({ toolName, args, result }: ToolCallMessagePartProps) {
       </div>
       {/* Show error message prominently if there's an error */}
       {isError && errorMessage && (
-        <div className="px-3 py-2 text-sm text-red-500 bg-red-500/5 border-b border-red-500/20">
-          <span className="font-medium">Error:</span> {errorMessage}
+        <div className="px-3 py-2 font-mono text-xs text-[var(--cyber-red)] bg-[var(--cyber-red)]/5 border-b border-[var(--cyber-red)]/20">
+          <span className="font-medium uppercase tracking-wider">Error:</span> {errorMessage}
         </div>
       )}
       <details className="group">
-        <summary className="px-3 py-2 text-xs text-muted-foreground cursor-pointer hover:bg-muted/50">
-          {isComplete ? 'Show details' : 'Show arguments'}
+        <summary className="px-3 py-2 font-mono text-xs text-muted-foreground cursor-pointer hover:bg-muted/30 transition-colors">
+          {isComplete ? '> Show details' : '> Show arguments'}
         </summary>
         <div className="px-3 py-2 space-y-2 min-w-0">
           <div className="min-w-0">
-            <span className="text-xs font-medium text-muted-foreground">Arguments:</span>
-            <pre className="mt-1 text-xs bg-background rounded p-2 overflow-x-auto max-h-32 whitespace-pre-wrap break-all">
+            <span className="font-mono text-xs font-medium text-[var(--cyber-cyan)] uppercase tracking-wider">Arguments:</span>
+            <pre className="mt-1 font-mono text-xs bg-background/50 rounded p-2 overflow-x-auto max-h-32 whitespace-pre-wrap break-all border border-border/30">
               {JSON.stringify(args, null, 2)}
             </pre>
           </div>
           <div className="min-w-0">
-            <span className="text-xs font-medium text-muted-foreground">Result:</span>
-            <pre className={`mt-1 text-xs rounded p-2 overflow-x-auto max-h-32 whitespace-pre-wrap break-all ${isError ? 'bg-red-500/10 text-red-400' : 'bg-background'}`}>
+            <span className="font-mono text-xs font-medium text-[var(--cyber-cyan)] uppercase tracking-wider">Result:</span>
+            <pre className={`mt-1 font-mono text-xs rounded p-2 overflow-x-auto max-h-32 whitespace-pre-wrap break-all border ${isError ? 'bg-[var(--cyber-red)]/5 text-[var(--cyber-red)] border-[var(--cyber-red)]/30' : 'bg-background/50 border-border/30'}`}>
               {resultDisplay}
             </pre>
           </div>
@@ -372,8 +372,8 @@ const ToolGroup: FC<PropsWithChildren<{ startIndex: number; endIndex: number }>>
 
   return (
     <details className="my-2" open>
-      <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground">
-        {toolCount} tool {toolCount === 1 ? "call" : "calls"}
+      <summary className="cursor-pointer font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]/80 transition-colors">
+        [{toolCount}] tool {toolCount === 1 ? "call" : "calls"}
       </summary>
       <div className="mt-1 space-y-1">{children}</div>
     </details>
@@ -410,7 +410,7 @@ function UserMessage() {
 
   return (
     <MessagePrimitive.Root className="flex justify-end mb-4">
-      <div className="max-w-[80%] rounded-lg px-4 py-2 bg-primary text-primary-foreground">
+      <div className="max-w-[80%] rounded px-4 py-2 bg-[var(--cyber-cyan)] text-black font-mono text-sm border border-[var(--cyber-cyan)] shadow-[0_0_12px_var(--cyber-cyan)/20]">
         {/* Render images */}
         {imageAttachments.map((img, index) => (
           <ImagePart key={`img-${index}`} image={img.image} />
@@ -454,7 +454,7 @@ function AssistantMessage() {
   
   return (
     <MessagePrimitive.Root className="flex justify-start mb-4 min-w-0 w-full">
-      <div className="max-w-[80%] min-w-0 rounded-lg px-4 py-2 bg-muted overflow-hidden">
+      <div className="max-w-[80%] min-w-0 rounded px-4 py-2 bg-muted/50 border border-border/30 overflow-hidden backdrop-blur-sm">
         <MessagePrimitive.Content
           components={{
             Text: TextPart,
@@ -666,7 +666,7 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
   }, [showCommandPicker, showFilePicker, handleSubmit]);
   
   return (
-    <div className="border-t p-4 bg-background relative">
+    <div className="border-t border-[var(--cyber-cyan)]/20 p-4 bg-background/80 backdrop-blur-sm relative">
       {/* Command Picker */}
       <CommandPicker
         query={commandQuery}
@@ -719,21 +719,27 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
             value={inputValue}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Type a message... (/ for commands, @ for files)"
-            className="flex-1 min-h-[40px] max-h-[200px] px-3 py-2 bg-input border border-border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+            placeholder="> Type a message... (/ for commands, @ for files)"
+            className="flex-1 min-h-[40px] max-h-[200px] px-3 py-2 font-mono text-sm bg-background/50 border border-border/50 rounded resize-none focus:outline-none focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)] placeholder:text-muted-foreground/50 transition-colors"
             rows={1}
           />
           <button
             type="submit"
             disabled={!inputValue.trim() && attachments.length === 0}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] text-black rounded hover:bg-[var(--cyber-cyan)]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-[0_0_12px_var(--cyber-cyan)/20]"
           >
             Send
           </button>
         </div>
       </form>
-      <p className="text-xs text-muted-foreground mt-2">
-        Press Enter to send, Shift+Enter for new line · <kbd className="px-1 bg-muted rounded">📎</kbd> to attach files · <kbd className="px-1 bg-muted rounded">/</kbd> for commands · <kbd className="px-1 bg-muted rounded">@</kbd> for files · <kbd className="px-1 bg-muted rounded">⌘,/.</kbd> switch agents · <kbd className="px-1 bg-muted rounded">⌥,/.</kbd> switch models
+      <p className="font-mono text-xs text-muted-foreground/70 mt-2">
+        <kbd className="px-1 bg-muted/50 rounded border border-border/30">Enter</kbd> send · 
+        <kbd className="px-1 bg-muted/50 rounded border border-border/30 mx-1">Shift+Enter</kbd> newline · 
+        <kbd className="px-1 bg-muted/50 rounded border border-border/30">📎</kbd> attach · 
+        <kbd className="px-1 bg-muted/50 rounded border border-border/30 mx-1">/</kbd> commands · 
+        <kbd className="px-1 bg-muted/50 rounded border border-border/30">@</kbd> files · 
+        <kbd className="px-1 bg-muted/50 rounded border border-border/30 mx-1">⌘,/.</kbd> agents · 
+        <kbd className="px-1 bg-muted/50 rounded border border-border/30">⌥,/.</kbd> models
       </p>
     </div>
   );
@@ -746,8 +752,8 @@ function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center h-full text-center p-8">
       <div className="text-muted-foreground">
-        <p className="text-lg font-medium">No messages yet</p>
-        <p className="text-sm mt-1">
+        <p className="font-mono text-sm uppercase tracking-wider text-[var(--cyber-cyan)]">[no_messages]</p>
+        <p className="font-mono text-xs mt-2 text-muted-foreground">
           Send a message to start a conversation with OpenCode.
         </p>
       </div>
@@ -792,14 +798,14 @@ function LoadingIndicator() {
   
   return (
     <div className="flex justify-start mb-4">
-      <div className="max-w-[80%] rounded-lg px-4 py-3 bg-muted">
+      <div className="max-w-[80%] rounded px-4 py-3 bg-muted/50 border border-[var(--cyber-cyan)]/20 backdrop-blur-sm">
         <div className="flex items-center gap-2">
           <div className="flex gap-1">
-            <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-            <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-            <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+            <span className="w-2 h-2 bg-[var(--cyber-cyan)] rounded-full animate-bounce shadow-[0_0_6px_var(--cyber-cyan)]" style={{ animationDelay: "0ms" }} />
+            <span className="w-2 h-2 bg-[var(--cyber-cyan)] rounded-full animate-bounce shadow-[0_0_6px_var(--cyber-cyan)]" style={{ animationDelay: "150ms" }} />
+            <span className="w-2 h-2 bg-[var(--cyber-cyan)] rounded-full animate-bounce shadow-[0_0_6px_var(--cyber-cyan)]" style={{ animationDelay: "300ms" }} />
           </div>
-          <span className="text-sm text-muted-foreground">Thinking...</span>
+          <span className="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">Processing...</span>
         </div>
       </div>
     </div>

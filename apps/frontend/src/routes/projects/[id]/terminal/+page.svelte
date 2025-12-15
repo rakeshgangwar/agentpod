@@ -34,53 +34,47 @@
   });
 </script>
 
-<div class="terminal-page">
+<div class="h-[calc(100vh-300px)] min-h-[400px] flex flex-col animate-fade-in">
   {#if !sandbox}
-    <div class="status-message">
-      <p class="text-muted-foreground">Loading sandbox...</p>
+    <!-- Loading State -->
+    <div class="flex-1 flex items-center justify-center">
+      <div class="text-center animate-fade-in-up">
+        <div class="relative mx-auto w-16 h-16">
+          <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
+          <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
+          <div class="absolute inset-0 flex items-center justify-center">
+            <div class="w-2 h-2 rounded-full bg-[var(--cyber-cyan)] animate-pulse-dot"></div>
+          </div>
+        </div>
+        <p class="mt-6 text-sm font-mono text-muted-foreground tracking-wider uppercase">
+          Loading sandbox<span class="typing-cursor"></span>
+        </p>
+      </div>
     </div>
   {:else if !isRunning}
-    <div class="status-message">
-      <div class="status-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-12 w-12 text-muted-foreground/50">
-          <circle cx="12" cy="12" r="10" />
-          <line x1="12" y1="8" x2="12" y2="12" />
-          <line x1="12" y1="16" x2="12.01" y2="16" />
-        </svg>
+    <!-- Not Running State -->
+    <div class="flex-1 flex items-center justify-center">
+      <div class="text-center animate-fade-in-up cyber-card corner-accent p-12">
+        <div class="font-mono text-5xl text-[var(--cyber-amber)]/30 mb-6">⌨</div>
+        <h3 class="text-lg font-bold" style="font-family: 'Space Grotesk', sans-serif;">
+          Sandbox Not Running
+        </h3>
+        <p class="text-sm font-mono text-muted-foreground mt-2">
+          Start the sandbox to access the terminal
+        </p>
+        <div class="mt-4 flex items-center justify-center gap-2">
+          <span class="font-mono text-xs text-muted-foreground uppercase tracking-wider">Status:</span>
+          <span class="status-indicator status-stopped">
+            <span class="status-dot"></span>
+            <span>{sandbox.status}</span>
+          </span>
+        </div>
       </div>
-      <h3 class="text-lg font-semibold">Sandbox Not Running</h3>
-      <p class="text-sm text-muted-foreground">
-        Start the sandbox to access the terminal.
-      </p>
-      <p class="text-xs text-muted-foreground mt-2">
-        Current status: <span class="font-medium">{sandbox.status}</span>
-      </p>
     </div>
   {:else}
-    <TerminalTabs {sandboxId} class="h-full" />
+    <!-- Terminal Content -->
+    <div class="flex-1 cyber-card corner-accent overflow-hidden">
+      <TerminalTabs {sandboxId} class="h-full" />
+    </div>
   {/if}
 </div>
-
-<style>
-  .terminal-page {
-    height: calc(100vh - 300px);
-    min-height: 400px;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .status-message {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    gap: 1rem;
-    text-align: center;
-    padding: 2rem;
-  }
-
-  .status-icon {
-    margin-bottom: 0.5rem;
-  }
-</style>

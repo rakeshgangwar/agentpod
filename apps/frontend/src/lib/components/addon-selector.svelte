@@ -90,8 +90,8 @@
 <div class="space-y-3">
   <!-- Header -->
   <div>
-    <h3 class="text-sm font-medium">Add-ons</h3>
-    <p class="text-xs text-muted-foreground">
+    <h3 class="text-xs font-mono uppercase tracking-wider text-[var(--cyber-cyan)]">[add-ons]</h3>
+    <p class="text-xs text-muted-foreground font-mono">
       Optional features for your development environment
     </p>
   </div>
@@ -100,16 +100,16 @@
     <!-- Loading skeleton -->
     <div class="space-y-2">
       {#each Array(3) as _}
-        <div class="h-12 bg-muted rounded-lg animate-pulse"></div>
+        <div class="h-12 rounded border border-[var(--cyber-cyan)]/20 bg-[var(--cyber-cyan)]/5 animate-pulse"></div>
       {/each}
     </div>
   {:else if error}
     <!-- Error state -->
-    <div class="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
+    <div class="text-sm font-mono text-[var(--cyber-red)] bg-[var(--cyber-red)]/10 border border-[var(--cyber-red)]/30 p-3 rounded">
       {error}
       <button 
         type="button" 
-        class="ml-2 underline hover:no-underline"
+        class="ml-2 underline hover:no-underline text-[var(--cyber-cyan)]"
         onclick={loadAddons}
       >
         Retry
@@ -123,10 +123,10 @@
         {@const isDisabled = isAddonDisabled(addon)}
         <button
           type="button"
-          class="w-full text-left p-3 rounded-lg border transition-all
+          class="w-full text-left p-3 rounded border transition-all font-mono
             {isSelected 
-              ? 'border-primary bg-primary/5' 
-              : 'border-border hover:border-muted-foreground/30 hover:bg-muted/50'}
+              ? 'border-[var(--cyber-cyan)] bg-[var(--cyber-cyan)]/10' 
+              : 'border-border/30 hover:border-[var(--cyber-cyan)]/50 hover:bg-[var(--cyber-cyan)]/5'}
             {isDisabled ? 'opacity-50 cursor-not-allowed' : ''}"
           onclick={() => toggleAddon(addon.id, addon)}
           disabled={isDisabled}
@@ -134,10 +134,10 @@
           <div class="flex items-center gap-3">
             <!-- Checkbox -->
             <div class="flex-shrink-0">
-              <div class="w-4 h-4 rounded border-2 flex items-center justify-center
-                {isSelected ? 'border-primary bg-primary' : 'border-muted-foreground/30'}">
+              <div class="w-4 h-4 rounded border-2 flex items-center justify-center transition-all
+                {isSelected ? 'border-[var(--cyber-cyan)] bg-[var(--cyber-cyan)] shadow-[0_0_6px_var(--cyber-cyan)]' : 'border-muted-foreground/30'}">
                 {#if isSelected}
-                  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-primary-foreground">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-black">
                     <polyline points="20 6 9 17 4 12"></polyline>
                   </svg>
                 {/if}
@@ -147,14 +147,14 @@
             <!-- Addon info -->
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
-                <span class="font-medium text-sm">{addon.name}</span>
-                <Badge variant="outline" class="text-[10px] px-1.5 py-0">
+                <span class="font-medium text-sm {isSelected ? 'text-[var(--cyber-cyan)]' : ''}">{addon.name}</span>
+                <span class="text-[10px] px-1.5 py-0 rounded border border-[var(--cyber-magenta)]/30 bg-[var(--cyber-magenta)]/10 text-[var(--cyber-magenta)]">
                   {categoryInfo[addon.category]?.label || addon.category}
-                </Badge>
+                </span>
                 {#if addon.priceMonthly > 0}
                   <span class="text-xs text-muted-foreground">+${addon.priceMonthly}/mo</span>
                 {:else}
-                  <span class="text-xs text-green-600">Free</span>
+                  <span class="text-xs text-[var(--cyber-emerald)]">Free</span>
                 {/if}
               </div>
               <p class="text-xs text-muted-foreground truncate">
@@ -164,7 +164,7 @@
             
             <!-- Port info -->
             {#if addon.port}
-              <div class="flex-shrink-0 text-xs text-muted-foreground">
+              <div class="flex-shrink-0 text-xs text-[var(--cyber-amber)]">
                 :{addon.port}
               </div>
             {/if}
@@ -172,7 +172,7 @@
           
           <!-- GPU warning -->
           {#if addon.requiresGpu && !hasGpu}
-            <p class="text-xs text-amber-600 mt-1 ml-7">
+            <p class="text-xs text-[var(--cyber-amber)] mt-1 ml-7">
               Requires GPU-enabled host
             </p>
           {/if}
@@ -182,7 +182,7 @@
     
     <!-- Empty state -->
     {#if addons.length === 0}
-      <div class="text-sm text-muted-foreground text-center p-4 border rounded-lg">
+      <div class="text-sm text-muted-foreground font-mono text-center p-4 border border-dashed border-border/30 rounded">
         No addons available
       </div>
     {/if}
@@ -191,10 +191,10 @@
     {#if selectedAddonIds.length > 0}
       {@const selectedAddons = addons.filter(a => selectedAddonIds.includes(a.id))}
       {@const totalPrice = selectedAddons.reduce((sum, a) => sum + a.priceMonthly, 0)}
-      <div class="text-xs text-muted-foreground pt-2 border-t">
-        {selectedAddonIds.length} addon{selectedAddonIds.length !== 1 ? 's' : ''} selected
+      <div class="text-xs text-muted-foreground font-mono pt-2 border-t border-border/30">
+        <span class="text-[var(--cyber-cyan)]">{selectedAddonIds.length}</span> addon{selectedAddonIds.length !== 1 ? 's' : ''} selected
         {#if totalPrice > 0}
-          · +${totalPrice}/mo
+          · <span class="text-[var(--cyber-amber)]">+${totalPrice}/mo</span>
         {/if}
       </div>
     {/if}

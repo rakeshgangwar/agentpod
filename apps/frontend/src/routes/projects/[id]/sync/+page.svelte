@@ -1,8 +1,6 @@
 <script lang="ts">
   import { page } from "$app/stores";
-  import * as Card from "$lib/components/ui/card";
   import { Button } from "$lib/components/ui/button";
-  import { Badge } from "$lib/components/ui/badge";
   import { Input } from "$lib/components/ui/input";
   import { 
     sandboxes, 
@@ -10,7 +8,7 @@
     getGitLog, 
     commitChanges 
   } from "$lib/stores/sandboxes.svelte";
-  import type { GitStatusResponse, GitLogResponse, GitCommit, GitFileStatus } from "$lib/api/tauri";
+  import type { GitStatusResponse, GitLogResponse, GitFileStatus } from "$lib/api/tauri";
   import { onMount } from "svelte";
 
   let sandboxId = $derived($page.params.id ?? "");
@@ -88,20 +86,20 @@
     }
   }
 
-  function getStatusBadge(file: GitFileStatus): { variant: "default" | "secondary" | "destructive" | "outline"; text: string } {
+  function getStatusBadge(file: GitFileStatus): { color: string; text: string } {
     if (file.staged === "A" || file.unstaged === "?") {
-      return { variant: "default", text: "New" };
+      return { color: "var(--cyber-emerald)", text: "New" };
     }
     if (file.staged === "M" || file.unstaged === "M") {
-      return { variant: "secondary", text: "Modified" };
+      return { color: "var(--cyber-amber)", text: "Modified" };
     }
     if (file.staged === "D" || file.unstaged === "D") {
-      return { variant: "destructive", text: "Deleted" };
+      return { color: "var(--cyber-red)", text: "Deleted" };
     }
     if (file.staged === "R") {
-      return { variant: "outline", text: "Renamed" };
+      return { color: "var(--cyber-cyan)", text: "Renamed" };
     }
-    return { variant: "outline", text: "Changed" };
+    return { color: "var(--cyber-magenta)", text: "Changed" };
   }
 
   function formatCommitDate(timestamp: string): string {
@@ -129,64 +127,89 @@
   let unstagedFiles = $derived(gitStatus?.files.filter(f => f.unstaged && f.unstaged !== " ") ?? []);
 </script>
 
-<div class="space-y-6">
+<div class="space-y-6 animate-fade-in">
+  <!-- Header -->
   <div class="flex items-center justify-between">
-    <h2 class="text-xl font-semibold">Git</h2>
-    <div class="flex gap-2">
-      <Button 
-        size="sm" 
-        variant="outline" 
-        onclick={refreshGitStatus}
-        disabled={isLoadingStatus || sandbox?.status !== "running"}
-      >
-        {isLoadingStatus ? "Loading..." : "Refresh Status"}
-      </Button>
-    </div>
+    <h2 class="text-xl font-bold" style="font-family: 'Space Grotesk', sans-serif;">
+      Git
+    </h2>
+    <Button 
+      size="sm" 
+      variant="outline" 
+      onclick={refreshGitStatus}
+      disabled={isLoadingStatus || sandbox?.status !== "running"}
+      class="h-8 px-4 font-mono text-xs uppercase tracking-wider border-border/50
+             hover:border-[var(--cyber-cyan)]/50 hover:text-[var(--cyber-cyan)]"
+    >
+      {isLoadingStatus ? "Loading..." : "↻ Refresh"}
+    </Button>
   </div>
 
   {#if sandbox?.status !== "running"}
-    <Card.Root>
-      <Card.Content class="py-12 text-center">
-        <p class="text-muted-foreground">Start the sandbox to view Git status.</p>
-      </Card.Content>
-    </Card.Root>
+    <!-- Not Running State -->
+    <div class="cyber-card corner-accent p-12 text-center">
+      <div class="font-mono text-4xl text-[var(--cyber-amber)]/20 mb-4">⚙</div>
+      <p class="font-mono text-sm text-muted-foreground">
+        Start the sandbox to view Git status
+      </p>
+    </div>
   {:else}
     <!-- Working Directory Status -->
-    <Card.Root>
-      <Card.Header>
-        <Card.Title class="flex items-center justify-between">
-          <span>Working Directory</span>
+    <div class="cyber-card corner-accent overflow-hidden">
+      <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+        <div class="flex items-center justify-between">
+          <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+            [working_directory]
+          </h3>
           {#if hasChanges}
-            <Badge variant="secondary">{gitStatus?.files.length} changes</Badge>
+            <span class="px-2 py-0.5 rounded text-xs font-mono bg-[var(--cyber-amber)]/10 text-[var(--cyber-amber)] border border-[var(--cyber-amber)]/30">
+              {gitStatus?.files.length} changes
+            </span>
           {:else}
-            <Badge variant="outline">Clean</Badge>
+            <span class="px-2 py-0.5 rounded text-xs font-mono bg-[var(--cyber-emerald)]/10 text-[var(--cyber-emerald)] border border-[var(--cyber-emerald)]/30">
+              Clean
+            </span>
           {/if}
-        </Card.Title>
-        <Card.Description>
+        </div>
+        <p class="text-xs font-mono text-muted-foreground mt-1">
           Current changes in your working directory
-        </Card.Description>
-      </Card.Header>
-      <Card.Content>
+        </p>
+      </div>
+      
+      <div class="p-4">
         {#if isLoadingStatus}
-          <div class="text-sm text-muted-foreground py-4 text-center">
-            Loading git status...
+          <div class="text-center py-8">
+            <div class="relative mx-auto w-8 h-8">
+              <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
+              <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
+            </div>
+            <p class="mt-3 text-xs font-mono text-muted-foreground">Loading git status...</p>
           </div>
         {:else if !hasChanges}
-          <div class="text-sm text-muted-foreground py-4 text-center">
-            No uncommitted changes. Your working directory is clean.
+          <div class="text-center py-8">
+            <div class="font-mono text-3xl text-[var(--cyber-emerald)]/30 mb-3">✓</div>
+            <p class="text-sm font-mono text-muted-foreground">
+              No uncommitted changes. Your working directory is clean.
+            </p>
           </div>
         {:else}
           <div class="space-y-4">
             <!-- Staged Changes -->
             {#if stagedFiles.length > 0}
               <div>
-                <h4 class="text-sm font-medium mb-2 text-green-600">Staged ({stagedFiles.length})</h4>
+                <h4 class="text-xs font-mono uppercase tracking-wider text-[var(--cyber-emerald)] mb-2">
+                  Staged ({stagedFiles.length})
+                </h4>
                 <div class="space-y-1">
                   {#each stagedFiles as file}
                     {@const badge = getStatusBadge(file)}
-                    <div class="flex items-center justify-between py-1 px-2 bg-green-500/10 rounded text-sm">
-                      <span class="font-mono truncate">{file.path}</span>
-                      <Badge variant={badge.variant} class="text-xs">{badge.text}</Badge>
+                    <div class="flex items-center justify-between py-1.5 px-3 bg-[var(--cyber-emerald)]/5 
+                                rounded border border-[var(--cyber-emerald)]/20 text-sm">
+                      <span class="font-mono text-xs truncate">{file.path}</span>
+                      <span class="px-1.5 py-0.5 rounded text-xs font-mono" 
+                            style="color: {badge.color}; background: {badge.color}10; border: 1px solid {badge.color}30;">
+                        {badge.text}
+                      </span>
                     </div>
                   {/each}
                 </div>
@@ -196,13 +219,19 @@
             <!-- Unstaged Changes -->
             {#if unstagedFiles.length > 0}
               <div>
-                <h4 class="text-sm font-medium mb-2 text-orange-600">Unstaged ({unstagedFiles.length})</h4>
+                <h4 class="text-xs font-mono uppercase tracking-wider text-[var(--cyber-amber)] mb-2">
+                  Unstaged ({unstagedFiles.length})
+                </h4>
                 <div class="space-y-1">
                   {#each unstagedFiles as file}
                     {@const badge = getStatusBadge(file)}
-                    <div class="flex items-center justify-between py-1 px-2 bg-orange-500/10 rounded text-sm">
-                      <span class="font-mono truncate">{file.path}</span>
-                      <Badge variant={badge.variant} class="text-xs">{badge.text}</Badge>
+                    <div class="flex items-center justify-between py-1.5 px-3 bg-[var(--cyber-amber)]/5 
+                                rounded border border-[var(--cyber-amber)]/20 text-sm">
+                      <span class="font-mono text-xs truncate">{file.path}</span>
+                      <span class="px-1.5 py-0.5 rounded text-xs font-mono" 
+                            style="color: {badge.color}; background: {badge.color}10; border: 1px solid {badge.color}30;">
+                        {badge.text}
+                      </span>
                     </div>
                   {/each}
                 </div>
@@ -210,27 +239,30 @@
             {/if}
           </div>
         {/if}
-      </Card.Content>
-    </Card.Root>
+      </div>
+    </div>
 
     <!-- Commit Form -->
     {#if hasChanges}
-      <Card.Root>
-        <Card.Header>
-          <Card.Title>Commit Changes</Card.Title>
-          <Card.Description>
+      <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-1">
+        <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+          <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+            [commit_changes]
+          </h3>
+          <p class="text-xs font-mono text-muted-foreground mt-1">
             Stage all changes and create a commit
-          </Card.Description>
-        </Card.Header>
-        <Card.Content class="space-y-4">
+          </p>
+        </div>
+        
+        <div class="p-4 space-y-4">
           {#if commitError}
-            <div class="p-3 bg-destructive/10 text-destructive text-sm rounded">
-              {commitError}
+            <div class="p-3 rounded border border-[var(--cyber-red)]/50 bg-[var(--cyber-red)]/5">
+              <span class="font-mono text-xs text-[var(--cyber-red)]">{commitError}</span>
             </div>
           {/if}
           {#if commitSuccess}
-            <div class="p-3 bg-green-500/10 text-green-600 text-sm rounded">
-              Changes committed successfully!
+            <div class="p-3 rounded border border-[var(--cyber-emerald)]/50 bg-[var(--cyber-emerald)]/5">
+              <span class="font-mono text-xs text-[var(--cyber-emerald)]">Changes committed successfully!</span>
             </div>
           {/if}
           <div class="flex gap-2">
@@ -240,61 +272,76 @@
               bind:value={commitMessage}
               disabled={isCommitting}
               onkeydown={(e) => e.key === "Enter" && handleCommit()}
+              class="flex-1 h-9 font-mono text-sm bg-background/50 border-border/50 
+                     focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)]"
             />
             <Button 
               onclick={handleCommit}
               disabled={isCommitting || !commitMessage.trim()}
+              class="h-9 px-4 font-mono text-xs uppercase tracking-wider
+                     bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-black
+                     disabled:opacity-30"
             >
-              {isCommitting ? "Committing..." : "Commit"}
+              {isCommitting ? "..." : "Commit"}
             </Button>
           </div>
-          <p class="text-xs text-muted-foreground">
+          <p class="text-xs font-mono text-muted-foreground/70">
             This will stage all changes and create a commit with the message above.
           </p>
-        </Card.Content>
-      </Card.Root>
+        </div>
+      </div>
     {/if}
 
     <!-- Commit History -->
-    <Card.Root>
-      <Card.Header>
-        <Card.Title class="flex items-center justify-between">
-          <span>Commit History</span>
+    <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-2">
+      <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+        <div class="flex items-center justify-between">
+          <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+            [commit_history]
+          </h3>
           <Button 
             size="sm" 
             variant="ghost" 
             onclick={refreshGitLog}
             disabled={isLoadingLog}
+            class="h-6 px-2 font-mono text-xs text-muted-foreground hover:text-[var(--cyber-cyan)]"
           >
             {isLoadingLog ? "..." : "↻"}
           </Button>
-        </Card.Title>
-        <Card.Description>
+        </div>
+        <p class="text-xs font-mono text-muted-foreground mt-1">
           Recent commits in this repository
-        </Card.Description>
-      </Card.Header>
-      <Card.Content>
+        </p>
+      </div>
+      
+      <div class="p-4">
         {#if isLoadingLog}
-          <div class="text-sm text-muted-foreground py-4 text-center">
-            Loading commit history...
+          <div class="text-center py-8">
+            <div class="relative mx-auto w-8 h-8">
+              <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
+              <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
+            </div>
+            <p class="mt-3 text-xs font-mono text-muted-foreground">Loading commit history...</p>
           </div>
         {:else if !gitLog?.commits || gitLog.commits.length === 0}
-          <div class="text-sm text-muted-foreground py-4 text-center">
-            No commits yet.
+          <div class="text-center py-8">
+            <div class="font-mono text-3xl text-[var(--cyber-cyan)]/20 mb-3">○</div>
+            <p class="text-sm font-mono text-muted-foreground">No commits yet.</p>
           </div>
         {:else}
           <div class="space-y-3">
-            {#each gitLog.commits.slice(0, 10) as commit}
-              <div class="border-l-2 border-muted pl-4 py-2">
+            {#each gitLog.commits.slice(0, 10) as commit, i}
+              <div class="border-l-2 border-[var(--cyber-cyan)]/30 pl-4 py-2 animate-fade-in-up" 
+                   style="animation-delay: {i * 50}ms">
                 <div class="flex items-start justify-between gap-2">
                   <div class="min-w-0 flex-1">
-                    <p class="font-medium truncate">{commit.message.split("\n")[0]}</p>
-                    <p class="text-xs text-muted-foreground mt-1">
-                      <span class="font-mono">{shortenSha(commit.sha)}</span>
-                      {" · "}
-                      {commit.author.name}
-                      {" · "}
-                      {formatCommitDate(commit.timestamp)}
+                    <p class="font-medium text-sm truncate">{commit.message.split("\n")[0]}</p>
+                    <p class="text-xs font-mono text-muted-foreground mt-1">
+                      <span class="text-[var(--cyber-cyan)]">{shortenSha(commit.sha)}</span>
+                      <span class="mx-1">·</span>
+                      <span>{commit.author.name}</span>
+                      <span class="mx-1">·</span>
+                      <span>{formatCommitDate(commit.timestamp)}</span>
                     </p>
                   </div>
                 </div>
@@ -302,7 +349,7 @@
             {/each}
           </div>
         {/if}
-      </Card.Content>
-    </Card.Root>
+      </div>
+    </div>
   {/if}
 </div>

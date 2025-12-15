@@ -970,7 +970,16 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
   if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <p className="text-muted-foreground">Loading conversation...</p>
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex gap-1">
+            <span className="w-2 h-2 rounded-full bg-[var(--cyber-cyan)] animate-bounce" style={{ animationDelay: "0ms" }} />
+            <span className="w-2 h-2 rounded-full bg-[var(--cyber-cyan)] animate-bounce" style={{ animationDelay: "150ms" }} />
+            <span className="w-2 h-2 rounded-full bg-[var(--cyber-cyan)] animate-bounce" style={{ animationDelay: "300ms" }} />
+          </div>
+          <p className="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+            Loading conversation...
+          </p>
+        </div>
       </div>
     );
   }
@@ -986,11 +995,14 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
         <div className="flex flex-col flex-1 min-h-0">
           {/* Error banner - dismissible, doesn't hide chat */}
           {error && (
-            <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-2 flex items-center justify-between gap-2">
-              <span className="text-sm">{error}</span>
+            <div className="border-b border-[var(--cyber-red)]/30 bg-[var(--cyber-red)]/10 px-4 py-2 flex items-center justify-between gap-2 backdrop-blur-sm">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[var(--cyber-red)] animate-pulse" />
+                <span className="font-mono text-xs text-[var(--cyber-red)]">{error}</span>
+              </div>
               <button
                 onClick={() => setError(null)}
-                className="text-destructive hover:text-destructive/80 text-sm font-medium px-2 py-1 rounded hover:bg-destructive/10"
+                className="font-mono text-xs uppercase tracking-wider px-2 py-1 rounded border border-[var(--cyber-red)]/30 text-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/10 transition-colors"
               >
                 Dismiss
               </button>

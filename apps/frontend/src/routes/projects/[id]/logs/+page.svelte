@@ -5,7 +5,6 @@
   import { Label } from "$lib/components/ui/label";
   import { Input } from "$lib/components/ui/input";
   import { CodeBlock } from "$lib/components/ui/code-block";
-  import * as Card from "$lib/components/ui/card";
   import { ScrollArea } from "$lib/components/ui/scroll-area";
 
   // Get sandbox ID from route params
@@ -70,74 +69,95 @@
   }
 </script>
 
-<div class="space-y-4">
-  <!-- Controls -->
-  <Card.Root>
-    <Card.Content class="pt-4">
-      <div class="flex flex-wrap items-center gap-4">
-        <div class="flex items-center gap-2">
-          <Label for="lines" class="whitespace-nowrap">Lines:</Label>
-          <Input 
-            id="lines"
-            type="number" 
-            min="1" 
-            max="1000"
-            value={lines}
-            onchange={handleLinesChange}
-            class="w-24"
-          />
-        </div>
-        
-        <Button 
-          variant="outline" 
-          size="sm"
-          onclick={loadLogs}
-          disabled={isLoading}
-        >
-          {isLoading ? "Loading..." : "Refresh"}
-        </Button>
-        
-        <Button 
-          variant={autoRefresh ? "default" : "outline"}
-          size="sm"
-          onclick={() => autoRefresh = !autoRefresh}
-        >
-          {autoRefresh ? "Auto-refresh ON" : "Auto-refresh OFF"}
-        </Button>
-        
-        {#if autoRefresh}
-          <span class="text-xs text-muted-foreground">Refreshing every 5s</span>
-        {/if}
+<div class="space-y-4 animate-fade-in">
+  <!-- Controls Card -->
+  <div class="cyber-card corner-accent p-4">
+    <div class="flex flex-wrap items-center gap-4">
+      <div class="flex items-center gap-2">
+        <Label for="lines" class="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+          Lines:
+        </Label>
+        <Input 
+          id="lines"
+          type="number" 
+          min="1" 
+          max="1000"
+          value={lines}
+          onchange={handleLinesChange}
+          class="w-24 h-8 font-mono text-sm bg-background/50 border-border/50 
+                 focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)]"
+        />
       </div>
-    </Card.Content>
-  </Card.Root>
+      
+      <Button 
+        variant="outline" 
+        size="sm"
+        onclick={loadLogs}
+        disabled={isLoading}
+        class="h-8 px-4 font-mono text-xs uppercase tracking-wider border-border/50
+               hover:border-[var(--cyber-cyan)]/50 hover:text-[var(--cyber-cyan)]"
+      >
+        {isLoading ? "Loading..." : "↻ Refresh"}
+      </Button>
+      
+      <Button 
+        size="sm"
+        onclick={() => autoRefresh = !autoRefresh}
+        class="h-8 px-4 font-mono text-xs uppercase tracking-wider
+               {autoRefresh 
+                 ? 'bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-black' 
+                 : 'bg-transparent border border-border/50 hover:border-[var(--cyber-emerald)]/50 hover:text-[var(--cyber-emerald)]'}"
+      >
+        {autoRefresh ? "● Auto ON" : "○ Auto OFF"}
+      </Button>
+      
+      {#if autoRefresh}
+        <span class="text-xs font-mono text-[var(--cyber-emerald)]">
+          Refreshing every 5s
+        </span>
+      {/if}
+    </div>
+  </div>
 
-  <!-- Logs Display -->
-  <Card.Root>
-    <Card.Header class="pb-2">
-      <Card.Title class="text-base flex items-center justify-between">
-        <span>Container Logs</span>
+  <!-- Logs Display Card -->
+  <div class="cyber-card corner-accent overflow-hidden">
+    <!-- Header -->
+    <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+      <div class="flex items-center justify-between">
+        <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+          [container_logs]
+        </h3>
         {#if logs}
-          <span class="text-xs font-normal text-muted-foreground">
+          <span class="text-xs font-mono text-muted-foreground">
             {logs.split('\n').length} lines
           </span>
         {/if}
-      </Card.Title>
-    </Card.Header>
-    <Card.Content>
+      </div>
+    </div>
+    
+    <!-- Content -->
+    <div class="bg-black/20">
       {#if error}
-        <div class="text-sm p-4 rounded-md bg-destructive/10 text-destructive">
-          {error}
+        <div class="p-4">
+          <div class="p-4 rounded border border-[var(--cyber-red)]/50 bg-[var(--cyber-red)]/5">
+            <span class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-red)]">[error]</span>
+            <p class="text-sm text-[var(--cyber-red)] mt-2">{error}</p>
+          </div>
         </div>
       {:else if isLoading && !logs}
-        <div class="flex items-center justify-center py-12">
-          <div class="text-center">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p class="mt-2 text-sm text-muted-foreground">Loading logs...</p>
+        <div class="flex items-center justify-center py-16">
+          <div class="text-center animate-fade-in-up">
+            <div class="relative mx-auto w-12 h-12">
+              <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
+              <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
+            </div>
+            <p class="mt-4 text-sm font-mono text-muted-foreground tracking-wider uppercase">
+              Loading logs<span class="typing-cursor"></span>
+            </p>
           </div>
         </div>
       {:else if logs}
-        <ScrollArea class="h-[500px] w-full rounded-md border">
+        <ScrollArea class="h-[500px] w-full">
           <div class="p-1">
             <CodeBlock 
               code={logs} 
@@ -147,16 +167,21 @@
           </div>
         </ScrollArea>
       {:else}
-        <div class="text-center py-12 text-muted-foreground">
-          <p>No logs available</p>
-          <p class="text-xs mt-1">The container may not be running or hasn't produced any output yet.</p>
+        <div class="flex items-center justify-center py-16">
+          <div class="text-center animate-fade-in-up">
+            <div class="font-mono text-4xl text-[var(--cyber-cyan)]/20 mb-4">[ ]</div>
+            <p class="text-sm font-mono text-muted-foreground">No logs available</p>
+            <p class="text-xs font-mono text-muted-foreground/70 mt-2">
+              The container may not be running or hasn't produced any output yet
+            </p>
+          </div>
         </div>
       {/if}
-    </Card.Content>
-  </Card.Root>
+    </div>
+  </div>
 
   <!-- Help text -->
-  <p class="text-xs text-muted-foreground">
-    Logs are retrieved from the container's stdout/stderr. Use the Deploy button in the header to rebuild the container if needed.
+  <p class="text-xs font-mono text-muted-foreground/70">
+    Logs are retrieved from the container's stdout/stderr. Use the Restart button in the header to rebuild the container if needed.
   </p>
 </div>
