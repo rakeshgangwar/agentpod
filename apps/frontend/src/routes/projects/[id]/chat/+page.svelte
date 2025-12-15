@@ -11,6 +11,7 @@
   import AgentSelector from "$lib/components/agent-selector.svelte";
   import OnboardingBanner from "$lib/components/onboarding-banner.svelte";
   import SandboxNotRunning from "$lib/components/sandbox-not-running.svelte";
+  import { X, Menu, RefreshCw, CornerDownRight } from "@lucide/svelte";
   import { sandboxes } from "$lib/stores/sandboxes.svelte";
 import {
     sandboxOpencodeListSessions,
@@ -705,7 +706,7 @@ import {
                       }}
                       title="Delete session"
                     >
-                      ✕
+                      <X class="h-3 w-3" />
                     </button>
                   </div>
                 </div>
@@ -728,7 +729,7 @@ import {
                           <div class="min-w-0 flex-1">
                             <div class="font-medium truncate flex items-center gap-1
                                         {selectedSessionId === childSession.id ? 'text-[var(--cyber-cyan)]' : 'text-foreground'}">
-                              <span class="text-xs text-[var(--cyber-cyan)]/50">↳</span>
+                              <CornerDownRight class="h-3 w-3 text-[var(--cyber-cyan)]/50" />
                               {getSessionTitle(childSession)}
                             </div>
                             <div class="text-xs font-mono truncate text-muted-foreground">
@@ -745,7 +746,7 @@ import {
                             }}
                             title="Delete session"
                           >
-                            ✕
+                            <X class="h-3 w-3" />
                           </button>
                         </div>
                       </div>
@@ -763,11 +764,16 @@ import {
         <Button
           size="sm"
           variant="ghost"
-          class="w-full h-8 font-mono text-xs text-muted-foreground hover:text-foreground"
+          class="w-full h-8 font-mono text-xs text-muted-foreground hover:text-foreground flex items-center justify-center gap-2"
           onclick={loadSessions}
           disabled={isLoading}
         >
-          {isLoading ? "Loading..." : "↻ Refresh"}
+          {#if isLoading}
+            Loading...
+          {:else}
+            <RefreshCw class="h-3 w-3" />
+            Refresh
+          {/if}
         </Button>
       </div>
     </aside>
@@ -779,7 +785,11 @@ import {
              shadow-lg shadow-[var(--cyber-cyan)]/20"
       onclick={() => sidebarCollapsed = !sidebarCollapsed}
     >
-      {sidebarCollapsed ? '☰' : '✕'}
+      {#if sidebarCollapsed}
+        <Menu class="h-5 w-5" />
+      {:else}
+        <X class="h-5 w-5" />
+      {/if}
     </button>
 
     <!-- Chat Area -->

@@ -53,7 +53,7 @@
   </div>
 {:else if !isRunning}
   <!-- Not Running State -->
-  <SandboxNotRunning {sandbox} icon="⌨" actionText="access the terminal" />
+  <SandboxNotRunning {sandbox} icon="💻" actionText="access the terminal" />
 {:else}
   <!-- Terminal Content -->
   <div class="animate-fade-in">

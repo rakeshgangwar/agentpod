@@ -5,6 +5,7 @@
   import { Input } from "$lib/components/ui/input";
   import { CodeBlock } from "$lib/components/ui/code-block";
   import { ScrollArea } from "$lib/components/ui/scroll-area";
+  import { RefreshCw, Circle } from "@lucide/svelte";
   import { getSandboxLogs, sandboxes } from "$lib/stores/sandboxes.svelte";
   import SandboxNotRunning from "$lib/components/sandbox-not-running.svelte";
 
@@ -116,20 +117,22 @@
         onclick={loadLogs}
         disabled={isLoading}
         class="h-8 px-4 font-mono text-xs uppercase tracking-wider border-border/50
-               hover:border-[var(--cyber-cyan)]/50 hover:text-[var(--cyber-cyan)]"
+               hover:border-[var(--cyber-cyan)]/50 hover:text-[var(--cyber-cyan)] flex items-center gap-2"
       >
-        {isLoading ? "Loading..." : "↻ Refresh"}
+        <RefreshCw class="h-3 w-3 {isLoading ? 'animate-spin' : ''}" />
+        {isLoading ? "Loading..." : "Refresh"}
       </Button>
 
       <Button
         size="sm"
         onclick={() => autoRefresh = !autoRefresh}
-        class="h-8 px-4 font-mono text-xs uppercase tracking-wider
+        class="h-8 px-4 font-mono text-xs uppercase tracking-wider flex items-center gap-2
                {autoRefresh
                  ? 'bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-black'
                  : 'bg-transparent border border-border/50 hover:border-[var(--cyber-emerald)]/50 hover:text-[var(--cyber-emerald)]'}"
       >
-        {autoRefresh ? "● Auto ON" : "○ Auto OFF"}
+        <Circle class="h-2.5 w-2.5 {autoRefresh ? 'fill-current' : ''}" />
+        Auto {autoRefresh ? "ON" : "OFF"}
       </Button>
 
       {#if autoRefresh}

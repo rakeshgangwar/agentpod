@@ -2,6 +2,7 @@
   import { page } from "$app/stores";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
+  import { RefreshCw, Check, Circle } from "@lucide/svelte";
   import {
     sandboxes,
     getGitStatus,
@@ -143,7 +144,7 @@
     </div>
   </div>
 {:else if !isRunning}
-  <SandboxNotRunning {sandbox} icon="⚙" actionText="view Git status" />
+  <SandboxNotRunning {sandbox} icon="🔀" actionText="view Git status" />
 {:else}
   <div class="space-y-6 animate-fade-in">
     <!-- Header -->
@@ -157,9 +158,10 @@
         onclick={refreshGitStatus}
         disabled={isLoadingStatus}
         class="h-8 px-4 font-mono text-xs uppercase tracking-wider border-border/50
-               hover:border-[var(--cyber-cyan)]/50 hover:text-[var(--cyber-cyan)]"
+               hover:border-[var(--cyber-cyan)]/50 hover:text-[var(--cyber-cyan)] flex items-center gap-2"
       >
-        {isLoadingStatus ? "Loading..." : "↻ Refresh"}
+        <RefreshCw class="h-3 w-3 {isLoadingStatus ? 'animate-spin' : ''}" />
+        {isLoadingStatus ? "Loading..." : "Refresh"}
       </Button>
     </div>
     <!-- Working Directory Status -->
@@ -195,7 +197,7 @@
           </div>
         {:else if !hasChanges}
           <div class="text-center py-8">
-            <div class="font-mono text-3xl text-[var(--cyber-emerald)]/30 mb-3">✓</div>
+            <Check class="h-8 w-8 mx-auto text-[var(--cyber-emerald)]/30 mb-3" />
             <p class="text-sm font-mono text-muted-foreground">
               No uncommitted changes. Your working directory is clean.
             </p>
@@ -312,9 +314,9 @@
             variant="ghost"
             onclick={refreshGitLog}
             disabled={isLoadingLog}
-            class="h-6 px-2 font-mono text-xs text-muted-foreground hover:text-[var(--cyber-cyan)]"
+            class="h-6 w-6 p-0 font-mono text-xs text-muted-foreground hover:text-[var(--cyber-cyan)]"
           >
-            {isLoadingLog ? "..." : "↻"}
+            <RefreshCw class="h-3 w-3 {isLoadingLog ? 'animate-spin' : ''}" />
           </Button>
         </div>
         <p class="text-xs font-mono text-muted-foreground mt-1">
@@ -333,7 +335,7 @@
           </div>
         {:else if !gitLog?.commits || gitLog.commits.length === 0}
           <div class="text-center py-8">
-            <div class="font-mono text-3xl text-[var(--cyber-cyan)]/20 mb-3">○</div>
+            <Circle class="h-8 w-8 mx-auto text-[var(--cyber-cyan)]/20 mb-3" />
             <p class="text-sm font-mono text-muted-foreground">No commits yet.</p>
           </div>
         {:else}

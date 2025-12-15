@@ -8,9 +8,10 @@
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
   import * as Tabs from "$lib/components/ui/tabs";
+  import { Check } from "@lucide/svelte";
   import ResourceTierSelector from "$lib/components/resource-tier-selector.svelte";
   import FlavorSelector from "$lib/components/flavor-selector.svelte";
-import AddonSelector from "$lib/components/addon-selector.svelte";
+  import AddonSelector from "$lib/components/addon-selector.svelte";
   import ProjectIconPicker from "$lib/components/project-icon-picker.svelte";
   import { getSuggestedIcon } from "$lib/utils/project-icons";
   import { projectIcons } from "$lib/stores/project-icons.svelte";
@@ -300,7 +301,7 @@ import AddonSelector from "$lib/components/addon-selector.svelte";
             <div class="flex items-center gap-3 animate-fade-in-up" style="animation-delay: {i * 100}ms">
               {#if step.done}
                 <div class="w-5 h-5 rounded-full bg-[var(--cyber-emerald)]/20 border border-[var(--cyber-emerald)] flex items-center justify-center">
-                  <span class="text-[var(--cyber-emerald)] text-xs">✓</span>
+                  <Check class="h-3 w-3 text-[var(--cyber-emerald)]" />
                 </div>
               {:else}
                 <div class="relative w-5 h-5">
