@@ -11,13 +11,17 @@
   import ModelSelector from "$lib/components/model-selector.svelte";
   import AgentSelector from "$lib/components/agent-selector.svelte";
   import OnboardingBanner from "$lib/components/onboarding-banner.svelte";
-  import {
+import {
     sandboxOpencodeListSessions,
     sandboxOpencodeCreateSession,
     sandboxOpencodeDeleteSession,
     sandboxOpencodeFindFiles,
+    sandboxOpencodeGetAgents,
+    sandboxOpencodeGetProviders,
     type Session,
     type ModelSelection,
+    type OpenCodeAgent,
+    type OpenCodeProvider,
   } from "$lib/api/tauri";
   import { confirm } from "@tauri-apps/plugin-dialog";
   import { toast } from "svelte-sonner";
@@ -109,8 +113,73 @@ import {
   // Track which session's agent we've loaded to avoid re-detecting
   let agentLoadedForSession = $state<string | null>(null);
   
+  // Agents list (loaded at page level for keyboard shortcut cycling)
+  let agents = $state<OpenCodeAgent[]>([]);
+  let agentsLoading = $state(true);
+  let agentAnimationTrigger = $state(0);
+  
+  // Filter to primary agents only
+  let primaryAgents = $derived(
+    agents.filter(agent => agent.mode === "primary" || agent.mode === "all")
+  );
+  
+  // Load agents when project changes
+  async function loadAgents() {
+    if (!projectId) return;
+    agentsLoading = true;
+    try {
+      agents = await sandboxOpencodeGetAgents(projectId);
+      // Auto-select default agent if none selected
+      if (!selectedAgent && primaryAgents.length > 0) {
+        const buildAgent = primaryAgents.find(a => a.name.toLowerCase() === "build");
+        selectedAgent = buildAgent?.name ?? primaryAgents[0].name;
+      }
+    } catch (err) {
+      console.error("Failed to load agents:", err);
+    } finally {
+      agentsLoading = false;
+    }
+  }
+  
+  // Providers list (loaded at page level for keyboard shortcut model cycling)
+  let providers = $state<OpenCodeProvider[]>([]);
+  let providersLoading = $state(true);
+  let modelAnimationTrigger = $state(0);
+  
+  // Flattened list of all models for easy cycling
+  let allModels = $derived(
+    providers.flatMap(provider => 
+      provider.models.map(model => ({
+        providerId: provider.id,
+        modelId: model.id,
+        displayName: `${provider.name} / ${model.name}`,
+      }))
+    )
+  );
+  
+  // Load providers when project changes
+  async function loadProviders() {
+    if (!projectId) return;
+    providersLoading = true;
+    try {
+      providers = await sandboxOpencodeGetProviders(projectId);
+      // Auto-select first model if none selected
+      if (!selectedModel && providers.length > 0 && providers[0].models.length > 0) {
+        selectedModel = {
+          providerId: providers[0].id,
+          modelId: providers[0].models[0].id,
+        };
+      }
+    } catch (err) {
+      console.error("Failed to load providers:", err);
+    } finally {
+      providersLoading = false;
+    }
+  }
+
   // Pending onboarding message to send via RuntimeProvider
-  let pendingOnboardingMessage = $state<{ text: string; agent?: string } | undefined>(undefined);
+  // Includes the target sessionId to prevent sending to wrong session
+  let pendingOnboardingMessage = $state<{ text: string; agent?: string; sessionId: string } | undefined>(undefined);
   
   // Reset agent when session changes so it can be detected from the new session's messages
   // For child sessions, use the agent extracted from the session title
@@ -140,39 +209,51 @@ import {
     }
   }
 
-  // Load sessions and onboarding status when project changes
+  // Load sessions, onboarding status, agents, and providers when project changes
   $effect(() => {
     if (projectId) {
+      // Reset banner dismissed state when project changes
+      onboardingBannerDismissed = false;
+      
       // Use untrack to prevent state updates inside these async functions
       // from causing the effect to re-run
       untrack(() => {
         loadSessions();
+        loadAgents();
+        loadProviders();
         fetchOnboardingSession(projectId);
       });
     }
   });
 
+  // Local state to track if banner has been dismissed (for immediate UX feedback)
+  let onboardingBannerDismissed = $state(false);
+
   // Onboarding handlers with toast notifications
   async function handleStartOnboarding() {
-    const success = await startOnboarding(projectId);
-    if (success) {
-      // Set pending message to be sent by RuntimeProvider when it's ready
-      if (selectedSessionId) {
-        const onboardingAgent = "manage";
-        pendingOnboardingMessage = {
-          text: "Start the workspace setup and help me configure this project.",
-          agent: onboardingAgent,
-        };
-        // Update the agent dropdown to reflect the agent being used
-        selectedAgent = onboardingAgent;
-        toast.info("Setup started", {
-          description: "The onboarding assistant is ready to help configure your workspace.",
-        });
-      } else {
-        toast.info("Setup ready", {
-          description: "Create a session first, then click 'Start Setup' again.",
-        });
-      }
+    // Dismiss banner immediately (local state for instant UX feedback)
+    onboardingBannerDismissed = true;
+    
+    // Set pending message to be sent by RuntimeProvider when it's ready
+    if (selectedSessionId) {
+      const onboardingAgent = "manage";
+      pendingOnboardingMessage = {
+        text: "Start the workspace setup and help me configure this project.",
+        agent: onboardingAgent,
+        sessionId: selectedSessionId, // Track which session this message is for
+      };
+      // Update the agent dropdown to reflect the agent being used
+      selectedAgent = onboardingAgent;
+      toast.info("Setup started", {
+        description: "The onboarding assistant is ready to help configure your workspace.",
+      });
+      
+      // Mark as skipped in backend (non-blocking)
+      skipOnboarding(projectId);
+    } else {
+      toast.info("Setup ready", {
+        description: "Create a session first, then click 'Start Setup' again.",
+      });
     }
   }
   
@@ -182,6 +263,9 @@ import {
   }
 
   async function handleSkipOnboarding() {
+    // Dismiss banner immediately (local state for instant UX feedback)
+    onboardingBannerDismissed = true;
+    
     const success = await skipOnboarding(projectId);
     if (success) {
       toast.success("Setup skipped", {
@@ -217,8 +301,19 @@ import {
     try {
       // projectId is actually sandboxId in v2 API
       const session = await sandboxOpencodeCreateSession(projectId);
-      sessions = [session, ...sessions];
+      console.log("[Chat] Created new session:", session.id);
+      
+      // Check if session was already added by SSE event (race condition)
+      const alreadyExists = sessions.some(s => s.id === session.id);
+      if (!alreadyExists) {
+        sessions = [session, ...sessions];
+      } else {
+        console.log("[Chat] Session already in list from SSE event");
+      }
+      
+      // Always select the new session
       selectedSessionId = session.id;
+      console.log("[Chat] Selected session:", selectedSessionId);
     } catch (err) {
       error = err instanceof Error ? err.message : "Failed to create session";
       console.error("Failed to create session:", err);
@@ -357,7 +452,133 @@ import {
     selectedSessionId = sessionId;
     // The $effect above will auto-expand the parent if needed
   }
+
+  // Handler for when a new session is created (e.g., child session from task tool)
+  // This updates the sessions list in real-time without needing a manual refresh
+  // We use setTimeout to defer the update to avoid race conditions
+  function handleSessionCreated(newSession: Session) {
+    // Defer update to next tick to avoid race conditions
+    setTimeout(() => {
+      // Check if session already exists (avoid duplicates)
+      if (sessions.some(s => s.id === newSession.id)) {
+        return;
+      }
+      
+      console.log("[Chat] New session created:", newSession.id, newSession.title);
+      
+      // Add the new session to the list
+      sessions = [newSession, ...sessions];
+      
+      // If it's a child session, auto-expand the parent
+      if (newSession.parentID && !expandedSessions.has(newSession.parentID)) {
+        expandedSessions = new Set([...expandedSessions, newSession.parentID]);
+      }
+    }, 0);
+  }
+
+  // Handler for when a session is updated (e.g., title changed)
+  // This updates the sessions list in real-time without needing a manual refresh
+  // NOTE: This should only UPDATE existing sessions, not add new ones.
+  // New sessions are handled by createNewSession (manual) or handleSessionCreated (child sessions)
+  // We use setTimeout to defer the update to avoid race conditions with createNewSession
+  function handleSessionUpdated(updatedSession: Session) {
+    // Defer update to next tick to avoid race conditions with createNewSession
+    setTimeout(() => {
+      console.log("[Chat] Session updated:", updatedSession.id, updatedSession.title);
+      
+      // Only update if session exists - don't add new sessions here
+      // This prevents race conditions with createNewSession
+      const sessionExists = sessions.some(s => s.id === updatedSession.id);
+      
+      if (sessionExists) {
+        // Update existing session
+        sessions = sessions.map(s => 
+          s.id === updatedSession.id 
+            ? { ...s, ...updatedSession }
+            : s
+        );
+      } else {
+        // Session not in list - this is expected for newly created sessions
+        // The session will be added by createNewSession or handleSessionCreated
+        console.log("[Chat] Session update received for unknown session (will be added by creator):", updatedSession.id);
+      }
+    }, 0);
+  }
+
+  // Agent cycling with keyboard shortcuts (Cmd+, for previous, Cmd+. for next)
+  function cycleAgent(direction: 1 | -1) {
+    if (primaryAgents.length === 0) return;
+    
+    const currentIndex = primaryAgents.findIndex(a => a.name === selectedAgent);
+    let newIndex: number;
+    
+    if (currentIndex === -1) {
+      newIndex = 0;
+    } else {
+      newIndex = (currentIndex + direction + primaryAgents.length) % primaryAgents.length;
+    }
+    
+    selectedAgent = primaryAgents[newIndex].name;
+    agentAnimationTrigger++; // Trigger animation in AgentSelector
+  }
+
+  // Model cycling with keyboard shortcuts (Alt+, for previous, Alt+. for next)
+  function cycleModel(direction: 1 | -1) {
+    if (allModels.length === 0) return;
+    
+    // Find current model index
+    const currentIndex = allModels.findIndex(m => 
+      m.providerId === selectedModel?.providerId && m.modelId === selectedModel?.modelId
+    );
+    let newIndex: number;
+    
+    if (currentIndex === -1) {
+      newIndex = 0;
+    } else {
+      newIndex = (currentIndex + direction + allModels.length) % allModels.length;
+    }
+    
+    const newModel = allModels[newIndex];
+    selectedModel = {
+      providerId: newModel.providerId,
+      modelId: newModel.modelId,
+    };
+    modelAnimationTrigger++; // Trigger animation in ModelSelector
+  }
+
+  function handleGlobalKeyDown(e: KeyboardEvent) {
+    // Handle model cycling with Alt+, and Alt+.
+    // On Mac, Alt+, produces '≤' and Alt+. produces '≥', so we check for both
+    if (e.altKey && !e.metaKey && !e.ctrlKey) {
+      if ((e.key === ',' || e.key === '≤') && allModels.length > 0) {
+        e.preventDefault();
+        cycleModel(-1); // Previous model
+        return;
+      } else if ((e.key === '.' || e.key === '≥') && allModels.length > 0) {
+        e.preventDefault();
+        cycleModel(1); // Next model
+        return;
+      }
+    }
+    
+    // Handle agent cycling with Cmd/Ctrl+, and Cmd/Ctrl+.
+    // Only handle if we have agents and agent switching is not disabled
+    if (primaryAgents.length === 0) return;
+    if (isChildSession) return; // Agent switching disabled for child sessions
+    
+    const isMeta = e.metaKey || e.ctrlKey; // Support both Mac (Cmd) and Windows/Linux (Ctrl)
+    
+    if (isMeta && e.key === ',') {
+      e.preventDefault();
+      cycleAgent(-1); // Previous agent
+    } else if (isMeta && e.key === '.') {
+      e.preventDefault();
+      cycleAgent(1); // Next agent
+    }
+  }
 </script>
+
+<svelte:window on:keydown={handleGlobalKeyDown} />
 
 {#if projectId}
   <div class="flex h-[calc(100vh-200px)] min-h-[400px]">
@@ -534,6 +755,8 @@ import {
                 {projectId}
                 bind:selectedModel
                 compact={true}
+                {providers}
+                animateTrigger={modelAnimationTrigger}
               />
             </div>
             <div class="flex items-center gap-2">
@@ -543,6 +766,8 @@ import {
                 bind:selectedAgent
                 compact={true}
                 disabled={isChildSession}
+                agents={primaryAgents}
+                animateTrigger={agentAnimationTrigger}
               />
               {#if isChildSession}
                 <span class="text-xs text-muted-foreground italic">(subagent)</span>
@@ -553,7 +778,7 @@ import {
         
         <!-- Onboarding Banner -->
         {@const onboardingStatus = onboarding.getStatus(projectId)}
-        {#if onboardingStatus && !onboarding.isComplete(projectId)}
+        {#if onboardingStatus && !onboarding.isComplete(projectId) && !onboardingBannerDismissed}
           <div class="px-4 py-2 border-b">
             <OnboardingBanner
               status={onboardingStatus}
@@ -576,6 +801,8 @@ import {
             onSessionAgentDetected={handleSessionAgentDetected}
             pendingMessage={pendingOnboardingMessage}
             onPendingMessageSent={handlePendingOnboardingMessageSent}
+            onSessionCreated={handleSessionCreated}
+            onSessionUpdated={handleSessionUpdated}
           >
             <react.ChatThread 
               {projectId} 
