@@ -733,7 +733,7 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
         </div>
       </form>
       <p className="text-xs text-muted-foreground mt-2">
-        Press Enter to send, Shift+Enter for new line · <kbd className="px-1 bg-muted rounded">📎</kbd> to attach files · <kbd className="px-1 bg-muted rounded">/</kbd> for commands · <kbd className="px-1 bg-muted rounded">@</kbd> for files
+        Press Enter to send, Shift+Enter for new line · <kbd className="px-1 bg-muted rounded">📎</kbd> to attach files · <kbd className="px-1 bg-muted rounded">/</kbd> for commands · <kbd className="px-1 bg-muted rounded">@</kbd> for files · <kbd className="px-1 bg-muted rounded">⌘,/.</kbd> switch agents · <kbd className="px-1 bg-muted rounded">⌥,/.</kbd> switch models
       </p>
     </div>
   );

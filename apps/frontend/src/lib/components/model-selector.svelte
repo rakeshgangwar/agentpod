@@ -4,6 +4,8 @@
    * 
    * A compact dropdown for selecting an LLM model in the chat interface.
    * Fetches available providers/models from the OpenCode container.
+   * 
+   * Can accept external providers list for keyboard shortcut cycling.
    */
   
   import { onMount } from "svelte";
@@ -21,26 +23,51 @@
     selectedModel = $bindable<ModelSelection | undefined>(undefined),
     disabled = false,
     compact = false,
+    providers: externalProviders,
+    animateTrigger = 0,
   }: {
     projectId: string;
     selectedModel?: ModelSelection;
     disabled?: boolean;
     compact?: boolean;
+    /** External providers list (if provided, skip internal loading) */
+    providers?: OpenCodeProvider[];
+    /** Trigger animation when this value changes (for keyboard shortcut cycling) */
+    animateTrigger?: number;
   } = $props();
   
   // State
-  let providers = $state<OpenCodeProvider[]>([]);
+  let internalProviders = $state<OpenCodeProvider[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
+  let isAnimating = $state(false);
+  
+  // Use external providers if provided, otherwise use internal
+  let providers = $derived(externalProviders ?? internalProviders);
+  
+  // Trigger animation when animateTrigger changes
+  $effect(() => {
+    if (animateTrigger > 0) {
+      isAnimating = true;
+      const timer = setTimeout(() => {
+        isAnimating = false;
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  });
   
   // Computed value for the select
   let selectValue = $derived(
     selectedModel ? `${selectedModel.providerId}::${selectedModel.modelId}` : ""
   );
   
-  // Load providers on mount
+  // Load providers on mount (only if not externally provided)
   onMount(() => {
-    loadProviders();
+    if (!externalProviders) {
+      loadProviders();
+    } else {
+      loading = false;
+    }
   });
   
   async function loadProviders() {
@@ -50,13 +77,13 @@
     try {
       // projectId is actually sandboxId in v2 API
       const result = await sandboxOpencodeGetProviders(projectId);
-      providers = result;
+      internalProviders = result;
       
       // Auto-select first model if none selected
-      if (!selectedModel && providers.length > 0 && providers[0].models.length > 0) {
+      if (!selectedModel && internalProviders.length > 0 && internalProviders[0].models.length > 0) {
         selectedModel = {
-          providerId: providers[0].id,
-          modelId: providers[0].models[0].id,
+          providerId: internalProviders[0].id,
+          modelId: internalProviders[0].models[0].id,
         };
       }
     } catch (err) {
@@ -96,7 +123,7 @@
   }
 </script>
 
-{#if loading}
+{#if loading && !externalProviders}
   <div class="text-xs text-muted-foreground animate-pulse px-2 py-1">
     Loading models...
   </div>
@@ -121,7 +148,7 @@
     onValueChange={handleValueChange}
     {disabled}
   >
-    <Select.Trigger class={compact ? 'h-7 text-xs min-w-[120px] max-w-[200px]' : 'h-9 text-sm min-w-[180px]'}>
+    <Select.Trigger class="{compact ? 'h-7 text-xs min-w-[120px] max-w-[200px]' : 'h-9 text-sm min-w-[180px]'} {isAnimating ? 'animate-agent-switch' : ''}">
       <span class="truncate">{getDisplayName()}</span>
     </Select.Trigger>
     
