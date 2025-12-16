@@ -6,16 +6,22 @@
  * Architecture:
  * - Subscribes to SSE events from OpenCode containers
  * - Real-time sync: session.created, message.created, etc.
+ * - Permission caching: permission.updated, permission.replied
  * - Backup sync: Full sync every 5 minutes
  * - Reconnects with exponential backoff on failures
  * 
  * Design Decision: OpenCode is the source of truth for chat data.
  * Our database is a cache/backup that survives container recreation.
+ * 
+ * Permission Caching: Permissions are cached in-memory so they persist
+ * even when the frontend chat UI is not connected. When the frontend
+ * reconnects, it fetches cached permissions from the API.
  */
 
 import { createLogger } from '../../utils/logger.ts';
 import { getSandboxManager } from '../sandbox-manager.ts';
-import { opencodeV2 } from '../opencode-v2.ts';
+import { opencodeV2, cachePermission, uncachePermission } from '../opencode-v2.ts';
+import type { Permission } from '../opencode-v2.ts';
 import * as ChatSessionModel from '../../models/chat-session.ts';
 import * as ChatMessageModel from '../../models/chat-message.ts';
 import * as SandboxModel from '../../models/sandbox.ts';
@@ -108,6 +114,19 @@ interface MessagePartUpdatedEvent extends OpenCodeEvent {
       [key: string]: unknown;
     };
     delta?: string;
+  };
+}
+
+interface PermissionUpdatedEvent extends OpenCodeEvent {
+  type: 'permission.updated';
+  properties: Permission;
+}
+
+interface PermissionRepliedEvent extends OpenCodeEvent {
+  type: 'permission.replied';
+  properties: {
+    sessionID: string;
+    permissionID: string;
   };
 }
 
@@ -317,6 +336,12 @@ class OpenCodeSyncService {
         break;
       case 'message.part.updated':
         await this.handlePartUpdated(sandbox, event as MessagePartUpdatedEvent);
+        break;
+      case 'permission.updated':
+        this.handlePermissionUpdated(sandboxId, event as PermissionUpdatedEvent);
+        break;
+      case 'permission.replied':
+        this.handlePermissionReplied(sandboxId, event as PermissionRepliedEvent);
         break;
       case 'session.status':
       case 'session.diff':
@@ -540,6 +565,53 @@ class OpenCodeSyncService {
         hasText: !!text,
       });
     }
+  }
+
+  // ===========================================================================
+  // Permission Event Handling
+  // ===========================================================================
+
+  /**
+   * Handle permission.updated event
+   * 
+   * Caches the permission so it persists even when the frontend chat UI
+   * is not connected. The frontend can fetch cached permissions via the API
+   * when it reconnects.
+   */
+  private handlePermissionUpdated(sandboxId: string, event: PermissionUpdatedEvent): void {
+    const permission = event.properties;
+    if (!permission || !permission.id) {
+      log.warn('Invalid permission.updated event', { sandboxId, event });
+      return;
+    }
+
+    cachePermission(sandboxId, permission);
+    log.debug('Cached permission from sync service', {
+      sandboxId,
+      permissionId: permission.id,
+      sessionId: permission.sessionID,
+      type: permission.type,
+    });
+  }
+
+  /**
+   * Handle permission.replied event
+   * 
+   * Removes the permission from the cache after it has been responded to.
+   */
+  private handlePermissionReplied(sandboxId: string, event: PermissionRepliedEvent): void {
+    const { sessionID, permissionID } = event.properties;
+    if (!sessionID || !permissionID) {
+      log.warn('Invalid permission.replied event', { sandboxId, event });
+      return;
+    }
+
+    uncachePermission(sandboxId, sessionID, permissionID);
+    log.debug('Uncached permission from sync service', {
+      sandboxId,
+      permissionId: permissionID,
+      sessionId: sessionID,
+    });
   }
 
   // ===========================================================================

@@ -2,7 +2,7 @@
   import { page } from "$app/stores";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
-  import { RefreshCw, Check, Circle } from "@lucide/svelte";
+  import { RefreshCw, Check, Circle, GitCommit, FolderGit2 } from "@lucide/svelte";
   import {
     sandboxes,
     getGitStatus,
@@ -67,6 +67,10 @@
     }
   }
 
+  async function refreshAll() {
+    await Promise.all([refreshGitStatus(), refreshGitLog()]);
+  }
+
   async function handleCommit() {
     if (!sandboxId || !commitMessage.trim()) return;
 
@@ -81,6 +85,8 @@
         commitMessage = "";
         // Refresh status and log after commit
         await Promise.all([refreshGitStatus(), refreshGitLog()]);
+        // Clear success message after 3 seconds
+        setTimeout(() => { commitSuccess = false; }, 3000);
       }
     } catch (e) {
       commitError = e instanceof Error ? e.message : "Failed to commit changes";
@@ -89,20 +95,20 @@
     }
   }
 
-  function getStatusBadge(file: GitFileStatus): { color: string; text: string } {
+  function getStatusBadge(file: GitFileStatus): { color: string; text: string; icon: string } {
     if (file.staged === "A" || file.unstaged === "?") {
-      return { color: "var(--cyber-emerald)", text: "New" };
+      return { color: "var(--cyber-emerald)", text: "A", icon: "+" };
     }
     if (file.staged === "M" || file.unstaged === "M") {
-      return { color: "var(--cyber-amber)", text: "Modified" };
+      return { color: "var(--cyber-amber)", text: "M", icon: "~" };
     }
     if (file.staged === "D" || file.unstaged === "D") {
-      return { color: "var(--cyber-red)", text: "Deleted" };
+      return { color: "var(--cyber-red)", text: "D", icon: "-" };
     }
     if (file.staged === "R") {
-      return { color: "var(--cyber-cyan)", text: "Renamed" };
+      return { color: "var(--cyber-cyan)", text: "R", icon: "→" };
     }
-    return { color: "var(--cyber-magenta)", text: "Changed" };
+    return { color: "var(--cyber-magenta)", text: "?", icon: "?" };
   }
 
   function formatCommitDate(timestamp: string): string {
@@ -128,11 +134,12 @@
   let hasChanges = $derived(gitStatus?.files && gitStatus.files.length > 0);
   let stagedFiles = $derived(gitStatus?.files.filter(f => f.staged && f.staged !== " " && f.staged !== "?") ?? []);
   let unstagedFiles = $derived(gitStatus?.files.filter(f => f.unstaged && f.unstaged !== " ") ?? []);
+  let totalChanges = $derived((stagedFiles?.length ?? 0) + (unstagedFiles?.length ?? 0));
 </script>
 
 {#if !sandbox}
   <!-- Loading State -->
-  <div class="h-[calc(100vh-140px)] min-h-[500px] flex items-center justify-center animate-fade-in">
+  <div class="h-full flex items-center justify-center animate-fade-in">
     <div class="text-center animate-fade-in-up">
       <div class="relative mx-auto w-16 h-16">
         <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
@@ -146,219 +153,217 @@
 {:else if !isRunning}
   <SandboxNotRunning {sandbox} icon="🔀" actionText="view Git status" />
 {:else}
-  <div class="space-y-6 animate-fade-in">
-    <!-- Header -->
-    <div class="flex items-center justify-between">
-      <h2 class="text-xl font-bold">
-        Git
-      </h2>
+  <div class="h-full flex flex-col animate-fade-in">
+    <!-- Compact Header -->
+    <div class="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-border/30 bg-background/50 backdrop-blur-sm">
+      <div class="flex items-center gap-3">
+        <FolderGit2 class="h-5 w-5 text-[var(--cyber-cyan)]" />
+        <div>
+          <h2 class="text-base font-semibold">Git</h2>
+          <p class="text-xs font-mono text-muted-foreground">
+            {#if hasChanges}
+              <span class="text-[var(--cyber-amber)]">{totalChanges} uncommitted changes</span>
+            {:else}
+              <span class="text-[var(--cyber-emerald)]">Working directory clean</span>
+            {/if}
+          </p>
+        </div>
+      </div>
       <Button
         size="sm"
-        variant="outline"
-        onclick={refreshGitStatus}
-        disabled={isLoadingStatus}
-        class="h-8 px-4 font-mono text-xs uppercase tracking-wider border-border/50
-               hover:border-[var(--cyber-cyan)]/50 hover:text-[var(--cyber-cyan)] flex items-center gap-2"
+        variant="ghost"
+        onclick={refreshAll}
+        disabled={isLoadingStatus || isLoadingLog}
+        class="h-8 w-8 p-0 hover:text-[var(--cyber-cyan)]"
       >
-        <RefreshCw class="h-3 w-3 {isLoadingStatus ? 'animate-spin' : ''}" />
-        {isLoadingStatus ? "Loading..." : "Refresh"}
+        <RefreshCw class="h-4 w-4 {isLoadingStatus || isLoadingLog ? 'animate-spin' : ''}" />
       </Button>
     </div>
-    <!-- Working Directory Status -->
-    <div class="cyber-card corner-accent overflow-hidden">
-      <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
-        <div class="flex items-center justify-between">
-          <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
-            [working_directory]
-          </h3>
-          {#if hasChanges}
-            <span class="px-2 py-0.5 rounded text-xs font-mono bg-[var(--cyber-amber)]/10 text-[var(--cyber-amber)] border border-[var(--cyber-amber)]/30">
-              {gitStatus?.files.length} changes
-            </span>
-          {:else}
-            <span class="px-2 py-0.5 rounded text-xs font-mono bg-[var(--cyber-emerald)]/10 text-[var(--cyber-emerald)] border border-[var(--cyber-emerald)]/30">
-              Clean
-            </span>
-          {/if}
-        </div>
-        <p class="text-xs font-mono text-muted-foreground mt-1">
-          Current changes in your working directory
-        </p>
-      </div>
 
-      <div class="p-4">
-        {#if isLoadingStatus}
-          <div class="text-center py-8">
-            <div class="relative mx-auto w-8 h-8">
-              <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
-              <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
-            </div>
-            <p class="mt-3 text-xs font-mono text-muted-foreground">Loading git status...</p>
+    <!-- Main Content - Two Column Layout -->
+    <div class="flex-1 min-h-0 overflow-hidden">
+      <div class="h-full grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-border/30">
+        
+        <!-- Left Column: Changes & Commit -->
+        <div class="flex flex-col min-h-0 overflow-hidden">
+          <!-- Section Header -->
+          <div class="flex-shrink-0 px-4 py-2 border-b border-border/20 bg-muted/30">
+            <h3 class="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+              Working Directory
+            </h3>
           </div>
-        {:else if !hasChanges}
-          <div class="text-center py-8">
-            <Check class="h-8 w-8 mx-auto text-[var(--cyber-emerald)]/30 mb-3" />
-            <p class="text-sm font-mono text-muted-foreground">
-              No uncommitted changes. Your working directory is clean.
-            </p>
-          </div>
-        {:else}
-          <div class="space-y-4">
-            <!-- Staged Changes -->
-            {#if stagedFiles.length > 0}
-              <div>
-                <h4 class="text-xs font-mono uppercase tracking-wider text-[var(--cyber-emerald)] mb-2">
-                  Staged ({stagedFiles.length})
-                </h4>
-                <div class="space-y-1">
-                  {#each stagedFiles as file}
-                    {@const badge = getStatusBadge(file)}
-                    <div class="flex items-center justify-between py-1.5 px-3 bg-[var(--cyber-emerald)]/5
-                                rounded border border-[var(--cyber-emerald)]/20 text-sm">
-                      <span class="font-mono text-xs truncate">{file.path}</span>
-                      <span class="px-1.5 py-0.5 rounded text-xs font-mono"
-                            style="color: {badge.color}; background: color-mix(in oklch, {badge.color} 10%, transparent); border: 1px solid color-mix(in oklch, {badge.color} 30%, transparent);">
-                        {badge.text}
-                      </span>
-                    </div>
-                  {/each}
+          
+          <!-- Changes List -->
+          <div class="flex-1 min-h-0 overflow-y-auto">
+            {#if isLoadingStatus}
+              <div class="flex items-center justify-center py-12">
+                <div class="relative w-6 h-6">
+                  <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
+                  <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
                 </div>
               </div>
-            {/if}
-
-            <!-- Unstaged Changes -->
-            {#if unstagedFiles.length > 0}
-              <div>
-                <h4 class="text-xs font-mono uppercase tracking-wider text-[var(--cyber-amber)] mb-2">
-                  Unstaged ({unstagedFiles.length})
-                </h4>
-                <div class="space-y-1">
-                  {#each unstagedFiles as file}
-                    {@const badge = getStatusBadge(file)}
-                    <div class="flex items-center justify-between py-1.5 px-3 bg-[var(--cyber-amber)]/5
-                                rounded border border-[var(--cyber-amber)]/20 text-sm">
-                      <span class="font-mono text-xs truncate">{file.path}</span>
-                      <span class="px-1.5 py-0.5 rounded text-xs font-mono"
-                            style="color: {badge.color}; background: color-mix(in oklch, {badge.color} 10%, transparent); border: 1px solid color-mix(in oklch, {badge.color} 30%, transparent);">
-                        {badge.text}
+            {:else if !hasChanges}
+              <div class="flex flex-col items-center justify-center py-12 px-4">
+                <Check class="h-10 w-10 text-[var(--cyber-emerald)]/40 mb-3" />
+                <p class="text-sm font-mono text-muted-foreground text-center">
+                  Working directory clean
+                </p>
+                <p class="text-xs text-muted-foreground/60 mt-1">
+                  No uncommitted changes
+                </p>
+              </div>
+            {:else}
+              <div class="p-3 space-y-3">
+                <!-- Staged Files -->
+                {#if stagedFiles.length > 0}
+                  <div>
+                    <div class="flex items-center gap-2 mb-2">
+                      <span class="w-2 h-2 rounded-full bg-[var(--cyber-emerald)]"></span>
+                      <span class="text-xs font-mono uppercase tracking-wider text-[var(--cyber-emerald)]">
+                        Staged ({stagedFiles.length})
                       </span>
                     </div>
-                  {/each}
-                </div>
-              </div>
-            {/if}
-          </div>
-        {/if}
-      </div>
-    </div>
-
-    <!-- Commit Form -->
-    {#if hasChanges}
-      <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-1">
-        <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
-          <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
-            [commit_changes]
-          </h3>
-          <p class="text-xs font-mono text-muted-foreground mt-1">
-            Stage all changes and create a commit
-          </p>
-        </div>
-
-        <div class="p-4 space-y-4">
-          {#if commitError}
-            <div class="p-3 rounded border border-[var(--cyber-red)]/50 bg-[var(--cyber-red)]/5">
-              <span class="font-mono text-xs text-[var(--cyber-red)]">{commitError}</span>
-            </div>
-          {/if}
-          {#if commitSuccess}
-            <div class="p-3 rounded border border-[var(--cyber-emerald)]/50 bg-[var(--cyber-emerald)]/5">
-              <span class="font-mono text-xs text-[var(--cyber-emerald)]">Changes committed successfully!</span>
-            </div>
-          {/if}
-          <div class="flex gap-2">
-            <Input
-              type="text"
-              placeholder="Commit message..."
-              bind:value={commitMessage}
-              disabled={isCommitting}
-              onkeydown={(e) => e.key === "Enter" && handleCommit()}
-              class="flex-1 h-9 font-mono text-sm bg-background/50 border-border/50
-                     focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)]"
-            />
-            <Button
-              onclick={handleCommit}
-              disabled={isCommitting || !commitMessage.trim()}
-              class="h-9 px-4 font-mono text-xs uppercase tracking-wider
-                     bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-black
-                     disabled:opacity-30"
-            >
-              {isCommitting ? "..." : "Commit"}
-            </Button>
-          </div>
-          <p class="text-xs font-mono text-muted-foreground/70">
-            This will stage all changes and create a commit with the message above.
-          </p>
-        </div>
-      </div>
-    {/if}
-
-    <!-- Commit History -->
-    <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-2">
-      <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
-        <div class="flex items-center justify-between">
-          <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
-            [commit_history]
-          </h3>
-          <Button
-            size="sm"
-            variant="ghost"
-            onclick={refreshGitLog}
-            disabled={isLoadingLog}
-            class="h-6 w-6 p-0 font-mono text-xs text-muted-foreground hover:text-[var(--cyber-cyan)]"
-          >
-            <RefreshCw class="h-3 w-3 {isLoadingLog ? 'animate-spin' : ''}" />
-          </Button>
-        </div>
-        <p class="text-xs font-mono text-muted-foreground mt-1">
-          Recent commits in this repository
-        </p>
-      </div>
-
-      <div class="p-4">
-        {#if isLoadingLog}
-          <div class="text-center py-8">
-            <div class="relative mx-auto w-8 h-8">
-              <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
-              <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
-            </div>
-            <p class="mt-3 text-xs font-mono text-muted-foreground">Loading commit history...</p>
-          </div>
-        {:else if !gitLog?.commits || gitLog.commits.length === 0}
-          <div class="text-center py-8">
-            <Circle class="h-8 w-8 mx-auto text-[var(--cyber-cyan)]/20 mb-3" />
-            <p class="text-sm font-mono text-muted-foreground">No commits yet.</p>
-          </div>
-        {:else}
-          <div class="space-y-3">
-            {#each gitLog.commits.slice(0, 10) as commit, i}
-              <div class="border-l-2 border-[var(--cyber-cyan)]/30 pl-4 py-2 animate-fade-in-up"
-                   style="animation-delay: {i * 50}ms">
-                <div class="flex items-start justify-between gap-2">
-                  <div class="min-w-0 flex-1">
-                    <p class="font-medium text-sm truncate">{commit.message.split("\n")[0]}</p>
-                    <p class="text-xs font-mono text-muted-foreground mt-1">
-                      <span class="text-[var(--cyber-cyan)]">{shortenSha(commit.sha)}</span>
-                      <span class="mx-1">·</span>
-                      <span>{commit.author.name}</span>
-                      <span class="mx-1">·</span>
-                      <span>{formatCommitDate(commit.timestamp)}</span>
-                    </p>
+                    <div class="space-y-1">
+                      {#each stagedFiles as file}
+                        {@const badge = getStatusBadge(file)}
+                        <div class="flex items-center gap-2 py-1 px-2 rounded bg-[var(--cyber-emerald)]/5 
+                                    border border-[var(--cyber-emerald)]/10 group hover:border-[var(--cyber-emerald)]/30 transition-colors">
+                          <span class="w-5 h-5 flex items-center justify-center rounded text-xs font-mono font-bold"
+                                style="color: {badge.color}; background: color-mix(in oklch, {badge.color} 15%, transparent);">
+                            {badge.icon}
+                          </span>
+                          <span class="font-mono text-xs truncate flex-1" title={file.path}>{file.path}</span>
+                        </div>
+                      {/each}
+                    </div>
                   </div>
+                {/if}
+
+                <!-- Unstaged Files -->
+                {#if unstagedFiles.length > 0}
+                  <div>
+                    <div class="flex items-center gap-2 mb-2">
+                      <span class="w-2 h-2 rounded-full bg-[var(--cyber-amber)]"></span>
+                      <span class="text-xs font-mono uppercase tracking-wider text-[var(--cyber-amber)]">
+                        Unstaged ({unstagedFiles.length})
+                      </span>
+                    </div>
+                    <div class="space-y-1">
+                      {#each unstagedFiles as file}
+                        {@const badge = getStatusBadge(file)}
+                        <div class="flex items-center gap-2 py-1 px-2 rounded bg-[var(--cyber-amber)]/5 
+                                    border border-[var(--cyber-amber)]/10 group hover:border-[var(--cyber-amber)]/30 transition-colors">
+                          <span class="w-5 h-5 flex items-center justify-center rounded text-xs font-mono font-bold"
+                                style="color: {badge.color}; background: color-mix(in oklch, {badge.color} 15%, transparent);">
+                            {badge.icon}
+                          </span>
+                          <span class="font-mono text-xs truncate flex-1" title={file.path}>{file.path}</span>
+                        </div>
+                      {/each}
+                    </div>
+                  </div>
+                {/if}
+              </div>
+            {/if}
+          </div>
+
+          <!-- Commit Form - Fixed at bottom -->
+          {#if hasChanges}
+            <div class="flex-shrink-0 border-t border-border/30 bg-background/80 backdrop-blur-sm p-3 space-y-2">
+              {#if commitError}
+                <div class="px-3 py-2 rounded border border-[var(--cyber-red)]/50 bg-[var(--cyber-red)]/5">
+                  <span class="font-mono text-xs text-[var(--cyber-red)]">{commitError}</span>
+                </div>
+              {/if}
+              {#if commitSuccess}
+                <div class="px-3 py-2 rounded border border-[var(--cyber-emerald)]/50 bg-[var(--cyber-emerald)]/5">
+                  <span class="font-mono text-xs text-[var(--cyber-emerald)]">Committed successfully!</span>
+                </div>
+              {/if}
+              <div class="flex gap-2">
+                <Input
+                  type="text"
+                  placeholder="Commit message..."
+                  bind:value={commitMessage}
+                  disabled={isCommitting}
+                  onkeydown={(e) => e.key === "Enter" && handleCommit()}
+                  class="flex-1 h-9 font-mono text-sm bg-background/50 border-border/50
+                         focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)]"
+                />
+                <Button
+                  onclick={handleCommit}
+                  disabled={isCommitting || !commitMessage.trim()}
+                  class="h-9 px-4 font-mono text-xs uppercase tracking-wider
+                         bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-black
+                         disabled:opacity-30"
+                >
+                  {#if isCommitting}
+                    <RefreshCw class="h-3 w-3 animate-spin" />
+                  {:else}
+                    Commit
+                  {/if}
+                </Button>
+              </div>
+              <p class="text-xs font-mono text-muted-foreground/60">
+                Stages all changes and commits
+              </p>
+            </div>
+          {/if}
+        </div>
+
+        <!-- Right Column: Commit History -->
+        <div class="flex flex-col min-h-0 overflow-hidden">
+          <!-- Section Header -->
+          <div class="flex-shrink-0 px-4 py-2 border-b border-border/20 bg-muted/30">
+            <h3 class="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+              Commit History
+            </h3>
+          </div>
+
+          <!-- Commits List -->
+          <div class="flex-1 min-h-0 overflow-y-auto">
+            {#if isLoadingLog}
+              <div class="flex items-center justify-center py-12">
+                <div class="relative w-6 h-6">
+                  <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
+                  <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
                 </div>
               </div>
-            {/each}
+            {:else if !gitLog?.commits || gitLog.commits.length === 0}
+              <div class="flex flex-col items-center justify-center py-12 px-4">
+                <GitCommit class="h-10 w-10 text-muted-foreground/20 mb-3" />
+                <p class="text-sm font-mono text-muted-foreground">No commits yet</p>
+                <p class="text-xs text-muted-foreground/60 mt-1">
+                  Make your first commit to start tracking changes
+                </p>
+              </div>
+            {:else}
+              <div class="p-3">
+                {#each gitLog.commits.slice(0, 15) as commit, i}
+                  <div class="flex gap-3 py-2 group {i > 0 ? 'border-t border-border/10' : ''}">
+                    <!-- Timeline dot -->
+                    <div class="flex-shrink-0 pt-1">
+                      <div class="w-2 h-2 rounded-full bg-[var(--cyber-cyan)]/50 group-hover:bg-[var(--cyber-cyan)] transition-colors"></div>
+                    </div>
+                    <!-- Commit info -->
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm truncate group-hover:text-foreground transition-colors" title={commit.message}>
+                        {commit.message.split("\n")[0]}
+                      </p>
+                      <div class="flex items-center gap-2 mt-1 text-xs font-mono text-muted-foreground">
+                        <span class="text-[var(--cyber-cyan)]">{shortenSha(commit.sha)}</span>
+                        <span class="text-muted-foreground/40">•</span>
+                        <span class="truncate">{commit.author.name}</span>
+                        <span class="text-muted-foreground/40">•</span>
+                        <span class="flex-shrink-0">{formatCommitDate(commit.timestamp)}</span>
+                      </div>
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            {/if}
           </div>
-        {/if}
+        </div>
       </div>
     </div>
   </div>

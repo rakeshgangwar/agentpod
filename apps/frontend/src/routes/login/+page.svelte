@@ -57,7 +57,7 @@
     if (success) {
       // Redirect immediately after successful auth
       // The session cookie is set, so we're authenticated
-      goto("/projects");
+      goto("/");
     }
   }
 
@@ -66,10 +66,10 @@
     clearError();
   }
 
-  // Redirect to projects if already authenticated
+  // Redirect to homepage if already authenticated
   $effect(() => {
     if (auth.isAuthenticated && connection.isConnected) {
-      goto("/projects");
+      goto("/");
     }
   });
 </script>
