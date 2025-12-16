@@ -25,8 +25,9 @@ import {
   sandboxOpencodeSendMessage,
   sandboxOpencodeSendMessageWithParts,
   sandboxOpencodeAbortSession,
+  sandboxOpencodeRevertMessage,
+  sandboxOpencodeGetPendingPermissions,
   OpenCodeStream,
-  type Message,
   type OpenCodeEvent,
   type ModelSelection,
   type PermissionRequest,
@@ -37,6 +38,28 @@ import type { AttachedFile } from "./FileAttachment";
 import { PermissionProvider, usePermissions } from "./PermissionContext";
 import { PermissionBar } from "./PermissionBar";
 import { setSessionActivity } from "../stores/session-activity.svelte";
+
+// Import from our modular chat system
+import {
+  handleSSEEvent as handleSSEEventFromHandlers,
+  type HandlerAction,
+  type HandlerContext,
+  type SessionStatusType,
+  type RetryInfo,
+} from "./handlers";
+import {
+  createEmptyInternalMessage,
+  type InternalMessage,
+  type InternalFilePart,
+} from "./types/messages";
+import {
+  convertOpenCodeMessage,
+  type OpenCodeMessage,
+} from "./converters/message-converter";
+import { convertMessagesGrouped } from "./converters/thread-converter";
+
+// Re-export session status types for external use
+export type { SessionStatusType, RetryInfo };
 
 /**
  * Context for file attachment sending functionality.
@@ -57,18 +80,6 @@ export function useAttachments(): AttachmentContextValue {
     throw new Error("useAttachments must be used within RuntimeProvider");
   }
   return context;
-}
-
-/**
- * Session status types matching OpenCode's SessionStatus
- */
-export type SessionStatusType = "idle" | "busy" | "retry";
-
-export interface RetryInfo {
-  attempt: number;
-  message: string;
-  /** Timestamp (ms) when the next retry will occur */
-  next: number;
 }
 
 /**
@@ -120,163 +131,107 @@ interface RuntimeProviderProps {
   onSessionUpdated?: (session: Session) => void;
 }
 
-// Tool call status for tracking state
-type ToolCallStatus = "pending" | "running" | "completed" | "error";
-
-// File attachment in a message
-interface InternalFilePart {
-  id: string;
-  url: string;
-  filename?: string;
-  mime?: string;
-}
-
-// Internal message type (mutable) that we manage
-interface InternalMessage {
-  id: string;
-  role: "user" | "assistant";
-  text: string;
-  toolCalls: Map<string, {
-    toolCallId: string;
-    toolName: string;
-    args: Record<string, unknown>;
-    result?: unknown;
-    status?: ToolCallStatus;
-    error?: string; // Error message when status is "error"
-  }>;
-  files: InternalFilePart[];
-  createdAt?: Date;
-}
-
 /**
- * Convert OpenCode message to our internal format
+ * Apply handler actions to state.
+ * This is called after handleSSEEvent returns actions to apply.
+ * 
+ * Now uses the unified InternalMessage type directly - no conversion needed!
  */
-function convertOpenCodeMessage(msg: Message): InternalMessage {
-  const internal: InternalMessage = {
-    id: msg.info.id,
-    role: msg.info.role,
-    text: "",
-    toolCalls: new Map(),
-    files: [],
-    createdAt: msg.info.time?.created ? new Date(msg.info.time.created) : undefined,
-  };
+interface ActionAppliers {
+  setInternalMessages: React.Dispatch<React.SetStateAction<InternalMessage[]>>;
+  setIsRunning: React.Dispatch<React.SetStateAction<boolean>>;
+  setSessionStatus: React.Dispatch<React.SetStateAction<SessionStatusType>>;
+  setRetryInfo: React.Dispatch<React.SetStateAction<RetryInfo | null>>;
+  setError: React.Dispatch<React.SetStateAction<string | null>>;
+  addPermissionRef: React.RefObject<(permission: PermissionRequest) => void>;
+  removePermissionRef: React.RefObject<(id: string) => void>;
+  onSessionCreatedRef: React.RefObject<((session: Session) => void) | undefined>;
+  onSessionUpdatedRef: React.RefObject<((session: Session) => void) | undefined>;
+  projectId: string;
+  sessionId: string | null;
+}
 
-  for (const part of msg.parts) {
-    if (part.type === "text" && part.text) {
-      internal.text += part.text;
-    } 
-    // Handle file parts
-    else if (part.type === "file" && part.url) {
-      internal.files.push({
-        id: part.id,
-        url: part.url,
-        filename: part.filename,
-        mime: part.mime,
-      });
-    }
-    // Handle tool-invocation format (legacy)
-    else if (part.type === "tool-invocation" && part.toolInvocation) {
-      internal.toolCalls.set(part.toolInvocation.toolCallId, {
-        toolCallId: part.toolInvocation.toolCallId,
-        toolName: part.toolInvocation.toolName,
-        args: (part.toolInvocation.args ?? {}) as Record<string, unknown>,
-        result: part.toolInvocation.result,
-      });
-    }
-    // Handle "tool" format (current OpenCode format)
-    // Structure: { type: "tool", callID, tool, state: { status, input, output, error, ... } }
-    else if (part.type === "tool" && part.callID && part.state) {
-      const callID = part.callID;
-      const toolName = part.tool || "unknown";
-      const state = part.state;
-      const status = state.status as ToolCallStatus | undefined;
-      const input = state.input ?? {};
-      const output = state.output;
-      const error = state.error as string | undefined;
+function applyHandlerActions(actions: HandlerAction[], appliers: ActionAppliers): void {
+  for (const action of actions) {
+    switch (action.type) {
+      case "add_message":
+        // Add message only if it doesn't already exist (upsert behavior)
+        // This prevents duplicate messages when message.updated and message.part.updated
+        // both arrive before state updates propagate
+        appliers.setInternalMessages(prev => {
+          const exists = prev.some(m => m.id === action.message.id);
+          if (exists) {
+            console.log("[applyHandlerActions] Skipping duplicate add_message:", action.message.id);
+            return prev;
+          }
+          return [...prev, action.message];
+        });
+        break;
       
-      internal.toolCalls.set(callID, {
-        toolCallId: callID,
-        toolName,
-        args: input,
-        // For error status, use error message; for completed, use output
-        result: status === "completed" ? output : status === "error" ? (error || output) : undefined,
-        status: status,
-        error: error,
-      });
+      case "update_message":
+        appliers.setInternalMessages(prev => prev.map(m => {
+          if (m.id !== action.messageId) return m;
+          // Apply the updater directly - types are now unified
+          return action.updater(m);
+        }));
+        break;
+      
+      case "remove_message":
+        appliers.setInternalMessages(prev => prev.filter(m => m.id !== action.messageId));
+        break;
+        
+      case "replace_message_id":
+        // Replace optimistic message ID with real ID, but only if:
+        // 1. The optimistic message exists
+        // 2. A message with the real ID doesn't already exist
+        appliers.setInternalMessages(prev => {
+          const realIdExists = prev.some(m => m.id === action.realId);
+          if (realIdExists) {
+            // Real ID already exists - just remove the optimistic one
+            console.log("[applyHandlerActions] Real ID exists, removing optimistic:", action.optimisticId);
+            return prev.filter(m => m.id !== action.optimisticId);
+          }
+          return prev.map(m => {
+            if (m.id !== action.optimisticId) return m;
+            return { ...m, id: action.realId };
+          });
+        });
+        break;
+        
+      case "set_running":
+        appliers.setIsRunning(action.isRunning);
+        break;
+        
+      case "set_session_status":
+        appliers.setSessionStatus(action.status);
+        appliers.setRetryInfo(action.retryInfo ?? null);
+        break;
+        
+      case "set_error":
+        appliers.setError(action.error);
+        break;
+        
+      case "add_permission":
+        appliers.addPermissionRef.current?.(action.permission);
+        break;
+        
+      case "remove_permission":
+        appliers.removePermissionRef.current?.(action.permissionId);
+        break;
+        
+      case "notify_session_created":
+        appliers.onSessionCreatedRef.current?.(action.session);
+        break;
+        
+      case "notify_session_updated":
+        appliers.onSessionUpdatedRef.current?.(action.session);
+        break;
+        
+      case "update_session_activity":
+        setSessionActivity(appliers.projectId, action.isActive, appliers.sessionId ?? undefined);
+        break;
     }
-    // Warn about unhandled tool parts
-    else if (part.type === "tool") {
-      console.warn("[ToolCall] Unhandled tool part - missing callID or state:", JSON.stringify(part).slice(0, 300));
-    }
   }
-
-  return internal;
-}
-
-/**
- * Convert internal message to ThreadMessageLike format for assistant-ui
- */
-function convertToThreadMessage(msg: InternalMessage): ThreadMessageLike {
-  const content: ThreadMessageLike["content"] = [];
-  
-  if (msg.text) {
-    (content as unknown[]).push({ type: "text", text: msg.text });
-  }
-  
-  // Add file parts - images as "image" type, others as custom "file" type
-  for (const file of msg.files) {
-    if (file.mime?.startsWith("image/")) {
-      // assistant-ui supports "image" type for image content
-      (content as unknown[]).push({
-        type: "image",
-        image: file.url,
-      });
-    } else {
-      // For non-image files, use a custom "file" type that we'll handle in the UI
-      (content as unknown[]).push({
-        type: "file",
-        file: {
-          url: file.url,
-          filename: file.filename,
-          mime: file.mime,
-        },
-      });
-    }
-  }
-  
-  for (const tc of msg.toolCalls.values()) {
-    // For tool calls with error status but no result, provide an error result
-    // so assistant-ui knows the tool is no longer running
-    let result = tc.result;
-    if (tc.status === "error" && result === undefined) {
-      result = { error: tc.error || "Tool execution failed or was rejected" };
-    }
-    
-    // Include status and error info for proper UI rendering
-    (content as unknown[]).push({
-      type: "tool-call",
-      toolCallId: tc.toolCallId,
-      toolName: tc.toolName,
-      args: tc.args,
-      argsText: JSON.stringify(tc.args),
-      result: result,
-      // Custom fields for error handling in ToolCallPart
-      status: tc.status,
-      error: tc.error,
-    });
-  }
-  
-  // Ensure at least one content part
-  if (content.length === 0) {
-    (content as unknown[]).push({ type: "text", text: "" });
-  }
-
-  return {
-    id: msg.id,
-    role: msg.role,
-    content,
-    createdAt: msg.createdAt,
-  };
 }
 
 /**
@@ -284,7 +239,7 @@ function convertToThreadMessage(msg: InternalMessage): ThreadMessageLike {
  * This is where all the SSE handling and runtime logic lives.
  */
 function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selectedModel, selectedAgent, onSessionModelDetected, onSessionAgentDetected, pendingMessage, onPendingMessageSent, onSessionCreated, onSessionUpdated, children }: RuntimeProviderProps) {
-  // Internal message state (mutable, managed by us)
+  // Internal message state using unified InternalMessage type
   const [internalMessages, setInternalMessages] = useState<InternalMessage[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -356,7 +311,8 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
 
         if (cancelled) return;
 
-        const converted = opencodeMessages.map(convertOpenCodeMessage);
+        // Use the converter from converters/message-converter.ts
+        const converted = opencodeMessages.map(msg => convertOpenCodeMessage(msg as OpenCodeMessage));
         setInternalMessages(converted);
         
         // Detect model from the last assistant message that has model info
@@ -401,6 +357,21 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
             }
           }
         }
+        
+        // Fetch and restore pending permissions from API cache
+        // This handles the case where user refreshes page while a permission is pending
+        try {
+          const pendingPermissions = await sandboxOpencodeGetPendingPermissions(projectId, sessionId);
+          if (!cancelled && pendingPermissions.length > 0) {
+            console.log(`[RuntimeProvider] Restoring ${pendingPermissions.length} pending permissions`);
+            for (const permission of pendingPermissions) {
+              addPermissionRef.current?.(permission);
+            }
+          }
+        } catch (permErr) {
+          // Non-fatal: just log and continue
+          console.warn("[RuntimeProvider] Failed to fetch pending permissions:", permErr);
+        }
       } catch (err) {
         if (cancelled) return;
         console.error("[RuntimeProvider] Failed to load messages:", err);
@@ -419,378 +390,35 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
     };
   }, [projectId, sessionId]);
 
-  // Handle SSE event to update message state
+  // Handle SSE event to update message state using modular handlers
   const handleSSEEvent = useCallback((event: OpenCodeEvent) => {
-    const eventData = event.data as Record<string, unknown>;
-    const properties = eventData?.properties as Record<string, unknown> | undefined;
+    // Build handler context with current state - direct use of unified types
+    const context: HandlerContext = {
+      projectId,
+      sessionId,
+      messages: internalMessages,
+    };
 
-    // Log all events for debugging
-    console.log("[RuntimeProvider] SSE Event:", event.eventType, properties);
+    // Dispatch event to handlers
+    const result = handleSSEEventFromHandlers(event, context);
 
-    // Handle permission.updated - permission request received
-    if (event.eventType === "permission.updated") {
-      console.log("[RuntimeProvider] Permission request received:", properties);
-      
-      // The permission data is in properties directly
-      if (properties && typeof properties.id === "string") {
-        const permission: PermissionRequest = {
-          id: properties.id as string,
-          type: (properties.type as string) || "unknown",
-          pattern: properties.pattern as string | string[] | undefined,
-          sessionID: (properties.sessionID as string) || sessionId || "",
-          messageID: (properties.messageID as string) || "",
-          callID: properties.callID as string | undefined,
-          title: (properties.title as string) || "Permission Required",
-          metadata: (properties.metadata as Record<string, unknown>) || {},
-          time: (properties.time as { created: number }) || { created: Date.now() },
-        };
-        
-        addPermissionRef.current(permission);
-      }
-    }
-    
-    // Handle permission.replied - permission was responded to (from another client/source)
-    if (event.eventType === "permission.replied") {
-      console.log("[RuntimeProvider] Permission replied:", properties);
-      
-      const permissionId = properties?.permissionID as string | undefined;
-      if (permissionId) {
-        removePermissionRef.current(permissionId);
-      }
-    }
-
-    // Handle message.updated - new message created
-    if (event.eventType === "message.updated") {
-      const info = properties?.info as Record<string, unknown> | undefined;
-      if (info && typeof info.id === "string" && typeof info.role === "string") {
-        // Filter by session - only process messages for the current session
-        const messageSessionId = info.sessionID as string | undefined;
-        if (messageSessionId && messageSessionId !== sessionId) {
-          return; // Skip messages from other sessions (e.g., child sessions from task tool)
-        }
-        
-        const messageId = info.id;
-        const role = info.role as "user" | "assistant";
-
-        setInternalMessages((prev) => {
-          // Check if message already exists by ID
-          const existsById = prev.some((m) => m.id === messageId);
-          if (existsById) return prev;
-
-          // For user messages, check if there's an optimistic message we should replace
-          if (role === "user") {
-            const optimisticIndex = prev.findIndex(
-              (m) => m.role === "user" && m.id.startsWith("user-")
-            );
-            if (optimisticIndex !== -1) {
-              // Replace the optimistic message with the real one
-              const newMessages = [...prev];
-              newMessages[optimisticIndex] = {
-                ...newMessages[optimisticIndex],
-                id: messageId, // Update to real ID
-              };
-              return newMessages;
-            }
-          }
-
-          return [
-            ...prev,
-            {
-              id: messageId,
-              role,
-              text: "",
-              toolCalls: new Map(),
-              files: [],
-              createdAt: new Date(),
-            },
-          ];
-        });
-      }
-    }
-
-    // Handle message.part.updated - streaming content update
-    if (event.eventType === "message.part.updated") {
-      const part = properties?.part as Record<string, unknown> | undefined;
-      const messageId = (properties?.messageID || (part as Record<string, unknown>)?.messageID) as string | undefined;
-
-      if (!messageId) {
-        return;
-      }
-      
-      if (!part) return;
-
-      // Filter by session - only process parts for the current session
-      const partSessionId = part.sessionID as string | undefined;
-      if (partSessionId && partSessionId !== sessionId) {
-        return; // Skip parts from other sessions (e.g., child sessions from task tool)
-      }
-
-      setInternalMessages((prev) => {
-        // Check if message exists
-        const messageExists = prev.some((m) => m.id === messageId);
-        
-        // If message doesn't exist yet (race condition: part.updated arrived before message.updated),
-        // create it now. This typically happens with assistant messages during streaming.
-        if (!messageExists) {
-          const newMessage: InternalMessage = {
-            id: messageId,
-            role: "assistant", // Parts arriving before message.updated are typically from assistant
-            text: "",
-            toolCalls: new Map(),
-            files: [],
-            createdAt: new Date(),
-          };
-          
-          // Apply the part update to the new message
-          if (part.type === "text") {
-            const delta = properties?.delta as string | undefined;
-            if (typeof part.text === "string") {
-              newMessage.text = part.text;
-            } else if (delta) {
-              newMessage.text = delta;
-            }
-          }
-          
-          // Handle tool-invocation format (legacy)
-          if (part.type === "tool-invocation") {
-            const toolInvocation = part.toolInvocation as Record<string, unknown> | undefined;
-            if (toolInvocation?.toolCallId) {
-              const toolName = (toolInvocation.toolName as string) || "unknown";
-              newMessage.toolCalls.set(toolInvocation.toolCallId as string, {
-                toolCallId: toolInvocation.toolCallId as string,
-                toolName,
-                args: (toolInvocation.args as Record<string, unknown>) ?? {},
-                result: toolInvocation.result,
-              });
-            }
-          }
-          
-          // Handle "tool" format (from SSE stream)
-          if (part.type === "tool") {
-            const callID = part.callID as string | undefined;
-            const toolName = (part.tool as string | undefined) || "unknown";
-            const state = part.state as Record<string, unknown> | undefined;
-            
-            if (callID) {
-              const status = state?.status as ToolCallStatus | undefined;
-              const input = (state?.input as Record<string, unknown>) ?? {};
-              const output = state?.output;
-              const error = state?.error as string | undefined;
-              
-              newMessage.toolCalls.set(callID, {
-                toolCallId: callID,
-                toolName,
-                args: input,
-                // For error status, use error message; for completed, use output
-                result: status === "completed" ? output : status === "error" ? (error || output) : undefined,
-                status: status,
-                error: error,
-              });
-            }
-          }
-          
-          return [...prev, newMessage];
-        }
-        
-        // Message exists, update it
-        return prev.map((m) => {
-          if (m.id !== messageId) return m;
-
-          // Clone the message to update
-          const updated: InternalMessage = {
-            ...m,
-            toolCalls: new Map(m.toolCalls),
-          };
-
-          if (part.type === "text") {
-            const delta = properties?.delta as string | undefined;
-            if (typeof part.text === "string") {
-              updated.text = part.text;
-            } else if (delta) {
-              updated.text = m.text + delta;
-            }
-          }
-
-          // Handle tool-invocation format (legacy)
-          if (part.type === "tool-invocation") {
-            const toolInvocation = part.toolInvocation as Record<string, unknown> | undefined;
-            if (toolInvocation?.toolCallId) {
-              const toolName = (toolInvocation.toolName as string) || "unknown";
-              updated.toolCalls.set(toolInvocation.toolCallId as string, {
-                toolCallId: toolInvocation.toolCallId as string,
-                toolName,
-                args: (toolInvocation.args as Record<string, unknown>) ?? {},
-                result: toolInvocation.result,
-              });
-            }
-          }
-
-          // Handle "tool" format (from SSE stream)
-          // Format: { type: "tool", callID, tool, state: { input, status, output, error, ... } }
-          if (part.type === "tool") {
-            const callID = part.callID as string | undefined;
-            const toolName = (part.tool as string | undefined) || "unknown";
-            const state = part.state as Record<string, unknown> | undefined;
-            
-            if (callID) {
-              const status = state?.status as ToolCallStatus | undefined;
-              const input = (state?.input as Record<string, unknown>) ?? {};
-              const output = state?.output;
-              const error = state?.error as string | undefined;
-              
-              updated.toolCalls.set(callID, {
-                toolCallId: callID,
-                toolName,
-                args: input,
-                // For error status, use error message; for completed, use output
-                result: status === "completed" ? output : status === "error" ? (error || output) : undefined,
-                status: status,
-                error: error,
-              });
-            }
-          }
-
-          return updated;
-        });
+    // Apply returned actions to state
+    if (result.actions.length > 0) {
+      applyHandlerActions(result.actions, {
+        setInternalMessages,
+        setIsRunning,
+        setSessionStatus,
+        setRetryInfo,
+        setError,
+        addPermissionRef,
+        removePermissionRef,
+        onSessionCreatedRef,
+        onSessionUpdatedRef,
+        projectId,
+        sessionId,
       });
     }
-
-    // Handle session.idle - processing complete
-    if (event.eventType === "session.idle") {
-      setIsRunning(false);
-      setSessionStatus("idle");
-      setRetryInfo(null);
-      // Update session activity store for projects page indicator
-      setSessionActivity(projectId, false, sessionId ?? undefined);
-    }
-
-    // Handle session.status - explicit status updates (idle/busy/retry)
-    if (event.eventType === "session.status") {
-      const eventSessionId = properties?.sessionID as string | undefined;
-      const status = properties?.status as Record<string, unknown> | undefined;
-      
-      // Only process status updates for the current session
-      if (eventSessionId && eventSessionId !== sessionId) {
-        return;
-      }
-      
-      if (status) {
-        const statusType = status.type as string | undefined;
-        console.log("[RuntimeProvider] Session status:", statusType, status);
-        
-        if (statusType === "idle") {
-          setSessionStatus("idle");
-          setRetryInfo(null);
-          setIsRunning(false);
-          // Update session activity store for projects page indicator
-          setSessionActivity(projectId, false, sessionId ?? undefined);
-        } else if (statusType === "busy") {
-          setSessionStatus("busy");
-          setRetryInfo(null);
-          setIsRunning(true);
-          // Update session activity store for projects page indicator
-          setSessionActivity(projectId, true, sessionId ?? undefined);
-        } else if (statusType === "retry") {
-          setSessionStatus("retry");
-          setRetryInfo({
-            attempt: (status.attempt as number) ?? 1,
-            message: (status.message as string) ?? "Retrying...",
-            next: (status.next as number) ?? Date.now() + 5000,
-          });
-          // Keep isRunning true during retry
-          setIsRunning(true);
-        }
-      }
-    }
-
-    // Handle session.updated for status and title changes
-    if (event.eventType === "session.updated") {
-      const info = properties?.info as Record<string, unknown> | undefined;
-      if (info && typeof info.id === "string") {
-        const status = info?.status as Record<string, unknown> | undefined;
-        if (status?.type === "idle") {
-          setIsRunning(false);
-        }
-        
-        // Build Session object and notify parent about updates (e.g., title change)
-        const updatedSession: Session = {
-          id: info.id as string,
-          parentID: info.parentID as string | undefined,
-          title: info.title as string | undefined,
-          time: info.time as { created: number; updated: number } | undefined,
-          status: status?.type as string | undefined,
-        };
-        
-        console.log("[RuntimeProvider] Session updated:", updatedSession.id, updatedSession.title);
-        onSessionUpdatedRef.current?.(updatedSession);
-      }
-    }
-
-    // Handle session.created - new session created (e.g., child session from task tool)
-    // Only notify for child sessions (sessions with parentID) to avoid interfering
-    // with manually created sessions via the "+ New" button
-    if (event.eventType === "session.created") {
-      const info = properties?.info as Record<string, unknown> | undefined;
-      if (info && typeof info.id === "string") {
-        const parentID = info.parentID as string | undefined;
-        
-        // Only handle child sessions here - top-level sessions are handled by createNewSession
-        if (parentID) {
-          console.log("[RuntimeProvider] New child session created:", info);
-          
-          // Build Session object from the event info
-          const newSession: Session = {
-            id: info.id as string,
-            parentID: parentID,
-            title: info.title as string | undefined,
-            time: info.time as { created: number; updated: number } | undefined,
-            status: (info.status as { type?: string })?.type,
-          };
-          
-          // Notify parent component about the new session
-          onSessionCreatedRef.current?.(newSession);
-        }
-      }
-    }
-
-    // Handle session.error - display error to user
-    if (event.eventType === "session.error") {
-      console.error("[RuntimeProvider] Session error:", properties);
-      // Error can be an object with { name, data: { message } } structure
-      const errorObj = properties?.error as { name?: string; data?: { message?: string } } | string | undefined;
-      let errorMessage: string;
-      
-      if (typeof errorObj === "object" && errorObj !== null) {
-        // Handle structured error object from OpenCode API
-        errorMessage = errorObj.data?.message || errorObj.name || "An error occurred";
-      } else if (typeof errorObj === "string") {
-        errorMessage = errorObj;
-      } else if (typeof properties?.message === "string") {
-        errorMessage = properties.message;
-      } else {
-        errorMessage = "An error occurred";
-      }
-      
-      setError(errorMessage);
-      setIsRunning(false);
-    }
-
-    // Handle message.removed - remove message from state
-    if (event.eventType === "message.removed") {
-      const messageId = properties?.messageID as string | undefined;
-      const removedSessionId = properties?.sessionID as string | undefined;
-      
-      // Filter by session - only process removals for the current session
-      if (removedSessionId && removedSessionId !== sessionId) {
-        return; // Skip removals from other sessions
-      }
-      
-      if (messageId) {
-        console.log("[RuntimeProvider] Message removed:", messageId);
-        setInternalMessages((prev) => prev.filter((m) => m.id !== messageId));
-      }
-    }
-  }, [sessionId]); // Use refs for permission functions to keep this callback stable
+  }, [projectId, sessionId, internalMessages]);
 
   // Connect to SSE stream when session is available
   // Use a ref for handleSSEEvent to avoid triggering reconnects when it changes
@@ -856,7 +484,7 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
         streamRef.current = null;
       }
     };
-  }, [projectId, sessionId, isLoading]); // Removed handleSSEEvent - using ref instead
+  }, [projectId, sessionId, isLoading]);
 
   // Handle sending a new message
   const onNew = useCallback(async (message: AppendMessage) => {
@@ -892,18 +520,12 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
     setSessionActivity(projectId, true, sessionId ?? undefined);
 
     // Add user message to state immediately (optimistic update)
+    // Using createEmptyInternalMessage from types/messages.ts
     const userMessageId = `user-${Date.now()}`;
-    setInternalMessages((prev) => [
-      ...prev,
-      {
-        id: userMessageId,
-        role: "user" as const,
-        text: textPart.text,
-        toolCalls: new Map(),
-        files: [],
-        createdAt: new Date(),
-      },
-    ]);
+    const userMessage = createEmptyInternalMessage(userMessageId, "user");
+    userMessage.text = textPart.text;
+    
+    setInternalMessages((prev) => [...prev, userMessage]);
 
     try {
       // Send message to OpenCode - response comes via SSE (projectId is actually sandboxId in v2 API)
@@ -930,6 +552,180 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
     // Update session activity store for projects page indicator
     setSessionActivity(projectId, false, sessionId ?? undefined);
   }, [projectId, sessionId]);
+
+  // Handle editing a user message (edit and re-run)
+  // parentId is the message BEFORE the one being edited (assistant-ui convention)
+  // We need to revert the message being edited (after parentId) and send new content
+  const onEdit = useCallback(async (message: AppendMessage) => {
+    if (!sessionId) {
+      console.error("[RuntimeProvider] No session ID for edit");
+      return;
+    }
+
+    // Extract text from message
+    const textPart = message.content.find((p) => p.type === "text");
+    if (!textPart || textPart.type !== "text") {
+      console.error("[RuntimeProvider] No text content in edited message");
+      return;
+    }
+
+    // message.parentId tells us the message BEFORE the one being edited
+    // If parentId is null, we're editing the first message
+    const parentId = message.parentId;
+    
+    console.log("[RuntimeProvider] Editing message, parentId:", parentId);
+
+    setIsRunning(true);
+    setSessionActivity(projectId, true, sessionId ?? undefined);
+
+    try {
+      if (parentId) {
+        // Find the message being edited (the one after parentId)
+        const parentIndex = internalMessages.findIndex(m => m.id === parentId);
+        if (parentIndex !== -1 && parentIndex < internalMessages.length - 1) {
+          // The message being edited is the one after the parent
+          const messageBeingEdited = internalMessages[parentIndex + 1];
+          console.log("[RuntimeProvider] Reverting message being edited:", messageBeingEdited.id);
+          await sandboxOpencodeRevertMessage(projectId, sessionId, messageBeingEdited.id);
+        }
+        
+        // Update local state - keep messages up to and including parent
+        // Remove the message being edited and everything after
+        setInternalMessages(prev => {
+          const idx = prev.findIndex(m => m.id === parentId);
+          if (idx === -1) {
+            console.warn("[RuntimeProvider] Parent message not found in state");
+            return prev;
+          }
+          return prev.slice(0, idx + 1);
+        });
+      } else {
+        // No parent - this is editing the first message
+        // Revert the first message if it exists
+        if (internalMessages.length > 0) {
+          console.log("[RuntimeProvider] Editing first message, reverting:", internalMessages[0].id);
+          await sandboxOpencodeRevertMessage(projectId, sessionId, internalMessages[0].id);
+        }
+        setInternalMessages([]);
+      }
+
+      // Add the edited user message optimistically for immediate UI feedback
+      const userMessageId = `user-${Date.now()}`;
+      const userMessage = createEmptyInternalMessage(userMessageId, "user");
+      userMessage.text = textPart.text;
+      
+      setInternalMessages(prev => [...prev, userMessage]);
+
+      // Send the edited message to get a new response
+      console.log("[RuntimeProvider] Sending edited message:", textPart.text.slice(0, 50));
+      await sandboxOpencodeSendMessage(projectId, sessionId, textPart.text, selectedModel, selectedAgent);
+    } catch (err) {
+      console.error("[RuntimeProvider] Failed to edit message:", err);
+      setError(err instanceof Error ? err.message : "Failed to edit message");
+      setIsRunning(false);
+      setSessionActivity(projectId, false, sessionId ?? undefined);
+    }
+  }, [projectId, sessionId, selectedModel, selectedAgent, internalMessages]);
+
+  // Handle regenerating/reloading an assistant response
+  // This reverts the assistant message and re-sends the user message that triggered it
+  const onReload = useCallback(async (parentId: string | null) => {
+    if (!sessionId) {
+      console.error("[RuntimeProvider] No session ID for reload");
+      return;
+    }
+
+    console.log("[RuntimeProvider] Reloading from parentId:", parentId);
+
+    // parentId is the user message ID that triggered the assistant response we want to regenerate
+    // We need to find the user message to get its text, then revert and resend
+    
+    const userMessage = parentId 
+      ? internalMessages.find(m => m.id === parentId)
+      : null;
+
+    if (parentId && !userMessage) {
+      console.error("[RuntimeProvider] Could not find user message at parentId:", parentId);
+      return;
+    }
+
+    // If no parentId and no messages, nothing to reload
+    if (!parentId && internalMessages.length === 0) {
+      console.warn("[RuntimeProvider] No messages to reload");
+      return;
+    }
+
+    // Get the text to resend BEFORE we modify state
+    const textToSend = userMessage?.text || internalMessages[0]?.text;
+    if (!textToSend) {
+      console.warn("[RuntimeProvider] No text to resend for reload");
+      return;
+    }
+
+    setIsRunning(true);
+    setSessionActivity(projectId, true, sessionId ?? undefined);
+
+    try {
+      // Find the first assistant message that follows the user message
+      // This is what we need to revert to remove the assistant's response
+      if (parentId) {
+        const parentIndex = internalMessages.findIndex(m => m.id === parentId);
+        if (parentIndex !== -1 && parentIndex < internalMessages.length - 1) {
+          // Find assistant message(s) after the user message
+          const assistantMessages = internalMessages
+            .slice(parentIndex + 1)
+            .filter(m => m.role === "assistant");
+          
+          if (assistantMessages.length > 0) {
+            // Revert to the first assistant message - this marks it and everything after as reverted
+            const firstAssistantId = assistantMessages[0].id;
+            console.log("[RuntimeProvider] Reverting assistant message:", firstAssistantId);
+            await sandboxOpencodeRevertMessage(projectId, sessionId, firstAssistantId);
+          }
+        }
+        
+        // Update local state - keep only messages BEFORE the user message we're regenerating from
+        // This is because OpenCode will send new messages via SSE (both user and assistant)
+        // We don't want duplicates
+        setInternalMessages(prev => {
+          const idx = prev.findIndex(m => m.id === parentId);
+          if (idx === -1) return prev;
+          // Keep everything before the user message
+          return prev.slice(0, idx);
+        });
+      } else {
+        // No parentId - clear all messages
+        setInternalMessages([]);
+      }
+
+      // Add optimistic user message so UI shows it immediately
+      const userMessageId = `user-${Date.now()}`;
+      const optimisticUserMessage = createEmptyInternalMessage(userMessageId, "user");
+      optimisticUserMessage.text = textToSend;
+      setInternalMessages(prev => [...prev, optimisticUserMessage]);
+
+      // Re-send the original user message to get a new response
+      console.log("[RuntimeProvider] Re-sending user message:", textToSend.slice(0, 50));
+      await sandboxOpencodeSendMessage(projectId, sessionId, textToSend, selectedModel, selectedAgent);
+    } catch (err) {
+      console.error("[RuntimeProvider] Failed to reload:", err);
+      setError(err instanceof Error ? err.message : "Failed to regenerate response");
+      setIsRunning(false);
+      setSessionActivity(projectId, false, sessionId ?? undefined);
+    }
+  }, [projectId, sessionId, selectedModel, selectedAgent, internalMessages]);
+
+  // Handle setting messages directly (for branch switching)
+  const setMessages = useCallback((messages: readonly ThreadMessageLike[]) => {
+    // Convert ThreadMessageLike back to InternalMessage format
+    // This is a simplified conversion - in practice, you may need more complex logic
+    // for branch switching scenarios
+    console.log("[RuntimeProvider] setMessages called with", messages.length, "messages");
+    
+    // For now, we log but don't implement full branch switching
+    // as it requires additional OpenCode API support
+    console.warn("[RuntimeProvider] Branch switching via setMessages not fully implemented");
+  }, []);
 
   // Handle sending a message with file attachments
   const sendWithAttachments = useCallback(async (text: string, attachments: AttachedFile[]) => {
@@ -976,17 +772,12 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
       mime: file.mime,
     }));
     
-    setInternalMessages((prev) => [
-      ...prev,
-      {
-        id: userMessageId,
-        role: "user" as const,
-        text: displayText,
-        toolCalls: new Map(),
-        files: fileParts,
-        createdAt: new Date(),
-      },
-    ]);
+    // Using createEmptyInternalMessage from types/messages.ts
+    const userMessage = createEmptyInternalMessage(userMessageId, "user");
+    userMessage.text = displayText;
+    userMessage.files = fileParts;
+    
+    setInternalMessages((prev) => [...prev, userMessage]);
 
     try {
       // Send message with parts to OpenCode
@@ -1028,19 +819,12 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
       // Use the agent from pendingMessage if specified, otherwise use selectedAgent
       const agentToUse = pendingMessage.agent || selectedAgent;
       
-      // Add optimistic user message
+      // Add optimistic user message using createEmptyInternalMessage
       const userMessageId = `user-${Date.now()}`;
-      setInternalMessages((prev) => [
-        ...prev,
-        {
-          id: userMessageId,
-          role: "user" as const,
-          text: pendingMessage.text,
-          toolCalls: new Map(),
-          files: [],
-          createdAt: new Date(),
-        },
-      ]);
+      const userMessage = createEmptyInternalMessage(userMessageId, "user");
+      userMessage.text = pendingMessage.text;
+      
+      setInternalMessages((prev) => [...prev, userMessage]);
       
       setIsRunning(true);
       setError(null);
@@ -1063,18 +847,27 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
   }, [pendingMessage, isLoading, sessionId, selectedModel, selectedAgent, onPendingMessageSent, projectId]);
 
   // Convert internal messages to ThreadMessageLike for the runtime
-  const threadMessages = internalMessages.map(convertToThreadMessage);
+  // Using convertMessagesGrouped to merge assistant messages with same parentID
+  const threadMessages = convertMessagesGrouped(internalMessages);
 
   // Identity converter since we already convert to ThreadMessageLike
-  const convertMessage = useCallback((msg: ThreadMessageLike): ThreadMessageLike => msg, []);
+  const convertMessageForRuntime = useCallback((msg: ThreadMessageLike): ThreadMessageLike => msg, []);
 
   // Create the external store runtime
+  // - onNew: handles sending new messages
+  // - onCancel: handles aborting generation
+  // - onEdit: handles editing user messages (edit and re-run)
+  // - onReload: handles regenerating assistant responses
+  // - setMessages: enables branch switching (limited support)
   const runtime = useExternalStoreRuntime({
     messages: threadMessages,
-    convertMessage,
+    convertMessage: convertMessageForRuntime,
     isRunning,
     onNew,
     onCancel,
+    onEdit,
+    onReload,
+    setMessages,
   });
 
   // Show loading state

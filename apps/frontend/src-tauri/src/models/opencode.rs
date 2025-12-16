@@ -432,6 +432,48 @@ pub struct PermissionRequest {
     pub time: PermissionTime,
 }
 
+/// Permission request with sandbox context for global pending actions view.
+/// Used on the home page to show all pending permissions across all sandboxes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PendingPermission {
+    /// The sandbox ID where this permission was requested
+    pub sandbox_id: String,
+    
+    /// Unique permission request ID
+    pub id: String,
+    
+    /// Permission type: "bash", "edit", "external_directory", "webfetch", etc.
+    #[serde(rename = "type")]
+    pub permission_type: String,
+    
+    /// Pattern for the permission (command pattern, file path pattern, etc.)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pattern: Option<serde_json::Value>,
+    
+    /// Session ID where this permission was requested
+    #[serde(rename = "sessionID")]
+    pub session_id: String,
+    
+    /// Message ID that triggered this permission request
+    #[serde(rename = "messageID")]
+    pub message_id: String,
+    
+    /// Tool call ID (links to the tool part waiting for permission)
+    #[serde(rename = "callID", skip_serializing_if = "Option::is_none")]
+    pub call_id: Option<String>,
+    
+    /// Human-readable title describing what permission is being requested
+    pub title: String,
+    
+    /// Additional metadata about the permission request
+    #[serde(default)]
+    pub metadata: serde_json::Value,
+    
+    /// Time when the permission was requested
+    pub time: PermissionTime,
+}
+
 /// Permission response type
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]

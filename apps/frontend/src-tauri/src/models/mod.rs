@@ -41,7 +41,8 @@ pub struct HealthResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SuccessResponse {
     pub success: bool,
-    pub message: String,
+    #[serde(default)]
+    pub message: Option<String>,
 }
 
 /// Error response from API

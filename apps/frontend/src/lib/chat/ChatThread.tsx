@@ -9,6 +9,8 @@ import { type FC, type PropsWithChildren, useState, useRef, useCallback, useEffe
 import {
   ThreadPrimitive,
   MessagePrimitive,
+  ActionBarPrimitive,
+  ComposerPrimitive,
   useThread,
   useMessage,
   useComposerRuntime,
@@ -20,6 +22,102 @@ import { CommandPicker, type Command } from "./CommandPicker";
 import { FilePicker } from "./FilePicker";
 import { FileAttachmentButton, FileAttachmentPreview, type AttachedFile } from "./FileAttachment";
 import { useAttachments, useSessionStatus } from "./RuntimeProvider";
+
+// Import new components for OpenCode-specific content
+import {
+  ReasoningDisplay,
+  PatchViewer,
+  SubtaskList,
+  RetryIndicator,
+} from "./components";
+
+// Import metadata extractors from thread-converter
+import {
+  getMessageCost,
+  getMessagePatches,
+  getMessageSubtasks,
+  isMessageCompacted,
+} from "./converters/thread-converter";
+
+// Import types for metadata
+import type { InternalReasoning, InternalRetry } from "./types/messages";
+
+/**
+ * Icon components for action buttons
+ * Simple SVG icons matching the cyber theme
+ */
+function EditIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`w-4 h-4 text-muted-foreground ${className || ""}`}
+    >
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </svg>
+  );
+}
+
+function CopyIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`w-4 h-4 text-muted-foreground ${className || ""}`}
+    >
+      <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+      <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+    </svg>
+  );
+}
+
+function CheckIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`w-4 h-4 ${className || ""}`}
+    >
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
+function RefreshIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`w-4 h-4 text-muted-foreground ${className || ""}`}
+    >
+      <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+      <path d="M16 16h5v5" />
+    </svg>
+  );
+}
 
 /**
  * Child session info for matching task tools to their spawned sessions
@@ -216,19 +314,16 @@ function UserTextPart() {
  * 
  * Error handling: Detects error status from result.error or result object structure
  */
-function ToolCallPart({ toolName, args, result }: ToolCallMessagePartProps) {
+function ToolCallPart({ toolName, args, result, isError }: ToolCallMessagePartProps) {
   const { onSessionSelect, childSessions } = useContext(SessionNavigationContext);
   
-  // Detect completion and error states
+  // Detect completion state
   const isComplete = result !== undefined;
   
-  // Check for error state - result can be { error: "message" } or just the error string
-  const isError = isComplete && (
-    (typeof result === "object" && result !== null && "error" in result) ||
-    (typeof result === "string" && result.toLowerCase().includes("error"))
-  );
+  // isError comes from props (set by convertToolCallToPart based on toolCall.status === "error")
+  // This is more reliable than trying to detect errors from result content
   
-  // Extract error message if present
+  // Extract error message if present (only when isError is true)
   const errorMessage = isError 
     ? (typeof result === "object" && result !== null && "error" in result
         ? (result as { error: string }).error
@@ -382,6 +477,7 @@ const ToolGroup: FC<PropsWithChildren<{ startIndex: number; endIndex: number }>>
 
 /**
  * UserMessage component renders user messages with text and file attachments
+ * Includes action bar with Edit and Copy buttons
  */
 function UserMessage() {
   const message = useMessage();
@@ -409,7 +505,7 @@ function UserMessage() {
   });
 
   return (
-    <MessagePrimitive.Root className="flex justify-end mb-4">
+    <MessagePrimitive.Root className="group flex justify-end mb-4 relative">
       <div className="max-w-[80%] rounded px-4 py-2 bg-[var(--cyber-cyan)] text-black font-mono text-sm border border-[var(--cyber-cyan)] shadow-[0_0_12px_var(--cyber-cyan)/20]">
         {/* Render images */}
         {imageAttachments.map((img, index) => (
@@ -431,40 +527,239 @@ function UserMessage() {
           />
         )}
       </div>
+      
+      {/* Action bar for user messages - appears on hover */}
+      <ActionBarPrimitive.Root
+        hideWhenRunning
+        autohide="not-last"
+        className="absolute right-0 -bottom-8 flex items-center gap-1 px-1 py-0.5 rounded bg-background/90 border border-border/50 opacity-0 group-hover:opacity-100 transition-opacity shadow-md z-10"
+      >
+        <ActionBarPrimitive.Edit
+          className="p-1.5 rounded hover:bg-muted/50 transition-colors"
+          title="Edit message"
+        >
+          <EditIcon />
+        </ActionBarPrimitive.Edit>
+        <ActionBarPrimitive.Copy
+          className="p-1.5 rounded hover:bg-muted/50 transition-colors group/copy"
+          title="Copy message"
+        >
+          <CopyIcon className="group-data-[copied]/copy:hidden" />
+          <CheckIcon className="hidden group-data-[copied]/copy:block text-[var(--cyber-emerald)]" />
+        </ActionBarPrimitive.Copy>
+      </ActionBarPrimitive.Root>
     </MessagePrimitive.Root>
+  );
+}
+
+/**
+ * EditComposer component - shown when editing a user message
+ * This replaces the user message content during edit mode
+ */
+function EditComposer() {
+  return (
+    <MessagePrimitive.Root className="flex justify-end mb-4">
+      <ComposerPrimitive.Root className="w-full max-w-[80%] flex flex-col rounded bg-[var(--cyber-cyan)]/10 border border-[var(--cyber-cyan)] shadow-[0_0_12px_var(--cyber-cyan)/20]">
+        <ComposerPrimitive.Input
+          className="min-h-[60px] w-full resize-none bg-transparent px-4 py-3 font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground"
+          autoFocus
+          placeholder="Edit your message..."
+        />
+        <div className="flex items-center justify-end gap-2 px-3 pb-3">
+          <ComposerPrimitive.Cancel asChild>
+            <button
+              type="button"
+              className="px-3 py-1.5 font-mono text-xs uppercase tracking-wider text-muted-foreground hover:text-foreground rounded border border-border/50 hover:border-border transition-colors"
+            >
+              Cancel
+            </button>
+          </ComposerPrimitive.Cancel>
+          <ComposerPrimitive.Send asChild>
+            <button
+              type="submit"
+              className="px-3 py-1.5 font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] text-black rounded hover:bg-[var(--cyber-cyan)]/90 transition-colors shadow-[0_0_8px_var(--cyber-cyan)/30]"
+            >
+              Update
+            </button>
+          </ComposerPrimitive.Send>
+        </div>
+      </ComposerPrimitive.Root>
+    </MessagePrimitive.Root>
+  );
+}
+
+/**
+ * Message type from useMessage() - includes content, metadata, etc.
+ */
+type ThreadMessageState = {
+  role: string;
+  content: Array<{ type: string; text?: string; [key: string]: unknown }>;
+  metadata?: {
+    custom?: Record<string, unknown>;
+    steps?: Array<{ usage?: { promptTokens: number; completionTokens: number } }>;
+  };
+};
+
+/**
+ * Extract retries from message metadata
+ */
+function getMessageRetries(message: ThreadMessageState): InternalRetry[] {
+  const custom = message.metadata?.custom;
+  const retries = custom?.retries;
+  if (!Array.isArray(retries)) return [];
+  return retries as InternalRetry[];
+}
+
+/**
+ * Extract reasoning from message content
+ */
+function getMessageReasoning(message: ThreadMessageState): InternalReasoning[] {
+  const reasoning: InternalReasoning[] = [];
+  for (const part of message.content) {
+    if (part.type === "reasoning" && typeof part.text === "string") {
+      reasoning.push({
+        id: `reasoning-${reasoning.length}`,
+        text: part.text,
+      });
+    }
+  }
+  return reasoning;
+}
+
+/**
+ * MessageMetadataFooter - shows cost and other metadata
+ * Token counts removed - will be shown at session level instead
+ */
+function MessageMetadataFooter({ message }: { message: ThreadMessageState }) {
+  // Extract metadata using converters
+  const cost = getMessageCost(message as Parameters<typeof getMessageCost>[0]);
+  const compacted = isMessageCompacted(message as Parameters<typeof isMessageCompacted>[0]);
+  
+  // Don't show footer if no metadata to display
+  if ((cost === undefined || cost === 0) && !compacted) {
+    return null;
+  }
+  
+  return (
+    <div className="mt-2 pt-2 border-t border-border/20">
+      <div className="flex items-center gap-3 flex-wrap font-mono text-[10px] text-muted-foreground/70">
+        {/* Cost */}
+        {cost !== undefined && cost > 0 && (
+          <span className="text-[var(--cyber-emerald)]">
+            ${cost < 0.0001 ? "<0.0001" : cost < 0.01 ? cost.toFixed(4) : cost.toFixed(3)}
+          </span>
+        )}
+        
+        {/* Compacted indicator */}
+        {compacted && (
+          <span className="px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground/50">
+            compacted
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
 
 /**
  * AssistantMessage component renders assistant messages
  * Hides empty messages (e.g., auto-created placeholder when isRunning)
+ * 
+ * Enhanced to display:
+ * - Reasoning/thinking sections (collapsible)
+ * - File patches (changed files)
+ * - Subtasks spawned
+ * - Retry attempts
+ * - Cost/token usage footer
+ * - Action bar with Reload and Copy buttons
  */
 function AssistantMessage() {
+  const { onSessionSelect } = useContext(SessionNavigationContext);
   const message = useMessage();
+  
+  // Cast message to our thread message state type for helper functions
+  const messageState = message as unknown as ThreadMessageState;
   
   // Don't render if message has no actual content
   // (assistant-ui auto-creates empty assistant message when isRunning)
   const hasContent = message.content.some((part) => {
     if (part.type === "text" && part.text && part.text.length > 0) return true;
     if (part.type === "tool-call") return true;
+    if (part.type === "reasoning") return true;
     return false;
   });
   
   if (!hasContent) return null;
   
+  // Extract extended data from metadata (using ThreadMessageLike cast for helper functions)
+  const patches = getMessagePatches(message as Parameters<typeof getMessagePatches>[0]);
+  const subtasks = getMessageSubtasks(message as Parameters<typeof getMessageSubtasks>[0]);
+  const retries = getMessageRetries(messageState);
+  const reasoning = getMessageReasoning(messageState);
+  
   return (
-    <MessagePrimitive.Root className="flex justify-start mb-4 min-w-0 w-full">
+    <MessagePrimitive.Root className="group flex justify-start mb-4 min-w-0 w-full relative">
       <div className="max-w-[80%] min-w-0 rounded px-4 py-2 bg-muted/50 border border-border/30 overflow-hidden backdrop-blur-sm">
+        {/* Retry indicator at top if there were retries */}
+        {retries.length > 0 && (
+          <RetryIndicator retries={retries} />
+        )}
+        
+        {/* Reasoning section (collapsible) */}
+        {reasoning.length > 0 && (
+          <ReasoningDisplay reasoning={reasoning} />
+        )}
+        
+        {/* Main content (text + tool calls) */}
         <MessagePrimitive.Content
           components={{
             Text: TextPart,
+            // Hide reasoning from default rendering since we render it above
+            Reasoning: () => null,
             tools: {
               Fallback: ToolCallPart,
             },
             ToolGroup: ToolGroup,
           }}
         />
+        
+        {/* Patches (files changed) */}
+        {patches.length > 0 && (
+          <PatchViewer patches={patches} />
+        )}
+        
+        {/* Subtasks spawned */}
+        {subtasks.length > 0 && (
+          <SubtaskList 
+            subtasks={subtasks}
+            onNavigateToSession={onSessionSelect}
+          />
+        )}
+        
+        {/* Footer with cost/tokens/steps - consolidated view */}
+        <MessageMetadataFooter message={messageState} />
       </div>
+      
+      {/* Action bar for assistant messages - appears on hover */}
+      <ActionBarPrimitive.Root
+        hideWhenRunning
+        autohide="not-last"
+        className="absolute left-0 -bottom-8 flex items-center gap-1 px-1 py-0.5 rounded bg-background/90 border border-border/50 opacity-0 group-hover:opacity-100 transition-opacity shadow-md z-10"
+      >
+        <ActionBarPrimitive.Reload
+          className="p-1.5 rounded hover:bg-muted/50 transition-colors"
+          title="Regenerate response"
+        >
+          <RefreshIcon />
+        </ActionBarPrimitive.Reload>
+        <ActionBarPrimitive.Copy
+          className="p-1.5 rounded hover:bg-muted/50 transition-colors group/copy"
+          title="Copy message"
+        >
+          <CopyIcon className="group-data-[copied]/copy:hidden" />
+          <CheckIcon className="hidden group-data-[copied]/copy:block text-[var(--cyber-emerald)]" />
+        </ActionBarPrimitive.Copy>
+      </ActionBarPrimitive.Root>
     </MessagePrimitive.Root>
   );
 }
@@ -509,6 +804,28 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
       inputRef.current?.focus();
     }
   }, [pendingFilePath, onPendingFilePathClear]);
+  
+  // Auto-resize textarea based on content
+  // Expands up to ~8 lines (160px), then scrolls
+  const adjustTextareaHeight = useCallback(() => {
+    const textarea = inputRef.current;
+    if (!textarea) return;
+    
+    // Reset height to auto to get the correct scrollHeight
+    textarea.style.height = "auto";
+    
+    // Calculate the new height (min 40px, max 160px for ~8 lines)
+    const minHeight = 40;
+    const maxHeight = 160; // ~8 lines at 20px line height
+    const newHeight = Math.min(Math.max(textarea.scrollHeight, minHeight), maxHeight);
+    
+    textarea.style.height = `${newHeight}px`;
+  }, []);
+  
+  // Adjust height when input value changes
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [inputValue, adjustTextareaHeight]);
   
   // Handle input changes
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -720,8 +1037,9 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             placeholder="> Type a message... (/ for commands, @ for files)"
-            className="flex-1 min-h-[40px] max-h-[200px] px-3 py-2 font-mono text-sm bg-background/50 border border-border/50 rounded resize-none focus:outline-none focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)] placeholder:text-muted-foreground/50 transition-colors"
+            className="flex-1 min-h-[40px] px-3 py-2 font-mono text-sm bg-background/50 border border-border/50 rounded resize-none focus:outline-none focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)] placeholder:text-muted-foreground/50 transition-colors overflow-y-auto"
             rows={1}
+            style={{ height: "40px" }}
           />
           <button
             type="submit"
@@ -768,9 +1086,14 @@ function EmptyState() {
 function LoadingIndicator() {
   const isRunning = useThread((t) => t.isRunning);
   const messages = useThread((t) => t.messages);
+  const { status: sessionStatus } = useSessionStatus();
+  
+  // Use EITHER runtime isRunning OR sessionStatus === "busy"
+  // This handles the case where SSE session.status:busy arrives before/after isRunning changes
+  const isActive = isRunning || sessionStatus === "busy";
   
   // Only show loading when:
-  // 1. Thread is running (assistant is processing)
+  // 1. Thread is running OR session status is busy
   // 2. Either:
   //    - No messages yet
   //    - Last message is from user
@@ -778,7 +1101,7 @@ function LoadingIndicator() {
   const lastMessage = messages[messages.length - 1];
   
   let showLoading = false;
-  if (isRunning) {
+  if (isActive) {
     if (!lastMessage) {
       showLoading = true;
     } else if (lastMessage.role === "user") {
@@ -788,10 +1111,16 @@ function LoadingIndicator() {
       const hasContent = lastMessage.content.some((part) => {
         if (part.type === "text" && part.text && part.text.length > 0) return true;
         if (part.type === "tool-call") return true;
+        if (part.type === "reasoning") return true;
         return false;
       });
       showLoading = !hasContent;
     }
+  }
+  
+  // Debug logging
+  if (process.env.NODE_ENV === "development") {
+    console.log("[LoadingIndicator] isRunning:", isRunning, "sessionStatus:", sessionStatus, "isActive:", isActive, "lastMessage:", lastMessage?.role, "showLoading:", showLoading);
   }
   
   if (!showLoading) return null;
@@ -823,6 +1152,11 @@ function LoadingIndicator() {
 function SessionStatusIndicator() {
   const { status, retryInfo } = useSessionStatus();
   const [countdown, setCountdown] = useState<number | null>(null);
+  
+  // Debug logging
+  if (process.env.NODE_ENV === "development") {
+    console.log("[SessionStatusIndicator] status:", status);
+  }
   
   // Update countdown for retry status
   useEffect(() => {
@@ -948,6 +1282,7 @@ export function ChatThread({
             <ThreadPrimitive.Messages
               components={{
                 UserMessage,
+                EditComposer,
                 AssistantMessage,
               }}
             />

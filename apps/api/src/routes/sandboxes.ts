@@ -22,7 +22,8 @@ import { streamSSE } from "hono/streaming";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { getSandboxManager } from "../services/sandbox-manager.ts";
-import { opencodeV2, OpenCodeV2Error } from "../services/opencode-v2.ts";
+import { opencodeV2, OpenCodeV2Error, cachePermission, uncachePermission } from "../services/opencode-v2.ts";
+import type { Permission } from "../services/opencode-v2.ts";
 import { createLogger } from "../utils/logger.ts";
 
 const log = createLogger("sandbox-routes");
@@ -626,9 +627,65 @@ export const sandboxRoutes = new Hono()
       }
 
       await opencodeV2.respondToPermission(id, sessionId, permissionId, response);
-      return c.json({ success: true });
+      return c.json({ success: true, message: "Permission response sent" });
     } catch (error) {
       return handleOpenCodeError(c, error, "Failed to respond to permission");
+    }
+  })
+
+  // ===========================================================================
+  // OpenCode: Fork Session
+  // ===========================================================================
+  .post("/:id/opencode/session/:sessionId/fork", async (c) => {
+    const id = c.req.param("id");
+    const sessionId = c.req.param("sessionId");
+
+    try {
+      const body = await c.req.json().catch(() => ({}));
+      const messageId = body.messageId as string | undefined;
+
+      const newSession = await opencodeV2.forkSession(id, sessionId, messageId);
+      return c.json(newSession);
+    } catch (error) {
+      return handleOpenCodeError(c, error, "Failed to fork session");
+    }
+  })
+
+  // ===========================================================================
+  // OpenCode: Revert Message (Undo)
+  // ===========================================================================
+  .post("/:id/opencode/session/:sessionId/revert", async (c) => {
+    const id = c.req.param("id");
+    const sessionId = c.req.param("sessionId");
+
+    try {
+      const body = await c.req.json();
+      const messageId = body.messageId as string;
+      const partId = body.partId as string | undefined;
+
+      if (!messageId) {
+        return c.json({ error: "messageId is required" }, 400);
+      }
+
+      const updatedSession = await opencodeV2.revertMessage(id, sessionId, messageId, partId);
+      return c.json(updatedSession);
+    } catch (error) {
+      return handleOpenCodeError(c, error, "Failed to revert message");
+    }
+  })
+
+  // ===========================================================================
+  // OpenCode: Unrevert Session (Redo)
+  // ===========================================================================
+  .post("/:id/opencode/session/:sessionId/unrevert", async (c) => {
+    const id = c.req.param("id");
+    const sessionId = c.req.param("sessionId");
+
+    try {
+      const updatedSession = await opencodeV2.unrevertSession(id, sessionId);
+      return c.json(updatedSession);
+    } catch (error) {
+      return handleOpenCodeError(c, error, "Failed to unrevert session");
     }
   })
 
@@ -787,6 +844,15 @@ export const sandboxRoutes = new Hono()
           const events = await opencodeV2.subscribeToEvents(id, abortController.signal);
           
           for await (const event of events) {
+            // Cache/uncache permissions for reconnection support
+            if (event.type === "permission.updated") {
+              const permission = event.properties as Permission;
+              cachePermission(id, permission);
+            } else if (event.type === "permission.replied") {
+              const { sessionID, permissionID } = event.properties as { sessionID: string; permissionID: string };
+              uncachePermission(id, sessionID, permissionID);
+            }
+
             // Send the full event object (type + properties) to match OpenCode SDK format
             await stream.writeSSE({
               event: event.type,
@@ -801,6 +867,21 @@ export const sandboxRoutes = new Hono()
       });
     } catch (error) {
       return handleOpenCodeError(c, error, "Failed to start OpenCode event stream");
+    }
+  })
+
+  // ===========================================================================
+  // OpenCode: List Pending Permissions
+  // ===========================================================================
+  .get("/:id/opencode/session/:sessionId/permissions", async (c) => {
+    const id = c.req.param("id");
+    const sessionId = c.req.param("sessionId");
+
+    try {
+      const permissions = opencodeV2.getPendingPermissions(id, sessionId);
+      return c.json({ permissions });
+    } catch (error) {
+      return handleOpenCodeError(c, error, "Failed to get pending permissions");
     }
   });
 
@@ -838,6 +919,29 @@ export const sandboxHealthRoutes = new Hono()
       return c.json(
         { status: "unhealthy", message: error instanceof Error ? error.message : "Unknown error" },
         503
+      );
+    }
+  });
+
+// =============================================================================
+// Global Pending Actions Routes
+// =============================================================================
+
+export const pendingActionsRoutes = new Hono()
+  /**
+   * GET /api/v2/pending-actions/permissions
+   * Get all pending permission requests across all sandboxes.
+   * Used by the home page to show a global view of pending actions.
+   */
+  .get("/permissions", async (c) => {
+    try {
+      const permissions = opencodeV2.getAllPendingPermissions();
+      return c.json({ permissions });
+    } catch (error) {
+      log.error("Failed to get all pending permissions", { error });
+      return c.json(
+        { error: "Failed to get pending permissions", details: error instanceof Error ? error.message : "Unknown error" },
+        500
       );
     }
   });

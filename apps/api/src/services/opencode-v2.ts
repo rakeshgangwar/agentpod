@@ -9,10 +9,127 @@
  */
 
 import { createOpencodeClient } from "@opencode-ai/sdk";
-import type { Session, Message, Part } from "@opencode-ai/sdk";
+import type { Session, Message, Part, Permission } from "@opencode-ai/sdk";
 import { getSandboxManager, type Sandbox } from "./sandbox-manager.ts";
 import { createLogger } from "../utils/logger.ts";
 import { config } from "../config.ts";
+
+// =============================================================================
+// Permission Cache
+// =============================================================================
+
+/**
+ * In-memory cache for pending permissions.
+ * 
+ * This cache is necessary because OpenCode stores permissions only in memory
+ * and delivers them via SSE events. When a client reconnects, they lose
+ * knowledge of pending permissions since the `permission.updated` events
+ * are not re-sent.
+ * 
+ * Structure: sandboxId -> sessionId -> permissionId -> Permission
+ */
+const permissionCache = new Map<string, Map<string, Map<string, Permission>>>();
+
+/**
+ * Cache a permission when we receive a permission.updated SSE event.
+ * Called from the SSE event handler.
+ */
+export function cachePermission(sandboxId: string, permission: Permission): void {
+  if (!permissionCache.has(sandboxId)) {
+    permissionCache.set(sandboxId, new Map());
+  }
+  const sandboxPerms = permissionCache.get(sandboxId)!;
+  
+  if (!sandboxPerms.has(permission.sessionID)) {
+    sandboxPerms.set(permission.sessionID, new Map());
+  }
+  const sessionPerms = sandboxPerms.get(permission.sessionID)!;
+  
+  sessionPerms.set(permission.id, permission);
+  
+  log.debug("Cached permission", {
+    sandboxId,
+    sessionId: permission.sessionID,
+    permissionId: permission.id,
+    type: permission.type,
+    title: permission.title,
+  });
+}
+
+/**
+ * Remove a permission from cache when it's been responded to.
+ * Called when we receive a permission.replied SSE event or when responding.
+ */
+export function uncachePermission(sandboxId: string, sessionId: string, permissionId: string): void {
+  const sandboxPerms = permissionCache.get(sandboxId);
+  if (!sandboxPerms) return;
+  
+  const sessionPerms = sandboxPerms.get(sessionId);
+  if (!sessionPerms) return;
+  
+  sessionPerms.delete(permissionId);
+  
+  log.debug("Uncached permission", {
+    sandboxId,
+    sessionId,
+    permissionId,
+  });
+  
+  // Clean up empty maps
+  if (sessionPerms.size === 0) {
+    sandboxPerms.delete(sessionId);
+  }
+  if (sandboxPerms.size === 0) {
+    permissionCache.delete(sandboxId);
+  }
+}
+
+/**
+ * Get all pending permissions for a session.
+ * Returns permissions that haven't been responded to yet.
+ */
+export function getCachedPermissions(sandboxId: string, sessionId: string): Permission[] {
+  const sandboxPerms = permissionCache.get(sandboxId);
+  if (!sandboxPerms) return [];
+  
+  const sessionPerms = sandboxPerms.get(sessionId);
+  if (!sessionPerms) return [];
+  
+  return Array.from(sessionPerms.values());
+}
+
+/**
+ * Clear all cached permissions for a sandbox.
+ * Called when a sandbox is stopped/deleted.
+ */
+export function clearPermissionCache(sandboxId: string): void {
+  permissionCache.delete(sandboxId);
+  log.debug("Cleared permission cache for sandbox", { sandboxId });
+}
+
+/**
+ * Get all pending permissions across all sandboxes.
+ * Returns an array of permissions with their associated sandboxId for context.
+ */
+export function getAllCachedPermissions(): Array<Permission & { sandboxId: string }> {
+  const allPermissions: Array<Permission & { sandboxId: string }> = [];
+  
+  for (const [sandboxId, sandboxPerms] of permissionCache) {
+    for (const [_sessionId, sessionPerms] of sandboxPerms) {
+      for (const permission of sessionPerms.values()) {
+        allPermissions.push({
+          ...permission,
+          sandboxId,
+        });
+      }
+    }
+  }
+  
+  // Sort by creation time (newest first)
+  allPermissions.sort((a, b) => (b.time?.created || 0) - (a.time?.created || 0));
+  
+  return allPermissions;
+}
 
 /**
  * Custom fetch that bypasses SSL verification for container-to-container communication.
@@ -33,7 +150,7 @@ const log = createLogger("opencode-v2");
 // Types (re-export from SDK for convenience)
 // =============================================================================
 
-export type { Session, Message, Part };
+export type { Session, Message, Part, Permission };
 
 export interface SendMessageInput {
   parts: Array<{
@@ -199,6 +316,111 @@ export const opencodeV2 = {
     await client.session.abort({
       path: { id: sessionId },
     });
+  },
+
+  /**
+   * Fork a session at a specific message.
+   * Creates a new session that diverges from the original at the specified point.
+   * Used for branching conversations.
+   * 
+   * @param sandboxId - The sandbox ID
+   * @param sessionId - The session ID to fork from
+   * @param messageId - Optional message ID to fork at. If not provided, forks from the latest message.
+   * @returns The new forked session
+   */
+  async forkSession(
+    sandboxId: string,
+    sessionId: string,
+    messageId?: string
+  ): Promise<Session> {
+    const { client } = await getClient(sandboxId);
+
+    log.info("Forking session", {
+      sandboxId,
+      sessionId,
+      messageId,
+    });
+
+    const result = await client.session.fork({
+      path: { id: sessionId },
+      body: messageId ? { messageID: messageId } : undefined,
+    });
+
+    log.info("Session forked successfully", {
+      sandboxId,
+      originalSessionId: sessionId,
+      newSessionId: result.data?.id,
+    });
+
+    return result.data!;
+  },
+
+  /**
+   * Revert a message in a session (undo).
+   * Marks the message and all subsequent messages as reverted.
+   * The reverted messages are preserved and can be restored with unrevert.
+   * 
+   * @param sandboxId - The sandbox ID
+   * @param sessionId - The session ID
+   * @param messageId - The message ID to revert to
+   * @param partId - Optional part ID for partial revert
+   * @returns The updated session
+   */
+  async revertMessage(
+    sandboxId: string,
+    sessionId: string,
+    messageId: string,
+    partId?: string
+  ): Promise<Session> {
+    const { client } = await getClient(sandboxId);
+
+    log.info("Reverting message", {
+      sandboxId,
+      sessionId,
+      messageId,
+      partId,
+    });
+
+    const result = await client.session.revert({
+      path: { id: sessionId },
+      body: { messageID: messageId, partID: partId },
+    });
+
+    log.info("Message reverted successfully", {
+      sandboxId,
+      sessionId,
+      messageId,
+    });
+
+    return result.data!;
+  },
+
+  /**
+   * Unrevert a session (redo).
+   * Restores all previously reverted messages.
+   * 
+   * @param sandboxId - The sandbox ID
+   * @param sessionId - The session ID
+   * @returns The updated session
+   */
+  async unrevertSession(sandboxId: string, sessionId: string): Promise<Session> {
+    const { client } = await getClient(sandboxId);
+
+    log.info("Unreverting session", {
+      sandboxId,
+      sessionId,
+    });
+
+    const result = await client.session.unrevert({
+      path: { id: sessionId },
+    });
+
+    log.info("Session unrevert successful", {
+      sandboxId,
+      sessionId,
+    });
+
+    return result.data!;
   },
 
   // ---------------------------------------------------------------------------
@@ -421,6 +643,9 @@ export const opencodeV2 = {
       body: { response },
     });
 
+    // Remove from cache since it's been responded to
+    uncachePermission(sandboxId, sessionId, permissionId);
+
     log.info("Permission response sent successfully", {
       sandboxId,
       sessionId,
@@ -429,6 +654,23 @@ export const opencodeV2 = {
     });
 
     return result.data ?? true;
+  },
+
+  /**
+   * Get pending permissions for a session from the cache.
+   * This is used when a client reconnects to retrieve permissions
+   * that were received via SSE but not yet responded to.
+   */
+  getPendingPermissions(sandboxId: string, sessionId: string): Permission[] {
+    return getCachedPermissions(sandboxId, sessionId);
+  },
+
+  /**
+   * Get all pending permissions across all sandboxes.
+   * Used by the home page to show a global view of pending actions.
+   */
+  getAllPendingPermissions(): Array<Permission & { sandboxId: string }> {
+    return getAllCachedPermissions();
   },
 
   // ---------------------------------------------------------------------------

@@ -15,7 +15,7 @@ import { preferencesRoutes } from './routes/preferences.ts';
 import { activityRoutes } from './routes/activity.ts';
 import { accountRoutes } from './routes/account.ts';
 // v2 Routes (direct Docker orchestrator)
-import { sandboxRoutes, sandboxHealthRoutes } from './routes/sandboxes.ts';
+import { sandboxRoutes, sandboxHealthRoutes, pendingActionsRoutes } from './routes/sandboxes.ts';
 import { repoRoutes } from './routes/repos.ts';
 import { chatRoutes } from './routes/chat.ts';
 // Terminal WebSocket routes
@@ -83,6 +83,7 @@ const app = new Hono()
   .route('/api/v2/sandboxes', terminalRoutes) // Terminal WebSocket (interactive shell)
   .route('/api/v2/repos', repoRoutes) // Git repository management
   .route('/api/v2/health', sandboxHealthRoutes) // Health checks (includes /docker)
+  .route('/api/v2/pending-actions', pendingActionsRoutes) // Global pending actions
   // Onboarding system endpoints
   .route('/api/knowledge', knowledgeRoutes) // Knowledge documents
   .route('/api/onboarding', onboardingRoutes) // Onboarding sessions

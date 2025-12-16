@@ -380,6 +380,106 @@ pub async fn sandbox_opencode_respond_permission(
     Ok(true)
 }
 
+/// Get pending permission requests for a session
+/// This fetches cached permissions from the API that were received via SSE
+/// but haven't been responded to yet. Useful after page refresh/reconnection.
+#[tauri::command]
+pub async fn sandbox_opencode_get_pending_permissions(
+    sandbox_id: String,
+    session_id: String,
+) -> Result<Vec<crate::models::PermissionRequest>, AppError> {
+    let client = get_client()?;
+    
+    #[derive(serde::Deserialize)]
+    struct Response {
+        permissions: Vec<crate::models::PermissionRequest>,
+    }
+    
+    let response: Response = client
+        .get(&format!(
+            "/api/v2/sandboxes/{}/opencode/session/{}/permissions",
+            sandbox_id, session_id
+        ))
+        .await?;
+    Ok(response.permissions)
+}
+
+/// Get all pending permission requests across all sandboxes.
+/// This is used by the home page to show a global view of pending actions.
+#[tauri::command]
+pub async fn get_all_pending_permissions() -> Result<Vec<crate::models::PendingPermission>, AppError> {
+    let client = get_client()?;
+    
+    #[derive(serde::Deserialize)]
+    struct Response {
+        permissions: Vec<crate::models::PendingPermission>,
+    }
+    
+    let response: Response = client
+        .get("/api/v2/pending-actions/permissions")
+        .await?;
+    Ok(response.permissions)
+}
+
+/// Fork an OpenCode session at a specific message
+/// Creates a new session that diverges from the original at the specified point.
+#[tauri::command]
+pub async fn sandbox_opencode_fork_session(
+    sandbox_id: String,
+    session_id: String,
+    message_id: Option<String>,
+) -> Result<Session, AppError> {
+    let client = get_client()?;
+    let body = match message_id {
+        Some(id) => serde_json::json!({ "messageId": id }),
+        None => serde_json::json!({}),
+    };
+    client
+        .post(
+            &format!("/api/v2/sandboxes/{}/opencode/session/{}/fork", sandbox_id, session_id),
+            &body,
+        )
+        .await
+}
+
+/// Revert a message in an OpenCode session (undo)
+/// Marks the message and all subsequent messages as reverted.
+#[tauri::command]
+pub async fn sandbox_opencode_revert_message(
+    sandbox_id: String,
+    session_id: String,
+    message_id: String,
+    part_id: Option<String>,
+) -> Result<Session, AppError> {
+    let client = get_client()?;
+    let body = match part_id {
+        Some(pid) => serde_json::json!({ "messageId": message_id, "partId": pid }),
+        None => serde_json::json!({ "messageId": message_id }),
+    };
+    client
+        .post(
+            &format!("/api/v2/sandboxes/{}/opencode/session/{}/revert", sandbox_id, session_id),
+            &body,
+        )
+        .await
+}
+
+/// Unrevert an OpenCode session (redo)
+/// Restores all previously reverted messages.
+#[tauri::command]
+pub async fn sandbox_opencode_unrevert_session(
+    sandbox_id: String,
+    session_id: String,
+) -> Result<Session, AppError> {
+    let client = get_client()?;
+    client
+        .post(
+            &format!("/api/v2/sandboxes/{}/opencode/session/{}/unrevert", sandbox_id, session_id),
+            &(),
+        )
+        .await
+}
+
 /// List messages in an OpenCode session
 #[tauri::command]
 pub async fn sandbox_opencode_list_messages(sandbox_id: String, session_id: String) -> Result<Vec<Message>, AppError> {

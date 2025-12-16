@@ -81,6 +81,22 @@ import {
     }
   });
 
+  // Track session ID from URL parameter (from pending actions navigation)
+  // This is read once on page load and cleared after use
+  let urlSessionId = $state<string | null>(null);
+
+  // Read session param from URL immediately (before loadSessions runs)
+  // This needs to happen synchronously on page load
+  if (typeof window !== "undefined") {
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionParam = urlParams.get("session");
+    if (sessionParam) {
+      urlSessionId = sessionParam;
+      // Clean up the URL immediately
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }
+
   // Session state
   let sessions = $state<Session[]>([]);
   let selectedSessionId = $state<string | null>(null);
@@ -281,8 +297,27 @@ import {
     try {
       // projectId is actually sandboxId in v2 API
       sessions = await sandboxOpencodeListSessions(projectId);
-      // Auto-select the most recent session if none selected
-      if (!selectedSessionId && sessions.length > 0) {
+      
+      // Priority for session selection:
+      // 1. URL session parameter (from pending actions or direct link)
+      // 2. Already selected session (preserve current selection)
+      // 3. Most recent session (default)
+      if (urlSessionId) {
+        // Check if the URL session exists in the list
+        const urlSession = sessions.find(s => s.id === urlSessionId);
+        if (urlSession) {
+          selectedSessionId = urlSessionId;
+          console.log("[Chat] Selected session from URL:", urlSessionId);
+        } else {
+          console.warn("[Chat] URL session not found, falling back to recent:", urlSessionId);
+          if (!selectedSessionId && sessions.length > 0) {
+            selectedSessionId = sessions[0].id;
+          }
+        }
+        // Clear the URL session ID after using it
+        urlSessionId = null;
+      } else if (!selectedSessionId && sessions.length > 0) {
+        // Auto-select the most recent session if none selected
         selectedSessionId = sessions[0].id;
       }
     } catch (err) {

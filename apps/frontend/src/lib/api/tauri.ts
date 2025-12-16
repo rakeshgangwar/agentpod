@@ -410,6 +410,15 @@ export interface PermissionReplied {
   response: PermissionResponseType;
 }
 
+/**
+ * Pending permission with sandbox context.
+ * Used for the global pending actions view on the home page.
+ */
+export interface PendingPermission extends PermissionRequest {
+  /** The sandbox ID where this permission was requested */
+  sandboxId: string;
+}
+
 // =============================================================================
 // OpenCode - SSE Streaming Types
 // =============================================================================
@@ -1081,6 +1090,96 @@ export async function sandboxOpencodeRespondPermission(
     sessionId,
     permissionId,
     response,
+  });
+}
+
+/**
+ * Get pending permission requests for a session.
+ * This fetches cached permissions from the API that were received via SSE
+ * but haven't been responded to yet. Useful after page refresh/reconnection.
+ */
+export async function sandboxOpencodeGetPendingPermissions(
+  sandboxId: string,
+  sessionId: string
+): Promise<PermissionRequest[]> {
+  return invoke<PermissionRequest[]>("sandbox_opencode_get_pending_permissions", {
+    sandboxId,
+    sessionId,
+  });
+}
+
+/**
+ * Get all pending permission requests across all sandboxes.
+ * This is used by the home page to show a global view of pending actions.
+ * 
+ * @returns Array of pending permissions with their associated sandbox IDs
+ */
+export async function getAllPendingPermissions(): Promise<PendingPermission[]> {
+  return invoke<PendingPermission[]>("get_all_pending_permissions", {});
+}
+
+/**
+ * Fork an OpenCode session at a specific message.
+ * Creates a new session that diverges from the original at the specified point.
+ * Used for branching conversations.
+ * 
+ * @param sandboxId - The sandbox ID
+ * @param sessionId - The session ID to fork from
+ * @param messageId - Optional message ID to fork at. If not provided, forks from the latest message.
+ * @returns The new forked session
+ */
+export async function sandboxOpencodeForkSession(
+  sandboxId: string,
+  sessionId: string,
+  messageId?: string
+): Promise<Session> {
+  return invoke<Session>("sandbox_opencode_fork_session", {
+    sandboxId,
+    sessionId,
+    messageId,
+  });
+}
+
+/**
+ * Revert a message in an OpenCode session (undo).
+ * Marks the message and all subsequent messages as reverted.
+ * The reverted messages are preserved and can be restored with unrevert.
+ * 
+ * @param sandboxId - The sandbox ID
+ * @param sessionId - The session ID
+ * @param messageId - The message ID to revert to
+ * @param partId - Optional part ID for partial revert
+ * @returns The updated session
+ */
+export async function sandboxOpencodeRevertMessage(
+  sandboxId: string,
+  sessionId: string,
+  messageId: string,
+  partId?: string
+): Promise<Session> {
+  return invoke<Session>("sandbox_opencode_revert_message", {
+    sandboxId,
+    sessionId,
+    messageId,
+    partId,
+  });
+}
+
+/**
+ * Unrevert an OpenCode session (redo).
+ * Restores all previously reverted messages.
+ * 
+ * @param sandboxId - The sandbox ID
+ * @param sessionId - The session ID
+ * @returns The updated session
+ */
+export async function sandboxOpencodeUnrevertSession(
+  sandboxId: string,
+  sessionId: string
+): Promise<Session> {
+  return invoke<Session>("sandbox_opencode_unrevert_session", {
+    sandboxId,
+    sessionId,
   });
 }
 

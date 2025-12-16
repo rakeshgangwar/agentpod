@@ -173,8 +173,13 @@
     flex-direction: column;
     height: calc(100vh - 300px);
     min-height: 400px;
-    background-color: #0d0d14;
+    background-color: hsl(var(--background));
     font-family: var(--font-mono), ui-monospace, monospace;
+  }
+
+  /* Dark mode - use deep dark background */
+  :global(.dark) .terminal-tabs {
+    background-color: #0d0d14;
   }
 
   .tab-bar {
@@ -182,9 +187,15 @@
     align-items: center;
     gap: 0.5rem;
     padding: 0.5rem 0.75rem;
-    background: linear-gradient(180deg, rgba(13, 13, 20, 0.95) 0%, rgba(20, 20, 30, 0.9) 100%);
-    border-bottom: 1px solid color-mix(in oklch, var(--cyber-cyan) 20%, transparent);
+    background: hsl(var(--muted) / 0.3);
+    border-bottom: 1px solid hsl(var(--border));
     position: relative;
+  }
+
+  /* Dark mode - use gradient background */
+  :global(.dark) .tab-bar {
+    background: linear-gradient(180deg, rgba(13, 13, 20, 0.95) 0%, rgba(20, 20, 30, 0.9) 100%);
+    border-bottom-color: color-mix(in oklch, var(--cyber-cyan) 20%, transparent);
   }
 
   .tab-bar::after {
@@ -194,6 +205,11 @@
     left: 0;
     right: 0;
     height: 1px;
+    background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.3) 20%, hsl(var(--primary) / 0.3) 80%, transparent);
+  }
+
+  /* Dark mode - use cyber cyan glow */
+  :global(.dark) .tab-bar::after {
     background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--cyber-cyan) 50%, transparent) 20%, color-mix(in oklch, var(--cyber-cyan) 50%, transparent) 80%, transparent);
   }
 
@@ -219,8 +235,8 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: hsl(var(--muted-foreground));
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: hsl(var(--muted) / 0.3);
+    border: 1px solid hsl(var(--border) / 0.5);
     border-radius: 4px;
     cursor: pointer;
     white-space: nowrap;
@@ -228,13 +244,33 @@
     position: relative;
   }
 
+  /* Dark mode tab background */
+  :global(.dark) .tab {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
   .tab:hover {
+    background: hsl(var(--primary) / 0.1);
+    border-color: hsl(var(--primary) / 0.3);
+    color: hsl(var(--primary));
+  }
+
+  /* Dark mode hover */
+  :global(.dark) .tab:hover {
     background: color-mix(in oklch, var(--cyber-cyan) 8%, transparent);
     border-color: color-mix(in oklch, var(--cyber-cyan) 30%, transparent);
     color: var(--cyber-cyan);
   }
 
   .tab.active {
+    background: hsl(var(--primary) / 0.15);
+    border-color: hsl(var(--primary) / 0.5);
+    color: hsl(var(--primary));
+  }
+
+  /* Dark mode active */
+  :global(.dark) .tab.active {
     background: color-mix(in oklch, var(--cyber-cyan) 12%, transparent);
     border-color: color-mix(in oklch, var(--cyber-cyan) 50%, transparent);
     color: var(--cyber-cyan);
@@ -249,15 +285,34 @@
     left: 0;
     right: 0;
     height: 1px;
+    background: linear-gradient(90deg, transparent, hsl(var(--primary)) 50%, transparent);
+    opacity: 0.5;
+  }
+
+  /* Dark mode active glow line */
+  :global(.dark) .tab.active::before {
     background: linear-gradient(90deg, transparent, var(--cyber-cyan) 50%, transparent);
+    opacity: 1;
   }
 
   .tab.error {
+    color: hsl(var(--destructive));
+    border-color: hsl(var(--destructive) / 0.3);
+  }
+
+  /* Dark mode error */
+  :global(.dark) .tab.error {
     color: var(--cyber-red);
     border-color: color-mix(in oklch, var(--cyber-red) 30%, transparent);
   }
 
   .tab.error.active {
+    background: hsl(var(--destructive) / 0.1);
+    border-color: hsl(var(--destructive) / 0.5);
+  }
+
+  /* Dark mode error active */
+  :global(.dark) .tab.error.active {
     background: color-mix(in oklch, var(--cyber-red) 10%, transparent);
     border-color: color-mix(in oklch, var(--cyber-red) 50%, transparent);
   }
@@ -284,6 +339,12 @@
 
   .close-btn:hover {
     opacity: 1;
+    background: hsl(var(--destructive) / 0.2);
+    color: hsl(var(--destructive));
+  }
+
+  /* Dark mode close button */
+  :global(.dark) .close-btn:hover {
     background: color-mix(in oklch, var(--cyber-red) 20%, transparent);
     color: var(--cyber-red);
   }
@@ -296,6 +357,11 @@
     flex: 1;
     min-height: 0;
     position: relative;
+    background: hsl(var(--background));
+  }
+
+  /* Dark mode terminal content */
+  :global(.dark) .terminal-content {
     background: #0d0d14;
   }
 
@@ -308,11 +374,22 @@
     padding: 2rem;
     text-align: center;
     color: hsl(var(--muted-foreground));
+    background: radial-gradient(ellipse at center, hsl(var(--primary) / 0.03) 0%, transparent 70%);
+  }
+
+  /* Dark mode empty state */
+  :global(.dark) .empty-state {
     background: radial-gradient(ellipse at center, color-mix(in oklch, var(--cyber-cyan) 3%, transparent) 0%, transparent 70%);
   }
 
   .empty-icon {
     margin-bottom: 1.5rem;
+    color: hsl(var(--primary) / 0.4);
+    filter: drop-shadow(0 0 8px hsl(var(--primary) / 0.2));
+  }
+
+  /* Dark mode empty icon */
+  :global(.dark) .empty-icon {
     color: color-mix(in oklch, var(--cyber-cyan) 40%, transparent);
     filter: drop-shadow(0 0 8px color-mix(in oklch, var(--cyber-cyan) 30%, transparent));
   }
@@ -323,8 +400,13 @@
     font-family: var(--font-mono), ui-monospace, monospace;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    color: var(--cyber-cyan);
+    color: hsl(var(--primary));
     margin-bottom: 0.5rem;
+  }
+
+  /* Dark mode empty title */
+  :global(.dark) .empty-title {
+    color: var(--cyber-cyan);
   }
 
   .empty-description {
@@ -338,11 +420,18 @@
     margin-top: 1rem;
     font-size: 0.75rem;
     font-family: var(--font-mono), ui-monospace, monospace;
-    color: var(--cyber-red);
+    color: hsl(var(--destructive));
     padding: 0.5rem 1rem;
-    background: color-mix(in oklch, var(--cyber-red) 10%, transparent);
-    border: 1px solid color-mix(in oklch, var(--cyber-red) 30%, transparent);
+    background: hsl(var(--destructive) / 0.1);
+    border: 1px solid hsl(var(--destructive) / 0.3);
     border-radius: 4px;
+  }
+
+  /* Dark mode error message */
+  :global(.dark) .error-message {
+    color: var(--cyber-red);
+    background: color-mix(in oklch, var(--cyber-red) 10%, transparent);
+    border-color: color-mix(in oklch, var(--cyber-red) 30%, transparent);
   }
 
   .error-overlay {
@@ -353,17 +442,28 @@
     gap: 1rem;
     height: 100%;
     padding: 2rem;
-    background: linear-gradient(180deg, rgba(13, 13, 20, 0.98) 0%, rgba(30, 15, 15, 0.95) 100%);
-    border: 1px solid color-mix(in oklch, var(--cyber-red) 30%, transparent);
+    background: hsl(var(--background));
+    border: 1px solid hsl(var(--destructive) / 0.3);
     position: relative;
+  }
+
+  /* Dark mode error overlay */
+  :global(.dark) .error-overlay {
+    background: linear-gradient(180deg, rgba(13, 13, 20, 0.98) 0%, rgba(30, 15, 15, 0.95) 100%);
+    border-color: color-mix(in oklch, var(--cyber-red) 30%, transparent);
   }
 
   .error-overlay::before {
     content: '';
     position: absolute;
     inset: 0;
-    background: radial-gradient(ellipse at center, color-mix(in oklch, var(--cyber-red) 5%, transparent) 0%, transparent 70%);
+    background: radial-gradient(ellipse at center, hsl(var(--destructive) / 0.05) 0%, transparent 70%);
     pointer-events: none;
+  }
+
+  /* Dark mode error overlay glow */
+  :global(.dark) .error-overlay::before {
+    background: radial-gradient(ellipse at center, color-mix(in oklch, var(--cyber-red) 5%, transparent) 0%, transparent 70%);
   }
 
   .error-text {

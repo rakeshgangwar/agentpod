@@ -15,6 +15,7 @@
   import { getProjectIcon } from "$lib/utils/project-icons";
   import { getAnimatedIcon } from "$lib/utils/animated-icons";
   import LottieIcon from "$lib/components/lottie-icon.svelte";
+  import PendingActions from "$lib/components/pending-actions.svelte";
   import { Button } from "$lib/components/ui/button";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
   import { Avatar, AvatarFallback } from "$lib/components/ui/avatar";
@@ -373,6 +374,9 @@
           </div>
         </div>
       {/if}
+
+      <!-- Pending Actions Section (shows permission requests needing user attention) -->
+      <PendingActions />
 
       <!-- Main Content Grid -->
       <div class="grid lg:grid-cols-3 gap-4 sm:gap-6">
