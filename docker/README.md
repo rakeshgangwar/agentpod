@@ -172,7 +172,7 @@ services:
   sandbox:
     image: codeopen-fullstack:latest
     volumes:
-      - ./my-project:/home/developer/workspace
+      - ./my-project:/home/workspace
 ```
 
 ### Mode 2: Clone from Remote

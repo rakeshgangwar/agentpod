@@ -59,9 +59,10 @@ RUN add-apt-repository ppa:deadsnakes/ppa -y && \
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:${PATH}"
 
-# Make uv available to developer user
-RUN cp -r /root/.local /home/developer/.local 2>/dev/null || true && \
-    chown -R developer:developer /home/developer/.local
+# Make uv available to developer user (in /home/.local for HOME=/home)
+RUN mkdir -p /home/.local/bin && \
+    cp -r /root/.local/bin/* /home/.local/bin/ 2>/dev/null || true && \
+    chown -R developer:developer /home/.local
 
 # =============================================================================
 # Poetry - Dependency management
@@ -96,10 +97,10 @@ RUN pip install --break-system-packages \
 USER developer
 
 # Update PATH for developer user
-ENV PATH="/home/developer/.local/bin:${PATH}"
+ENV PATH="/home/.local/bin:${PATH}"
 
 # Update shell configuration
-RUN echo 'export PATH="/home/developer/.local/bin:$PATH"' >> /home/developer/.bashrc
+RUN echo 'export PATH="/home/.local/bin:$PATH"' >> /home/developer/.bashrc
 
 # =============================================================================
 # Flavor metadata
@@ -107,4 +108,4 @@ RUN echo 'export PATH="/home/developer/.local/bin:$PATH"' >> /home/developer/.ba
 ENV CODEOPEN_FLAVOR="python"
 ENV CODEOPEN_LANGUAGES="python"
 
-WORKDIR /home/developer/workspace
+WORKDIR /home/workspace

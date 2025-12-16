@@ -20,7 +20,7 @@ echo "=============================================="
 #
 # Git Repository Options (choose one):
 #   Option 1: Pre-mounted workspace (new architecture)
-#     - Workspace is mounted as a volume at /home/developer/workspace
+#     - Workspace is mounted as a volume at /home/workspace
 #     - No cloning needed, repository is already there
 #
 #   Option 2: Clone from remote (legacy, still supported)
@@ -31,9 +31,9 @@ echo "=============================================="
 #
 # OpenCode Configuration:
 #   OPENCODE_AUTH_JSON    - Pre-built auth.json content (for LLM providers)
-#                           Written to ~/.local/share/opencode/auth.json
+#                           Written to /home/.local/share/opencode/auth.json
 #   OPENCODE_USER_CONFIG  - User's global config JSON (settings, custom files)
-#                           Written to ~/.config/opencode/
+#                           Written to /home/.config/opencode/
 #   CODEOPEN_FLAVOR       - Container flavor (js, python, go, rust, fullstack, polyglot)
 #                           Used for flavor-specific AGENTS.md in workspace
 #   OPENCODE_PORT         - Port for OpenCode server (default: 4096)
@@ -47,10 +47,21 @@ echo "=============================================="
 #   WILDCARD_DOMAIN       - Domain for URL generation (default: localhost)
 # =============================================================================
 
+# Directory configuration:
+# - HOME stays as /home/developer so git and other tools work normally
+# - WORKSPACE is /home/workspace where the git repo is mounted
+# - XDG_CONFIG_HOME and XDG_DATA_HOME point to /home so OpenCode finds its config
+#   at /home/.config/opencode (not /home/developer/.config/opencode)
 HOME_DIR="/home/developer"
-WORKSPACE="${HOME_DIR}/workspace"
-OPENCODE_CONFIG_DIR="${HOME_DIR}/.config/opencode"
-OPENCODE_DATA_DIR="${HOME_DIR}/.local/share/opencode"
+WORKSPACE="/home/workspace"
+OPENCODE_CONFIG_DIR="/home/.config/opencode"
+OPENCODE_DATA_DIR="/home/.local/share/opencode"
+
+# Export XDG directories so OpenCode uses /home/.config/opencode for global config
+# while git and other tools still use /home/developer for their configs
+export XDG_CONFIG_HOME="/home/.config"
+export XDG_DATA_HOME="/home/.local/share"
+export XDG_CACHE_HOME="/home/.cache"
 
 # Source common functions if available
 if [ -f /opt/agentpod/scripts/common-setup.sh ]; then

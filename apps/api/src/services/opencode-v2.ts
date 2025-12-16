@@ -9,7 +9,7 @@
  */
 
 import { createOpencodeClient } from "@opencode-ai/sdk";
-import type { Session, Message, Part, Permission } from "@opencode-ai/sdk";
+import type { Session, Message, Part, Permission, Agent } from "@opencode-ai/sdk";
 import { getSandboxManager, type Sandbox } from "./sandbox-manager.ts";
 import { createLogger } from "../utils/logger.ts";
 import { config } from "../config.ts";
@@ -150,7 +150,7 @@ const log = createLogger("opencode-v2");
 // Types (re-export from SDK for convenience)
 // =============================================================================
 
-export type { Session, Message, Part, Permission };
+export type { Session, Message, Part, Permission, Agent };
 
 export interface SendMessageInput {
   parts: Array<{
@@ -705,32 +705,26 @@ export const opencodeV2 = {
 
   /**
    * Get available agents from OpenCode
-   * Returns all agents with their properties
+   * Returns all agents with their properties using SDK types
+   * 
+   * Note: OpenCode API returns `native` field but SDK types define `builtIn`.
+   * We normalize the response to match SDK types.
    */
-  async getAgents(
-    sandboxId: string
-  ): Promise<
-    Array<{
-      name: string;
-      description?: string;
-      mode: "primary" | "subagent" | "all";
-      builtIn: boolean;
-      color?: string;
-    }>
-  > {
+  async getAgents(sandboxId: string): Promise<(Agent & { hidden?: boolean })[]> {
     const { client } = await getClient(sandboxId);
     const result = await client.app.agents();
-
     const agents = result.data ?? [];
-
-    // Return all agents with their properties
-    return agents.map((agent) => ({
-      name: agent.name,
-      description: agent.description,
-      mode: agent.mode,
-      builtIn: agent.builtIn,
-      color: agent.color,
-    }));
+    
+    // Normalize: OpenCode returns `native`, SDK types expect `builtIn`
+    // Also include `hidden` field which isn't in SDK types but is in API response
+    return agents.map((agent) => {
+      const rawAgent = agent as Agent & { native?: boolean; hidden?: boolean };
+      return {
+        ...agent,
+        builtIn: rawAgent.native ?? agent.builtIn ?? false,
+        hidden: rawAgent.hidden,
+      };
+    });
   },
 
   // ---------------------------------------------------------------------------
@@ -850,7 +844,7 @@ export const opencodeV2 = {
     clientCache.delete(sandboxId);
 
     const opencodePort = config.opencode.serverPort;
-    const workspace = "/home/developer/workspace";
+    const workspace = "/home/workspace";
 
     // Step 1: Kill existing OpenCode process
     try {
@@ -867,10 +861,11 @@ export const opencodeV2 = {
     // Step 2: Start OpenCode in the background using setsid for proper detachment
     // setsid creates a new session and detaches from the controlling terminal
     // This ensures the process survives after docker exec completes
+    // XDG vars ensure OpenCode finds its config at /home/.config/opencode
     const startCommand = [
       "sh",
       "-c",
-      `setsid sh -c 'cd ${workspace} && exec opencode serve --port ${opencodePort} --hostname 0.0.0.0' </dev/null >/tmp/opencode.log 2>&1 &`
+      `setsid sh -c 'export XDG_CONFIG_HOME=/home/.config && export XDG_DATA_HOME=/home/.local/share && export XDG_CACHE_HOME=/home/.cache && cd ${workspace} && exec opencode serve --port ${opencodePort} --hostname 0.0.0.0' </dev/null >/tmp/opencode.log 2>&1 &`
     ];
 
     try {

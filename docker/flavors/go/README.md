@@ -72,4 +72,4 @@ gotestsum ./...
 | Variable | Value | Description |
 |----------|-------|-------------|
 | `GOROOT` | /usr/local/go | Go installation |
-| `GOPATH` | /home/developer/go | Go workspace |
+| `GOPATH` | /home/go | Go workspace |

@@ -372,6 +372,7 @@ export interface OpenCodeAgent {
   mode: "primary" | "subagent" | "all";
   builtIn: boolean;
   color?: string;
+  hidden?: boolean;
 }
 
 // =============================================================================

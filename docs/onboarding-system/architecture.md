@@ -133,7 +133,7 @@ Docker container running OpenCode with injected onboarding configuration.
 **Injected Files:**
 
 ```
-/home/developer/workspace/
+/home/workspace/
 ├── opencode.json              # Project config with MCP connection
 ├── AGENTS.md                  # Initial instructions
 └── .opencode/

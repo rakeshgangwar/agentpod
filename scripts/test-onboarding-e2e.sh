@@ -186,7 +186,7 @@ print_success "Container is running"
 print_step "Verifying onboarding agent installation..."
 
 # Check agents directory exists
-AGENTS_LIST=$(docker exec "$CONTAINER_NAME" ls -la /home/developer/workspace/.opencode/agent/ 2>&1 || echo "FAILED")
+AGENTS_LIST=$(docker exec "$CONTAINER_NAME" ls -la /home/workspace/.opencode/agent/ 2>&1 || echo "FAILED")
 if echo "$AGENTS_LIST" | grep -q "onboarding.md"; then
   print_success "Onboarding agent installed"
 else
@@ -204,7 +204,7 @@ fi
 # Check opencode.json
 print_step "Verifying opencode.json configuration..."
 
-OPENCODE_CONFIG=$(docker exec "$CONTAINER_NAME" cat /home/developer/workspace/opencode.json 2>&1 || echo "FAILED")
+OPENCODE_CONFIG=$(docker exec "$CONTAINER_NAME" cat /home/workspace/opencode.json 2>&1 || echo "FAILED")
 if echo "$OPENCODE_CONFIG" | grep -q "agentpod_knowledge"; then
   print_success "MCP server configured in opencode.json"
 else

@@ -91,15 +91,15 @@ RUN curl -fsSL https://get.docker.com | sh || true
 # =============================================================================
 USER developer
 
-# Copy uv to developer user
-RUN mkdir -p /home/developer/.local/bin && \
-    sudo cp /root/.local/bin/uv /home/developer/.local/bin/ 2>/dev/null || true && \
-    sudo chown developer:developer /home/developer/.local/bin/uv 2>/dev/null || true
+# Copy uv to /home/.local (for HOME=/home)
+RUN mkdir -p /home/.local/bin && \
+    sudo cp /root/.local/bin/uv /home/.local/bin/ 2>/dev/null || true && \
+    sudo chown -R developer:developer /home/.local 2>/dev/null || true
 
 # =============================================================================
 # Update shell configuration
 # =============================================================================
-RUN echo 'export PATH="/home/developer/.local/bin:$PATH"' >> /home/developer/.bashrc
+RUN echo 'export PATH="/home/.local/bin:$PATH"' >> /home/developer/.bashrc
 
 # =============================================================================
 # Flavor metadata
@@ -107,4 +107,4 @@ RUN echo 'export PATH="/home/developer/.local/bin:$PATH"' >> /home/developer/.ba
 ENV CODEOPEN_FLAVOR="fullstack"
 ENV CODEOPEN_LANGUAGES="javascript,typescript,python"
 
-WORKDIR /home/developer/workspace
+WORKDIR /home/workspace

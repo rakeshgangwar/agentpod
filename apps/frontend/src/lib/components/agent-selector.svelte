@@ -42,9 +42,9 @@
   // Use external agents if provided, otherwise use internal
   let agents = $derived(externalAgents ?? internalAgents);
   
-  // Filter to only primary agents
+  // Filter to only primary agents, excluding hidden agents
   let primaryAgents = $derived(
-    agents.filter(agent => agent.mode === "primary" || agent.mode === "all")
+    agents.filter(agent => (agent.mode === "primary" || agent.mode === "all") && !agent.hidden)
   );
   
   // Animation state

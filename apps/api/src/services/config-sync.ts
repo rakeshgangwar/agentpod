@@ -23,8 +23,8 @@ import { createLogger } from '../utils/logger.ts';
 
 const log = createLogger('config-sync');
 
-// Container paths
-const CONFIG_DIR = '/home/developer/.config/opencode';
+// Container paths - /home is the HOME directory for OpenCode config
+const CONFIG_DIR = '/home/.config/opencode';
 
 // Exec options for running as developer user
 const EXEC_OPTS = { user: 'developer' };

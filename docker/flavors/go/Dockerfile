@@ -23,7 +23,7 @@ RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-$(dpkg --print-architect
 
 # Set up Go environment
 ENV GOROOT=/usr/local/go
-ENV GOPATH=/home/developer/go
+ENV GOPATH=/home/go
 ENV PATH="${GOROOT}/bin:${GOPATH}/bin:${PATH}"
 
 # =============================================================================
@@ -32,7 +32,7 @@ ENV PATH="${GOROOT}/bin:${GOPATH}/bin:${PATH}"
 USER developer
 
 # Create Go directories
-RUN mkdir -p /home/developer/go/{bin,src,pkg}
+RUN mkdir -p /home/go/{bin,src,pkg}
 
 # Install common Go tools
 RUN go install golang.org/x/tools/gopls@latest && \
@@ -47,7 +47,7 @@ RUN go install golang.org/x/tools/gopls@latest && \
 # Update shell configuration
 # =============================================================================
 RUN echo 'export GOROOT=/usr/local/go' >> /home/developer/.bashrc && \
-    echo 'export GOPATH=/home/developer/go' >> /home/developer/.bashrc && \
+    echo 'export GOPATH=/home/go' >> /home/developer/.bashrc && \
     echo 'export PATH="${GOROOT}/bin:${GOPATH}/bin:${PATH}"' >> /home/developer/.bashrc
 
 # =============================================================================
@@ -56,4 +56,4 @@ RUN echo 'export GOROOT=/usr/local/go' >> /home/developer/.bashrc && \
 ENV CODEOPEN_FLAVOR="go"
 ENV CODEOPEN_LANGUAGES="go"
 
-WORKDIR /home/developer/workspace
+WORKDIR /home/workspace

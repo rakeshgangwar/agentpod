@@ -87,7 +87,7 @@ ENV GO_VERSION=1.22.4
 RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-$(dpkg --print-architecture).tar.gz" | tar -C /usr/local -xzf -
 
 ENV GOROOT=/usr/local/go
-ENV GOPATH=/home/developer/go
+ENV GOPATH=/home/go
 ENV PATH="${GOROOT}/bin:${GOPATH}/bin:${PATH}"
 
 # =============================================================================
@@ -134,7 +134,7 @@ RUN curl -fsSL https://get.docker.com | sh || true
 USER developer
 
 # Create Go directories
-RUN mkdir -p /home/developer/go/{bin,src,pkg}
+RUN mkdir -p /home/go/{bin,src,pkg}
 
 # Install Go tools
 RUN go install golang.org/x/tools/gopls@latest && \
@@ -145,8 +145,8 @@ RUN go install golang.org/x/tools/gopls@latest && \
 # Install Rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
 
-ENV CARGO_HOME="/home/developer/.cargo"
-ENV RUSTUP_HOME="/home/developer/.rustup"
+ENV CARGO_HOME="/home/.cargo"
+ENV RUSTUP_HOME="/home/.rustup"
 ENV PATH="${CARGO_HOME}/bin:${PATH}"
 
 # Install Rust components and tools
@@ -154,19 +154,19 @@ RUN . "$CARGO_HOME/env" && \
     rustup component add clippy rustfmt rust-analyzer && \
     cargo install cargo-watch cargo-edit bacon just
 
-# Copy tools to developer user
-RUN mkdir -p /home/developer/.local/bin && \
-    mkdir -p /home/developer/.deno/bin && \
-    sudo cp /root/.local/bin/uv /home/developer/.local/bin/ 2>/dev/null || true && \
-    sudo cp /root/.deno/bin/deno /home/developer/.deno/bin/ 2>/dev/null || true && \
-    sudo chown -R developer:developer /home/developer/.local /home/developer/.deno
+# Copy tools to /home/.local and /home/.deno (for HOME=/home)
+RUN mkdir -p /home/.local/bin && \
+    mkdir -p /home/.deno/bin && \
+    sudo cp /root/.local/bin/uv /home/.local/bin/ 2>/dev/null || true && \
+    sudo cp /root/.deno/bin/deno /home/.deno/bin/ 2>/dev/null || true && \
+    sudo chown -R developer:developer /home/.local /home/.deno
 
 # =============================================================================
 # Update shell configuration
 # =============================================================================
 RUN echo 'export GOROOT=/usr/local/go' >> /home/developer/.bashrc && \
-    echo 'export GOPATH=/home/developer/go' >> /home/developer/.bashrc && \
-    echo 'export PATH="/home/developer/.local/bin:/home/developer/.deno/bin:${GOROOT}/bin:${GOPATH}/bin:${CARGO_HOME}/bin:${PATH}"' >> /home/developer/.bashrc && \
+    echo 'export GOPATH=/home/go' >> /home/developer/.bashrc && \
+    echo 'export PATH="/home/.local/bin:/home/.deno/bin:${GOROOT}/bin:${GOPATH}/bin:${CARGO_HOME}/bin:${PATH}"' >> /home/developer/.bashrc && \
     echo 'source "$HOME/.cargo/env"' >> /home/developer/.bashrc
 
 # =============================================================================
@@ -175,4 +175,4 @@ RUN echo 'export GOROOT=/usr/local/go' >> /home/developer/.bashrc && \
 ENV CODEOPEN_FLAVOR="polyglot"
 ENV CODEOPEN_LANGUAGES="javascript,typescript,python,go,rust"
 
-WORKDIR /home/developer/workspace
+WORKDIR /home/workspace

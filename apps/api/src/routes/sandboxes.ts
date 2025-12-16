@@ -698,7 +698,7 @@ export const sandboxRoutes = new Hono()
     
     // OpenCode expects paths relative to the workspace root
     // Strip common absolute path prefixes if provided
-    const workspacePrefixes = ["/home/developer/workspace/", "/home/developer/workspace", "/workspace/", "/workspace"];
+    const workspacePrefixes = ["/home/workspace/", "/home/workspace"];
     for (const prefix of workspacePrefixes) {
       if (path.startsWith(prefix)) {
         path = path.slice(prefix.length) || "/";
@@ -727,7 +727,7 @@ export const sandboxRoutes = new Hono()
 
     // OpenCode expects paths relative to the workspace root
     // Strip common absolute path prefixes if provided
-    const workspacePrefixes = ["/home/developer/workspace/", "/home/developer/workspace", "/workspace/", "/workspace"];
+    const workspacePrefixes = ["/home/workspace/", "/home/workspace"];
     for (const prefix of workspacePrefixes) {
       if (path.startsWith(prefix)) {
         path = path.slice(prefix.length) || "/";

@@ -58,6 +58,11 @@ function getFileIcon(filename: string): string {
 const PatchItem: FC<{ patch: InternalPatch }> = ({ patch }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   
+  // Safely get files array
+  const files = patch.files ?? [];
+  const fileCount = files.length;
+  const hash = patch.hash ?? "";
+  
   return (
     <div className="border-b border-border/10 last:border-0">
       <button
@@ -72,20 +77,22 @@ const PatchItem: FC<{ patch: InternalPatch }> = ({ patch }) => {
         {/* File count badge */}
         <span className="flex-shrink-0 px-1.5 py-0.5 rounded bg-[var(--cyber-emerald)]/10 border border-[var(--cyber-emerald)]/30">
           <span className="font-mono text-[10px] text-[var(--cyber-emerald)]">
-            {patch.files.length} {patch.files.length === 1 ? "file" : "files"}
+            {fileCount} {fileCount === 1 ? "file" : "files"}
           </span>
         </span>
         
         {/* Hash (truncated) */}
-        <span className="font-mono text-[10px] text-muted-foreground/50 ml-auto">
-          #{patch.hash.slice(0, 8)}
-        </span>
+        {hash && (
+          <span className="font-mono text-[10px] text-muted-foreground/50 ml-auto">
+            #{hash.slice(0, 8)}
+          </span>
+        )}
       </button>
       
       {/* Expanded file list */}
-      {isExpanded && (
+      {isExpanded && files.length > 0 && (
         <div className="px-3 pb-2 pl-8 space-y-1">
-          {patch.files.map((file, index) => (
+          {files.map((file, index) => (
             <div 
               key={index}
               className="flex items-center gap-2 font-mono text-xs"
@@ -108,9 +115,16 @@ export const PatchViewer: FC<PatchViewerProps> = ({ patches, compact = false }) 
     return null;
   }
   
+  // Filter out patches with no files array
+  const validPatches = patches.filter(p => p.files && Array.isArray(p.files));
+  
+  if (validPatches.length === 0) {
+    return null;
+  }
+  
   // Calculate totals
-  const totalFiles = patches.reduce((acc, p) => acc + p.files.length, 0);
-  const uniqueFiles = new Set(patches.flatMap(p => p.files)).size;
+  const totalFiles = validPatches.reduce((acc, p) => acc + p.files.length, 0);
+  const uniqueFiles = new Set(validPatches.flatMap(p => p.files)).size;
   
   if (compact) {
     // Compact mode - just show count
@@ -147,7 +161,7 @@ export const PatchViewer: FC<PatchViewerProps> = ({ patches, compact = false }) 
       
       {/* Patch list */}
       <div>
-        {patches.map((patch, index) => (
+        {validPatches.map((patch, index) => (
           <PatchItem key={patch.id || index} patch={patch} />
         ))}
       </div>

@@ -37,8 +37,8 @@ USER developer
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
 
 # Set up environment
-ENV CARGO_HOME="/home/developer/.cargo"
-ENV RUSTUP_HOME="/home/developer/.rustup"
+ENV CARGO_HOME="/home/.cargo"
+ENV RUSTUP_HOME="/home/.rustup"
 ENV PATH="${CARGO_HOME}/bin:${PATH}"
 
 # =============================================================================
@@ -70,4 +70,4 @@ RUN echo 'source "$HOME/.cargo/env"' >> /home/developer/.bashrc
 ENV CODEOPEN_FLAVOR="rust"
 ENV CODEOPEN_LANGUAGES="rust"
 
-WORKDIR /home/developer/workspace
+WORKDIR /home/workspace

@@ -280,20 +280,12 @@ function generateEnv(
 function generateVolumes(options: ContainerSpecOptions): VolumeMount[] {
   const volumes: VolumeMount[] = [];
 
-  // Mount the repository
+  // Mount the repository to /home/workspace (matches container WORKSPACE env)
   volumes.push({
     host: options.repoPath,
-    container: "/workspace",
+    container: "/home/workspace",
     mode: "rw",
     type: "bind",
-  });
-
-  // Create a named volume for user home directory (for caches, etc.)
-  volumes.push({
-    host: `agentpod-home-${options.sandboxId}`,
-    container: "/home/coder",
-    mode: "rw",
-    type: "volume",
   });
 
   return volumes;

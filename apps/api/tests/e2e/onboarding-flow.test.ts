@@ -186,7 +186,7 @@ describe("Onboarding E2E Flow", () => {
         const agentCheck = await dockerClient.exec(container.id, [
           "ls",
           "-la",
-          "/home/developer/workspace/.opencode/agent/",
+          "/home/workspace/.opencode/agent/",
         ]);
 
         expect(agentCheck.exitCode).toBe(0);
@@ -221,7 +221,7 @@ describe("Onboarding E2E Flow", () => {
         // Check opencode.json exists and has MCP config
         const configCheck = await dockerClient.exec(container.id, [
           "cat",
-          "/home/developer/workspace/opencode.json",
+          "/home/workspace/opencode.json",
         ]);
 
         expect(configCheck.exitCode).toBe(0);

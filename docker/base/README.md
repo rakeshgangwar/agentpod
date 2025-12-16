@@ -25,7 +25,7 @@ Foundation layer for all CodeOpen container flavors.
 | `OPENCODE_PORT` | 4096 | OpenCode server port |
 | `ACP_GATEWAY_PORT` | 4097 | ACP Gateway port |
 | `OPENCODE_HOST` | 0.0.0.0 | Bind address |
-| `WORKSPACE` | /home/developer/workspace | Project workspace |
+| `WORKSPACE` | /home/workspace | Project workspace |
 | `OPENCODE_AUTH_JSON` | - | LLM provider credentials |
 | `OPENCODE_CONFIG_JSON` | - | OpenCode configuration |
 | `AGENT_MODEL` | - | Model for AgentPod agents (e.g., `copilot/gpt-4o`, `anthropic/claude-sonnet-4-20250514`) |
@@ -93,13 +93,14 @@ curl http://localhost:4097/agents
 ## Directory Structure
 
 ```
-/home/developer/
-├── workspace/              # Project files
+/home/
+├── workspace/              # Project files (git repo mount point)
 ├── .config/
-│   ├── opencode/          # OpenCode configuration
-│   └── opencode-custom/   # Custom configurations
+│   └── opencode/          # OpenCode global configuration
 ├── .local/share/opencode/ # OpenCode data (auth.json)
 └── .cache/opencode/       # OpenCode cache
+
+/home/developer/            # Developer user's actual home
 
 /opt/
 ├── acp-gateway/           # ACP Gateway source

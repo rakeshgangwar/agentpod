@@ -85,15 +85,26 @@ ENV LC_ALL=en_US.UTF-8
 # =============================================================================
 ENV USERNAME=developer
 ENV HOME=/home/$USERNAME
-ENV WORKSPACE=/home/$USERNAME/workspace
+ENV WORKSPACE=/home/workspace
 
-RUN useradd -m -s /bin/bash -d $HOME $USERNAME && \
+# XDG Base Directory spec - OpenCode and other modern tools use these
+# This allows OpenCode config to be at /home/.config/opencode while
+# git and other tools use the developer user's home at /home/developer
+ENV XDG_CONFIG_HOME=/home/.config
+ENV XDG_DATA_HOME=/home/.local/share
+ENV XDG_CACHE_HOME=/home/.cache
+
+RUN useradd -m -s /bin/bash -d /home/$USERNAME $USERNAME && \
     echo "${USERNAME} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers && \
     mkdir -p $WORKSPACE && \
-    mkdir -p $HOME/.cache && \
-    mkdir -p $HOME/.config && \
-    mkdir -p $HOME/.local/share && \
-    chown -R $USERNAME:$USERNAME $HOME
+    mkdir -p /home/.cache && \
+    mkdir -p /home/.config/opencode && \
+    mkdir -p /home/.local/share/opencode && \
+    chown -R $USERNAME:$USERNAME /home/$USERNAME && \
+    chown -R $USERNAME:$USERNAME /home/.cache && \
+    chown -R $USERNAME:$USERNAME /home/.config && \
+    chown -R $USERNAME:$USERNAME /home/.local && \
+    chown -R $USERNAME:$USERNAME $WORKSPACE
 
 # =============================================================================
 # Node.js 22 LTS
@@ -172,19 +183,17 @@ RUN chmod +x /opt/agentpod/scripts/*.sh 2>/dev/null || true
 # Configuration directories
 # =============================================================================
 USER $USERNAME
-WORKDIR $HOME
+WORKDIR $WORKSPACE
 
-# Create OpenCode config directories
-RUN mkdir -p $HOME/.config/opencode && \
-    mkdir -p $HOME/.config/opencode-custom && \
-    mkdir -p $HOME/.local/share/opencode && \
-    mkdir -p $HOME/.cache/opencode && \
-    mkdir -p $WORKSPACE
-
-# Set up shell configuration
-RUN echo 'export PATH="/usr/local/bun/bin:$PATH"' >> $HOME/.bashrc && \
-    echo 'export EDITOR=vim' >> $HOME/.bashrc && \
-    echo '[ -f /opt/fzf/shell/key-bindings.bash ] && source /opt/fzf/shell/key-bindings.bash' >> $HOME/.bashrc
+# OpenCode config directories are created in the user creation step above
+# Set up shell configuration for the developer user
+# XDG vars ensure OpenCode finds config at /home/.config/opencode
+RUN echo 'export PATH="/usr/local/bun/bin:$PATH"' >> /home/$USERNAME/.bashrc && \
+    echo 'export EDITOR=vim' >> /home/$USERNAME/.bashrc && \
+    echo 'export XDG_CONFIG_HOME=/home/.config' >> /home/$USERNAME/.bashrc && \
+    echo 'export XDG_DATA_HOME=/home/.local/share' >> /home/$USERNAME/.bashrc && \
+    echo 'export XDG_CACHE_HOME=/home/.cache' >> /home/$USERNAME/.bashrc && \
+    echo '[ -f /opt/fzf/shell/key-bindings.bash ] && source /opt/fzf/shell/key-bindings.bash' >> /home/$USERNAME/.bashrc
 
 # =============================================================================
 # Environment variables

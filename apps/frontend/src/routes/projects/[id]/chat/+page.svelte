@@ -138,9 +138,9 @@ import {
   let agents = $state<OpenCodeAgent[]>([]);
   let agentAnimationTrigger = $state(0);
 
-  // Filter to primary agents only
+  // Filter to primary agents only, excluding hidden agents
   let primaryAgents = $derived(
-    agents.filter(agent => agent.mode === "primary" || agent.mode === "all")
+    agents.filter(agent => (agent.mode === "primary" || agent.mode === "all") && !agent.hidden)
   );
 
   // Load agents when project changes

@@ -54,4 +54,4 @@ RUN echo 'export PATH="/usr/local/bin:$PATH"' >> /home/developer/.bashrc
 ENV CODEOPEN_FLAVOR="js"
 ENV CODEOPEN_LANGUAGES="javascript,typescript"
 
-WORKDIR /home/developer/workspace
+WORKDIR /home/workspace

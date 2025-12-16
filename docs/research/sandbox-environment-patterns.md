@@ -678,16 +678,16 @@ Detected: package.json, requirements.txt
 ```yaml
 # Persistent across sandbox restarts
 volumes:
-  workspace: /home/developer/workspace  # Git repo
-  npm-cache: /home/developer/.npm       # Package cache
-  pip-cache: /home/developer/.cache/pip
-  cargo: /home/developer/.cargo
+  workspace: /home/workspace  # Git repo
+  npm-cache: /home/.npm       # Package cache
+  pip-cache: /home/.cache/pip
+  cargo: /home/.cargo
   postgres-data: /var/lib/postgresql
 
 # Ephemeral (recreated each time)
 ephemeral:
   tmp: /tmp
-  build: /home/developer/.build
+  build: /home/.build
 ```
 
 ---
@@ -703,8 +703,8 @@ services:
   dev:
     image: codeopen-fullstack:latest
     volumes:
-      - .:/home/developer/workspace
-      - npm-cache:/home/developer/.npm
+      - .:/home/workspace
+      - npm-cache:/home/.npm
     ports:
       - "3000:3000"
       - "8000:8000"
