@@ -157,6 +157,8 @@ function mapPresetToFontPairing(preset: ThemePreset): string | null {
 function updateResolvedMode() {
   if (typeof window === "undefined") return;
 
+  const previousMode = resolvedMode;
+
   if (themeMode === "system") {
     resolvedMode = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   } else {
@@ -165,6 +167,11 @@ function updateResolvedMode() {
 
   // Update document class
   document.documentElement.classList.toggle("dark", resolvedMode === "dark");
+
+  // Re-apply theme colors if mode changed (light/dark have different color values)
+  if (previousMode !== resolvedMode) {
+    applyTheme();
+  }
 }
 
 // =============================================================================
