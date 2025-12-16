@@ -503,7 +503,7 @@
       </div>
 
       <!-- File Content -->
-      <div class="flex-1 overflow-hidden bg-black/20">
+      <div class="flex-1 overflow-hidden bg-background">
         <ScrollArea class="h-full" orientation="both">
           {#if isLoadingContent}
             <div class="p-4 space-y-2">

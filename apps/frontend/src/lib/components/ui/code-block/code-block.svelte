@@ -148,7 +148,7 @@
   
   /* Light mode (default) - use --shiki-light variables */
   .code-block :global(.shiki) {
-    background-color: var(--shiki-light-bg) !important;
+    background-color: transparent !important;
   }
   
   .code-block :global(.shiki span) {
@@ -157,7 +157,7 @@
 
   /* Dark mode - use --shiki-dark variables */
   :global(.dark) .code-block :global(.shiki) {
-    background-color: var(--shiki-dark-bg) !important;
+    background-color: transparent !important;
   }
   
   :global(.dark) .code-block :global(.shiki span) {
