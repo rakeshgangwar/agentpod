@@ -303,8 +303,9 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
   // Stream reference for SSE
   const streamRef = useRef<OpenCodeStream | null>(null);
   
-  // Permission context
-  const { addPermission, removePermission, clearPermissions } = usePermissions();
+  // Permission context - we only use addPermission and removePermission
+  // clearPermissions is intentionally NOT used (see comment below)
+  const { addPermission, removePermission } = usePermissions();
   
   // Refs for permission functions and callbacks to keep handleSSEEvent stable
   const addPermissionRef = useRef(addPermission);
@@ -318,10 +319,10 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
     onSessionUpdatedRef.current = onSessionUpdated;
   }, [addPermission, removePermission, onSessionCreated, onSessionUpdated]);
 
-  // Clear permissions when session changes
-  useEffect(() => {
-    clearPermissions();
-  }, [sessionId, clearPermissions]);
+  // Note: We intentionally do NOT clear permissions when session changes.
+  // Permissions from child sessions (subagents) should still be displayed
+  // when the user is viewing the parent session. The PermissionProvider
+  // is scoped at the project level, not session level.
 
   // Load initial messages when session changes
   useEffect(() => {
@@ -1139,12 +1140,24 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
  * RuntimeProvider wraps children with the assistant-ui runtime
  * configured for OpenCode using External Store Runtime.
  * 
- * This includes the Permission system for human-in-the-loop approvals,
- * with a PermissionBar sticky at the bottom of the chat.
+ * IMPORTANT: For proper permission handling across session switches,
+ * wrap the parent component with PermissionProvider at a level that
+ * doesn't remount when sessions change. Example:
+ * 
+ * ```tsx
+ * <PermissionProvider projectId={projectId}>
+ *   {#key sessionId}
+ *     <RuntimeProvider ... />
+ *   {/key}
+ * </PermissionProvider>
+ * ```
+ * 
+ * If PermissionProvider is not found in the tree, RuntimeProvider
+ * will create one internally (legacy behavior).
  */
 export function RuntimeProvider({ projectId, sessionId, selectedModel, selectedAgent, onSessionModelDetected, onSessionAgentDetected, pendingMessage, onPendingMessageSent, onSessionCreated, onSessionUpdated, children }: RuntimeProviderProps) {
   return (
-    <PermissionProvider projectId={projectId}>
+    <PermissionProviderWrapper projectId={projectId}>
       <RuntimeProviderInner
         projectId={projectId}
         sessionId={sessionId}
@@ -1159,8 +1172,30 @@ export function RuntimeProvider({ projectId, sessionId, selectedModel, selectedA
       >
         {children}
       </RuntimeProviderInner>
-    </PermissionProvider>
+    </PermissionProviderWrapper>
   );
 }
 
+/**
+ * Wrapper that only adds PermissionProvider if not already present in the tree.
+ * This allows the chat page to provide PermissionProvider at a higher level
+ * for proper persistence across session switches.
+ */
+function PermissionProviderWrapper({ projectId, children }: { projectId: string; children: ReactNode }) {
+  // Try to use existing permission context - if it throws, we need to provide one
+  try {
+    usePermissions();
+    // Context exists, just render children
+    return <>{children}</>;
+  } catch {
+    // No context, provide one
+    return (
+      <PermissionProvider projectId={projectId}>
+        {children}
+      </PermissionProvider>
+    );
+  }
+}
+
+export { PermissionProvider };
 export default RuntimeProvider;

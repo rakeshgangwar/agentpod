@@ -2,7 +2,7 @@
   import { page } from "$app/stores";
   import { untrack } from "svelte";
   import { sveltify } from "svelte-preprocess-react";
-  import { RuntimeProvider } from "$lib/chat/RuntimeProvider";
+  import { RuntimeProvider, PermissionProvider } from "$lib/chat/RuntimeProvider";
   import { ChatThread } from "$lib/chat/ChatThread";
   import { Button } from "$lib/components/ui/button";
   import { Skeleton } from "$lib/components/ui/skeleton";
@@ -61,7 +61,7 @@ import {
   }
 
   // Wrap React components for use in Svelte
-  const react = sveltify({ RuntimeProvider, ChatThread });
+  const react = sveltify({ RuntimeProvider, ChatThread, PermissionProvider });
 
   // Get project ID from route params
   let projectId = $derived($page.params.id ?? "");
@@ -846,30 +846,33 @@ import {
           </div>
         {/if}
 
-        {#key selectedSessionId}
-          <react.RuntimeProvider
-            {projectId}
-            sessionId={selectedSessionId}
-            {selectedModel}
-            {selectedAgent}
-            onSessionModelDetected={handleSessionModelDetected}
-            onSessionAgentDetected={handleSessionAgentDetected}
-            pendingMessage={pendingOnboardingMessage}
-            onPendingMessageSent={handlePendingOnboardingMessageSent}
-            onSessionCreated={handleSessionCreated}
-            onSessionUpdated={handleSessionUpdated}
-          >
-            <react.ChatThread
+        <!-- PermissionProvider wraps OUTSIDE the {#key} so permissions persist across session switches -->
+        <react.PermissionProvider {projectId}>
+          {#key selectedSessionId}
+            <react.RuntimeProvider
               {projectId}
-              {findFiles}
-              onFilePickerRequest={handleFilePickerRequest}
-              {pendingFilePath}
-              onPendingFilePathClear={clearPendingFilePath}
-              onSessionSelect={handleSessionSelect}
-              childSessions={currentSessionChildren}
-            />
-          </react.RuntimeProvider>
-        {/key}
+              sessionId={selectedSessionId}
+              {selectedModel}
+              {selectedAgent}
+              onSessionModelDetected={handleSessionModelDetected}
+              onSessionAgentDetected={handleSessionAgentDetected}
+              pendingMessage={pendingOnboardingMessage}
+              onPendingMessageSent={handlePendingOnboardingMessageSent}
+              onSessionCreated={handleSessionCreated}
+              onSessionUpdated={handleSessionUpdated}
+            >
+              <react.ChatThread
+                {projectId}
+                {findFiles}
+                onFilePickerRequest={handleFilePickerRequest}
+                {pendingFilePath}
+                onPendingFilePathClear={clearPendingFilePath}
+                onSessionSelect={handleSessionSelect}
+                childSessions={currentSessionChildren}
+              />
+            </react.RuntimeProvider>
+          {/key}
+        </react.PermissionProvider>
       {:else}
         <!-- No session selected state -->
         <div class="flex-1 flex items-center justify-center">
