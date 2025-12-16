@@ -92,7 +92,9 @@
   });
 
   function handleTabChange(tab: string) {
-    goto(`/projects/${sandboxId}/${tab}`);
+    // Use replaceState to avoid polluting browser history with tab changes
+    // This way the back button navigates to the previous page, not previous tab
+    goto(`/projects/${sandboxId}/${tab}`, { replaceState: true });
   }
 
   function getStatusVariant(status: string): "running" | "starting" | "stopped" | "error" {
@@ -164,12 +166,13 @@
     { id: "settings", label: "Settings" },
   ];
 
-  // Back navigation helper - uses browser history for proper back behavior
+  // Back navigation - uses browser history for proper back behavior
+  // Tab changes use replaceState so they don't pollute history
   function goBack() {
     if (typeof window !== "undefined" && window.history.length > 1) {
       window.history.back();
     } else {
-      goto("/projects");
+      goto("/");
     }
   }
 </script>
