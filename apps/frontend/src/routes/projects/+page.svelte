@@ -3,7 +3,6 @@
   import { onMount, onDestroy } from "svelte";
   import { confirm } from "@tauri-apps/plugin-dialog";
   import { connection } from "$lib/stores/connection.svelte";
-  import { auth, logout } from "$lib/stores/auth.svelte";
   import {
     sandboxes,
     fetchSandboxes,
@@ -17,9 +16,8 @@
   import { getProjectIcon } from "$lib/utils/project-icons";
   import { getAnimatedIcon } from "$lib/utils/animated-icons";
   import LottieIcon from "$lib/components/lottie-icon.svelte";
+  import PageHeader from "$lib/components/page-header.svelte";
   import { Button } from "$lib/components/ui/button";
-  import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
-  import { Avatar, AvatarFallback } from "$lib/components/ui/avatar";
 
   // Icons
   import ListIcon from "@lucide/svelte/icons/list";
@@ -27,8 +25,18 @@
   import Grid3x3Icon from "@lucide/svelte/icons/grid-3x3";
   import Trash2Icon from "@lucide/svelte/icons/trash-2";
   import ArrowRightIcon from "@lucide/svelte/icons/arrow-right";
-  import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
   import PlusIcon from "@lucide/svelte/icons/plus";
+  import FolderIcon from "@lucide/svelte/icons/folder";
+  import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
+
+  // Back navigation helper
+  function goBack() {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      window.history.back();
+    } else {
+      goto("/");
+    }
+  }
 
   // View mode types
   type ViewMode = "cards" | "compact" | "list";
@@ -94,11 +102,6 @@
       goto("/login");
     }
   });
-
-  async function handleLogout() {
-    goto("/login");
-    await logout();
-  }
 
   // Check Docker health and load sandboxes when connected
   $effect(() => {
@@ -215,128 +218,69 @@
 <div class="noise-overlay"></div>
 
 <main class="h-screen flex flex-col grid-bg mesh-gradient overflow-hidden">
-  <!-- Fixed Header Section -->
-  <div class="shrink-0 px-6 pt-8 pb-6 max-w-7xl mx-auto w-full">
-    <header class="animate-fade-in-up">
-      <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
-
-        <!-- Title Area -->
-        <div class="space-y-4">
-          <div class="flex items-center gap-3">
-            <span class="text-xs font-mono text-muted-foreground tracking-widest uppercase">
-              // sandbox_controller
-            </span>
-          </div>
-
-          <h1 class="text-5xl lg:text-6xl font-bold tracking-tight glitch-hover">
-            <span class="text-foreground">Projects</span>
-            <span class="typing-cursor"></span>
-          </h1>
-
-          <div class="flex flex-wrap items-center gap-4 text-sm font-mono">
-            <div class="flex items-center gap-2 text-muted-foreground">
-              <span class="text-[var(--cyber-cyan)]">@</span>
-              <span class="truncate max-w-[200px]">{connection.apiUrl}</span>
-            </div>
-
-            {#if sandboxes.dockerHealthy !== null}
-              <div class="health-indicator {sandboxes.dockerHealthy ? 'healthy' : 'unhealthy'}">
-                <span class="status-dot {sandboxes.dockerHealthy ? 'animate-pulse-dot' : ''}"
-                      style="background: currentColor;"></span>
-                <span>docker: {sandboxes.dockerHealthy ? "online" : "offline"}</span>
-              </div>
-            {/if}
-          </div>
-        </div>
-
-        <!-- Actions Area -->
-        <div class="flex items-center gap-3">
-          <!-- View Mode Toggle -->
-          {#if sandboxes.list.length > 0}
-            <div class="flex items-center border border-border/50 rounded-sm overflow-hidden">
-              <!-- List View -->
-              <button
-                onclick={() => setViewMode("list")}
-                class="p-2 h-10 w-10 flex items-center justify-center transition-colors {viewMode === 'list' ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
-                title="List view"
-              >
-                <ListIcon size={18} />
-              </button>
-              <!-- Card View -->
-              <button
-                onclick={() => setViewMode("cards")}
-                class="p-2 h-10 w-10 flex items-center justify-center border-l border-border/50 transition-colors {viewMode === 'cards' ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
-                title="Card view"
-              >
-                <LayoutGridIcon size={18} />
-              </button>
-              <!-- Compact View -->
-              <button
-                onclick={() => setViewMode("compact")}
-                class="p-2 h-10 w-10 flex items-center justify-center border-l border-border/50 transition-colors {viewMode === 'compact' ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
-                title="Compact view"
-              >
-                <Grid3x3Icon size={18} />
-              </button>
-            </div>
-          {/if}
-
-          <Button
-            onclick={() => goto("/projects/new")}
-            class="cyber-btn-primary px-6 h-10 font-mono text-xs uppercase tracking-wider"
+  <!-- Page Header -->
+  <PageHeader
+    title="All Projects"
+    icon={FolderIcon}
+    subtitle="Manage your AI coding sandboxes"
+  >
+    {#snippet leading()}
+      <Button
+        variant="ghost"
+        size="icon"
+        onclick={goBack}
+        class="h-8 w-8 border border-border/30 hover:border-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]"
+      >
+        <ArrowLeftIcon class="h-4 w-4" />
+      </Button>
+    {/snippet}
+    
+    {#snippet actions()}
+      <!-- View Mode Toggle -->
+      {#if sandboxes.list.length > 0}
+        <div class="flex items-center border border-border/50 rounded-sm overflow-hidden">
+          <!-- List View -->
+          <button
+            onclick={() => setViewMode("list")}
+            class="p-2 h-9 w-9 flex items-center justify-center transition-colors {viewMode === 'list' ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
+            title="List view"
           >
-            <PlusIcon class="h-4 w-4 mr-2" /> New Project
-          </Button>
-
-          <Button
-            variant="ghost"
-            onclick={() => goto("/settings")}
-            class="font-mono text-xs uppercase tracking-wider h-10"
+            <ListIcon size={16} />
+          </button>
+          <!-- Card View -->
+          <button
+            onclick={() => setViewMode("cards")}
+            class="p-2 h-9 w-9 flex items-center justify-center border-l border-border/50 transition-colors {viewMode === 'cards' ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
+            title="Card view"
           >
-            Settings
-          </Button>
-
-          <!-- User Menu -->
-          <DropdownMenu.Root>
-            <DropdownMenu.Trigger>
-              <Button variant="ghost" size="icon" class="rounded-sm h-10 w-10 border border-border/50">
-                <Avatar class="h-7 w-7">
-                  <AvatarFallback class="text-xs font-mono bg-[var(--cyber-cyan)]/10 text-[var(--cyber-cyan)]">
-                    {auth.initials}
-                  </AvatarFallback>
-                </Avatar>
-              </Button>
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Content align="end" class="w-56 font-mono">
-              <DropdownMenu.Label>
-                <div class="flex flex-col space-y-1">
-                  <p class="text-sm font-medium leading-none">{auth.displayName}</p>
-                  {#if auth.user?.email}
-                    <p class="text-xs leading-none text-muted-foreground">{auth.user.email}</p>
-                  {/if}
-                </div>
-              </DropdownMenu.Label>
-              <DropdownMenu.Separator />
-              <DropdownMenu.Item onclick={() => goto("/settings")}>
-                <span class="text-[var(--cyber-cyan)] mr-2">&gt;</span> Settings
-              </DropdownMenu.Item>
-              <DropdownMenu.Separator />
-              <DropdownMenu.Item onclick={handleLogout} class="text-destructive focus:text-destructive">
-                <span class="mr-2">&gt;</span> Disconnect
-              </DropdownMenu.Item>
-            </DropdownMenu.Content>
-          </DropdownMenu.Root>
+            <LayoutGridIcon size={16} />
+          </button>
+          <!-- Compact View -->
+          <button
+            onclick={() => setViewMode("compact")}
+            class="p-2 h-9 w-9 flex items-center justify-center border-l border-border/50 transition-colors {viewMode === 'compact' ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
+            title="Compact view"
+          >
+            <Grid3x3Icon size={16} />
+          </button>
         </div>
-      </div>
-    </header>
-  </div>
+      {/if}
+
+      <Button
+        onclick={() => goto("/projects/new")}
+        class="cyber-btn-primary px-4 h-9 font-mono text-xs uppercase tracking-wider"
+      >
+        <PlusIcon class="h-4 w-4 mr-2" /> New Project
+      </Button>
+    {/snippet}
+  </PageHeader>
 
   <!-- Scrollable Content Area -->
-  <div class="flex-1 overflow-y-auto px-6 pb-8">
-    <div class="max-w-7xl mx-auto">
+  <div class="flex-1 overflow-y-auto px-4 sm:px-6 pb-8">
+    <div class="max-w-7xl mx-auto pt-6">
       <!-- Error Display -->
       {#if sandboxes.error}
-        <div class="mb-8 animate-fade-in-up stagger-1 cyber-card p-4 border-[var(--cyber-red)]/50">
+        <div class="mb-6 animate-fade-in-up cyber-card p-4 border-[var(--cyber-red)]/50">
           <div class="flex items-center gap-3 text-[var(--cyber-red)]">
             <span class="font-mono text-xs uppercase tracking-wider">[error]</span>
             <span class="text-sm">{sandboxes.error}</span>
@@ -346,7 +290,7 @@
 
       <!-- Docker Health Warning -->
       {#if sandboxes.dockerHealthy === false}
-        <div class="mb-8 animate-fade-in-up stagger-1 cyber-card p-4 border-[var(--cyber-amber)]/50">
+        <div class="mb-6 animate-fade-in-up cyber-card p-4 border-[var(--cyber-amber)]/50">
           <div class="flex items-center gap-3 text-[var(--cyber-amber)]">
             <span class="font-mono text-xs uppercase tracking-wider">[warning]</span>
             <span class="text-sm">Docker daemon is not accessible. Please ensure Docker is running.</span>
@@ -356,7 +300,7 @@
 
       <!-- Stats Bar -->
       {#if sandboxes.list.length > 0}
-        <div class="mb-8 flex flex-wrap gap-6 text-sm font-mono animate-fade-in-up stagger-2">
+        <div class="mb-6 flex flex-wrap gap-4 sm:gap-6 text-sm font-mono animate-fade-in-up">
           <div class="flex items-center gap-2">
             <span class="text-muted-foreground">total:</span>
             <span class="text-foreground font-semibold">{sandboxes.list.length}</span>
@@ -396,7 +340,7 @@
       </div>
     {:else if sandboxes.list.length === 0}
       <!-- Empty State -->
-      <div class="cyber-card corner-accent p-12 text-center animate-fade-in-up stagger-1">
+      <div class="cyber-card corner-accent p-12 text-center animate-fade-in-up">
         <div class="max-w-md mx-auto space-y-6">
           <div class="font-mono text-6xl text-[var(--cyber-cyan)]/20">[ ]</div>
           <div class="space-y-2">
@@ -429,7 +373,7 @@
           </div>
 
           <!-- Table Rows -->
-          {#each sandboxes.list as sandbox, i (sandbox.id)}
+          {#each sandboxes.list as sandbox (sandbox.id)}
             {@const iconData = getSandboxIconData(sandbox)}
             {@const isBusy = checkSandboxBusy(sandbox.id)}
             <div

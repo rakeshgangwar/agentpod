@@ -8,7 +8,7 @@
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
   import * as Tabs from "$lib/components/ui/tabs";
-  import { Check } from "@lucide/svelte";
+  import { Check, ArrowLeft } from "@lucide/svelte";
   import ResourceTierSelector from "$lib/components/resource-tier-selector.svelte";
   import FlavorSelector from "$lib/components/flavor-selector.svelte";
   import AddonSelector from "$lib/components/addon-selector.svelte";
@@ -260,7 +260,12 @@
   }
 
   function handleCancel() {
-    goto("/projects");
+    // Use browser history for proper back navigation
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      window.history.back();
+    } else {
+      goto("/");
+    }
   }
 </script>
 
@@ -273,11 +278,11 @@
     <div class="flex items-center gap-4">
       <Button 
         variant="ghost" 
-        size="sm" 
+        size="icon"
         onclick={handleCancel}
-        class="font-mono text-xs uppercase tracking-wider h-8 px-3"
+        class="h-8 w-8 border border-border/30 hover:border-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]"
       >
-        <span class="mr-1">&larr;</span> Back
+        <ArrowLeft class="h-4 w-4" />
       </Button>
       <div>
         <h1 class="text-2xl font-bold glitch-hover">

@@ -163,6 +163,15 @@
     { id: "sync", label: "Git" },
     { id: "settings", label: "Settings" },
   ];
+
+  // Back navigation helper - uses browser history for proper back behavior
+  function goBack() {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      window.history.back();
+    } else {
+      goto("/projects");
+    }
+  }
 </script>
 
 <!-- Noise overlay for atmosphere -->
@@ -190,7 +199,7 @@
         <Button 
           variant="ghost" 
           size="icon"
-          onclick={() => goto("/projects")}
+          onclick={goBack}
           class="h-8 w-8 border border-border/30 hover:border-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]"
         >
           <ArrowLeftIcon class="h-4 w-4" />
