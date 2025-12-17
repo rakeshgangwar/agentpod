@@ -65,7 +65,7 @@ services:
   # Handles routing for *.localhost domains
   # Dashboard available at http://localhost:8080
   traefik:
-    image: traefik:v3.3
+    image: traefik:v3.6
     container_name: agentpod-traefik
     restart: unless-stopped
     command:
