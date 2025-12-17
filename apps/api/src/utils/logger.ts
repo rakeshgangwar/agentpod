@@ -1,9 +1,17 @@
-/**
- * Simple logger utility
- * Can be replaced with a more sophisticated logging library later
- */
-
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+interface LogContext {
+  [key: string]: unknown;
+}
+
+interface LogEntry {
+  timestamp: string;
+  level: LogLevel;
+  service: string;
+  component: string;
+  message: string;
+  context?: LogContext;
+}
 
 const LOG_LEVELS: Record<LogLevel, number> = {
   debug: 0,
@@ -12,48 +20,101 @@ const LOG_LEVELS: Record<LogLevel, number> = {
   error: 3,
 };
 
-const currentLevel = (process.env.LOG_LEVEL as LogLevel) || 'info';
+const LOG_LEVEL = (process.env.LOG_LEVEL || 'info').toLowerCase() as LogLevel;
 
 function shouldLog(level: LogLevel): boolean {
-  return LOG_LEVELS[level] >= LOG_LEVELS[currentLevel];
+  return LOG_LEVELS[level] >= LOG_LEVELS[LOG_LEVEL];
 }
 
-function formatMessage(level: LogLevel, context: string, message: string, data?: unknown): string {
-  const timestamp = new Date().toISOString();
-  const prefix = `[${timestamp}] [${level.toUpperCase()}] [${context}]`;
-  
-  if (data !== undefined) {
-    return `${prefix} ${message} ${JSON.stringify(data)}`;
+function formatLog(entry: LogEntry): string {
+  return JSON.stringify(entry);
+}
+
+class Logger {
+  private component: string;
+  private service = 'agentpod-api';
+
+  constructor(component: string) {
+    this.component = component;
   }
-  return `${prefix} ${message}`;
+
+  private log(level: LogLevel, message: string, context?: LogContext): void {
+    if (!shouldLog(level)) return;
+
+    const entry: LogEntry = {
+      timestamp: new Date().toISOString(),
+      level,
+      service: this.service,
+      component: this.component,
+      message,
+      ...(context && Object.keys(context).length > 0 ? { context } : {}),
+    };
+
+    const output = formatLog(entry);
+
+    switch (level) {
+      case 'error':
+        console.error(output);
+        break;
+      case 'warn':
+        console.warn(output);
+        break;
+      default:
+        console.log(output);
+    }
+  }
+
+  debug(message: string, context?: LogContext): void {
+    this.log('debug', message, context);
+  }
+
+  info(message: string, context?: LogContext): void {
+    this.log('info', message, context);
+  }
+
+  warn(message: string, context?: LogContext): void {
+    this.log('warn', message, context);
+  }
+
+  error(message: string, context?: LogContext): void {
+    this.log('error', message, context);
+  }
+
+  child(additionalContext: LogContext): Logger {
+    const childLogger = new Logger(this.component);
+    const originalLog = childLogger.log.bind(childLogger);
+    
+    childLogger.log = (level: LogLevel, message: string, context?: LogContext) => {
+      originalLog(level, message, { ...additionalContext, ...context });
+    };
+    
+    return childLogger;
+  }
 }
 
-export function createLogger(context: string) {
-  return {
-    debug(message: string, data?: unknown) {
-      if (shouldLog('debug')) {
-        console.debug(formatMessage('debug', context, message, data));
-      }
-    },
-    
-    info(message: string, data?: unknown) {
-      if (shouldLog('info')) {
-        console.info(formatMessage('info', context, message, data));
-      }
-    },
-    
-    warn(message: string, data?: unknown) {
-      if (shouldLog('warn')) {
-        console.warn(formatMessage('warn', context, message, data));
-      }
-    },
-    
-    error(message: string, data?: unknown) {
-      if (shouldLog('error')) {
-        console.error(formatMessage('error', context, message, data));
-      }
-    },
-  };
+export function createLogger(component: string): Logger {
+  return new Logger(component);
 }
 
-export type Logger = ReturnType<typeof createLogger>;
+export function logRequest(
+  logger: Logger,
+  method: string,
+  path: string,
+  status: number,
+  durationMs: number,
+  userId?: string,
+  requestId?: string
+): void {
+  const level: LogLevel = status >= 500 ? 'error' : status >= 400 ? 'warn' : 'info';
+  
+  logger[level](`${method} ${path} ${status}`, {
+    method,
+    path,
+    status,
+    durationMs,
+    userId,
+    requestId,
+  });
+}
+
+export type { Logger };

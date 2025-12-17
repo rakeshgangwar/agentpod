@@ -36,3 +36,7 @@ vite.config.ts.timestamp-*
 # Logs
 *.log
 data/
+
+# Database backups (contain sensitive data)
+backups/
+*.sql.gz

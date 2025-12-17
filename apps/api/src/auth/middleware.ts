@@ -9,11 +9,24 @@
 
 import { createMiddleware } from "hono/factory";
 import type { Context, Next } from "hono";
+import { timingSafeEqual } from "crypto";
 import { auth, type Session, type User } from "./drizzle-auth";
 import { config } from "../config";
 import { createLogger } from "../utils/logger";
 
 const log = createLogger("auth-middleware");
+
+function safeCompare(a: string, b: string): boolean {
+  if (a.length !== b.length) {
+    const dummy = Buffer.from(a);
+    timingSafeEqual(dummy, dummy);
+    return false;
+  }
+  
+  const bufferA = Buffer.from(a, "utf-8");
+  const bufferB = Buffer.from(b, "utf-8");
+  return timingSafeEqual(bufferA, bufferB);
+}
 
 // =============================================================================
 // Types
@@ -129,7 +142,7 @@ export const authMiddleware = createMiddleware(async (c: Context, next: Next) =>
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.slice(7);
 
-    if (token === config.auth.token) {
+    if (safeCompare(token, config.auth.token)) {
       log.debug("Authenticated via API key");
       c.set("user", {
         id: config.defaultUserId,
@@ -194,7 +207,7 @@ export const optionalAuthMiddleware = createMiddleware(async (c: Context, next: 
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.slice(7);
 
-    if (token === config.auth.token) {
+    if (safeCompare(token, config.auth.token)) {
       c.set("user", {
         id: config.defaultUserId,
         authType: "api_key",

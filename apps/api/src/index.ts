@@ -2,9 +2,14 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { config } from './config.ts';
+import { validateConfig } from './utils/validate-config.ts';
 import { initDatabase } from './db/drizzle.ts';
 import { auth } from './auth/drizzle-auth.ts';
 import { authMiddleware } from './auth/middleware.ts';
+import { securityHeadersMiddleware } from './middleware/security-headers.ts';
+import { rateLimitMiddleware } from './middleware/rate-limit.ts';
+import { csrfMiddleware } from './middleware/csrf.ts';
+import { createLogger } from './utils/logger.ts';
 import { healthRoutes } from './routes/health.ts';
 import { userRoutes } from './routes/users.ts';
 import { resourceTiersRouter } from './routes/resource-tiers.ts';
@@ -30,9 +35,12 @@ import { activityLoggerMiddleware } from './middleware/activity-logger.ts';
 import { startSyncForRunningSandboxes, stopAllSync } from './services/sync/opencode-sync.ts';
 import { startArchivalService, stopArchivalService } from './services/sync/activity-archival.ts';
 
-// Initialize database (includes running migrations)
+validateConfig();
+
 console.log('Initializing database...');
 await initDatabase();
+
+const errorLogger = createLogger('error-handler');
 
 // Create the Hono app
 const app = new Hono()
@@ -53,18 +61,18 @@ const app = new Hono()
     credentials: true,
     allowHeaders: ['Content-Type', 'Authorization'],
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    exposeHeaders: ['Content-Length'],
+    exposeHeaders: ['Content-Length', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset'],
     maxAge: 600,
   }))
-  // Health routes are public (no auth required)
+  .use('*', securityHeadersMiddleware)
+  .use('*', rateLimitMiddleware)
   .route('/', healthRoutes)
   // Better Auth routes - handle authentication (public, no auth middleware)
   .on(['GET', 'POST'], '/api/auth/*', (c) => {
     return auth.handler(c.req.raw);
   })
-  // Protected API routes require authentication (Better Auth session or API key)
   .use('/api/*', authMiddleware)
-  // Activity logging middleware (logs POST/PUT/PATCH/DELETE actions)
+  .use('/api/*', csrfMiddleware)
   .use('/api/*', activityLoggerMiddleware)
   // User configuration endpoints
   .route('/api/users', userRoutes) // User OpenCode config
@@ -87,9 +95,47 @@ const app = new Hono()
   // Onboarding system endpoints
   .route('/api/knowledge', knowledgeRoutes) // Knowledge documents
   .route('/api/onboarding', onboardingRoutes) // Onboarding sessions
-  .route('/api/mcp/knowledge', mcpKnowledgeRoutes); // MCP Knowledge server
+  .route('/api/mcp/knowledge', mcpKnowledgeRoutes);
 
-// Export type for Hono Client (type-safe RPC from mobile app)
+app.onError((err, c) => {
+  const requestId = c.req.header('x-request-id') || crypto.randomUUID();
+  const isProduction = config.nodeEnv === 'production';
+
+  errorLogger.error('Unhandled error', {
+    requestId,
+    error: err.message,
+    stack: err.stack,
+    path: c.req.path,
+    method: c.req.method,
+    userId: c.get('user')?.id,
+  });
+
+  let status = 500;
+  if ('status' in err && typeof err.status === 'number') {
+    status = err.status;
+  }
+
+  return c.json(
+    {
+      error: isProduction ? 'Internal Server Error' : err.name,
+      message: isProduction ? 'An unexpected error occurred' : err.message,
+      requestId,
+      ...(isProduction ? {} : { stack: err.stack }),
+    },
+    status as Parameters<typeof c.json>[1]
+  );
+});
+
+app.notFound((c) => {
+  return c.json(
+    {
+      error: 'Not Found',
+      message: `Route ${c.req.method} ${c.req.path} not found`,
+    },
+    404
+  );
+});
+
 export type AppType = typeof app;
 
 // Export app for testing

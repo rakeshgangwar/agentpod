@@ -226,6 +226,120 @@ services:
       postgres:
         condition: service_healthy
 
+  # ===========================================================================
+  # Database Backup Service
+  # ===========================================================================
+  backup:
+    image: postgres:16-alpine
+    container_name: agentpod-backup
+    restart: unless-stopped
+    environment:
+      - PGHOST=postgres
+      - PGPORT=5432
+      - PGUSER=agentpod
+      - PGPASSWORD=${POSTGRES_PASSWORD:-agentpod-dev-password}
+      - PGDATABASE=agentpod
+      - BACKUP_DIR=/backups
+      - KEEP_DAILY=${KEEP_DAILY:-7}
+      - KEEP_WEEKLY=${KEEP_WEEKLY:-4}
+    volumes:
+      - ./scripts/backup-db.sh:/backup.sh:ro
+      - ./backups:/backups
+    networks:
+      - agentpod-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: /bin/sh
+    command: >
+      -c "
+        chmod +x /backup.sh &&
+        echo '0 3 * * * /backup.sh backup >> /var/log/backup.log 2>&1' | crontab - &&
+        echo 'Backup cron job installed. Running initial backup...' &&
+        /backup.sh backup &&
+        echo 'Starting cron daemon...' &&
+        crond -f -l 2
+      "
+    labels:
+      - "traefik.enable=false"
+      -       "agentpod.managed=false"
+
+  # ===========================================================================
+  # Observability Stack: Loki + Fluent Bit + Grafana
+  # ===========================================================================
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: agentpod-loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./config/loki/local-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    networks:
+      - agentpod-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      - "traefik.enable=false"
+      - "agentpod.managed=false"
+
+  fluent-bit:
+    image: fluent/fluent-bit:3.1
+    container_name: agentpod-fluent-bit
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./config/fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+      - ./config/fluent-bit/parsers.conf:/fluent-bit/etc/parsers.conf:ro
+      - fluent-bit-db:/fluent-bit/db
+    networks:
+      - agentpod-net
+    depends_on:
+      loki:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=false"
+      - "agentpod.managed=false"
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: agentpod-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_SERVER_ENABLE_GZIP=true
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+      - GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES=false
+      - GF_ALERTING_ENABLED=true
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - agentpod-net
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      loki:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      - "traefik.enable=false"
+      - "agentpod.managed=false"
+
 # =============================================================================
 # Volumes
 # =============================================================================
@@ -233,6 +347,12 @@ volumes:
   postgres-data:
     driver: local
   agentpod-data:
+    driver: local
+  loki-data:
+    driver: local
+  grafana-data:
+    driver: local
+  fluent-bit-db:
     driver: local
 
 # =============================================================================
