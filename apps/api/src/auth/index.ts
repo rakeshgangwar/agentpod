@@ -65,6 +65,8 @@ export const auth = betterAuth({
   // App name for emails/display
   appName: "AgentPod",
 
+  secret: config.betterAuth.session.secret,
+
   // ==========================================================================
   // Session Configuration
   // ==========================================================================

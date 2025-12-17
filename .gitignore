@@ -40,3 +40,4 @@ data/
 # Database backups (contain sensitive data)
 backups/
 *.sql.gz
+do-not-commit/
