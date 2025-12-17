@@ -21,7 +21,7 @@ tauri-plugin-os = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
-tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
+tokio-tungstenite = { version = "0.28", features = ["rustls-tls-webpki-roots"] }
 http = "1"
 reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"], default-features = false }
 urlencoding = "2"
