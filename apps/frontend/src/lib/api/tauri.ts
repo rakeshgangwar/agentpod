@@ -1484,7 +1484,7 @@ export interface UserOpencodeConfig {
 /**
  * Get user's full OpenCode configuration
  */
-export async function getUserOpencodeConfig(userId?: string): Promise<UserOpencodeConfig> {
+export async function getUserOpencodeConfig(userId: string): Promise<UserOpencodeConfig> {
   return invoke<UserOpencodeConfig>("get_user_opencode_config", { userId });
 }
 
@@ -1492,8 +1492,8 @@ export async function getUserOpencodeConfig(userId?: string): Promise<UserOpenco
  * Update user's OpenCode settings
  */
 export async function updateUserOpencodeSettings(
-  settings: UserOpencodeSettings,
-  userId?: string
+  userId: string,
+  settings: UserOpencodeSettings
 ): Promise<UserOpencodeSettings> {
   return invoke<UserOpencodeSettings>("update_user_opencode_settings", { 
     userId, 
@@ -1504,7 +1504,7 @@ export async function updateUserOpencodeSettings(
 /**
  * Update user's AGENTS.md content
  */
-export async function updateUserAgentsMd(content: string, userId?: string): Promise<void> {
+export async function updateUserAgentsMd(userId: string, content: string): Promise<void> {
   return invoke("update_user_agents_md", { userId, content });
 }
 
@@ -1512,8 +1512,8 @@ export async function updateUserAgentsMd(content: string, userId?: string): Prom
  * List user's OpenCode config files
  */
 export async function listUserOpencodeFiles(
-  fileType?: "agent" | "command" | "tool" | "plugin",
-  userId?: string
+  userId: string,
+  fileType?: "agent" | "command" | "tool" | "plugin"
 ): Promise<UserOpencodeFile[]> {
   return invoke<UserOpencodeFile[]>("list_user_opencode_files", { 
     userId, 
@@ -1525,11 +1525,11 @@ export async function listUserOpencodeFiles(
  * Create or update a user's OpenCode config file
  */
 export async function upsertUserOpencodeFile(
+  userId: string,
   fileType: "agent" | "command" | "tool" | "plugin",
   name: string,
   content: string,
-  extension?: string,
-  userId?: string
+  extension?: string
 ): Promise<UserOpencodeFile> {
   return invoke<UserOpencodeFile>("upsert_user_opencode_file", { 
     userId, 
@@ -1544,9 +1544,9 @@ export async function upsertUserOpencodeFile(
  * Delete a user's OpenCode config file
  */
 export async function deleteUserOpencodeFile(
+  userId: string,
   fileType: "agent" | "command" | "tool" | "plugin",
-  name: string,
-  userId?: string
+  name: string
 ): Promise<void> {
   return invoke("delete_user_opencode_file", { userId, fileType, name });
 }

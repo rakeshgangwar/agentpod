@@ -982,8 +982,32 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
     }
   }, [showCommandPicker, showFilePicker, handleSubmit]);
   
+  // Prevent scroll propagation to parent when interacting with composer
+  const composerRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    const composer = composerRef.current;
+    if (!composer) return;
+    
+    const handleWheel = (e: WheelEvent) => {
+      // Prevent scroll from propagating to parent
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    
+    // Use passive: false to allow preventDefault
+    composer.addEventListener('wheel', handleWheel, { passive: false });
+    
+    return () => {
+      composer.removeEventListener('wheel', handleWheel);
+    };
+  }, []);
+
   return (
-    <div className="border-t border-[var(--cyber-cyan)]/20 p-4 bg-background/80 backdrop-blur-sm relative">
+    <div 
+      ref={composerRef}
+      className="border-t border-[var(--cyber-cyan)]/20 p-4 bg-background/80 backdrop-blur-sm relative"
+    >
       {/* Command Picker */}
       <CommandPicker
         query={commandQuery}
@@ -1036,7 +1060,7 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
             value={inputValue}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="> Type a message... (/ for commands, @ for files)"
+            placeholder="> Type a message..."
             className="flex-1 min-h-[40px] px-3 py-2 font-mono text-sm bg-background/50 border border-border/50 rounded resize-none focus:outline-none focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)] placeholder:text-muted-foreground/50 transition-colors overflow-y-auto"
             rows={1}
             style={{ height: "40px" }}
@@ -1050,14 +1074,9 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
           </button>
         </div>
       </form>
-      <p className="font-mono text-xs text-muted-foreground/70 mt-2">
-        <kbd className="px-1 bg-muted/50 rounded border border-border/30">Enter</kbd> send · 
-        <kbd className="px-1 bg-muted/50 rounded border border-border/30 mx-1">Shift+Enter</kbd> newline · 
-        <kbd className="px-1 bg-muted/50 rounded border border-border/30">📎</kbd> attach · 
-        <kbd className="px-1 bg-muted/50 rounded border border-border/30 mx-1">/</kbd> commands · 
-        <kbd className="px-1 bg-muted/50 rounded border border-border/30">@</kbd> files · 
-        <kbd className="px-1 bg-muted/50 rounded border border-border/30 mx-1">⌘,/.</kbd> agents · 
-        <kbd className="px-1 bg-muted/50 rounded border border-border/30">⌥,/.</kbd> models
+      {/* Hints - simplified, shown only on larger screens */}
+      <p className="hidden md:block font-mono text-xs text-muted-foreground/50 mt-1.5">
+        <span className="text-muted-foreground/70">/</span> commands · <span className="text-muted-foreground/70">@</span> files
       </p>
     </div>
   );

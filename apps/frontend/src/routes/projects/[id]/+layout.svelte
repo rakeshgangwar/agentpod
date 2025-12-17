@@ -7,8 +7,6 @@
     sandboxes, 
     fetchSandboxes, 
     fetchSandbox,
-    startSandbox, 
-    stopSandbox, 
     restartSandbox,
     getSandbox 
   } from "$lib/stores/sandboxes.svelte";
@@ -17,9 +15,15 @@
   import PageHeader, { type PageIcon } from "$lib/components/page-header.svelte";
   import ThemeToggle from "$lib/components/theme-toggle.svelte";
   import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
+  import MessageSquareIcon from "@lucide/svelte/icons/message-square";
+  import FolderIcon from "@lucide/svelte/icons/folder";
+  import ScrollTextIcon from "@lucide/svelte/icons/scroll-text";
+  import TerminalIcon from "@lucide/svelte/icons/terminal";
+  import GitBranchIcon from "@lucide/svelte/icons/git-branch";
+  import SettingsIcon from "@lucide/svelte/icons/settings";
   import { getProjectIcon } from "$lib/utils/project-icons";
   import { getAnimatedIcon } from "$lib/utils/animated-icons";
-  import { projectIcons, isAnimatedIconId, parseIconId } from "$lib/stores/project-icons.svelte";
+  import { projectIcons, parseIconId } from "$lib/stores/project-icons.svelte";
 
   let { children } = $props();
 
@@ -158,12 +162,12 @@
   }
 
   const tabs = [
-    { id: "chat", label: "Chat" },
-    { id: "files", label: "Files" },
-    { id: "logs", label: "Logs" },
-    { id: "terminal", label: "Terminal" },
-    { id: "sync", label: "Git" },
-    { id: "settings", label: "Settings" },
+    { id: "chat", label: "Chat", icon: MessageSquareIcon },
+    { id: "files", label: "Files", icon: FolderIcon },
+    { id: "logs", label: "Logs", icon: ScrollTextIcon },
+    { id: "terminal", label: "Terminal", icon: TerminalIcon },
+    { id: "sync", label: "Git", icon: GitBranchIcon },
+    { id: "settings", label: "Settings", icon: SettingsIcon },
   ];
 
   // Back navigation - uses browser history for proper back behavior
@@ -209,43 +213,7 @@
         </Button>
       {/snippet}
       {#snippet actions()}
-        {#if sandbox.status === "stopped" || sandbox.status === "created"}
-          <Button 
-            size="sm" 
-            onclick={() => startSandbox(sandbox.id)}
-            class="font-mono text-xs uppercase tracking-wider h-8 px-4
-                   bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-black"
-          >
-            Start
-          </Button>
-        {:else if sandbox.status === "running"}
-          <Button 
-            size="sm" 
-            variant="secondary"
-            onclick={() => stopSandbox(sandbox.id)}
-            class="font-mono text-xs uppercase tracking-wider h-8 px-4"
-          >
-            Stop
-          </Button>
-        {:else if sandbox.status === "starting" || sandbox.status === "stopping"}
-          <Button 
-            size="sm" 
-            disabled={true}
-            class="font-mono text-xs uppercase tracking-wider h-8 px-4"
-          >
-            {sandbox.status === "starting" ? "Starting..." : "Stopping..."}
-          </Button>
-        {/if}
-        <Button 
-          size="sm" 
-          variant="outline" 
-          onclick={() => showRestartDialog = true}
-          class="font-mono text-xs uppercase tracking-wider h-8 px-4 border-border/50"
-        >
-          Restart
-        </Button>
-        <!-- Theme Toggle -->
-        <div class="h-6 w-px bg-border/30 hidden sm:block"></div>
+        <!-- Theme Toggle only - Container controls moved to Settings tab -->
         <ThemeToggle />
       {/snippet}
     </PageHeader>
@@ -291,9 +259,9 @@
       </Dialog.Content>
     </Dialog.Root>
 
-    <!-- Content area - fills remaining height with constrained width -->
-    <div class="flex-1 min-h-0 flex flex-col">
-      <div class="container mx-auto px-4 sm:px-6 py-6 max-w-7xl h-full flex flex-col min-h-0">
+    <!-- Content area - fills remaining height, each page handles its own scrolling -->
+    <div class="flex-1 min-h-0 flex flex-col pb-16 md:pb-0">
+      <div class="container mx-auto px-4 sm:px-6 py-4 md:py-6 max-w-7xl flex-1 min-h-0 flex flex-col">
         {@render children()}
       </div>
     </div>

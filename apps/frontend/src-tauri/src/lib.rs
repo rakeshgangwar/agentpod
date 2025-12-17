@@ -182,7 +182,8 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
-            // Handle window events
+            // Handle window events (desktop only - mobile has single window)
+            #[cfg(desktop)]
             if let RunEvent::WindowEvent { 
                 label, 
                 event: WindowEvent::CloseRequested { .. }, 
@@ -196,10 +197,14 @@ pub fn run() {
                         // Close all windows that start with "service-"
                         if window_label.starts_with("service-") {
                             tracing::debug!("Closing service window: {}", window_label);
-                            let _ = window.close();
+                            let _ = window.destroy();
                         }
                     }
                 }
             }
+            
+            // Suppress unused variable warnings on mobile
+            #[cfg(mobile)]
+            let _ = (&app_handle, &event);
         });
 }

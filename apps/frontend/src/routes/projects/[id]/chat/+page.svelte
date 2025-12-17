@@ -6,12 +6,14 @@
   import { ChatThread } from "$lib/chat/ChatThread";
   import { Button } from "$lib/components/ui/button";
   import { Skeleton } from "$lib/components/ui/skeleton";
+  import * as Sheet from "$lib/components/ui/sheet";
   import FilePickerModal from "$lib/components/file-picker-modal.svelte";
   import ModelSelector from "$lib/components/model-selector.svelte";
   import AgentSelector from "$lib/components/agent-selector.svelte";
+  import ModelAgentSheet from "$lib/components/model-agent-sheet.svelte";
   import OnboardingBanner from "$lib/components/onboarding-banner.svelte";
   import SandboxNotRunning from "$lib/components/sandbox-not-running.svelte";
-  import { X, Menu, RefreshCw, CornerDownRight } from "@lucide/svelte";
+  import { X, Menu, RefreshCw, CornerDownRight, MessageSquare } from "@lucide/svelte";
   import { sandboxes } from "$lib/stores/sandboxes.svelte";
 import {
     sandboxOpencodeListSessions,
@@ -618,8 +620,14 @@ import {
     }
   }
 
-  // Sidebar collapse state
-  let sidebarCollapsed = $state(false);
+  // Mobile sidebar sheet state (replaces simple collapse toggle)
+  let mobileSidebarOpen = $state(false);
+
+  // Close mobile sidebar when a session is selected
+  function selectSessionAndCloseMobile(sessionId: string) {
+    selectedSessionId = sessionId;
+    mobileSidebarOpen = false;
+  }
 </script>
 
 <svelte:window on:keydown={handleGlobalKeyDown} />
@@ -627,7 +635,7 @@ import {
 {#if projectId}
   {#if !sandbox}
     <!-- Loading State -->
-    <div class="h-full min-h-[400px] flex items-center justify-center animate-fade-in">
+    <div class="flex-1 min-h-0 flex items-center justify-center animate-fade-in">
       <div class="text-center animate-fade-in-up">
         <div class="relative mx-auto w-16 h-16">
           <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
@@ -644,227 +652,362 @@ import {
   {:else if !isRunning}
     <SandboxNotRunning {sandbox} icon="💬" actionText="use the chat" />
   {:else}
-    <div class="flex h-full min-h-[400px] animate-fade-in">
-    <!-- Session Sidebar -->
-    <aside class="w-64 border-r border-border/30 bg-background/50 backdrop-blur-sm flex flex-col animate-fade-in-up stagger-1
-                  {sidebarCollapsed ? 'hidden sm:flex' : 'flex'}">
-      <!-- Sidebar Header -->
-      <div class="p-3 border-b border-border/30">
-        <div class="flex items-center justify-between gap-2">
-          <h3 class="font-mono text-xs uppercase tracking-wider text-muted-foreground">Sessions</h3>
+    <div class="flex flex-col md:flex-row flex-1 min-h-0 animate-fade-in">
+      <!-- Mobile Header (visible only on mobile, sticky) -->
+      <div class="md:hidden sticky top-0 z-10 border-b border-border/30 bg-background/95 backdrop-blur-sm">
+        <!-- Top row: Menu, Session title, New button -->
+        <div class="flex items-center gap-2 px-2 py-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            class="h-8 w-8 shrink-0"
+            onclick={() => mobileSidebarOpen = true}
+            aria-label="Open sessions menu"
+          >
+            <Menu class="h-4 w-4" />
+          </Button>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium truncate">
+              {selectedSession ? getSessionTitle(selectedSession) : "No session"}
+            </p>
+          </div>
           <Button
             size="sm"
             onclick={createNewSession}
             disabled={isCreating}
-            class="h-7 px-3 font-mono text-xs uppercase tracking-wider
-                   bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black"
+            class="h-7 px-2 font-mono text-[10px] uppercase tracking-wider shrink-0"
           >
             {isCreating ? "..." : "+ New"}
           </Button>
         </div>
+        <!-- Bottom row: Model/Agent selector -->
+        <div class="flex items-center justify-center px-2 pb-2">
+          <ModelAgentSheet
+            bind:selectedModel
+            bind:selectedAgent
+            {providers}
+            agents={primaryAgents}
+            {isChildSession}
+          />
+        </div>
       </div>
 
-      <!-- Session List -->
-      <div class="flex-1 overflow-y-auto scrollbar-thin">
-        {#if isLoading}
-          <div class="p-3 space-y-2">
-            {#each [1, 2, 3] as i}
-              <div class="animate-fade-in-up stagger-{i}">
-                <Skeleton class="h-14 w-full bg-muted/30" />
-              </div>
-            {/each}
-          </div>
-        {:else if error}
-          <div class="p-3">
-            <div class="p-3 rounded border border-[var(--cyber-red)]/50 bg-[var(--cyber-red)]/5">
-              <span class="text-sm text-[var(--cyber-red)]">{error}</span>
-            </div>
-          </div>
-        {:else if sessions.length === 0}
-          <div class="p-6 text-center">
-            <div class="font-mono text-3xl text-[var(--cyber-cyan)]/20 mb-3">[ ]</div>
-            <p class="text-sm font-mono text-muted-foreground">No sessions yet</p>
-            <p class="text-xs font-mono text-muted-foreground/70 mt-1">Click "+ New" to start</p>
-          </div>
-        {:else}
-          <div class="p-2 space-y-1">
-            {#each topLevelSessions as session (session.id)}
-              <!-- Parent/Top-level Session -->
-              <div class="animate-fade-in">
-                <div
-                  class="w-full text-left p-2.5 rounded transition-all group cursor-pointer
-                    {selectedSessionId === session.id
-                      ? 'bg-[var(--cyber-cyan)]/10 border border-[var(--cyber-cyan)]/30'
-                      : 'hover:bg-muted/50 border border-transparent'}"
-                  onclick={() => (selectedSessionId = session.id)}
-                  ondblclick={() => hasChildren(session.id) && toggleSessionExpanded(session.id)}
-                  onkeydown={(e) => e.key === 'Enter' && (selectedSessionId = session.id)}
-                  role="button"
-                  tabindex="0"
-                >
-                  <div class="flex items-start justify-between gap-2">
-                    <!-- Expand/Collapse button for sessions with children -->
-                    {#if hasChildren(session.id)}
-                      <button
-                        class="p-0.5 -ml-1 rounded hover:bg-black/10 dark:hover:bg-white/10 flex-shrink-0 mt-0.5
-                          {selectedSessionId === session.id ? 'text-[var(--cyber-cyan)]' : 'text-muted-foreground'}"
-                        onclick={(e) => {
-                          e.stopPropagation();
-                          toggleSessionExpanded(session.id);
-                        }}
-                        title={expandedSessions.has(session.id) ? "Collapse" : "Expand"}
-                      >
-                        <span class="text-xs inline-block transition-transform {expandedSessions.has(session.id) ? 'rotate-90' : ''}">
-                          ▶
-                        </span>
-                      </button>
-                    {/if}
-                    <div class="min-w-0 flex-1">
-                      <div class="font-medium text-sm truncate flex items-center gap-1
-                                  {selectedSessionId === session.id ? 'text-[var(--cyber-cyan)]' : 'text-foreground'}">
-                        {getSessionTitle(session)}
-                        {#if hasChildren(session.id)}
-                          <span class="text-xs opacity-60 font-mono">({getChildCount(session.id)})</span>
-                        {/if}
-                      </div>
-                      <div class="text-xs font-mono truncate text-muted-foreground mt-0.5">
-                        {formatDate(session.time?.updated || session.time?.created)}
-                      </div>
-                    </div>
-                    <button
-                      class="opacity-0 group-hover:opacity-100 p-1 rounded text-xs
-                             text-muted-foreground hover:text-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/10
-                             transition-all"
-                      onclick={(e) => {
-                        e.stopPropagation();
-                        deleteSession(session.id);
-                      }}
-                      title="Delete session"
-                    >
-                      <X class="h-3 w-3" />
-                    </button>
-                  </div>
-                </div>
+      <!-- Mobile Session Sidebar (Sheet) -->
+      <Sheet.Root bind:open={mobileSidebarOpen}>
+        <Sheet.Content side="left" class="w-[280px] p-0 flex flex-col">
+          <Sheet.Header class="p-3 border-b border-border/30">
+            <Sheet.Title class="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+              Sessions
+            </Sheet.Title>
+          </Sheet.Header>
 
-                <!-- Child Sessions (nested) -->
-                {#if hasChildren(session.id) && expandedSessions.has(session.id)}
-                  <div class="ml-3 pl-2 border-l border-[var(--cyber-cyan)]/20 space-y-1 mt-1">
-                    {#each childSessionsMap[session.id] as childSession (childSession.id)}
-                      <div
-                        class="w-full text-left p-2 rounded transition-all group text-sm cursor-pointer
-                          {selectedSessionId === childSession.id
-                            ? 'bg-[var(--cyber-cyan)]/10 border border-[var(--cyber-cyan)]/30'
-                            : 'hover:bg-muted/50 border border-transparent'}"
-                        onclick={() => (selectedSessionId = childSession.id)}
-                        onkeydown={(e) => e.key === 'Enter' && (selectedSessionId = childSession.id)}
-                        role="button"
-                        tabindex="0"
-                      >
-                        <div class="flex items-start justify-between gap-2">
-                          <div class="min-w-0 flex-1">
-                            <div class="font-medium truncate flex items-center gap-1
-                                        {selectedSessionId === childSession.id ? 'text-[var(--cyber-cyan)]' : 'text-foreground'}">
-                              <CornerDownRight class="h-3 w-3 text-[var(--cyber-cyan)]/50" />
-                              {getSessionTitle(childSession)}
-                            </div>
-                            <div class="text-xs font-mono truncate text-muted-foreground">
-                              {formatDate(childSession.time?.updated || childSession.time?.created)}
-                            </div>
-                          </div>
+          <!-- Session List (Mobile) -->
+          <div class="flex-1 overflow-y-auto">
+            {#if isLoading}
+              <div class="p-3 space-y-2">
+                {#each [1, 2, 3] as i}
+                  <Skeleton class="h-14 w-full bg-muted/30" />
+                {/each}
+              </div>
+            {:else if error}
+              <div class="p-3">
+                <div class="p-3 rounded border border-destructive/50 bg-destructive/5">
+                  <span class="text-sm text-destructive">{error}</span>
+                </div>
+              </div>
+            {:else if sessions.length === 0}
+              <div class="p-6 text-center">
+                <MessageSquare class="h-8 w-8 mx-auto text-muted-foreground/30 mb-3" />
+                <p class="text-sm font-mono text-muted-foreground">No sessions yet</p>
+                <p class="text-xs text-muted-foreground/70 mt-1">Create one to start chatting</p>
+              </div>
+            {:else}
+              <div class="p-2 space-y-1">
+                {#each topLevelSessions as session (session.id)}
+                  <div>
+                    <button
+                      class="w-full text-left p-2.5 rounded transition-all group
+                        {selectedSessionId === session.id
+                          ? 'bg-primary/10 border border-primary/30'
+                          : 'hover:bg-muted/50 border border-transparent'}"
+                      onclick={() => selectSessionAndCloseMobile(session.id)}
+                    >
+                      <div class="flex items-start gap-2">
+                        {#if hasChildren(session.id)}
                           <button
-                            class="opacity-0 group-hover:opacity-100 p-1 rounded text-xs
-                                   text-muted-foreground hover:text-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/10
-                                   transition-all"
+                            class="p-0.5 -ml-1 rounded hover:bg-accent flex-shrink-0 mt-0.5 text-muted-foreground"
                             onclick={(e) => {
                               e.stopPropagation();
-                              deleteSession(childSession.id);
+                              toggleSessionExpanded(session.id);
                             }}
-                            title="Delete session"
                           >
-                            <X class="h-3 w-3" />
+                            <span class="text-xs inline-block transition-transform {expandedSessions.has(session.id) ? 'rotate-90' : ''}">▶</span>
                           </button>
+                        {/if}
+                        <div class="min-w-0 flex-1">
+                          <div class="font-medium text-sm truncate {selectedSessionId === session.id ? 'text-primary' : ''}">
+                            {getSessionTitle(session)}
+                            {#if hasChildren(session.id)}
+                              <span class="text-xs opacity-60 font-mono">({getChildCount(session.id)})</span>
+                            {/if}
+                          </div>
+                          <div class="text-xs font-mono text-muted-foreground mt-0.5">
+                            {formatDate(session.time?.updated || session.time?.created)}
+                          </div>
                         </div>
                       </div>
-                    {/each}
+                    </button>
+
+                    {#if hasChildren(session.id) && expandedSessions.has(session.id)}
+                      <div class="ml-3 pl-2 border-l border-primary/20 space-y-1 mt-1">
+                        {#each childSessionsMap[session.id] as childSession (childSession.id)}
+                          <button
+                            class="w-full text-left p-2 rounded transition-all text-sm
+                              {selectedSessionId === childSession.id
+                                ? 'bg-primary/10 border border-primary/30'
+                                : 'hover:bg-muted/50 border border-transparent'}"
+                            onclick={() => selectSessionAndCloseMobile(childSession.id)}
+                          >
+                            <div class="flex items-center gap-1 font-medium truncate {selectedSessionId === childSession.id ? 'text-primary' : ''}">
+                              <CornerDownRight class="h-3 w-3 text-primary/50" />
+                              {getSessionTitle(childSession)}
+                            </div>
+                            <div class="text-xs font-mono text-muted-foreground">
+                              {formatDate(childSession.time?.updated || childSession.time?.created)}
+                            </div>
+                          </button>
+                        {/each}
+                      </div>
+                    {/if}
                   </div>
-                {/if}
+                {/each}
               </div>
-            {/each}
-          </div>
-        {/if}
-      </div>
-
-      <!-- Sidebar Footer -->
-      <div class="p-2 border-t border-border/30">
-        <Button
-          size="sm"
-          variant="ghost"
-          class="w-full h-8 font-mono text-xs text-muted-foreground hover:text-foreground flex items-center justify-center gap-2"
-          onclick={loadSessions}
-          disabled={isLoading}
-        >
-          {#if isLoading}
-            Loading...
-          {:else}
-            <RefreshCw class="h-3 w-3" />
-            Refresh
-          {/if}
-        </Button>
-      </div>
-    </aside>
-
-    <!-- Mobile sidebar toggle -->
-    <button
-      class="sm:hidden fixed bottom-4 left-4 z-50 w-10 h-10 rounded-lg
-             bg-[var(--cyber-cyan)] text-black flex items-center justify-center
-             shadow-lg shadow-[var(--cyber-cyan)]/20"
-      onclick={() => sidebarCollapsed = !sidebarCollapsed}
-    >
-      {#if sidebarCollapsed}
-        <Menu class="h-5 w-5" />
-      {:else}
-        <X class="h-5 w-5" />
-      {/if}
-    </button>
-
-    <!-- Chat Area -->
-    <div class="flex-1 flex flex-col min-w-0 animate-fade-in-up stagger-2">
-      {#if selectedSessionId}
-        <!-- Model & Agent Selector Header -->
-        <div class="border-b border-border/30 px-4 py-2.5 flex items-center justify-between bg-background/50 backdrop-blur-sm">
-          <div class="flex items-center gap-4 flex-wrap">
-            <div class="flex items-center gap-2">
-              <span class="text-xs font-mono text-muted-foreground uppercase tracking-wider">Model:</span>
-              <ModelSelector
-                {projectId}
-                bind:selectedModel
-                compact={true}
-                {providers}
-                animateTrigger={modelAnimationTrigger}
-              />
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="text-xs font-mono text-muted-foreground uppercase tracking-wider">Agent:</span>
-              <AgentSelector
-                {projectId}
-                bind:selectedAgent
-                compact={true}
-                disabled={isChildSession}
-                agents={primaryAgents}
-                animateTrigger={agentAnimationTrigger}
-              />
-              {#if isChildSession}
-                <span class="text-xs font-mono text-[var(--cyber-amber)] italic">(subagent)</span>
-              {/if}
-            </div>
+            {/if}
           </div>
 
-          <!-- Keyboard hints -->
-          <div class="hidden lg:flex items-center gap-3 text-xs font-mono text-muted-foreground/50">
-            <span>Alt+,/. model</span>
-            <span>Cmd+,/. agent</span>
+          <!-- Sidebar Footer (Mobile) -->
+          <div class="p-2 border-t border-border/30 mt-auto">
+            <Button
+              size="sm"
+              variant="ghost"
+              class="w-full h-8 font-mono text-xs text-muted-foreground hover:text-foreground flex items-center justify-center gap-2"
+              onclick={loadSessions}
+              disabled={isLoading}
+            >
+              <RefreshCw class="h-3 w-3" />
+              Refresh
+            </Button>
+          </div>
+        </Sheet.Content>
+      </Sheet.Root>
+
+      <!-- Desktop Session Sidebar (hidden on mobile) -->
+      <aside class="hidden md:flex w-64 border-r border-border/30 bg-background/50 backdrop-blur-sm flex-col animate-fade-in-up stagger-1">
+        <!-- Sidebar Header -->
+        <div class="p-3 border-b border-border/30">
+          <div class="flex items-center justify-between gap-2">
+            <h3 class="font-mono text-xs uppercase tracking-wider text-muted-foreground">Sessions</h3>
+            <Button
+              size="sm"
+              onclick={createNewSession}
+              disabled={isCreating}
+              class="h-7 px-3 font-mono text-xs uppercase tracking-wider
+                     bg-primary hover:bg-primary/90 text-primary-foreground"
+            >
+              {isCreating ? "..." : "+ New"}
+            </Button>
           </div>
         </div>
+
+        <!-- Session List (Desktop) -->
+        <div class="flex-1 overflow-y-auto scrollbar-thin">
+          {#if isLoading}
+            <div class="p-3 space-y-2">
+              {#each [1, 2, 3] as i}
+                <div class="animate-fade-in-up stagger-{i}">
+                  <Skeleton class="h-14 w-full bg-muted/30" />
+                </div>
+              {/each}
+            </div>
+          {:else if error}
+            <div class="p-3">
+              <div class="p-3 rounded border border-destructive/50 bg-destructive/5">
+                <span class="text-sm text-destructive">{error}</span>
+              </div>
+            </div>
+          {:else if sessions.length === 0}
+            <div class="p-6 text-center">
+              <MessageSquare class="h-8 w-8 mx-auto text-muted-foreground/30 mb-3" />
+              <p class="text-sm font-mono text-muted-foreground">No sessions yet</p>
+              <p class="text-xs font-mono text-muted-foreground/70 mt-1">Click "+ New" to start</p>
+            </div>
+          {:else}
+            <div class="p-2 space-y-1">
+              {#each topLevelSessions as session (session.id)}
+                <!-- Parent/Top-level Session -->
+                <div class="animate-fade-in">
+                  <div
+                    class="w-full text-left p-2.5 rounded transition-all group cursor-pointer
+                      {selectedSessionId === session.id
+                        ? 'bg-primary/10 border border-primary/30'
+                        : 'hover:bg-muted/50 border border-transparent'}"
+                    onclick={() => (selectedSessionId = session.id)}
+                    ondblclick={() => hasChildren(session.id) && toggleSessionExpanded(session.id)}
+                    onkeydown={(e) => e.key === 'Enter' && (selectedSessionId = session.id)}
+                    role="button"
+                    tabindex="0"
+                  >
+                    <div class="flex items-start justify-between gap-2">
+                      {#if hasChildren(session.id)}
+                        <button
+                          class="p-0.5 -ml-1 rounded hover:bg-accent flex-shrink-0 mt-0.5
+                            {selectedSessionId === session.id ? 'text-primary' : 'text-muted-foreground'}"
+                          onclick={(e) => {
+                            e.stopPropagation();
+                            toggleSessionExpanded(session.id);
+                          }}
+                          title={expandedSessions.has(session.id) ? "Collapse" : "Expand"}
+                        >
+                          <span class="text-xs inline-block transition-transform {expandedSessions.has(session.id) ? 'rotate-90' : ''}">▶</span>
+                        </button>
+                      {/if}
+                      <div class="min-w-0 flex-1">
+                        <div class="font-medium text-sm truncate flex items-center gap-1
+                                    {selectedSessionId === session.id ? 'text-primary' : 'text-foreground'}">
+                          {getSessionTitle(session)}
+                          {#if hasChildren(session.id)}
+                            <span class="text-xs opacity-60 font-mono">({getChildCount(session.id)})</span>
+                          {/if}
+                        </div>
+                        <div class="text-xs font-mono truncate text-muted-foreground mt-0.5">
+                          {formatDate(session.time?.updated || session.time?.created)}
+                        </div>
+                      </div>
+                      <button
+                        class="opacity-0 group-hover:opacity-100 p-1 rounded text-xs
+                               text-muted-foreground hover:text-destructive hover:bg-destructive/10
+                               transition-all"
+                        onclick={(e) => {
+                          e.stopPropagation();
+                          deleteSession(session.id);
+                        }}
+                        title="Delete session"
+                      >
+                        <X class="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Child Sessions (nested) -->
+                  {#if hasChildren(session.id) && expandedSessions.has(session.id)}
+                    <div class="ml-3 pl-2 border-l border-primary/20 space-y-1 mt-1">
+                      {#each childSessionsMap[session.id] as childSession (childSession.id)}
+                        <div
+                          class="w-full text-left p-2 rounded transition-all group text-sm cursor-pointer
+                            {selectedSessionId === childSession.id
+                              ? 'bg-primary/10 border border-primary/30'
+                              : 'hover:bg-muted/50 border border-transparent'}"
+                          onclick={() => (selectedSessionId = childSession.id)}
+                          onkeydown={(e) => e.key === 'Enter' && (selectedSessionId = childSession.id)}
+                          role="button"
+                          tabindex="0"
+                        >
+                          <div class="flex items-start justify-between gap-2">
+                            <div class="min-w-0 flex-1">
+                              <div class="font-medium truncate flex items-center gap-1
+                                          {selectedSessionId === childSession.id ? 'text-primary' : 'text-foreground'}">
+                                <CornerDownRight class="h-3 w-3 text-primary/50" />
+                                {getSessionTitle(childSession)}
+                              </div>
+                              <div class="text-xs font-mono truncate text-muted-foreground">
+                                {formatDate(childSession.time?.updated || childSession.time?.created)}
+                              </div>
+                            </div>
+                            <button
+                              class="opacity-0 group-hover:opacity-100 p-1 rounded text-xs
+                                     text-muted-foreground hover:text-destructive hover:bg-destructive/10
+                                     transition-all"
+                              onclick={(e) => {
+                                e.stopPropagation();
+                                deleteSession(childSession.id);
+                              }}
+                              title="Delete session"
+                            >
+                              <X class="h-3 w-3" />
+                            </button>
+                          </div>
+                        </div>
+                      {/each}
+                    </div>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </div>
+
+        <!-- Sidebar Footer (Desktop) -->
+        <div class="p-2 border-t border-border/30">
+          <Button
+            size="sm"
+            variant="ghost"
+            class="w-full h-8 font-mono text-xs text-muted-foreground hover:text-foreground flex items-center justify-center gap-2"
+            onclick={loadSessions}
+            disabled={isLoading}
+          >
+            {#if isLoading}
+              Loading...
+            {:else}
+              <RefreshCw class="h-3 w-3" />
+              Refresh
+            {/if}
+          </Button>
+        </div>
+      </aside>
+
+      <!-- Chat Area -->
+    <div class="flex-1 flex flex-col min-w-0 min-h-0 animate-fade-in-up stagger-2">
+      {#if selectedSessionId}
+        <!-- Model & Agent Selector Header (desktop only - hidden on mobile) -->
+        <div class="hidden md:block sticky top-0 z-10 border-b border-border/30 px-4 py-2.5 bg-background/95 backdrop-blur-sm">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-4 flex-wrap min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-mono text-muted-foreground uppercase tracking-wider">Model:</span>
+                <ModelSelector
+                  {projectId}
+                  bind:selectedModel
+                  compact={true}
+                  {providers}
+                  animateTrigger={modelAnimationTrigger}
+                />
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-mono text-muted-foreground uppercase tracking-wider">Agent:</span>
+                <AgentSelector
+                  {projectId}
+                  bind:selectedAgent
+                  compact={true}
+                  disabled={isChildSession}
+                  agents={primaryAgents}
+                  animateTrigger={agentAnimationTrigger}
+                />
+                {#if isChildSession}
+                  <span class="text-xs font-mono text-amber-500 italic">(subagent)</span>
+                {/if}
+              </div>
+            </div>
+
+            <!-- Keyboard hints (desktop only) -->
+            <div class="hidden lg:flex items-center gap-3 text-xs font-mono text-muted-foreground/50 flex-shrink-0">
+              <span>Alt+,/. model</span>
+              <span>Cmd+,/. agent</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mobile Model & Agent Selector (shown below input via ChatThread) -->
+        <!-- These selectors are passed to ChatThread and rendered in the composer area on mobile -->
 
         <!-- Onboarding Banner -->
         {@const onboardingStatus = onboarding.getStatus(projectId)}
@@ -881,38 +1024,41 @@ import {
           </div>
         {/if}
 
-        <!-- PermissionProvider wraps OUTSIDE the {#key} so permissions persist across session switches -->
-        <react.PermissionProvider {projectId}>
-          {#key selectedSessionId}
-            <react.RuntimeProvider
-              {projectId}
-              sessionId={selectedSessionId}
-              {selectedModel}
-              {selectedAgent}
-              onSessionModelDetected={handleSessionModelDetected}
-              onSessionAgentDetected={handleSessionAgentDetected}
-              pendingMessage={pendingOnboardingMessage}
-              onPendingMessageSent={handlePendingOnboardingMessageSent}
-              onSessionCreated={handleSessionCreated}
-              onSessionUpdated={handleSessionUpdated}
-            >
-              <react.ChatThread
+        <!-- Chat content wrapper -->
+        <div class="flex-1 min-h-0 flex flex-col relative">
+          <!-- PermissionProvider wraps OUTSIDE the {#key} so permissions persist across session switches -->
+          <react.PermissionProvider {projectId}>
+            {#key selectedSessionId}
+              <react.RuntimeProvider
                 {projectId}
-                {findFiles}
-                onFilePickerRequest={handleFilePickerRequest}
-                {pendingFilePath}
-                onPendingFilePathClear={clearPendingFilePath}
-                onSessionSelect={handleSessionSelect}
-                childSessions={currentSessionChildren}
-              />
-            </react.RuntimeProvider>
-          {/key}
-        </react.PermissionProvider>
+                sessionId={selectedSessionId}
+                {selectedModel}
+                {selectedAgent}
+                onSessionModelDetected={handleSessionModelDetected}
+                onSessionAgentDetected={handleSessionAgentDetected}
+                pendingMessage={pendingOnboardingMessage}
+                onPendingMessageSent={handlePendingOnboardingMessageSent}
+                onSessionCreated={handleSessionCreated}
+                onSessionUpdated={handleSessionUpdated}
+              >
+                <react.ChatThread
+                  {projectId}
+                  {findFiles}
+                  onFilePickerRequest={handleFilePickerRequest}
+                  {pendingFilePath}
+                  onPendingFilePathClear={clearPendingFilePath}
+                  onSessionSelect={handleSessionSelect}
+                  childSessions={currentSessionChildren}
+                />
+              </react.RuntimeProvider>
+            {/key}
+          </react.PermissionProvider>
+        </div>
       {:else}
         <!-- No session selected state -->
-        <div class="flex-1 flex items-center justify-center">
-          <div class="text-center animate-fade-in-up cyber-card corner-accent p-12">
-            <div class="font-mono text-4xl text-[var(--cyber-cyan)]/20 mb-4">💬</div>
+        <div class="flex-1 flex items-center justify-center p-4">
+          <div class="text-center animate-fade-in-up cyber-card corner-accent p-8 md:p-12 max-w-sm">
+            <MessageSquare class="h-12 w-12 mx-auto text-primary/20 mb-4" />
             <p class="text-lg font-medium font-heading">
               No session selected
             </p>
@@ -920,8 +1066,7 @@ import {
               Create a new session to start chatting
             </p>
             <Button
-              class="mt-6 font-mono text-xs uppercase tracking-wider
-                     bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black"
+              class="mt-6 font-mono text-xs uppercase tracking-wider"
               onclick={createNewSession}
               disabled={isCreating}
             >

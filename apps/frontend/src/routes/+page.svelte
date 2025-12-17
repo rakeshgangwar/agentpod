@@ -32,6 +32,21 @@
   import SquareIcon from "@lucide/svelte/icons/square";
   import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
 
+  // Track if we're on mobile (for FAB visibility)
+  let isMobile = $state(false);
+
+  $effect(() => {
+    if (typeof window === "undefined") return;
+    
+    function checkMobile() {
+      isMobile = window.innerWidth < 768; // md breakpoint
+    }
+    
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  });
+
   // =============================================================================
   // State
   // =============================================================================
@@ -244,9 +259,10 @@
             <RefreshCwIcon class="h-4 w-4 {sandboxes.isLoading ? 'animate-spin' : ''}" />
           </Button>
 
+          <!-- Hide inline button on mobile - FAB is used instead -->
           <Button
             onclick={() => goto("/projects/new")}
-            class="cyber-btn-primary px-4 sm:px-6 h-10 font-mono text-xs uppercase tracking-wider"
+            class="cyber-btn-primary px-4 sm:px-6 h-10 font-mono text-xs uppercase tracking-wider hidden md:flex"
           >
             <PlusIcon class="h-4 w-4 mr-2" /> New Project
           </Button>
@@ -634,4 +650,17 @@
       </footer>
     </div>
   </div>
+
+  <!-- Mobile FAB (Floating Action Button) for New Project -->
+  {#if isMobile}
+    <button
+      onclick={() => goto("/projects/new")}
+      class="fixed right-4 bottom-20 z-50 flex items-center justify-center w-14 h-14 
+             rounded-full shadow-lg cyber-btn-primary touch-manipulation
+             active:scale-95 transition-transform safe-area-mb"
+      aria-label="New Project"
+    >
+      <PlusIcon class="h-6 w-6" />
+    </button>
+  {/if}
 </main>

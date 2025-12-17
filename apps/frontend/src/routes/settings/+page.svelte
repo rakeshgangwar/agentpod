@@ -8,6 +8,7 @@
     sendNotification 
   } from "@tauri-apps/plugin-notification";
   import { connection, disconnect, testConnection } from "$lib/stores/connection.svelte";
+  import { auth } from "$lib/stores/auth.svelte";
   import { sandboxes, fetchSandboxes } from "$lib/stores/sandboxes.svelte";
   import { 
     settings, 
@@ -88,6 +89,9 @@
 
   // Active tab state
   let activeTab = $state("connection");
+  
+  // OpenCode sub-tab state
+  let opencodeSubTab = $state<"permissions" | "instructions" | "custom">("permissions");
 
   // Settings state
   let isTesting = $state(false);
@@ -134,10 +138,11 @@
   });
 
   async function loadOpencodeConfig() {
+    if (!auth.user) return;
     opencodeConfigLoading = true;
     opencodeConfigError = null;
     try {
-      const config = await getUserOpencodeConfig();
+      const config = await getUserOpencodeConfig(auth.user.id);
       permissionSettings = config.settings.permission || {};
       agentsMd = config.agents_md || "";
       agentsMdOriginal = agentsMd;
@@ -153,9 +158,10 @@
   
   // AGENTS.md handlers
   async function handleSaveAgentsMd() {
+    if (!auth.user) return;
     agentsMdSaving = true;
     try {
-      await updateUserAgentsMd(agentsMd);
+      await updateUserAgentsMd(auth.user.id, agentsMd);
       agentsMdOriginal = agentsMd;
       toast.success("AGENTS.md saved successfully");
     } catch (e) {
@@ -176,11 +182,12 @@
   }
   
   async function handleSaveFile() {
-    if (!selectedFile) return;
+    if (!selectedFile || !auth.user) return;
     fileSaving = true;
     try {
       await upsertUserOpencodeFile(
-        selectedFile.type,
+        auth.user.id,
+        selectedFile.type as "agent" | "command" | "tool" | "plugin",
         selectedFile.name,
         editingFileContent,
         selectedFile.extension
@@ -275,9 +282,11 @@ export default {
       return;
     }
     
+    if (!auth.user) return;
     newFileCreating = true;
     try {
       const file = await upsertUserOpencodeFile(
+        auth.user.id,
         newFileType,
         newFileName,
         newFileContent,
@@ -303,10 +312,10 @@ export default {
   }
   
   async function handleConfirmDelete() {
-    if (!fileToDelete) return;
+    if (!fileToDelete || !auth.user) return;
     fileDeleting = true;
     try {
-      await deleteUserOpencodeFile(fileToDelete.type, fileToDelete.name);
+      await deleteUserOpencodeFile(auth.user.id, fileToDelete.type as "agent" | "command" | "tool" | "plugin", fileToDelete.name);
       configFiles = configFiles.filter(f => 
         !(f.name === fileToDelete!.name && f.type === fileToDelete!.type)
       );
@@ -339,6 +348,7 @@ export default {
   ] as const;
 
   async function handlePermissionChange(tool: keyof PermissionSettings, value: PermissionLevel) {
+    if (!auth.user) return;
     opencodeConfigSaving = true;
     opencodeConfigError = null;
     
@@ -350,7 +360,7 @@ export default {
       const updatedSettings: UserOpencodeSettings = {
         permission: permissionSettings
       };
-      await updateUserOpencodeSettings(updatedSettings);
+      await updateUserOpencodeSettings(auth.user.id, updatedSettings);
       toast.success(`${tool} permission updated to "${value}"`);
     } catch (e) {
       // Revert on error
@@ -382,7 +392,7 @@ export default {
   ];
 
   function getPermissionLabel(level: PermissionLevel | undefined): string {
-    if (!level) return "Ask (default)";
+    if (!level) return "Ask";
     return permissionLevels.find(p => p.value === level)?.label ?? "Ask";
   }
 
@@ -621,294 +631,334 @@ export default {
         </div>
       </div>
     {:else if activeTab === "opencode"}
-      <!-- OpenCode Tab -->
-        <!-- Permissions -->
-        <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-1">
-          <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
-            <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
-              [tool_permissions]
-            </h3>
+      <!-- OpenCode Tab with Sub-tabs -->
+      <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up">
+        <!-- Sub-tabs Navigation -->
+        <div class="border-b border-border/30 bg-background/30 backdrop-blur-sm">
+          <div class="flex">
+            <button
+              onclick={() => opencodeSubTab = "permissions"}
+              class="flex-1 py-3 px-4 font-mono text-xs uppercase tracking-wider transition-all border-b-2
+                     {opencodeSubTab === 'permissions' 
+                       ? 'border-[var(--cyber-cyan)] text-[var(--cyber-cyan)] bg-[var(--cyber-cyan)]/5' 
+                       : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30'}"
+            >
+              Permissions
+            </button>
+            <button
+              onclick={() => opencodeSubTab = "instructions"}
+              class="flex-1 py-3 px-4 font-mono text-xs uppercase tracking-wider transition-all border-b-2
+                     {opencodeSubTab === 'instructions' 
+                       ? 'border-[var(--cyber-cyan)] text-[var(--cyber-cyan)] bg-[var(--cyber-cyan)]/5' 
+                       : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30'}"
+            >
+              Instructions
+              {#if agentsMd !== agentsMdOriginal}
+                <span class="ml-1.5 w-1.5 h-1.5 rounded-full bg-[var(--cyber-amber)] inline-block"></span>
+              {/if}
+            </button>
+            <button
+              onclick={() => opencodeSubTab = "custom"}
+              class="flex-1 py-3 px-4 font-mono text-xs uppercase tracking-wider transition-all border-b-2
+                     {opencodeSubTab === 'custom' 
+                       ? 'border-[var(--cyber-cyan)] text-[var(--cyber-cyan)] bg-[var(--cyber-cyan)]/5' 
+                       : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30'}"
+            >
+              Custom
+              {#if configFiles.length > 0}
+                <span class="ml-1.5 text-xs bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)] px-1.5 py-0.5 rounded-full">
+                  {configFiles.length}
+                </span>
+              {/if}
+            </button>
           </div>
-          <div class="p-4 space-y-4">
-            <p class="text-xs text-muted-foreground font-mono">
-              Control what actions OpenCode can perform without asking for permission.
-              These settings apply to all your sandboxes.
-            </p>
-            {#if opencodeConfigLoading}
-              <div class="flex items-center justify-center py-8">
-                <div class="relative w-6 h-6">
-                  <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
-                  <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
-                </div>
-                <span class="ml-3 text-muted-foreground font-mono text-sm">Loading configuration...</span>
+        </div>
+
+        <!-- Sub-tab Content -->
+        <div class="p-4">
+          {#if opencodeSubTab === "permissions"}
+            <!-- Permissions Content -->
+            <div class="space-y-4">
+              <div>
+                <h3 class="font-mono text-sm font-medium text-[var(--cyber-cyan)] mb-1">[tool_permissions]</h3>
+                <p class="text-xs text-muted-foreground font-mono">
+                  Control what actions OpenCode can perform without asking for permission.
+                  These settings apply to all your sandboxes.
+                </p>
               </div>
-            {:else if opencodeConfigError}
-              <div class="p-4 rounded border bg-[var(--cyber-red)]/10 border-[var(--cyber-red)]/30 text-[var(--cyber-red)]">
-                <p class="font-mono text-sm font-medium">Failed to load configuration</p>
-                <p class="text-xs font-mono mt-1">{opencodeConfigError}</p>
+              {#if opencodeConfigLoading}
+                <div class="flex items-center justify-center py-8">
+                  <div class="relative w-6 h-6">
+                    <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
+                    <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
+                  </div>
+                  <span class="ml-3 text-muted-foreground font-mono text-sm">Loading configuration...</span>
+                </div>
+              {:else if opencodeConfigError}
+                <div class="p-4 rounded border bg-[var(--cyber-red)]/10 border-[var(--cyber-red)]/30 text-[var(--cyber-red)]">
+                  <p class="font-mono text-sm font-medium">Failed to load configuration</p>
+                  <p class="text-xs font-mono mt-1">{opencodeConfigError}</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onclick={loadOpencodeConfig}
+                    class="mt-3 font-mono text-xs uppercase tracking-wider"
+                  >
+                    Retry
+                  </Button>
+                </div>
+              {:else}
+                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {#each permissionTools as tool}
+                    <div class="flex items-center justify-between gap-3 p-3 border border-border/30 rounded bg-background/50 hover:border-[var(--cyber-cyan)]/30 transition-colors">
+                      <div class="space-y-0.5 min-w-0 flex-1">
+                        <Label class="font-mono text-sm">{tool.name}</Label>
+                        <p class="text-xs text-muted-foreground font-mono truncate">{tool.description}</p>
+                      </div>
+                      <Select.Root 
+                        type="single"
+                        value={permissionSettings[tool.key] || "ask"}
+                        onValueChange={(v) => {
+                          if (v) handlePermissionChange(tool.key, v as PermissionLevel);
+                        }}
+                        disabled={opencodeConfigSaving}
+                      >
+                        <Select.Trigger class="w-20 shrink-0 font-mono text-xs bg-background/50 border-border/50 [&>span]:truncate">
+                          {getPermissionLabel(permissionSettings[tool.key])}
+                        </Select.Trigger>
+                        <Select.Content align="end">
+                          {#each permissionLevels as level}
+                            <Select.Item value={level.value} label={level.label} />
+                          {/each}
+                        </Select.Content>
+                      </Select.Root>
+                    </div>
+                  {/each}
+                </div>
+                
+                <div class="p-3 bg-background/50 rounded border border-border/30 font-mono text-xs">
+                  <span class="text-[var(--cyber-emerald)]">Allow:</span> Execute automatically · 
+                  <span class="text-[var(--cyber-amber)]">Ask:</span> Request permission · 
+                  <span class="text-[var(--cyber-red)]">Deny:</span> Never allow
+                </div>
+              {/if}
+            </div>
+
+          {:else if opencodeSubTab === "instructions"}
+            <!-- AGENTS.md Instructions Content -->
+            <div class="space-y-4">
+              <div>
+                <h3 class="font-mono text-sm font-medium text-[var(--cyber-cyan)] mb-1">[global_instructions] AGENTS.md</h3>
+                <p class="text-xs text-muted-foreground font-mono">
+                  Define global instructions and context for OpenCode that apply to all your sandboxes.
+                </p>
+              </div>
+              {#if opencodeConfigLoading}
+                <div class="flex items-center justify-center py-8">
+                  <div class="relative w-6 h-6">
+                    <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
+                    <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
+                  </div>
+                  <span class="ml-3 text-muted-foreground font-mono text-sm">Loading...</span>
+                </div>
+              {:else}
+                <textarea 
+                  bind:value={agentsMd}
+                  placeholder="# My Global Instructions&#10;&#10;Add your personal coding preferences, guidelines, and context here..."
+                  class="w-full h-64 p-3 text-sm font-mono border border-border/50 rounded bg-background/50 resize-y
+                         focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)] focus:outline-none"
+                ></textarea>
+                <p class="text-xs text-muted-foreground font-mono">
+                  Use Markdown formatting. These instructions will be included in all your OpenCode sessions.
+                </p>
+                <div class="flex gap-2 pt-2">
+                  <Button 
+                    onclick={handleSaveAgentsMd}
+                    disabled={agentsMdSaving || agentsMd === agentsMdOriginal}
+                    class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black disabled:opacity-50"
+                  >
+                    {#if agentsMdSaving}
+                      <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>
+                    {/if}
+                    {agentsMdSaving ? "Saving..." : "Save Changes"}
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onclick={handleResetAgentsMd}
+                    disabled={agentsMd === agentsMdOriginal}
+                    class="font-mono text-xs uppercase tracking-wider border-border/50 hover:border-[var(--cyber-amber)] hover:text-[var(--cyber-amber)]"
+                  >
+                    Discard Changes
+                  </Button>
+                </div>
+              {/if}
+            </div>
+
+          {:else if opencodeSubTab === "custom"}
+            <!-- Custom Agents/Commands/Tools/Plugins Content -->
+            <div class="space-y-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="font-mono text-sm font-medium text-[var(--cyber-cyan)] mb-1">[custom_extensions]</h3>
+                  <p class="text-xs text-muted-foreground font-mono">
+                    Create and manage custom agents, commands, tools, and plugins.
+                  </p>
+                </div>
                 <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onclick={loadOpencodeConfig}
-                  class="mt-3 font-mono text-xs uppercase tracking-wider"
+                  onclick={handleOpenNewFileDialog} 
+                  size="sm"
+                  class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black"
                 >
-                  Retry
+                  + New File
                 </Button>
               </div>
-            {:else}
-              <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {#each permissionTools as tool}
-                  <div class="flex items-center justify-between p-3 border border-border/30 rounded bg-background/50 hover:border-[var(--cyber-cyan)]/30 transition-colors">
-                    <div class="space-y-0.5">
-                      <Label class="font-mono text-sm">{tool.name}</Label>
-                      <p class="text-xs text-muted-foreground font-mono">{tool.description}</p>
-                    </div>
-                    <Select.Root 
-                      type="single"
-                      value={permissionSettings[tool.key] || "ask"}
-                      onValueChange={(v) => {
-                        if (v) handlePermissionChange(tool.key, v as PermissionLevel);
-                      }}
-                      disabled={opencodeConfigSaving}
-                    >
-                      <Select.Trigger class="w-24 font-mono text-xs bg-background/50 border-border/50">
-                        {getPermissionLabel(permissionSettings[tool.key])}
-                      </Select.Trigger>
-                      <Select.Content>
-                        {#each permissionLevels as level}
-                          <Select.Item value={level.value} label={level.label} />
-                        {/each}
-                      </Select.Content>
-                    </Select.Root>
-                  </div>
-                {/each}
-              </div>
               
-              <div class="p-3 bg-background/50 rounded border border-border/30 font-mono text-xs">
-                <span class="text-[var(--cyber-emerald)]">Allow:</span> Execute automatically · 
-                <span class="text-[var(--cyber-amber)]">Ask:</span> Request permission · 
-                <span class="text-[var(--cyber-red)]">Deny:</span> Never allow
-              </div>
-            {/if}
-          </div>
-        </div>
-
-        <!-- AGENTS.md Editor -->
-        <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-2">
-          <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
-            <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
-              [global_instructions] AGENTS.md
-            </h3>
-          </div>
-          <div class="p-4 space-y-4">
-            <p class="text-xs text-muted-foreground font-mono">
-              Define global instructions and context for OpenCode that apply to all your sandboxes.
-            </p>
-            {#if opencodeConfigLoading}
-              <div class="flex items-center justify-center py-8">
-                <div class="relative w-6 h-6">
-                  <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
-                  <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
+              {#if opencodeConfigLoading}
+                <div class="flex items-center justify-center py-8">
+                  <div class="relative w-6 h-6">
+                    <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
+                    <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
+                  </div>
+                  <span class="ml-3 text-muted-foreground font-mono text-sm">Loading files...</span>
                 </div>
-                <span class="ml-3 text-muted-foreground font-mono text-sm">Loading...</span>
-              </div>
-            {:else}
-              <textarea 
-                bind:value={agentsMd}
-                placeholder="# My Global Instructions&#10;&#10;Add your personal coding preferences, guidelines, and context here..."
-                class="w-full h-48 p-3 text-sm font-mono border border-border/50 rounded bg-background/50 resize-y
-                       focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)] focus:outline-none"
-              ></textarea>
-              <p class="text-xs text-muted-foreground font-mono">
-                Use Markdown formatting. These instructions will be included in all your OpenCode sessions.
-              </p>
-            {/if}
-          </div>
-          <div class="px-4 pb-4 flex gap-2">
-            <Button 
-              onclick={handleSaveAgentsMd}
-              disabled={agentsMdSaving || agentsMd === agentsMdOriginal}
-              class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black disabled:opacity-50"
-            >
-              {#if agentsMdSaving}
-                <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>
-              {/if}
-              {agentsMdSaving ? "Saving..." : "Save Changes"}
-            </Button>
-            <Button 
-              variant="outline"
-              onclick={handleResetAgentsMd}
-              disabled={agentsMd === agentsMdOriginal}
-              class="font-mono text-xs uppercase tracking-wider border-border/50 hover:border-[var(--cyber-amber)] hover:text-[var(--cyber-amber)]"
-            >
-              Discard Changes
-            </Button>
-          </div>
-        </div>
-
-        <!-- Config Files Management -->
-        <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-3">
-          <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm flex items-center justify-between">
-            <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
-              [custom_agents_commands]
-            </h3>
-            <Button 
-              onclick={handleOpenNewFileDialog} 
-              size="sm"
-              class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black"
-            >
-              + New File
-            </Button>
-          </div>
-          <div class="p-4 space-y-4">
-            <p class="text-xs text-muted-foreground font-mono">
-              Create and manage custom agents, commands, tools, and plugins.
-            </p>
-            {#if opencodeConfigLoading}
-              <div class="flex items-center justify-center py-8">
-                <div class="relative w-6 h-6">
-                  <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
-                  <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
-                </div>
-                <span class="ml-3 text-muted-foreground font-mono text-sm">Loading files...</span>
-              </div>
-            {:else}
-              <Tabs.Root bind:value={selectedFileType}>
-                <Tabs.List class="grid w-full grid-cols-4 bg-background/30 border border-border/30 rounded p-1">
+              {:else}
+                <Tabs.Root bind:value={selectedFileType}>
+                  <Tabs.List class="grid w-full grid-cols-4 bg-background/30 border border-border/30 rounded p-1">
+                    {#each fileTypeTabs as tab}
+                      <Tabs.Trigger 
+                        value={tab.value}
+                        class="font-mono text-xs uppercase tracking-wider py-2
+                               data-[state=active]:bg-[var(--cyber-cyan)]/10 data-[state=active]:text-[var(--cyber-cyan)]
+                               hover:bg-muted/50 transition-all rounded"
+                      >
+                        {tab.label}
+                        {#if getFilteredFiles(tab.value).length > 0}
+                          <span class="ml-1 text-xs bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)] px-1.5 py-0.5 rounded-full">
+                            {getFilteredFiles(tab.value).length}
+                          </span>
+                        {/if}
+                      </Tabs.Trigger>
+                    {/each}
+                  </Tabs.List>
+                  
                   {#each fileTypeTabs as tab}
-                    <Tabs.Trigger 
-                      value={tab.value}
-                      class="font-mono text-xs uppercase tracking-wider py-2
-                             data-[state=active]:bg-[var(--cyber-cyan)]/10 data-[state=active]:text-[var(--cyber-cyan)]
-                             hover:bg-muted/50 transition-all rounded"
-                    >
-                      {tab.label}
-                      {#if getFilteredFiles(tab.value).length > 0}
-                        <span class="ml-1 text-xs bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)] px-1.5 py-0.5 rounded-full">
-                          {getFilteredFiles(tab.value).length}
-                        </span>
-                      {/if}
-                    </Tabs.Trigger>
-                  {/each}
-                </Tabs.List>
-                
-                {#each fileTypeTabs as tab}
-                  <Tabs.Content value={tab.value} class="mt-4">
-                    <p class="text-xs text-muted-foreground font-mono mb-3">{tab.description}</p>
-                    
-                    {#if getFilteredFiles(tab.value).length === 0}
-                      <div class="text-center py-8 border-2 border-dashed border-border/30 rounded bg-background/30">
-                        <p class="text-muted-foreground font-mono text-sm">No {tab.label.toLowerCase()} yet</p>
-                        <Button 
-                          variant="link" 
-                          onclick={() => {
-                            newFileType = tab.value;
-                            handleOpenNewFileDialog();
-                          }}
-                          class="text-[var(--cyber-cyan)] font-mono text-sm"
-                        >
-                          Create your first {tab.value}
-                        </Button>
-                      </div>
-                    {:else}
-                      <div class="space-y-2">
-                        {#each getFilteredFiles(tab.value) as file}
-                          <div 
-                            class="flex items-center justify-between p-3 border border-border/30 rounded bg-background/50 
-                                   hover:border-[var(--cyber-cyan)]/30 cursor-pointer transition-colors
-                                   {selectedFile?.name === file.name && selectedFile?.type === file.type ? 'border-[var(--cyber-cyan)] bg-[var(--cyber-cyan)]/5' : ''}"
-                            onclick={() => handleSelectFile(file)}
-                            onkeydown={(e) => e.key === 'Enter' && handleSelectFile(file)}
-                            tabindex="0"
-                            role="button"
+                    <Tabs.Content value={tab.value} class="mt-4">
+                      <p class="text-xs text-muted-foreground font-mono mb-3">{tab.description}</p>
+                      
+                      {#if getFilteredFiles(tab.value).length === 0}
+                        <div class="text-center py-8 border-2 border-dashed border-border/30 rounded bg-background/30">
+                          <p class="text-muted-foreground font-mono text-sm">No {tab.label.toLowerCase()} yet</p>
+                          <Button 
+                            variant="link" 
+                            onclick={() => {
+                              newFileType = tab.value;
+                              handleOpenNewFileDialog();
+                            }}
+                            class="text-[var(--cyber-cyan)] font-mono text-sm"
                           >
-                            <div class="flex items-center gap-3">
-                              <span class="text-lg font-mono">
-                                {#if file.type === "agent"}
-                                  <span class="text-[var(--cyber-cyan)]">λ</span>
-                                {:else if file.type === "command"}
-                                  <span class="text-[var(--cyber-magenta)]">/</span>
-                                {:else if file.type === "tool"}
-                                  <Settings class="h-4 w-4 text-[var(--cyber-amber)]" />
-                                {:else}
-                                  <PlusCircle class="h-4 w-4 text-[var(--cyber-emerald)]" />
-                                {/if}
-                              </span>
-                              <div>
-                                <p class="font-mono text-sm">{file.name}</p>
-                                <p class="text-xs text-muted-foreground font-mono">{file.name}.{file.extension}</p>
+                            Create your first {tab.value}
+                          </Button>
+                        </div>
+                      {:else}
+                        <div class="space-y-2">
+                          {#each getFilteredFiles(tab.value) as file}
+                            <div 
+                              class="flex items-center justify-between p-3 border border-border/30 rounded bg-background/50 
+                                     hover:border-[var(--cyber-cyan)]/30 cursor-pointer transition-colors
+                                     {selectedFile?.name === file.name && selectedFile?.type === file.type ? 'border-[var(--cyber-cyan)] bg-[var(--cyber-cyan)]/5' : ''}"
+                              onclick={() => handleSelectFile(file)}
+                              onkeydown={(e) => e.key === 'Enter' && handleSelectFile(file)}
+                              tabindex="0"
+                              role="button"
+                            >
+                              <div class="flex items-center gap-3">
+                                <span class="text-lg font-mono">
+                                  {#if file.type === "agent"}
+                                    <span class="text-[var(--cyber-cyan)]">λ</span>
+                                  {:else if file.type === "command"}
+                                    <span class="text-[var(--cyber-magenta)]">/</span>
+                                  {:else if file.type === "tool"}
+                                    <Settings class="h-4 w-4 text-[var(--cyber-amber)]" />
+                                  {:else}
+                                    <PlusCircle class="h-4 w-4 text-[var(--cyber-emerald)]" />
+                                  {/if}
+                                </span>
+                                <div>
+                                  <p class="font-mono text-sm">{file.name}</p>
+                                  <p class="text-xs text-muted-foreground font-mono">{file.name}.{file.extension}</p>
+                                </div>
                               </div>
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onclick={(e: MouseEvent) => {
+                                  e.stopPropagation();
+                                  handleDeleteFile(file);
+                                }}
+                                class="font-mono text-xs text-[var(--cyber-red)] hover:text-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/10"
+                              >
+                                Delete
+                              </Button>
                             </div>
+                          {/each}
+                        </div>
+                      {/if}
+                      
+                      <!-- File Editor -->
+                      {#if selectedFile && selectedFile.type === tab.value}
+                        <div class="mt-4 p-4 border border-[var(--cyber-cyan)]/30 rounded bg-[var(--cyber-cyan)]/5">
+                          <div class="flex items-center justify-between mb-3">
+                            <h4 class="font-mono text-sm text-[var(--cyber-cyan)]">
+                              Editing: {selectedFile.name}.{selectedFile.extension}
+                            </h4>
                             <Button 
                               variant="ghost" 
-                              size="sm"
-                              onclick={(e: MouseEvent) => {
-                                e.stopPropagation();
-                                handleDeleteFile(file);
-                              }}
-                              class="font-mono text-xs text-[var(--cyber-red)] hover:text-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/10"
+                              size="sm" 
+                              onclick={handleCloseFile}
+                              class="font-mono text-xs"
                             >
-                              Delete
+                              Close
                             </Button>
                           </div>
-                        {/each}
-                      </div>
-                    {/if}
-                    
-                    <!-- File Editor -->
-                    {#if selectedFile && selectedFile.type === tab.value}
-                      <div class="mt-4 p-4 border border-[var(--cyber-cyan)]/30 rounded bg-[var(--cyber-cyan)]/5">
-                        <div class="flex items-center justify-between mb-3">
-                          <h4 class="font-mono text-sm text-[var(--cyber-cyan)]">
-                            Editing: {selectedFile.name}.{selectedFile.extension}
-                          </h4>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onclick={handleCloseFile}
-                            class="font-mono text-xs"
-                          >
-                            Close
-                          </Button>
+                          <textarea 
+                            bind:value={editingFileContent}
+                            class="w-full h-48 p-3 text-sm font-mono border border-border/50 rounded bg-background/50 resize-y
+                                   focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)] focus:outline-none"
+                          ></textarea>
+                          <div class="flex gap-2 mt-3">
+                            <Button 
+                              onclick={handleSaveFile}
+                              disabled={fileSaving || editingFileContent === selectedFile.content}
+                              class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black disabled:opacity-50"
+                            >
+                              {#if fileSaving}
+                                <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>
+                              {/if}
+                              {fileSaving ? "Saving..." : "Save"}
+                            </Button>
+                            <Button 
+                              variant="outline"
+                              onclick={() => editingFileContent = selectedFile?.content || ""}
+                              disabled={editingFileContent === selectedFile.content}
+                              class="font-mono text-xs uppercase tracking-wider border-border/50"
+                            >
+                              Reset
+                            </Button>
+                          </div>
                         </div>
-                        <textarea 
-                          bind:value={editingFileContent}
-                          class="w-full h-48 p-3 text-sm font-mono border border-border/50 rounded bg-background/50 resize-y
-                                 focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)] focus:outline-none"
-                        ></textarea>
-                        <div class="flex gap-2 mt-3">
-                          <Button 
-                            onclick={handleSaveFile}
-                            disabled={fileSaving || editingFileContent === selectedFile.content}
-                            class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black disabled:opacity-50"
-                          >
-                            {#if fileSaving}
-                              <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>
-                            {/if}
-                            {fileSaving ? "Saving..." : "Save"}
-                          </Button>
-                          <Button 
-                            variant="outline"
-                            onclick={() => editingFileContent = selectedFile?.content || ""}
-                            disabled={editingFileContent === selectedFile.content}
-                            class="font-mono text-xs uppercase tracking-wider border-border/50"
-                          >
-                            Reset
-                          </Button>
-                        </div>
-                      </div>
-                    {/if}
-                  </Tabs.Content>
-                {/each}
-              </Tabs.Root>
-            {/if}
-          </div>
-          <div class="px-4 pb-4">
-            <p class="text-xs text-muted-foreground font-mono">
-              Changes require container restart to take effect.
-            </p>
-          </div>
+                      {/if}
+                    </Tabs.Content>
+                  {/each}
+                </Tabs.Root>
+                
+                <p class="text-xs text-muted-foreground font-mono pt-4 border-t border-border/30 mt-4">
+                  Changes require container restart to take effect.
+                </p>
+              {/if}
+            </div>
+          {/if}
         </div>
+      </div>
     {:else if activeTab === "about"}
       <!-- About Tab -->
       <div class="grid gap-6 md:grid-cols-2">

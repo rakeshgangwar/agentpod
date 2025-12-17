@@ -51,6 +51,10 @@
   // Expanded provider for model view
   let expandedProviderId = $state<string | null>(null);
   
+  // Show more/less state for All Providers tab
+  let showAllProviders = $state(false);
+  const INITIAL_PROVIDERS_COUNT = 8;
+  
   // Derived: filtered providers based on search
   const filteredConfigured = $derived(
     configuredProviders.filter(p => 
@@ -64,6 +68,17 @@
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.id.toLowerCase().includes(searchQuery.toLowerCase())
     )
+  );
+  
+  // Derived: visible providers in All tab (limited unless expanded)
+  const visibleAllProviders = $derived(
+    showAllProviders || searchQuery 
+      ? filteredAll 
+      : filteredAll.slice(0, INITIAL_PROVIDERS_COUNT)
+  );
+  
+  const hasMoreProviders = $derived(
+    filteredAll.length > INITIAL_PROVIDERS_COUNT && !searchQuery
   );
   
   // Derived: default provider
@@ -425,7 +440,7 @@
           </div>
         {:else}
           <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {#each filteredAll as provider (provider.id)}
+            {#each visibleAllProviders as provider (provider.id)}
               <div class="cyber-card corner-accent overflow-hidden hover:border-[var(--cyber-cyan)]/50 transition-colors {provider.isConfigured ? 'border-[var(--cyber-emerald)]/30 bg-[var(--cyber-emerald)]/5' : ''}">
                 <div class="p-4">
                   <div class="flex items-start gap-3">
@@ -484,6 +499,29 @@
               </div>
             {/each}
           </div>
+          
+          <!-- Show More / Show Less Button -->
+          {#if hasMoreProviders}
+            <div class="mt-6 text-center">
+              <Button 
+                variant="outline"
+                onclick={() => showAllProviders = !showAllProviders}
+                class="font-mono text-xs uppercase tracking-wider border-border/50 hover:border-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]"
+              >
+                {#if showAllProviders}
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                  </svg>
+                  Show Less
+                {:else}
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                  Show {filteredAll.length - INITIAL_PROVIDERS_COUNT} More
+                {/if}
+              </Button>
+            </div>
+          {/if}
         {/if}
       </Tabs.Content>
     </Tabs.Root>

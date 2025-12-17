@@ -1,14 +1,21 @@
 <script lang="ts">
   import { page } from "$app/stores";
-  import { sandboxes, fetchSandbox, getSandboxStats } from "$lib/stores/sandboxes.svelte";
+  import { toast } from "svelte-sonner";
+  import { sandboxes, fetchSandbox, getSandboxStats, startSandbox, stopSandbox, restartSandbox } from "$lib/stores/sandboxes.svelte";
   import type { SandboxStats, SandboxInfo } from "$lib/api/tauri";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
+  import * as Dialog from "$lib/components/ui/dialog";
   import { onMount } from "svelte";
   import { openServiceWindow, type ServiceType } from "$lib/utils/service-window";
   import ProjectIconPicker from "$lib/components/project-icon-picker.svelte";
   import { projectIcons } from "$lib/stores/project-icons.svelte";
+  
+  // Icons
+  import PlayIcon from "@lucide/svelte/icons/play";
+  import SquareIcon from "@lucide/svelte/icons/square";
+  import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
 
   // Get current sandbox ID from route params
   let sandboxId = $derived($page.params.id ?? "");
@@ -17,6 +24,47 @@
   let sandboxInfo = $state<SandboxInfo | null>(null);
   let stats = $state<SandboxStats | null>(null);
   let isLoadingStats = $state(false);
+  
+  // Container control state
+  let isRestarting = $state(false);
+  let restartError = $state<string | null>(null);
+  let showRestartDialog = $state(false);
+
+  async function handleStart() {
+    if (!sandboxId) return;
+    await startSandbox(sandboxId);
+  }
+
+  async function handleStop() {
+    if (!sandboxId) return;
+    await stopSandbox(sandboxId);
+  }
+
+  async function handleRestart() {
+    if (!sandboxId) return;
+    
+    isRestarting = true;
+    restartError = null;
+    
+    try {
+      await restartSandbox(sandboxId);
+      showRestartDialog = false;
+      
+      toast.success("Container restarted", {
+        description: "The sandbox container has been restarted.",
+      });
+      
+      // Refresh sandbox info
+      await fetchSandbox(sandboxId);
+    } catch (e) {
+      restartError = e instanceof Error ? e.message : "Restart failed";
+      toast.error("Restart failed", {
+        description: restartError,
+      });
+    } finally {
+      isRestarting = false;
+    }
+  }
 
   // Get current sandbox from list (quick access)
   let sandbox = $derived(sandboxInfo?.sandbox ?? sandboxes.list.find(s => s.id === sandboxId));
@@ -100,10 +148,84 @@
   }
 </script>
 
-<div class="space-y-6 animate-fade-in">
-  <h2 class="text-xl font-bold">
-    Settings
-  </h2>
+<div class="flex-1 min-h-0 overflow-y-auto">
+  <div class="space-y-6 animate-fade-in">
+    <h2 class="text-xl font-bold">
+      Settings
+    </h2>
+
+  <!-- Container Control Section (Primary on mobile) -->
+  <div class="cyber-card corner-accent overflow-hidden">
+    <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+      <div class="flex items-center justify-between">
+        <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+          [container_control]
+        </h3>
+        <span class="px-2 py-0.5 rounded text-xs font-mono" 
+              style="color: {getStatusColor(sandbox?.status)}; 
+                     background: color-mix(in oklch, {getStatusColor(sandbox?.status)} 10%, transparent); 
+                     border: 1px solid color-mix(in oklch, {getStatusColor(sandbox?.status)} 30%, transparent);">
+          {sandbox?.status ?? "Unknown"}
+        </span>
+      </div>
+    </div>
+    
+    <div class="p-4">
+      <p class="text-xs text-muted-foreground font-mono mb-4">
+        Control the sandbox container lifecycle
+      </p>
+      
+      <div class="flex flex-wrap gap-3">
+        {#if sandbox?.status === "stopped" || sandbox?.status === "created"}
+          <Button 
+            onclick={handleStart}
+            disabled={sandboxes.isLoading}
+            class="flex-1 sm:flex-none h-10 px-6 font-mono text-xs uppercase tracking-wider
+                   bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-black"
+          >
+            <PlayIcon class="h-4 w-4 mr-2" />
+            Start Container
+          </Button>
+        {:else if sandbox?.status === "running"}
+          <Button 
+            variant="secondary"
+            onclick={handleStop}
+            disabled={sandboxes.isLoading}
+            class="flex-1 sm:flex-none h-10 px-6 font-mono text-xs uppercase tracking-wider"
+          >
+            <SquareIcon class="h-4 w-4 mr-2" />
+            Stop Container
+          </Button>
+        {:else if sandbox?.status === "starting" || sandbox?.status === "stopping"}
+          <Button 
+            disabled={true}
+            class="flex-1 sm:flex-none h-10 px-6 font-mono text-xs uppercase tracking-wider"
+          >
+            <RefreshCwIcon class="h-4 w-4 mr-2 animate-spin" />
+            {sandbox?.status === "starting" ? "Starting..." : "Stopping..."}
+          </Button>
+        {/if}
+        
+        <Button 
+          variant="outline" 
+          onclick={() => showRestartDialog = true}
+          disabled={sandbox?.status !== "running" || sandboxes.isLoading}
+          class="flex-1 sm:flex-none h-10 px-6 font-mono text-xs uppercase tracking-wider border-border/50
+                 hover:border-[var(--cyber-amber)]/50 hover:text-[var(--cyber-amber)]
+                 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <RefreshCwIcon class="h-4 w-4 mr-2" />
+          Restart
+        </Button>
+      </div>
+      
+      {#if sandbox?.status !== "running"}
+        <p class="text-xs text-muted-foreground/70 font-mono mt-3">
+          Start the container to access chat, terminal, and other features.
+        </p>
+      {/if}
+    </div>
+  </div>
 
   <!-- Project Info Section -->
   <div class="cyber-card corner-accent overflow-hidden">
@@ -470,4 +592,46 @@
       </div>
     </div>
   {/if}
+  </div>
 </div>
+
+<!-- Restart Confirmation Dialog -->
+<Dialog.Root bind:open={showRestartDialog}>
+  <Dialog.Content class="cyber-card border-border/50">
+    <Dialog.Header>
+      <Dialog.Title class="font-bold font-heading">
+        Restart Container
+      </Dialog.Title>
+      <Dialog.Description class="font-mono text-sm text-muted-foreground">
+        This will restart the sandbox container. Any unsaved work in the container will be lost.
+      </Dialog.Description>
+    </Dialog.Header>
+    
+    {#if restartError}
+      <div class="p-3 rounded border border-[var(--cyber-red)]/50 bg-[var(--cyber-red)]/5">
+        <div class="flex items-center gap-2 text-[var(--cyber-red)]">
+          <span class="font-mono text-xs uppercase tracking-wider">[error]</span>
+          <span class="text-sm">{restartError}</span>
+        </div>
+      </div>
+    {/if}
+    
+    <Dialog.Footer class="gap-2">
+      <Button 
+        variant="outline" 
+        onclick={() => showRestartDialog = false} 
+        disabled={isRestarting}
+        class="font-mono text-xs uppercase tracking-wider"
+      >
+        Cancel
+      </Button>
+      <Button 
+        onclick={handleRestart} 
+        disabled={isRestarting}
+        class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-amber)] hover:bg-[var(--cyber-amber)]/90 text-black"
+      >
+        {isRestarting ? "Restarting..." : "Restart"}
+      </Button>
+    </Dialog.Footer>
+  </Dialog.Content>
+</Dialog.Root>

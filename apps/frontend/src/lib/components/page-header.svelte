@@ -4,6 +4,7 @@
   import ChevronUpIcon from "@lucide/svelte/icons/chevron-up";
   import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
   import LottieIcon from "$lib/components/lottie-icon.svelte";
+  import * as Tooltip from "$lib/components/ui/tooltip";
 
   // =============================================================================
   // Types
@@ -48,7 +49,7 @@
     sticky?: boolean;
     /** Whether header can collapse (manual toggle) */
     collapsible?: boolean;
-    /** Actions slot - for buttons on the right side of the header */
+    /** Actions slot - for buttons on the right side of the header (desktop) */
     actions?: Snippet;
     /** Leading slot - for back button or other leading content */
     leading?: Snippet;
@@ -136,7 +137,7 @@
   class="z-40 border-b border-border/30 bg-background/80 backdrop-blur-md {sticky ? 'sticky top-0' : ''}"
 >
   <div class="container mx-auto px-4 sm:px-6 max-w-7xl">
-    <!-- Collapsible Title Section -->
+    <!-- Collapsible Title Section (hidden on mobile when collapsed) -->
     <div 
       class="overflow-hidden transition-all duration-300 ease-out"
       style="max-height: {collapsible && isCollapsed ? '0px' : '200px'}; opacity: {collapsible && isCollapsed ? '0' : '1'}"
@@ -152,7 +153,7 @@
           
           <!-- Title and status -->
           <div class="min-w-0 flex-1 flex items-center gap-3">
-            <!-- Icon in expanded mode (centered with title + subtitle) -->
+            <!-- Icon in expanded mode -->
             {#if icon}
               <div class="flex items-center justify-center shrink-0 text-[var(--cyber-cyan)]">
                 {#if isAnimatedIcon(icon)}
@@ -186,7 +187,7 @@
           </div>
         </div>
         
-        <!-- Actions (only in expanded state) -->
+        <!-- Actions (only in expanded state on non-collapsible headers) -->
         {#if actions && !collapsible}
           <div class="flex items-center gap-2 shrink-0">
             {@render actions()}
@@ -195,88 +196,85 @@
       </div>
     </div>
     
-    <!-- Tab Navigation (always visible) -->
+    <!-- Tab Navigation Bar (always visible) -->
     {#if tabs.length > 0}
-      <div class="flex items-center gap-2">
-        <!-- Collapsed: Show icon (or compact title if no icon) -->
+      <div class="flex items-center gap-1 sm:gap-2 py-1 sm:py-0">
+        <!-- LEFT: Back button + Icon (only when collapsed) -->
         {#if collapsible && isCollapsed}
-          <div class="flex items-center gap-2 py-2 min-w-0">
+          <div class="flex items-center gap-1.5 shrink-0">
             {#if leading}
               {@render leading()}
             {/if}
-            <!-- Icon or fallback to title -->
-            {#if icon}
-              <div 
-                class="flex items-center justify-center text-[var(--cyber-cyan)]"
-                title={title}
-              >
-                {#if isAnimatedIcon(icon)}
-                  <LottieIcon src={icon.path} size={20} loop autoplay />
-                {:else if isEmojiIcon(icon)}
-                  <span class="text-xl">{icon}</span>
-                {:else if isComponentIcon(icon)}
-                  {@const IconComponent = icon}
-                  <IconComponent class="h-5 w-5" />
-                {/if}
-              </div>
-            {:else}
-              <span class="font-mono text-sm font-medium truncate text-[var(--cyber-cyan)] max-w-[120px]">{title}</span>
-            {/if}
-            {#if status}
-              <div class="status-indicator {getStatusClass(status.variant)} shrink-0 text-xs">
-                <span class="status-dot {status.animate ? 'animate-pulse-dot' : ''}"></span>
-              </div>
-            {/if}
           </div>
-          <div class="h-4 w-px bg-border/30"></div>
         {/if}
 
-        <!-- Tabs -->
-        <nav class="flex gap-1 overflow-x-auto pb-px -mb-px scrollbar-none flex-1">
+        <!-- CENTER: Tabs - take remaining space, centered on mobile -->
+        <nav class="flex-1 flex justify-center sm:justify-start gap-0.5 sm:gap-1 overflow-x-auto pb-px -mb-px scrollbar-hide">
           {#each tabs as tab}
-            <button
-              onclick={() => handleTabClick(tab.id)}
-              class="px-4 py-2.5 font-mono text-xs uppercase tracking-wider whitespace-nowrap
-                     border-b-2 transition-colors flex items-center gap-2
-                     {activeTab === tab.id 
-                       ? 'border-[var(--cyber-cyan)] text-[var(--cyber-cyan)]' 
-                       : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border/50'}"
-            >
-              {#if tab.icon}
-                {#if typeof tab.icon === "string"}
-                  <span class="text-sm">{tab.icon}</span>
-                {:else}
-                  {@const IconComponent = tab.icon}
-                  <IconComponent class="h-4 w-4" />
-                {/if}
-              {/if}
-              {tab.label}
-            </button>
+            <Tooltip.Root>
+              <Tooltip.Trigger>
+                <button
+                  type="button"
+                  class="px-2.5 sm:px-4 py-2 sm:py-2.5 font-mono text-xs uppercase tracking-wider whitespace-nowrap
+                         border-b-2 transition-colors flex items-center justify-center gap-2 touch-manipulation
+                         {activeTab === tab.id 
+                           ? 'border-primary text-primary' 
+                           : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border/50'}"
+                  onclick={() => handleTabClick(tab.id)}
+                >
+                  {#if tab.icon}
+                    {#if typeof tab.icon === "string"}
+                      <span class="text-sm">{tab.icon}</span>
+                    {:else}
+                      {@const IconComponent = tab.icon}
+                      <IconComponent class="h-4 w-4" />
+                    {/if}
+                  {/if}
+                  <!-- Label hidden on mobile, shown on sm+ -->
+                  <span class="hidden sm:inline">{tab.label}</span>
+                </button>
+              </Tooltip.Trigger>
+              <!-- Tooltip only shown on mobile where label is hidden -->
+              <Tooltip.Content class="sm:hidden">
+                <p>{tab.label}</p>
+              </Tooltip.Content>
+            </Tooltip.Root>
           {/each}
         </nav>
 
-        <!-- Actions (in collapsed state, show them inline) -->
-        {#if collapsible && actions}
-          <div class="flex items-center gap-2 shrink-0">
-            {@render actions()}
-          </div>
-        {/if}
+        <!-- RIGHT: Status badge + Actions + Collapse toggle -->
+        <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <!-- Status badge (only when collapsed) -->
+          {#if collapsible && isCollapsed && status}
+            <div class="status-indicator {getStatusClass(status.variant)} shrink-0 text-xs py-0.5 px-1.5">
+              <span class="status-dot {status.animate ? 'animate-pulse-dot' : ''}"></span>
+              <span class="hidden sm:inline">{status.label}</span>
+            </div>
+          {/if}
 
-        <!-- Collapse toggle button -->
-        {#if collapsible}
-          <button
-            onclick={toggleCollapse}
-            class="p-1.5 rounded border border-border/30 hover:border-[var(--cyber-cyan)]/50 
-                   hover:bg-[var(--cyber-cyan)]/5 transition-colors shrink-0"
-            title={isCollapsed ? "Expand header" : "Collapse header"}
-          >
-            {#if isCollapsed}
-              <ChevronDownIcon class="h-4 w-4 text-muted-foreground" />
-            {:else}
-              <ChevronUpIcon class="h-4 w-4 text-muted-foreground" />
-            {/if}
-          </button>
-        {/if}
+          <!-- Actions - hidden on mobile, shown on sm+ -->
+          {#if collapsible && actions}
+            <div class="hidden sm:flex items-center gap-2">
+              {@render actions()}
+            </div>
+          {/if}
+
+          <!-- Collapse toggle button - hidden on mobile -->
+          {#if collapsible}
+            <button
+              onclick={toggleCollapse}
+              class="hidden sm:block p-1.5 rounded border border-border/30 hover:border-[var(--cyber-cyan)]/50 
+                     hover:bg-[var(--cyber-cyan)]/5 transition-colors"
+              title={isCollapsed ? "Expand header" : "Collapse header"}
+            >
+              {#if isCollapsed}
+                <ChevronDownIcon class="h-4 w-4 text-muted-foreground" />
+              {:else}
+                <ChevronUpIcon class="h-4 w-4 text-muted-foreground" />
+              {/if}
+            </button>
+          {/if}
+        </div>
       </div>
     {:else if collapsible}
       <!-- No tabs, but collapsible - show toggle in a minimal bar -->

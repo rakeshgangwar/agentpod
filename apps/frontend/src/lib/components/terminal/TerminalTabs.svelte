@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount, onDestroy } from "svelte";
   import { Plus, X, AlertCircle, Loader2, RefreshCw } from "@lucide/svelte";
   import Terminal from "./Terminal.svelte";
   import * as terminalStore from "$lib/stores/terminals.svelte";
@@ -17,6 +18,43 @@
   }
 
   let { sandboxId, class: className = "" }: Props = $props();
+
+  // =============================================================================
+  // Keyboard-aware viewport handling
+  // =============================================================================
+  
+  let viewportHeight = $state(0);
+  let isKeyboardVisible = $state(false);
+
+  onMount(() => {
+    if (typeof window === "undefined") return;
+
+    // Use visualViewport API for accurate keyboard detection
+    const updateViewport = () => {
+      if (window.visualViewport) {
+        const newHeight = window.visualViewport.height;
+        const windowHeight = window.innerHeight;
+        
+        // If visual viewport is significantly smaller than window, keyboard is likely showing
+        isKeyboardVisible = windowHeight - newHeight > 150;
+        viewportHeight = newHeight;
+      }
+    };
+
+    // Listen to visual viewport changes (handles keyboard show/hide)
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", updateViewport);
+      window.visualViewport.addEventListener("scroll", updateViewport);
+      updateViewport();
+    }
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener("resize", updateViewport);
+        window.visualViewport.removeEventListener("scroll", updateViewport);
+      }
+    };
+  });
 
   // =============================================================================
   // Derived State
@@ -62,7 +100,7 @@
   }
 </script>
 
-<div class="terminal-tabs {className}">
+<div class="terminal-tabs {className}" class:keyboard-visible={isKeyboardVisible}>
   <!-- Tab Bar -->
   <div class="tab-bar">
     <div class="tabs">
@@ -172,9 +210,24 @@
     display: flex;
     flex-direction: column;
     height: calc(100vh - 300px);
-    min-height: 400px;
+    min-height: 300px;
     background-color: hsl(var(--background));
     font-family: var(--font-mono), ui-monospace, monospace;
+  }
+
+  /* On mobile with keyboard visible, adjust height dynamically */
+  @media (max-width: 768px) {
+    .terminal-tabs {
+      /* Use 100% of available space minus header/tabs area */
+      height: calc(100vh - 220px);
+      min-height: 200px;
+    }
+    
+    .terminal-tabs.keyboard-visible {
+      /* When keyboard is visible, shrink to fit */
+      height: auto;
+      max-height: calc(100vh - 220px);
+    }
   }
 
   /* Dark mode - use deep dark background */

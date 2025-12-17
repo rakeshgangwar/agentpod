@@ -1569,3 +1569,83 @@ article,
     animation: agent-switch 0.3s ease-out;
   }
 }
+
+/* ============================================
+   RESPONSIVE UTILITIES
+   Utilities for mobile-first responsive design
+   ============================================ */
+
+/* Safe area insets for iOS devices (notch, home indicator) */
+.safe-area-pt {
+  padding-top: env(safe-area-inset-top);
+}
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.safe-area-pl {
+  padding-left: env(safe-area-inset-left);
+}
+.safe-area-pr {
+  padding-right: env(safe-area-inset-right);
+}
+.safe-area-p {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Touch target minimum - ensures 44x44px minimum tap area */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Hide scrollbar but keep scroll functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Responsive container with consistent padding */
+.responsive-container {
+  @apply px-4 sm:px-6 lg:px-8;
+}
+
+/* Mobile-only visibility */
+.mobile-only {
+  @apply md:hidden;
+}
+
+/* Desktop-only visibility */
+.desktop-only {
+  @apply hidden md:block;
+}
+
+/* Prevent text selection on interactive elements (mobile UX) */
+.no-select {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Improve touch responsiveness */
+.touch-manipulation {
+  touch-action: manipulation;
+}
+
+/* Stack layout for mobile file browser and similar patterns */
+.mobile-stack {
+  @apply flex flex-col h-full;
+}
+
+.mobile-stack-header {
+  @apply flex-shrink-0 border-b border-border;
+}
+
+.mobile-stack-content {
+  @apply flex-1 overflow-auto;
+}

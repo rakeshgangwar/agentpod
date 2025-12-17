@@ -10,13 +10,23 @@
   import { sandboxes, startSandbox } from "$lib/stores/sandboxes.svelte";
   import SandboxNotRunning from "$lib/components/sandbox-not-running.svelte";
   import FileIcon from "$lib/components/file-icon.svelte";
-  import { RefreshCw, Download, ChevronRight, ChevronDown, File, Folder, Loader2 } from "@lucide/svelte";
+  import { RefreshCw, Download, ChevronRight, ChevronDown, File, Folder, Loader2, ArrowLeft } from "@lucide/svelte";
   import {
     sandboxOpencodeListFiles,
     sandboxOpencodeGetFileContent,
     type FileNode,
     type FileContent,
   } from "$lib/api/tauri";
+
+  // Mobile view state: 'tree' or 'content'
+  // On mobile, we show either the file tree or the file content, not both
+  let mobileView = $state<"tree" | "content">("tree");
+
+  // Go back to file tree on mobile
+  function goBackToTree() {
+    mobileView = "tree";
+    // Don't clear selectedFile so user can see what was selected
+  }
 
   // Copy path to clipboard
   function copyPath() {
@@ -221,6 +231,9 @@
     fileContent = null;
     rawBase64Content = null;
 
+    // Switch to content view on mobile when a file is selected
+    mobileView = "content";
+
     try {
       // projectId is actually sandboxId in v2 API
       const response = await sandboxOpencodeGetFileContent(projectId, node.path);
@@ -318,21 +331,22 @@
 {:else if !isRunning}
   <SandboxNotRunning {sandbox} icon="📁" actionText="browse files" />
 {:else}
-  <div class="flex h-full min-h-[400px] gap-4 overflow-hidden animate-fade-in">
-  <!-- File Tree Panel -->
-  <div class="w-72 flex-shrink-0 flex flex-col cyber-card corner-accent overflow-hidden">
+  <div class="flex flex-col md:flex-row h-full min-h-[400px] md:gap-4 overflow-hidden animate-fade-in">
+  <!-- File Tree Panel - Full width on mobile (hidden when viewing content), fixed width on desktop -->
+  <div class="flex-1 md:flex-none md:w-72 flex flex-col cyber-card md:corner-accent overflow-hidden
+              {mobileView === 'content' ? 'hidden md:flex' : 'flex'}">
     <!-- Header -->
-    <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+    <div class="py-2 md:py-3 px-3 md:px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
       <div class="flex items-center justify-between w-full">
-        <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
-          [files]
+        <h3 class="font-mono text-xs uppercase tracking-wider text-primary">
+          Files
         </h3>
         <Button
           size="sm"
           variant="ghost"
           onclick={loadFileTree}
           disabled={isLoadingTree}
-          class="h-7 w-7 p-0 font-mono text-xs text-muted-foreground hover:text-[var(--cyber-cyan)]"
+          class="h-7 w-7 p-0 font-mono text-xs text-muted-foreground hover:text-primary"
         >
           <RefreshCw class="h-3.5 w-3.5 {isLoadingTree ? 'animate-spin' : ''}" />
         </Button>
@@ -352,24 +366,24 @@
           </div>
         {:else if treeError}
           <div class="p-4">
-            <div class="p-3 rounded border border-[var(--cyber-red)]/50 bg-[var(--cyber-red)]/5">
-              <span class="font-mono text-xs text-[var(--cyber-red)]">[error]</span>
-              <p class="text-sm text-[var(--cyber-red)] mt-1">{treeError}</p>
+            <div class="p-3 rounded border border-destructive/50 bg-destructive/5">
+              <span class="font-mono text-xs text-destructive">[error]</span>
+              <p class="text-sm text-destructive mt-1">{treeError}</p>
             </div>
           </div>
         {:else if fileTree.length === 0}
           <div class="p-6 text-center">
-            <div class="font-mono text-3xl text-[var(--cyber-cyan)]/20 mb-3">[ ]</div>
+            <Folder class="h-8 w-8 mx-auto text-primary/20 mb-3" />
             <p class="text-sm font-mono text-muted-foreground">No files found</p>
           </div>
         {:else}
           <div class="p-2">
             {#snippet renderNode(node: FileNode, depth: number = 0)}
               <div
-                class="flex items-center gap-2 py-1.5 px-2 rounded cursor-pointer text-sm font-mono
-                       transition-all group
+                class="flex items-center gap-2 py-2 md:py-1.5 px-2 rounded cursor-pointer text-sm font-mono
+                       transition-all group touch-manipulation
                   {selectedFile?.path === node.path
-                    ? 'bg-[var(--cyber-cyan)]/10 text-[var(--cyber-cyan)] border border-[var(--cyber-cyan)]/30'
+                    ? 'bg-primary/10 text-primary border border-primary/30'
                     : 'hover:bg-muted/30 border border-transparent hover:border-border/30'}
                   {node.ignored ? 'opacity-40' : ''}"
                 style="padding-left: {depth * 16 + 8}px"
@@ -379,7 +393,7 @@
                 tabindex="0"
               >
                 {#if node.type === "directory"}
-                  <span class="flex-shrink-0 w-4 flex items-center justify-center text-[var(--cyber-amber)] {selectedFile?.path === node.path ? 'text-[var(--cyber-cyan)]' : ''}">
+                  <span class="flex-shrink-0 w-4 flex items-center justify-center text-muted-foreground {selectedFile?.path === node.path ? 'text-primary' : ''}">
                     {#if loadingFolders.has(node.path)}
                       <Loader2 class="h-3.5 w-3.5 animate-spin" />
                     {:else if expandedPaths.has(node.path)}
@@ -396,7 +410,7 @@
                 <span class="truncate text-xs">{node.name}</span>
               </div>
               {#if node.type === "directory" && expandedPaths.has(node.path)}
-                <div class="border-l border-[var(--cyber-cyan)]/10 ml-4">
+                <div class="border-l border-primary/10 ml-4">
                   {#each sortNodes(getChildren(node.path)) as child (child.path)}
                     {@render renderNode(child, depth + 1)}
                   {/each}
@@ -413,28 +427,41 @@
     </div>
   </div>
 
-  <!-- File Content Panel -->
-  <div class="flex-1 min-w-0 flex flex-col cyber-card corner-accent overflow-hidden">
+  <!-- File Content Panel - Full width on mobile (hidden when viewing tree), flexible on desktop -->
+  <div class="flex-1 min-w-0 flex flex-col cyber-card md:corner-accent overflow-hidden
+              {mobileView === 'tree' ? 'hidden md:flex' : 'flex'}">
     {#if selectedFile}
       <!-- File Header -->
-      <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
-        <div class="flex items-center justify-between gap-4">
-          <div class="min-w-0 flex-1">
-            <h3 class="font-mono text-sm truncate text-foreground flex items-center gap-2">
-              <FileIcon filename={selectedFile.name} size="sm" />
-              {selectedFile.name}
-            </h3>
-            <p class="text-xs font-mono truncate text-muted-foreground mt-0.5">
-              {selectedFile.path}
-            </p>
+      <div class="py-2 md:py-3 px-3 md:px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+        <div class="flex items-center justify-between gap-2 md:gap-4">
+          <!-- Mobile back button + file info -->
+          <div class="flex items-center gap-2 min-w-0 flex-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              class="md:hidden h-8 w-8 flex-shrink-0"
+              onclick={goBackToTree}
+              aria-label="Back to file tree"
+            >
+              <ArrowLeft class="h-4 w-4" />
+            </Button>
+            <div class="min-w-0 flex-1">
+              <h3 class="font-mono text-sm truncate text-foreground flex items-center gap-2">
+                <FileIcon filename={selectedFile.name} size="sm" class="hidden sm:block" />
+                {selectedFile.name}
+              </h3>
+              <p class="text-xs font-mono truncate text-muted-foreground mt-0.5 hidden sm:block">
+                {selectedFile.path}
+              </p>
+            </div>
           </div>
-          <div class="flex gap-2 flex-wrap justify-end">
+          <div class="flex gap-1.5 md:gap-2 flex-wrap justify-end">
             {#if isMarkdownFile(selectedFile.name)}
               <div class="flex border border-border/50 rounded overflow-hidden">
                 <button
                   class="px-2 py-1 text-xs font-mono uppercase tracking-wider transition-colors
                          {markdownViewMode === 'raw'
-                           ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]'
+                           ? 'bg-primary/20 text-primary'
                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'}"
                   onclick={() => markdownViewMode = "raw"}
                 >
@@ -443,7 +470,7 @@
                 <button
                   class="px-2 py-1 text-xs font-mono uppercase tracking-wider transition-colors
                          {markdownViewMode === 'preview'
-                           ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]'
+                           ? 'bg-primary/20 text-primary'
                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'}"
                   onclick={() => markdownViewMode = "preview"}
                 >
@@ -451,13 +478,14 @@
                 </button>
               </div>
             {/if}
+            <!-- Path button - hidden on mobile -->
             <Button
               size="sm"
               variant="outline"
               onclick={copyPath}
               title="Copy file path to clipboard"
-              class="h-7 px-2 font-mono text-xs border-border/50 hover:border-[var(--cyber-cyan)]/50
-                     hover:text-[var(--cyber-cyan)]"
+              class="hidden sm:flex h-7 px-2 font-mono text-xs border-border/50 hover:border-primary/50
+                     hover:text-primary"
             >
               Path
             </Button>
@@ -466,8 +494,8 @@
               variant="outline"
               onclick={useInChat}
               title="Reference this file in chat"
-              class="h-7 px-2 font-mono text-xs border-border/50 hover:border-[var(--cyber-emerald)]/50
-                     hover:text-[var(--cyber-emerald)]"
+              class="h-7 px-2 font-mono text-xs border-border/50 hover:border-primary/50
+                     hover:text-primary"
             >
               Chat
             </Button>
@@ -482,8 +510,8 @@
               }}
               disabled={!fileContent?.content}
               title="Copy file content to clipboard"
-              class="h-7 px-2 font-mono text-xs border-border/50 hover:border-[var(--cyber-amber)]/50
-                     hover:text-[var(--cyber-amber)] disabled:opacity-30"
+              class="h-7 px-2 font-mono text-xs border-border/50 hover:border-primary/50
+                     hover:text-primary disabled:opacity-30"
             >
               Copy
             </Button>
@@ -493,8 +521,8 @@
               onclick={downloadFile}
               disabled={!fileContent?.content}
               title="Download file"
-              class="h-7 w-7 p-0 font-mono text-xs border-border/50 hover:border-[var(--cyber-magenta)]/50
-                     hover:text-[var(--cyber-magenta)] disabled:opacity-30"
+              class="h-7 w-7 p-0 font-mono text-xs border-border/50 hover:border-primary/50
+                     hover:text-primary disabled:opacity-30"
             >
               <Download class="h-3.5 w-3.5" />
             </Button>
@@ -515,9 +543,9 @@
             </div>
           {:else if contentError}
             <div class="p-4">
-              <div class="p-4 rounded border border-[var(--cyber-red)]/50 bg-[var(--cyber-red)]/5">
-                <span class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-red)]">[error]</span>
-                <p class="text-sm text-[var(--cyber-red)] mt-2">{contentError}</p>
+              <div class="p-4 rounded border border-destructive/50 bg-destructive/5">
+                <span class="font-mono text-xs uppercase tracking-wider text-destructive">[error]</span>
+                <p class="text-sm text-destructive mt-2">{contentError}</p>
               </div>
             </div>
           {:else if fileContent}
@@ -537,10 +565,10 @@
         </ScrollArea>
       </div>
     {:else}
-      <!-- No File Selected State -->
-      <div class="flex-1 flex items-center justify-center">
+      <!-- No File Selected State (shown on desktop, mobile shows file tree instead) -->
+      <div class="hidden md:flex flex-1 items-center justify-center">
         <div class="text-center animate-fade-in-up p-8">
-          <File class="h-12 w-12 mx-auto text-[var(--cyber-cyan)]/20 mb-4" />
+          <File class="h-12 w-12 mx-auto text-primary/20 mb-4" />
           <p class="text-lg font-medium font-heading">
             No file selected
           </p>
