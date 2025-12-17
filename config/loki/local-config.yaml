@@ -53,9 +53,5 @@ query_range:
   max_retries: 5
   cache_results: true
 
-chunk_store_config:
-  max_look_back_period: 0s
-
-table_manager:
-  retention_deletes_enabled: true
-  retention_period: 720h
+# Retention is handled by compactor (retention_enabled: true above)
+# chunk_store_config and table_manager are deprecated in Loki 3.0+

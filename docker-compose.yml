@@ -65,7 +65,7 @@ services:
   # Handles routing for *.localhost domains
   # Dashboard available at http://localhost:8080
   traefik:
-    image: traefik:v3.0
+    image: traefik:v3.2
     container_name: agentpod-traefik
     restart: unless-stopped
     command:
@@ -243,7 +243,8 @@ services:
       - KEEP_DAILY=${KEEP_DAILY:-7}
       - KEEP_WEEKLY=${KEEP_WEEKLY:-4}
     volumes:
-      - ./scripts/backup-db.sh:/backup.sh:ro
+      # Mount as executable (not read-only) so script can run
+      - ./scripts/backup-db.sh:/backup.sh
       - ./backups:/backups
     networks:
       - agentpod-net
@@ -253,7 +254,6 @@ services:
     entrypoint: /bin/sh
     command: >
       -c "
-        chmod +x /backup.sh &&
         echo '0 3 * * * /backup.sh backup >> /var/log/backup.log 2>&1' | crontab - &&
         echo 'Backup cron job installed. Running initial backup...' &&
         /backup.sh backup &&
