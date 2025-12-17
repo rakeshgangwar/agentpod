@@ -48,7 +48,7 @@ const app = new Hono()
   .use('*', logger())
   // CORS configuration - allow credentials for Better Auth cookies
   .use('*', cors({
-    origin: (origin) => {
+origin: (origin) => {
       // Allow requests from frontend (localhost in dev, production domain)
       const allowedOrigins = [
         'http://localhost:1420',  // Tauri dev
@@ -56,6 +56,13 @@ const app = new Hono()
         'tauri://localhost',      // Tauri production
         config.publicUrl,
       ];
+      
+      // Allow local network IPs for mobile development
+      // Matches 192.168.x.x and 10.x.x.x patterns
+      if (origin && /^https?:\/\/(192\.168|10)\.\d+\.\d+:\d+$/.test(origin)) {
+        return origin;
+      }
+      
       return allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
     },
     credentials: true,
