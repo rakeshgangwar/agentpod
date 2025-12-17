@@ -136,6 +136,20 @@ export function handleSSEEvent(
       console.log("[SSEEventHandler] Server connected:", properties);
       return notHandled();
     
+    case "server.heartbeat":
+      console.debug("[SSEEventHandler] Heartbeat received");
+      return notHandled();
+    
+    case "server.instance.disposed":
+      console.log("[SSEEventHandler] Server instance disposed:", properties);
+      return notHandled();
+    
+    case "server.heartbeat":
+      // Heartbeat events keep the SSE connection alive during long operations
+      // No state changes needed, just acknowledge receipt
+      console.debug("[SSEEventHandler] Server heartbeat received");
+      return notHandled();
+    
     case "server.instance.disposed":
       console.log("[SSEEventHandler] Server instance disposed:", properties);
       return notHandled();

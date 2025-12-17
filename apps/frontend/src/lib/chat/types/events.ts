@@ -103,8 +103,9 @@ export type OpenCodeEventType =
   // File events (2)
   | "file.edited"
   | "file.watcher.updated"
-  // Server events (3)
+  // Server events (4)
   | "server.connected"
+  | "server.heartbeat"
   | "server.instance.disposed"
   | "error"
   // VCS events (1)
