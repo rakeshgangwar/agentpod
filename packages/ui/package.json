@@ -30,7 +30,7 @@
   "scripts": {
   },
   "peerDependencies": {
-    "svelte": "^5.0.0"
+    "svelte": "^5.46.0"
   },
   "dependencies": {
     "bits-ui": "^2.14.4",
@@ -39,8 +39,8 @@
     "tailwind-variants": "^3.2.2"
   },
   "devDependencies": {
-    "svelte": "^5.0.0",
+    "svelte": "^5.46.0",
     "svelte-check": "^4.0.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.9.3"
   }
 }
