@@ -10,7 +10,7 @@ use crate::models::{
     ErrorResponse, HealthResponse,
 };
 use crate::services::auth::AuthService;
-use reqwest::Client;
+use tauri_plugin_http::reqwest::{self, Client};
 use std::time::Duration;
 
 /// API client for the Management API
@@ -42,8 +42,8 @@ impl ApiClient {
             .build()
             .map_err(|e| AppError::NetworkError(format!("Failed to create HTTP client: {}", e)))?;
 
-        // SSE client without timeout for long-lived streams
         let sse_client = Client::builder()
+            .http1_only()
             .build()
             .map_err(|e| AppError::NetworkError(format!("Failed to create SSE client: {}", e)))?;
 
@@ -164,7 +164,11 @@ impl ApiClient {
     /// Make an SSE GET request (returns Response for streaming)
     pub async fn sse_get(&self, path: &str) -> Result<reqwest::Response, AppError> {
         let url = format!("{}{}", self.base_url, path);
-        let request = self.add_auth(self.sse_client.get(&url)).await;
+        let request = self.add_auth(self.sse_client.get(&url))
+            .await
+            .header("Accept", "text/event-stream")
+            .header("Accept-Encoding", "identity")
+            .header("Cache-Control", "no-cache");
         let response = request.send().await?;
         
         if response.status().is_success() {

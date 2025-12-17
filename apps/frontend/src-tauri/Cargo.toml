@@ -10,20 +10,23 @@ name = "agentpod_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { version = "2.5.3", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
-tauri-plugin-opener = "2"
-tauri-plugin-dialog = "2"
-tauri-plugin-oauth = "2"
-tauri-plugin-os = "2"
+tauri = { version = "2.9.5", features = [] }
+tauri-plugin-opener = "2.5.2"
+tauri-plugin-dialog = "2.4.2"
+tauri-plugin-oauth = "2.0.0"
+tauri-plugin-os = "2.3.2"
+tauri-plugin-notification = "2.3.3"
+tauri-plugin-fs = "2.4.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
-tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
+tokio-tungstenite = { version = "0.28", features = ["rustls-tls-webpki-roots"] }
 http = "1"
-reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"], default-features = false }
+# Use rustls with native root certificates for all platforms including Android/iOS
+reqwest = { version = "0.12", features = ["json", "rustls-tls-native-roots", "stream", "gzip", "deflate"], default-features = false }
 urlencoding = "2"
 keyring = "3"
 thiserror = "2"
@@ -39,8 +42,7 @@ url = "2.5"
 uuid = { version = "1", features = ["v4"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-tauri-plugin-notification = "2.3.3"
-tauri-plugin-fs = "2.4.4"
+tauri-plugin-http = "2"
 
 [dev-dependencies]
 tokio-test = "0.4"

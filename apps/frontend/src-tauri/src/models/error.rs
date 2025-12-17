@@ -44,8 +44,8 @@ impl serde::Serialize for AppError {
 }
 
 // Conversion from reqwest errors
-impl From<reqwest::Error> for AppError {
-    fn from(err: reqwest::Error) -> Self {
+impl From<tauri_plugin_http::reqwest::Error> for AppError {
+    fn from(err: tauri_plugin_http::reqwest::Error) -> Self {
         if err.is_connect() {
             AppError::ConnectionFailed(err.to_string())
         } else if err.is_timeout() {
