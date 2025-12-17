@@ -1,0 +1,30 @@
+# Production overrides - use with: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+services:
+  traefik:
+    command:
+      - "--api.insecure=false"
+      - "--api.dashboard=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=agentpod-net"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-admin@agentpod.dev}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--log.level=WARN"
+      - "--accesslog=false"
+    ports:
+      - "80:80"
+      - "443:443"
+
+  api:
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - agentpod-data:/data/db
+      - ./data/repos:/data/repos
+      - ./data/volumes:/data/volumes
