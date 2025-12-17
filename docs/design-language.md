@@ -1,6 +1,6 @@
 # Design Language Foundation
 
-**Project**: Portable Command Center (CodeOpen)
+**Project**: AgentPod - Portable Command Center
 **Version**: 1.0.0
 **Last Updated**: December 2024
 

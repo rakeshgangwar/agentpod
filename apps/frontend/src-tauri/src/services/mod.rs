@@ -1,4 +1,4 @@
-//! Services for the CodeOpen Tauri app
+//! Services for the AgentPod Tauri app
 
 pub mod api;
 pub mod auth;

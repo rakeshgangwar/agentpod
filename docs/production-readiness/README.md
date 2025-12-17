@@ -1,6 +1,6 @@
 # Production Readiness Plan
 
-This document outlines the comprehensive plan to make CodeOpen/AgentPod production-ready. The plan is organized into four phases, prioritizing security first.
+This document outlines the comprehensive plan to make AgentPod/AgentPod production-ready. The plan is organized into four phases, prioritizing security first.
 
 > **📋 Ready to deploy?** See the [Production Checklist](./PRODUCTION_CHECKLIST.md)
 

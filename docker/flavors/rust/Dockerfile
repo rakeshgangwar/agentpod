@@ -1,5 +1,5 @@
 # =============================================================================
-# CodeOpen Rust Flavor
+# AgentPod Rust Flavor
 # Rust development environment
 # =============================================================================
 # Size: ~1.1GB (on top of base)
@@ -9,7 +9,7 @@
 ARG BASE_IMAGE=codeopen-base:latest
 FROM ${BASE_IMAGE}
 
-LABEL maintainer="CodeOpen Team"
+LABEL maintainer="AgentPod Team"
 LABEL description="Rust development environment"
 LABEL flavor="rust"
 

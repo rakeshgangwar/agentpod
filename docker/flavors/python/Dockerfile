@@ -1,5 +1,5 @@
 # =============================================================================
-# CodeOpen Python Flavor
+# AgentPod Python Flavor
 # Python development environment with ML/AI support
 # =============================================================================
 # Size: ~1.2GB (on top of base)
@@ -9,7 +9,7 @@
 ARG BASE_IMAGE=codeopen-base:latest
 FROM ${BASE_IMAGE}
 
-LABEL maintainer="CodeOpen Team"
+LABEL maintainer="AgentPod Team"
 LABEL description="Python development environment with ML/AI support"
 LABEL flavor="python"
 

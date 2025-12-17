@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Build All CodeOpen Container Images
+# Build All AgentPod Container Images
 # =============================================================================
 # Usage: ./build.sh [--no-cache] [--push] [--flavors <f1,f2>]
 #
@@ -54,7 +54,7 @@ else
 fi
 
 echo "=============================================="
-echo "  CodeOpen Container Build System"
+echo "  AgentPod Container Build System"
 echo "=============================================="
 echo "  Version:  $CONTAINER_VERSION"
 echo "  Registry: $REGISTRY_URL"

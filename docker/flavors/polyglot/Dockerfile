@@ -1,5 +1,5 @@
 # =============================================================================
-# CodeOpen Polyglot Flavor
+# AgentPod Polyglot Flavor
 # All languages development environment
 # =============================================================================
 # Size: ~3GB (on top of base)
@@ -9,7 +9,7 @@
 ARG BASE_IMAGE=codeopen-base:latest
 FROM ${BASE_IMAGE}
 
-LABEL maintainer="CodeOpen Team"
+LABEL maintainer="AgentPod Team"
 LABEL description="Polyglot development environment with all languages"
 LABEL flavor="polyglot"
 

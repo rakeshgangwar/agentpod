@@ -527,7 +527,7 @@ EOF
 # Project Instructions
 
 ## Environment
-This is a CodeOpen development environment.
+This is an AgentPod development environment.
 
 ## Code Style
 - Follow the project's existing code conventions

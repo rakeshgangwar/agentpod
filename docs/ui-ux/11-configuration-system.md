@@ -1,6 +1,6 @@
 # Configuration System & Project Onboarding
 
-**Application:** CodeOpen  
+**Application:** AgentPod  
 **Date:** December 2024  
 **Status:** Design Phase
 

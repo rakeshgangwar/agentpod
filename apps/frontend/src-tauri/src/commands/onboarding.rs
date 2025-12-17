@@ -1,4 +1,4 @@
-//! Onboarding commands for the CodeOpen app
+//! Onboarding commands for the AgentPod app
 //!
 //! These commands communicate with the Management API's onboarding endpoints.
 

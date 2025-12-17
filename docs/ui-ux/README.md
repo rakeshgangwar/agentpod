@@ -1,9 +1,9 @@
 # UI/UX Documentation
 
-**Application:** CodeOpen - Portable Command Center  
+**Application:** AgentPod - Portable Command Center  
 **Date:** December 2024
 
-Comprehensive UI/UX analysis and implementation planning for transforming CodeOpen into a true mobile-first AI agent management platform.
+Comprehensive UI/UX analysis and implementation planning for transforming AgentPod into a true mobile-first AI agent management platform.
 
 ---
 
@@ -18,7 +18,7 @@ Comprehensive UI/UX analysis and implementation planning for transforming CodeOp
 | [05-state-architecture.md](./05-state-architecture.md) | State management architecture analysis including Svelte stores, React context, and data flow |
 | [06-implementation-plan.md](./06-implementation-plan.md) | Original 5-week implementation roadmap (superseded by generative UI approach) |
 | [07-generative-ui-architecture.md](./07-generative-ui-architecture.md) | **Full Generative UI Architecture** - Intent-based UI system where interface adapts dynamically |
-| [08-shape-of-ai-patterns.md](./08-shape-of-ai-patterns.md) | 56 AI UX patterns from shapeof.ai research - categorized and applied to CodeOpen |
+| [08-shape-of-ai-patterns.md](./08-shape-of-ai-patterns.md) | 56 AI UX patterns from shapeof.ai research - categorized and applied to AgentPod |
 | [09-user-journey-paths.md](./09-user-journey-paths.md) | 40 detailed user journey paths across 10 categories |
 | [10-component-specifications.md](./10-component-specifications.md) | **Complete TypeScript specs** - Props, variants, accessibility, platform adaptations for all components |
 | [11-configuration-system.md](./11-configuration-system.md) | **Configuration & Onboarding** - Container tiers, LLM providers, agents, MCP servers, and project onboarding agent flow |

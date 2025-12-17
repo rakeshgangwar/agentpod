@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# CodeOpen Modular Container Build Configuration
+# AgentPod Modular Container Build Configuration
 # =============================================================================
 # This file is sourced by other scripts to provide default configuration.
 # Override values by setting environment variables before running scripts.

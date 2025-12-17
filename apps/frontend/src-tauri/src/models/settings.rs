@@ -1,6 +1,6 @@
-//! Settings models for the CodeOpen app
+//! Settings models for the AgentPod app
 //! 
-//! Local settings are stored in ~/.config/codeopen/settings.json
+//! Local settings are stored in ~/.config/agentpod/settings.json
 
 use serde::{Deserialize, Serialize};
 

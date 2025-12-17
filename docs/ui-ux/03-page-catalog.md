@@ -1,6 +1,6 @@
 # Page Catalog
 
-**Application:** CodeOpen  
+**Application:** AgentPod  
 **Date:** December 2024
 
 Comprehensive catalog of all pages/routes in the application with their components, data requirements, and current status.

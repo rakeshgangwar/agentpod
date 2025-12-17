@@ -1,4 +1,4 @@
-# CodeOpen JavaScript Flavor
+# AgentPod JavaScript Flavor
 
 JavaScript and TypeScript development environment.
 

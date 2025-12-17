@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Build All CodeOpen Container Images for Local Development
+# Build All AgentPod Container Images for Local Development
 # =============================================================================
 # Usage: ./build-dev.sh [--no-cache] [--flavors <f1,f2>] [--skip-base]
 #
@@ -73,7 +73,7 @@ fi
 
 echo ""
 echo "=============================================="
-echo "  CodeOpen Dev Build"
+echo "  AgentPod Dev Build"
 echo "=============================================="
 echo "  Base:    ${SKIP_BASE:-will build}"
 echo "  Flavors: $SELECTED_FLAVORS"

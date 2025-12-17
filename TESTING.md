@@ -1,6 +1,6 @@
 # Testing Guide
 
-This document outlines the testing strategy, conventions, and best practices for the AgentPod/CodeOpen project.
+This document outlines the testing strategy, conventions, and best practices for the AgentPod/AgentPod project.
 
 ## Quick Start
 

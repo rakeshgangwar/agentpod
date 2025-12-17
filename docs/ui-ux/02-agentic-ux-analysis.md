@@ -1,6 +1,6 @@
 # Agentic AI UX Analysis Report
 
-**Application:** CodeOpen "Portable Command Center"  
+**Application:** AgentPod "Portable Command Center"  
 **Date:** December 2024  
 **Focus:** AI Agent Management UX Patterns
 
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-CodeOpen is a Tauri + Svelte app that serves as a remote interface for AI coding agents (OpenCode) running on cloud infrastructure. The codebase demonstrates **foundational agentic UX patterns** but has significant gaps compared to best practices for this paradigm. The app handles basic chat interaction and permission requests but lacks the sophisticated transparency, control, and trust-building features essential for remote AI agent management.
+AgentPod is a Tauri + Svelte app that serves as a remote interface for AI coding agents (OpenCode) running on cloud infrastructure. The codebase demonstrates **foundational agentic UX patterns** but has significant gaps compared to best practices for this paradigm. The app handles basic chat interaction and permission requests but lacks the sophisticated transparency, control, and trust-building features essential for remote AI agent management.
 
 ---
 
@@ -376,7 +376,7 @@ All new components should follow these established patterns for consistency.
 
 ## 7. Conclusion
 
-CodeOpen has solid foundations for an agentic UX but is currently operating more like a traditional chat interface than a true "Portable Command Center." The most critical gaps are:
+AgentPod has solid foundations for an agentic UX but is currently operating more like a traditional chat interface than a true "Portable Command Center." The most critical gaps are:
 
 1. **Lack of transparency** - Users can't see what the AI is doing in real-time
 2. **No pause/resume** - Only destructive cancel available

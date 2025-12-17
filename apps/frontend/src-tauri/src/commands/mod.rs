@@ -1,4 +1,4 @@
-//! Tauri commands for the CodeOpen app
+//! Tauri commands for the AgentPod app
 
 pub mod auth;
 pub mod connection;

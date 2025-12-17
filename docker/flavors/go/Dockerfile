@@ -1,5 +1,5 @@
 # =============================================================================
-# CodeOpen Go Flavor
+# AgentPod Go Flavor
 # Go development environment
 # =============================================================================
 # Size: ~900MB (on top of base)
@@ -9,7 +9,7 @@
 ARG BASE_IMAGE=codeopen-base:latest
 FROM ${BASE_IMAGE}
 
-LABEL maintainer="CodeOpen Team"
+LABEL maintainer="AgentPod Team"
 LABEL description="Go development environment"
 LABEL flavor="go"
 

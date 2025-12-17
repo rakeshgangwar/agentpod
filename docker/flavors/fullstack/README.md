@@ -1,4 +1,4 @@
-# CodeOpen Full-Stack Flavor
+# AgentPod Full-Stack Flavor
 
 JavaScript, TypeScript, and Python development environment for full-stack web applications.
 

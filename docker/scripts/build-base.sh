@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Build CodeOpen Base Image
+# Build AgentPod Base Image
 # =============================================================================
 # Usage: ./build-base.sh [--no-cache] [--push]
 # =============================================================================
@@ -35,7 +35,7 @@ else
 fi
 
 echo "=============================================="
-echo "  CodeOpen Base Image Build"
+echo "  AgentPod Base Image Build"
 echo "=============================================="
 echo "  Version:  $CONTAINER_VERSION"
 echo "  Registry: $REGISTRY_DISPLAY"

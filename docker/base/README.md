@@ -1,6 +1,6 @@
-# CodeOpen Base Image
+# AgentPod Base Image
 
-Foundation layer for all CodeOpen container flavors.
+Foundation layer for all AgentPod container flavors (codeopen-* images).
 
 ## Contents
 

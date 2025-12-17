@@ -1,4 +1,4 @@
-//! Onboarding types for the CodeOpen Tauri app
+//! Onboarding types for the AgentPod Tauri app
 //! These models mirror the Management API onboarding types
 
 use serde::{Deserialize, Serialize};

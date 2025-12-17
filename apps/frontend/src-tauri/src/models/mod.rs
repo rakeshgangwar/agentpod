@@ -1,4 +1,4 @@
-//! Data models for the CodeOpen Tauri app
+//! Data models for the AgentPod Tauri app
 //! These models mirror the Management API types
 
 pub mod error;

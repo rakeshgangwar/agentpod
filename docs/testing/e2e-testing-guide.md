@@ -1,6 +1,6 @@
 # End-to-End Testing Guide
 
-This guide covers E2E testing patterns for the AgentPod/CodeOpen desktop application using Playwright and Tauri's WebDriver support.
+This guide covers E2E testing patterns for the AgentPod/AgentPod desktop application using Playwright and Tauri's WebDriver support.
 
 ## Overview
 

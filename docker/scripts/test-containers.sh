@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# CodeOpen Container Test Suite
+# AgentPod Container Test Suite
 # =============================================================================
 # Tests all container flavor and addon combinations to verify they:
 # 1. Build successfully
@@ -542,7 +542,7 @@ fi
 
 echo ""
 echo "╔═══════════════════════════════════════════════════════════════╗"
-echo "║           CodeOpen Container Test Suite                       ║"
+echo "║           AgentPod Container Test Suite                       ║"
 echo "╠═══════════════════════════════════════════════════════════════╣"
 echo "║  Flavors:    ${TEST_FLAVORS[*]}"
 echo "║  Addons:     ${ADDONS_DISPLAY}"

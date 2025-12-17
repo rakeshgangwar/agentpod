@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Push CodeOpen Container Images to Forgejo Registry
+# Push AgentPod Container Images to Registry
 # =============================================================================
 # Usage: ./push.sh [type] [name]
 # 
@@ -25,7 +25,7 @@ TYPE="${1:-all}"
 NAME="${2:-}"
 
 echo "=============================================="
-echo "  CodeOpen Container Push"
+echo "  AgentPod Container Push"
 echo "=============================================="
 echo "  Version:  $CONTAINER_VERSION"
 echo "  Registry: $REGISTRY_URL"

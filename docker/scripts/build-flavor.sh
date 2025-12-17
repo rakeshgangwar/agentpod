@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Build CodeOpen Flavor Image
+# Build AgentPod Flavor Image
 # =============================================================================
 # Usage: ./build-flavor.sh <flavor> [--no-cache] [--push] [--base <base-image>]
 #
@@ -89,7 +89,7 @@ else
 fi
 
 echo "=============================================="
-echo "  CodeOpen Flavor Build: $FLAVOR"
+echo "  AgentPod Flavor Build: $FLAVOR"
 echo "=============================================="
 echo "  Version:  $CONTAINER_VERSION"
 echo "  Registry: $REGISTRY_DISPLAY"

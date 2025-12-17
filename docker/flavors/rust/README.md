@@ -1,4 +1,4 @@
-# CodeOpen Rust Flavor
+# AgentPod Rust Flavor
 
 Rust development environment.
 

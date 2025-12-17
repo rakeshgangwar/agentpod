@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# CodeOpen Common Setup Functions
+# AgentPod Common Setup Functions
 # Shared functions for all container entrypoints
 # =============================================================================
 

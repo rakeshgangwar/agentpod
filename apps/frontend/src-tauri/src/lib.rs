@@ -1,6 +1,6 @@
-//! CodeOpen - Portable Command Center for OpenCode
+//! AgentPod - Portable Command Center for OpenCode
 //!
-//! This is the Tauri backend for the CodeOpen desktop/mobile app.
+//! This is the Tauri backend for the AgentPod desktop/mobile app.
 //! It provides secure connection management and API client functionality
 //! for communicating with the Management API.
 
@@ -66,7 +66,7 @@ pub fn run() {
         .with(EnvFilter::from_default_env().add_directive("codeopen_lib=debug".parse().unwrap()))
         .init();
     
-    tracing::info!("Starting CodeOpen with tracing enabled");
+    tracing::info!("Starting AgentPod with tracing enabled");
     
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())

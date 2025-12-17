@@ -197,7 +197,7 @@ export const modelsDev = {
       const response = await fetch('https://models.dev/api.json', {
         headers: {
           'Accept': 'application/json',
-          'User-Agent': 'CodeOpen/1.0',
+          'User-Agent': 'AgentPod/1.0',
         },
       });
 

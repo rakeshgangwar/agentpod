@@ -1,4 +1,4 @@
-# CodeOpen Go Flavor
+# AgentPod Go Flavor
 
 Go development environment.
 

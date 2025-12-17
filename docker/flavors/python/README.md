@@ -1,4 +1,4 @@
-# CodeOpen Python Flavor
+# AgentPod Python Flavor
 
 Python development environment with ML/AI support.
 

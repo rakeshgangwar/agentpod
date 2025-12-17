@@ -1,4 +1,4 @@
-//! Error types for the CodeOpen Tauri app
+//! Error types for the AgentPod Tauri app
 
 use thiserror::Error;
 

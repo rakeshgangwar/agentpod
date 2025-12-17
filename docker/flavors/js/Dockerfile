@@ -1,5 +1,5 @@
 # =============================================================================
-# CodeOpen JavaScript Flavor
+# AgentPod JavaScript Flavor
 # Node.js and TypeScript development environment
 # =============================================================================
 # Size: ~800MB (on top of base)
@@ -9,7 +9,7 @@
 ARG BASE_IMAGE=codeopen-base:latest
 FROM ${BASE_IMAGE}
 
-LABEL maintainer="CodeOpen Team"
+LABEL maintainer="AgentPod Team"
 LABEL description="JavaScript/TypeScript development environment"
 LABEL flavor="js"
 

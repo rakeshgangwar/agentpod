@@ -1,4 +1,4 @@
-//! Settings commands for the CodeOpen app
+//! Settings commands for the AgentPod app
 //! 
 //! Handles local settings storage and Management API provider operations.
 

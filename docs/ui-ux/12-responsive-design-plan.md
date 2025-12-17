@@ -1,6 +1,6 @@
 # Responsive Design Plan
 
-**Application:** CodeOpen - Portable Command Center  
+**Application:** AgentPod - Portable Command Center  
 **Date:** December 2024  
 **Status:** Implementation Ready
 
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-Transform CodeOpen from a desktop-first application into a truly **adaptive cross-platform experience** that feels native on phones, tablets, and desktops. This plan prioritizes mobile-first thinking while progressively enhancing for larger screens.
+Transform AgentPod from a desktop-first application into a truly **adaptive cross-platform experience** that feels native on phones, tablets, and desktops. This plan prioritizes mobile-first thinking while progressively enhancing for larger screens.
 
 ### Key Principle
 

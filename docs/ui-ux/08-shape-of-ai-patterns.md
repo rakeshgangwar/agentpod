@@ -4,7 +4,7 @@
 **License:** CC-BY-NC-SA  
 **Date Captured:** December 2024
 
-A comprehensive reference of AI UX patterns relevant to CodeOpen's generative UI implementation.
+A comprehensive reference of AI UX patterns relevant to AgentPod's generative UI implementation.
 
 ---
 
@@ -429,11 +429,11 @@ Change the modality of content.
 
 ---
 
-## Pattern Mapping to CodeOpen
+## Pattern Mapping to AgentPod
 
 ### High-Priority Patterns for Generative UI
 
-| Pattern | CodeOpen Application | Priority |
+| Pattern | AgentPod Application | Priority |
 |---------|---------------------|----------|
 | **Initial CTA** | "What's on your mind?" home page | P1 |
 | **Suggestions** | Quick actions, contextual suggestions | P1 |
