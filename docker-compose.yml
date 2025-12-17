@@ -129,6 +129,8 @@ services:
       # =======================================================================
       # Session secret for cookie signing (generate with: openssl rand -base64 32)
       - SESSION_SECRET=${SESSION_SECRET:-dev-session-secret-change-in-production}
+      # Better Auth secret (required in production)
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-dev-better-auth-secret-change-in-production}
       
       # GitHub OAuth (optional - create at https://github.com/settings/developers)
       - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
