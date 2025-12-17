@@ -294,9 +294,12 @@ function buildImageName(
   const version = config.registry.version;
   
   // Build image name from flavor only
-  const imageName = `codeopen-${flavor.id}`;
+  const baseName = `codeopen-${flavor.id}`;
   
-  const fullImageName = `${registry}/${owner}/${imageName}`;
+  // If registry and owner are configured, use full path; otherwise use local image name
+  const fullImageName = registry && owner 
+    ? `${registry}/${owner}/${baseName}`
+    : baseName;
   const imageRef = `${fullImageName}:${version}`;
   
   return {

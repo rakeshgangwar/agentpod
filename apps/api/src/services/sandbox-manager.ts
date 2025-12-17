@@ -1063,8 +1063,11 @@ export class SandboxManager {
       return devImage;
     }
 
-    // Production: use registry images
-    return `${config.registry.url}/${config.registry.owner}/${imageName}:${config.registry.version}`;
+    // Production: use registry images if configured, otherwise use local
+    const hasRegistry = config.registry.url && config.registry.owner;
+    return hasRegistry
+      ? `${config.registry.url}/${config.registry.owner}/${imageName}:${config.registry.version}`
+      : `${imageName}:${config.registry.version}`;
   }
 
   /**

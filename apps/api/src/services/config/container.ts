@@ -110,7 +110,10 @@ const HOMEPAGE_PORT = 4000;
  */
 export function getFlavorImage(flavor: FlavorId): string {
   const imageName = FLAVOR_IMAGES[flavor] ?? FLAVOR_IMAGES.fullstack;
-  return `${config.registry.url}/${config.registry.owner}/${imageName}:${config.registry.version}`;
+  const hasRegistry = config.registry.url && config.registry.owner;
+  return hasRegistry
+    ? `${config.registry.url}/${config.registry.owner}/${imageName}:${config.registry.version}`
+    : `${imageName}:${config.registry.version}`;
 }
 
 /**
