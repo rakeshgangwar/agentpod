@@ -65,7 +65,7 @@ services:
   # Handles routing for *.localhost domains
   # Dashboard available at http://localhost:8080
   traefik:
-    image: traefik:v3.2
+    image: traefik:v3.3
     container_name: agentpod-traefik
     restart: unless-stopped
     command:
@@ -78,29 +78,17 @@ services:
       - "--providers.docker.network=agentpod-net"
       # Entrypoints
       - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      # HTTP to HTTPS redirect (production only - controlled by TRAEFIK_TLS env var)
-      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
-      # Let's Encrypt ACME
-      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-admin@agentpod.dev}"
-      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
       # Logging
       - "--log.level=INFO"
       - "--accesslog=true"
     ports:
       # HTTP
       - "80:80"
-      # HTTPS
-      - "443:443"
       # Traefik Dashboard
       - "8080:8080"
     volumes:
       # Docker socket for container discovery
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      # Let's Encrypt certificates
-      - letsencrypt-data:/letsencrypt
     networks:
       - agentpod-net
     labels:
@@ -222,14 +210,8 @@ services:
       - agentpod-net
     labels:
       - "traefik.enable=true"
-      # HTTP router (redirects to HTTPS in production)
-      - "traefik.http.routers.api.rule=Host(`api.localhost`) || Host(`api.${BASE_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.api.rule=Host(`api.localhost`)"
       - "traefik.http.routers.api.entrypoints=web"
-      # HTTPS router (production)
-      - "traefik.http.routers.api-secure.rule=Host(`api.localhost`) || Host(`api.${BASE_DOMAIN:-localhost}`)"
-      - "traefik.http.routers.api-secure.entrypoints=websecure"
-      - "traefik.http.routers.api-secure.tls=true"
-      - "traefik.http.routers.api-secure.tls.certresolver=letsencrypt"
       - "traefik.http.services.api.loadbalancer.server.port=3001"
       - "agentpod.managed=false"
     healthcheck:
@@ -371,8 +353,6 @@ volumes:
   grafana-data:
     driver: local
   fluent-bit-db:
-    driver: local
-  letsencrypt-data:
     driver: local
 
 # =============================================================================
