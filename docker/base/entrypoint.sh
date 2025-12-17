@@ -34,7 +34,7 @@ echo "=============================================="
 #                           Written to /home/.local/share/opencode/auth.json
 #   OPENCODE_USER_CONFIG  - User's global config JSON (settings, custom files)
 #                           Written to /home/.config/opencode/
-#   CODEOPEN_FLAVOR       - Container flavor (js, python, go, rust, fullstack, polyglot)
+#   AGENTPOD_FLAVOR       - Container flavor (js, python, go, rust, fullstack, polyglot)
 #                           Used for flavor-specific AGENTS.md in workspace
 #   OPENCODE_PORT         - Port for OpenCode server (default: 4096)
 #   OPENCODE_HOST         - Host for OpenCode server (default: 0.0.0.0)
@@ -386,7 +386,7 @@ setup_project_config() {
     mkdir -p "$WORKSPACE"
     
     # Get flavor from environment (set by container)
-    FLAVOR="${CODEOPEN_FLAVOR:-fullstack}"
+    FLAVOR="${AGENTPOD_FLAVOR:-fullstack}"
     
     # Create project opencode.json if it doesn't exist
     if [ ! -f "$WORKSPACE/opencode.json" ]; then
@@ -502,6 +502,28 @@ This is a full-stack development environment with:
 - Follow the conventions of the primary language being used
 - Use appropriate linters and formatters for each language
 - Write tests alongside implementation code
+EOF
+                ;;
+            bare)
+                cat > "$WORKSPACE/AGENTS.md" << 'EOF'
+# Project Instructions
+
+## Environment
+This is a minimal workspace with OpenCode only:
+- No language-specific runtimes installed
+- Bash shell for scripting
+- Git for version control
+- Core CLI tools (ripgrep, fd, bat, fzf, jq, yq)
+
+## Use Cases
+- AI-assisted coding and code review
+- Documentation and markdown files
+- Configuration files (YAML, JSON, TOML)
+- Shell scripts
+
+## Notes
+- Install language runtimes as needed via apt or package managers
+- For heavier development, consider switching to a language-specific flavor
 EOF
                 ;;
             polyglot)

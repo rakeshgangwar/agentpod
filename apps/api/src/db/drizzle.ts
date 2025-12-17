@@ -128,6 +128,7 @@ export async function seedReferenceData(): Promise<void> {
 
   // Resource Tiers
   const resourceTierData = [
+    { id: "micro", name: "Micro", description: "Minimal workspace for AI-assisted coding", cpuCores: 1, memoryGb: 1, storageGb: 10, priceMonthly: 0, isDefault: false, sortOrder: 0 },
     { id: "starter", name: "Starter", description: "Perfect for learning and small projects", cpuCores: 1, memoryGb: 2, storageGb: 20, priceMonthly: 0, isDefault: true, sortOrder: 1 },
     { id: "builder", name: "Builder", description: "For active development and medium projects", cpuCores: 2, memoryGb: 4, storageGb: 30, priceMonthly: 10, isDefault: false, sortOrder: 2 },
     { id: "creator", name: "Creator", description: "For professional development and larger projects", cpuCores: 4, memoryGb: 8, storageGb: 50, priceMonthly: 25, isDefault: false, sortOrder: 3 },
@@ -146,6 +147,7 @@ export async function seedReferenceData(): Promise<void> {
 
   // Container Flavors
   const flavorData = [
+    { id: "bare", name: "Bare", description: "Minimal workspace with OpenCode only. No language runtimes.", languages: '[]', imageSizeMb: 500, isDefault: false, enabled: true, sortOrder: 0 },
     { id: "js", name: "JavaScript", description: "JavaScript and TypeScript development", languages: '["javascript","typescript"]', imageSizeMb: 800, isDefault: false, enabled: true, sortOrder: 1 },
     { id: "python", name: "Python", description: "Python development with data science tools", languages: '["python"]', imageSizeMb: 1200, isDefault: false, enabled: true, sortOrder: 2 },
     { id: "go", name: "Go", description: "Go development environment", languages: '["go"]', imageSizeMb: 900, isDefault: false, enabled: false, sortOrder: 3 },

@@ -429,6 +429,7 @@ export const migrations: Migration[] = [
       // Seed resource tiers
       db.exec(`
         INSERT OR IGNORE INTO resource_tiers (id, name, description, cpu_cores, memory_gb, storage_gb, price_monthly, is_default, sort_order) VALUES
+        ('micro', 'Micro', 'Minimal workspace for AI-assisted coding', 1, 1, 10, 0, 0, 0),
         ('starter', 'Starter', 'Perfect for learning and small projects', 1, 2, 20, 0, 1, 1),
         ('builder', 'Builder', 'For active development and medium projects', 2, 4, 30, 10, 0, 2),
         ('creator', 'Creator', 'For professional development and larger projects', 4, 8, 50, 25, 0, 3),
@@ -438,6 +439,7 @@ export const migrations: Migration[] = [
       // Seed container flavors
       db.exec(`
         INSERT OR IGNORE INTO container_flavors (id, name, description, languages, image_size_mb, is_default, sort_order) VALUES
+        ('bare', 'Bare', 'Minimal workspace with OpenCode only. No language runtimes.', '[]', 500, 0, 0),
         ('js', 'JavaScript', 'JavaScript and TypeScript development', '["javascript","typescript"]', 800, 0, 1),
         ('python', 'Python', 'Python development with data science tools', '["python"]', 1200, 0, 2),
         ('go', 'Go', 'Go development environment', '["go"]', 900, 0, 3),
