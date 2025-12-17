@@ -425,7 +425,7 @@ export default {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = "codeopen-settings.json";
+        a.download = "agentpod-settings.json";
         a.style.display = "none";
         document.body.appendChild(a);
         a.click();
@@ -1166,7 +1166,7 @@ export default {
           <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-4">
             <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
               <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
-                [about_codeopen]
+                [about_agentpod]
               </h3>
             </div>
             <div class="p-4 space-y-4">

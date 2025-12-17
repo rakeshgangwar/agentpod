@@ -132,7 +132,7 @@ export function getImageNameForFlavor(
   registry: string,
   owner: string
 ): string {
-  const baseName = `codeopen-${flavor.id}`;
+  const baseName = `agentpod-${flavor.id}`;
   return registry && owner ? `${registry}/${owner}/${baseName}` : baseName;
 }
 

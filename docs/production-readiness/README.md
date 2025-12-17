@@ -74,8 +74,8 @@ After implementation, the production deployment process will be:
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/your-org/codeopen.git
-cd codeopen
+git clone https://github.com/your-org/agentpod.git
+cd agentpod
 
 # 2. Configure environment
 cp .env.example .env

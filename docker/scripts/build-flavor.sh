@@ -8,7 +8,7 @@
 #   flavor      - js, python, go, rust, fullstack, polyglot
 #   --no-cache  - Build without Docker cache
 #   --push      - Push to registry after build
-#   --base      - Specify base image (default: codeopen-base:latest)
+#   --base      - Specify base image (default: agentpod-base:latest)
 # =============================================================================
 
 set -e
@@ -74,17 +74,17 @@ fi
 if [ -n "$CUSTOM_BASE" ]; then
     BASE_IMG="$CUSTOM_BASE"
 elif [ -n "$CONTAINER_REGISTRY" ]; then
-    BASE_IMG="${CONTAINER_REGISTRY}/codeopen-base:latest"
+    BASE_IMG="${CONTAINER_REGISTRY}/agentpod-base:latest"
 else
-    BASE_IMG="codeopen-base:latest"
+    BASE_IMG="agentpod-base:latest"
 fi
 
 # Determine flavor image name
 if [ -n "$CONTAINER_REGISTRY" ]; then
-    IMAGE_NAME="${CONTAINER_REGISTRY}/codeopen-${FLAVOR}"
+    IMAGE_NAME="${CONTAINER_REGISTRY}/agentpod-${FLAVOR}"
     REGISTRY_DISPLAY="$CONTAINER_REGISTRY"
 else
-    IMAGE_NAME="codeopen-${FLAVOR}"
+    IMAGE_NAME="agentpod-${FLAVOR}"
     REGISTRY_DISPLAY="local"
 fi
 
@@ -99,7 +99,7 @@ echo "  Cache:    ${NO_CACHE:-enabled}"
 echo "=============================================="
 echo ""
 
-echo "Building codeopen-${FLAVOR}..."
+echo "Building agentpod-${FLAVOR}..."
 
 docker build $NO_CACHE \
     --platform "$BUILD_PLATFORM" \

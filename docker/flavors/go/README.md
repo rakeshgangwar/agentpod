@@ -34,7 +34,7 @@ Go development environment.
 ## Usage
 
 ```bash
-docker run -it codeopen-go:latest
+docker run -it agentpod-go:latest
 ```
 
 ### Creating a New Module

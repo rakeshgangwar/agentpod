@@ -6,7 +6,7 @@
 # Languages: JavaScript, TypeScript
 # =============================================================================
 
-ARG BASE_IMAGE=codeopen-base:latest
+ARG BASE_IMAGE=agentpod-base:latest
 FROM ${BASE_IMAGE}
 
 LABEL maintainer="AgentPod Team"
@@ -51,7 +51,7 @@ RUN echo 'export PATH="/usr/local/bin:$PATH"' >> /home/developer/.bashrc
 # =============================================================================
 # Flavor metadata
 # =============================================================================
-ENV CODEOPEN_FLAVOR="js"
-ENV CODEOPEN_LANGUAGES="javascript,typescript"
+ENV AGENTPOD_FLAVOR="js"
+ENV AGENTPOD_LANGUAGES="javascript,typescript"
 
 WORKDIR /home/workspace

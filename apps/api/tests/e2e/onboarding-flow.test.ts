@@ -9,7 +9,7 @@
  *
  * These tests use REAL Docker containers and require:
  * - Docker to be running
- * - codeopen-fullstack:latest image available
+ * - agentpod-fullstack:latest image available
  * - Management API running on localhost:3001
  * - PostgreSQL with seeded knowledge base
  *
@@ -31,7 +31,7 @@ import {
 // Test Configuration
 // =============================================================================
 
-const TEST_IMAGE = "codeopen-fullstack:latest";
+const TEST_IMAGE = "agentpod-fullstack:latest";
 const MANAGEMENT_API_URL = "http://host.docker.internal:3001";
 
 /**

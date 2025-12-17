@@ -82,12 +82,12 @@ A cross-platform application for running AI coding agents in isolated sandbox en
 ### Container Flavors
 | Flavor | Languages | Size |
 |--------|-----------|------|
-| `codeopen-js` | JavaScript, TypeScript, Deno | ~800MB |
-| `codeopen-python` | Python 3.12, Jupyter, ML tools | ~1.2GB |
-| `codeopen-go` | Go 1.22 | ~900MB |
-| `codeopen-rust` | Rust stable | ~1.1GB |
-| `codeopen-fullstack` | JavaScript + Python (default) | ~1.8GB |
-| `codeopen-polyglot` | All languages | ~3GB |
+| `agentpod-js` | JavaScript, TypeScript, Deno | ~800MB |
+| `agentpod-python` | Python 3.12, Jupyter, ML tools | ~1.2GB |
+| `agentpod-go` | Go 1.22 | ~900MB |
+| `agentpod-rust` | Rust stable | ~1.1GB |
+| `agentpod-fullstack` | JavaScript + Python (default) | ~1.8GB |
+| `agentpod-polyglot` | All languages | ~3GB |
 
 ### Production Ready
 - **Observability**: Loki + Fluent Bit + Grafana for logging and monitoring
@@ -191,8 +191,8 @@ agentpod/
 
 ```bash
 # Clone the repository
-git clone https://github.com/rakeshgangwar/codeopen.git
-cd codeopen
+git clone https://github.com/rakeshgangwar/agentpod.git
+cd agentpod
 
 # Install dependencies
 pnpm install

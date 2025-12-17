@@ -56,22 +56,22 @@ The new architecture removes external dependencies:
 ## Image Hierarchy
 
 ```
-codeopen-base
+agentpod-base
     │
-    ├── codeopen-js (JavaScript/TypeScript)
-    ├── codeopen-python (Python + ML/AI)
-    ├── codeopen-go (Go)
-    ├── codeopen-rust (Rust)
-    ├── codeopen-fullstack (JS + Python) ← default
-    └── codeopen-polyglot (All languages)
+    ├── agentpod-js (JavaScript/TypeScript)
+    ├── agentpod-python (Python + ML/AI)
+    ├── agentpod-go (Go)
+    ├── agentpod-rust (Rust)
+    ├── agentpod-fullstack (JS + Python) ← default
+    └── agentpod-polyglot (All languages)
 ```
 
 ## Quick Start (Local Development)
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/agentpod/codeopen.git
-cd codeopen
+git clone https://github.com/rakeshgangwar/agentpod.git
+cd agentpod
 
 # 2. Copy environment files
 cp .env.example .env
@@ -94,18 +94,18 @@ docker compose logs -f api
 
 | Image | Description | Size |
 |-------|-------------|------|
-| `codeopen-base` | Foundation with Node.js 22, Bun, OpenCode CLI, ACP Gateway | ~500MB |
+| `agentpod-base` | Foundation with Node.js 22, Bun, OpenCode CLI, ACP Gateway | ~500MB |
 
 ### Flavors (Language Environments)
 
 | Flavor | Languages | Size (approx) |
 |--------|-----------|---------------|
-| `codeopen-js` | JavaScript, TypeScript, Deno | ~800MB |
-| `codeopen-python` | Python 3.12, Jupyter, ML tools | ~1.2GB |
-| `codeopen-go` | Go 1.22, common Go tools | ~900MB |
-| `codeopen-rust` | Rust stable, cargo tools | ~1.1GB |
-| `codeopen-fullstack` | JavaScript + Python (default) | ~1.8GB |
-| `codeopen-polyglot` | All languages | ~3GB |
+| `agentpod-js` | JavaScript, TypeScript, Deno | ~800MB |
+| `agentpod-python` | Python 3.12, Jupyter, ML tools | ~1.2GB |
+| `agentpod-go` | Go 1.22, common Go tools | ~900MB |
+| `agentpod-rust` | Rust stable, cargo tools | ~1.1GB |
+| `agentpod-fullstack` | JavaScript + Python (default) | ~1.8GB |
+| `agentpod-polyglot` | All languages | ~3GB |
 
 ## Ports
 
@@ -170,7 +170,7 @@ The workspace is mounted as a Docker volume. No cloning needed.
 # docker-compose.yml
 services:
   sandbox:
-    image: codeopen-fullstack:latest
+    image: agentpod-fullstack:latest
     volumes:
       - ./my-project:/home/workspace
 ```
@@ -183,7 +183,7 @@ Clone a repository on container startup.
 # docker-compose.yml
 services:
   sandbox:
-    image: codeopen-fullstack:latest
+    image: agentpod-fullstack:latest
     environment:
       - GIT_REPO_URL=https://github.com/user/repo.git
       - GIT_USERNAME=myuser

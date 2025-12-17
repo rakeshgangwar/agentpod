@@ -1040,12 +1040,12 @@ export class SandboxManager {
    */
   private getImageForFlavor(flavor: string): string {
     const flavorImages: Record<string, string> = {
-      js: "codeopen-js",
-      python: "codeopen-python",
-      go: "codeopen-go",
-      rust: "codeopen-rust",
-      fullstack: "codeopen-fullstack",
-      polyglot: "codeopen-polyglot",
+      js: "agentpod-js",
+      python: "agentpod-python",
+      go: "agentpod-go",
+      rust: "agentpod-rust",
+      fullstack: "agentpod-fullstack",
+      polyglot: "agentpod-polyglot",
     };
 
     const imageName = flavorImages[flavor] ?? flavorImages.fullstack;

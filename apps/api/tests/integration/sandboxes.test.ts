@@ -68,7 +68,7 @@ mock.module('../../src/services/sandbox-manager', () => {
             await mockOrchestrator.createSandbox({
               id,
               name: options.name,
-              image: 'codeopen-fullstack:dev',
+              image: 'agentpod-fullstack:dev',
               workdir: '/workspace',
               labels: { 'agentpod.managed': 'true' },
             } as any);

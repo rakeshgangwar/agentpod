@@ -67,12 +67,12 @@ interface AddonSpec {
  * Docker image names for each flavor
  */
 const FLAVOR_IMAGES: Record<FlavorId, string> = {
-  js: "codeopen-js",
-  python: "codeopen-python",
-  go: "codeopen-go",
-  rust: "codeopen-rust",
-  fullstack: "codeopen-fullstack",
-  polyglot: "codeopen-polyglot",
+  js: "agentpod-js",
+  python: "agentpod-python",
+  go: "agentpod-go",
+  rust: "agentpod-rust",
+  fullstack: "agentpod-fullstack",
+  polyglot: "agentpod-polyglot",
 };
 
 /**

@@ -6,7 +6,7 @@
 # Languages: Go
 # =============================================================================
 
-ARG BASE_IMAGE=codeopen-base:latest
+ARG BASE_IMAGE=agentpod-base:latest
 FROM ${BASE_IMAGE}
 
 LABEL maintainer="AgentPod Team"
@@ -53,7 +53,7 @@ RUN echo 'export GOROOT=/usr/local/go' >> /home/developer/.bashrc && \
 # =============================================================================
 # Flavor metadata
 # =============================================================================
-ENV CODEOPEN_FLAVOR="go"
-ENV CODEOPEN_LANGUAGES="go"
+ENV AGENTPOD_FLAVOR="go"
+ENV AGENTPOD_LANGUAGES="go"
 
 WORKDIR /home/workspace

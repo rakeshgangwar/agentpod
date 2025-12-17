@@ -27,7 +27,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-TEST_IMAGE="codeopen-fullstack:latest"
+TEST_IMAGE="agentpod-fullstack:latest"
 CONTAINER_NAME="e2e-onboarding-test-$$"
 API_PORT=3001
 API_URL="http://localhost:${API_PORT}"

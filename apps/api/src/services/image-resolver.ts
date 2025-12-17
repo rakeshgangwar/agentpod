@@ -280,7 +280,7 @@ export function generateProjectUrls(
 
 /**
  * Build the Docker image name from flavor
- * Pattern: codeopen-{flavor}:{version}
+ * Pattern: agentpod-{flavor}:{version}
  * 
  * Note: Addons are NOT part of the image name. They are applied at runtime
  * via Coolify's pre-deploy commands or init scripts.
@@ -294,7 +294,7 @@ function buildImageName(
   const version = config.registry.version;
   
   // Build image name from flavor only
-  const baseName = `codeopen-${flavor.id}`;
+  const baseName = `agentpod-${flavor.id}`;
   
   // If registry and owner are configured, use full path; otherwise use local image name
   const fullImageName = registry && owner 

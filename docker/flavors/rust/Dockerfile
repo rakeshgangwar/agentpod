@@ -6,7 +6,7 @@
 # Languages: Rust
 # =============================================================================
 
-ARG BASE_IMAGE=codeopen-base:latest
+ARG BASE_IMAGE=agentpod-base:latest
 FROM ${BASE_IMAGE}
 
 LABEL maintainer="AgentPod Team"
@@ -67,7 +67,7 @@ RUN echo 'source "$HOME/.cargo/env"' >> /home/developer/.bashrc
 # =============================================================================
 # Flavor metadata
 # =============================================================================
-ENV CODEOPEN_FLAVOR="rust"
-ENV CODEOPEN_LANGUAGES="rust"
+ENV AGENTPOD_FLAVOR="rust"
+ENV AGENTPOD_LANGUAGES="rust"
 
 WORKDIR /home/workspace

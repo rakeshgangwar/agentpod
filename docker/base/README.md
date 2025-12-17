@@ -1,6 +1,6 @@
 # AgentPod Base Image
 
-Foundation layer for all AgentPod container flavors (codeopen-* images).
+Foundation layer for all AgentPod container flavors (agentpod-* images).
 
 ## Contents
 
@@ -37,12 +37,12 @@ Foundation layer for all AgentPod container flavors (codeopen-* images).
 
 This image is not meant to be used directly. Use one of the flavor images instead:
 
-- `codeopen-js` - JavaScript/TypeScript development
-- `codeopen-python` - Python development
-- `codeopen-go` - Go development
-- `codeopen-rust` - Rust development
-- `codeopen-fullstack` - JavaScript + Python
-- `codeopen-polyglot` - All languages
+- `agentpod-js` - JavaScript/TypeScript development
+- `agentpod-python` - Python development
+- `agentpod-go` - Go development
+- `agentpod-rust` - Rust development
+- `agentpod-fullstack` - JavaScript + Python
+- `agentpod-polyglot` - All languages
 
 ## Building
 
@@ -51,7 +51,7 @@ This image is not meant to be used directly. Use one of the flavor images instea
 ./scripts/build-base.sh
 
 # Or manually
-docker build -t codeopen-base:latest ./codeopen-base/
+docker build -t agentpod-base:latest ./agentpod-base/
 ```
 
 ## Extending
@@ -59,7 +59,7 @@ docker build -t codeopen-base:latest ./codeopen-base/
 To create a new flavor:
 
 ```dockerfile
-ARG BASE_IMAGE=codeopen-base:latest
+ARG BASE_IMAGE=agentpod-base:latest
 FROM ${BASE_IMAGE}
 
 # Add your language-specific packages
@@ -104,5 +104,5 @@ curl http://localhost:4097/agents
 
 /opt/
 ├── acp-gateway/           # ACP Gateway source
-└── codeopen/scripts/      # Shared scripts
+└── agentpod/scripts/      # Shared scripts
 ```

@@ -11,7 +11,7 @@
       (function() {
         try {
           // Apply dark mode class immediately
-          const mode = localStorage.getItem('codeopen-theme-mode');
+          const mode = localStorage.getItem('agentpod-theme-mode');
           const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
           const isDark = mode === 'dark' || (mode === 'system' && prefersDark) || (!mode && prefersDark);
           if (isDark) {

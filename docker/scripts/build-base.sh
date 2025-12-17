@@ -27,10 +27,10 @@ done
 
 # Determine image name (with or without registry prefix)
 if [ -n "$CONTAINER_REGISTRY" ]; then
-    IMAGE_NAME="${CONTAINER_REGISTRY}/codeopen-base"
+    IMAGE_NAME="${CONTAINER_REGISTRY}/agentpod-base"
     REGISTRY_DISPLAY="$CONTAINER_REGISTRY"
 else
-    IMAGE_NAME="codeopen-base"
+    IMAGE_NAME="agentpod-base"
     REGISTRY_DISPLAY="local"
 fi
 
@@ -44,7 +44,7 @@ echo "  Cache:    ${NO_CACHE:-enabled}"
 echo "=============================================="
 echo ""
 
-echo "Building codeopen-base..."
+echo "Building agentpod-base..."
 
 docker build $NO_CACHE \
     --platform "$BUILD_PLATFORM" \

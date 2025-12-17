@@ -508,8 +508,8 @@ rclone sync "${BACKUP_DIR}" "remote:agentpod-backups" --transfers 4
 # 1. Set up fresh VPS with Docker
 
 # 2. Clone repository
-git clone https://github.com/your-org/codeopen.git
-cd codeopen
+git clone https://github.com/your-org/agentpod.git
+cd agentpod
 
 # 3. Configure environment
 cp .env.example .env
@@ -526,10 +526,10 @@ docker compose exec postgres pg_isready -U agentpod
 
 # 7. Restore from backup
 # Copy backup file to server first
-scp backup.sql.gz user@new-server:/opt/codeopen/backups/
+scp backup.sql.gz user@new-server:/opt/agentpod/backups/
 
 # Restore
-gunzip -c /opt/codeopen/backups/backup.sql.gz | \
+gunzip -c /opt/agentpod/backups/backup.sql.gz | \
   docker compose exec -T postgres psql -U agentpod -d agentpod
 
 # 8. Start remaining services

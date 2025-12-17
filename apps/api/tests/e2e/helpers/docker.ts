@@ -10,7 +10,7 @@
  * - Execute commands inside containers
  * - Cleanup containers after tests
  * 
- * NOTE: E2E tests require Docker to be running and the codeopen-fullstack:latest
+ * NOTE: E2E tests require Docker to be running and the agentpod-fullstack:latest
  * image to be available locally.
  */
 
@@ -460,7 +460,7 @@ export function getE2EDockerClient(): E2EDockerClient {
 /**
  * Check if E2E tests can run (Docker available, image exists)
  */
-export async function canRunE2ETests(imageName: string = "codeopen-fullstack:latest"): Promise<{
+export async function canRunE2ETests(imageName: string = "agentpod-fullstack:latest"): Promise<{
   canRun: boolean;
   reason?: string;
 }> {

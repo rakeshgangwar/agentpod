@@ -6,7 +6,7 @@
 # Languages: Python
 # =============================================================================
 
-ARG BASE_IMAGE=codeopen-base:latest
+ARG BASE_IMAGE=agentpod-base:latest
 FROM ${BASE_IMAGE}
 
 LABEL maintainer="AgentPod Team"
@@ -105,7 +105,7 @@ RUN echo 'export PATH="/home/.local/bin:$PATH"' >> /home/developer/.bashrc
 # =============================================================================
 # Flavor metadata
 # =============================================================================
-ENV CODEOPEN_FLAVOR="python"
-ENV CODEOPEN_LANGUAGES="python"
+ENV AGENTPOD_FLAVOR="python"
+ENV AGENTPOD_LANGUAGES="python"
 
 WORKDIR /home/workspace

@@ -74,14 +74,14 @@ describe('SandboxManager Service', () => {
 
   describe('getImageForFlavor (private method, tested via behavior)', () => {
     test('should return development image in dev mode', () => {
-      // In development mode, should return 'codeopen-js:dev'
+      // In development mode, should return 'agentpod-js:dev'
       // This is tested via createSandbox behavior
       expect(true).toBe(true);
     });
 
     test('should return registry image in production', () => {
       // In production, should return full registry path
-      // Pattern: {registry}/{owner}/codeopen-{flavor}:{version}
+      // Pattern: {registry}/{owner}/agentpod-{flavor}:{version}
       expect(true).toBe(true);
     });
 
@@ -469,7 +469,7 @@ describe('MockDockerOrchestrator', () => {
     const config = {
       id: 'test-sandbox',
       name: 'Test Sandbox',
-      image: 'codeopen-js:dev',
+      image: 'agentpod-js:dev',
       workdir: '/workspace',
       labels: { 'agentpod.managed': 'true' },
     };

@@ -10,7 +10,7 @@
 # Arguments:
 #   --no-cache   - Build without Docker cache
 #   --flavors    - Comma-separated list of flavors to build (default: all)
-#   --skip-base  - Skip building base image (use existing codeopen-base:dev)
+#   --skip-base  - Skip building base image (use existing agentpod-base:dev)
 # =============================================================================
 
 set -e
@@ -119,7 +119,7 @@ build_image() {
 # Build base image
 if [ -z "$SKIP_BASE" ]; then
     echo ""
-    if build_image "codeopen-base:dev" \
+    if build_image "agentpod-base:dev" \
                    "$DOCKER_DIR/base/Dockerfile" \
                    "$DOCKER_DIR/base"; then
         SUCCESS_IMAGES="$SUCCESS_IMAGES base"
@@ -132,11 +132,11 @@ if [ -z "$SKIP_BASE" ]; then
         exit 1
     fi
 else
-    echo "Skipping base image build (using existing codeopen-base:dev)"
+    echo "Skipping base image build (using existing agentpod-base:dev)"
     
     # Verify base image exists
-    if ! docker image inspect codeopen-base:dev &>/dev/null; then
-        echo "ERROR: codeopen-base:dev not found. Run without --skip-base first."
+    if ! docker image inspect agentpod-base:dev &>/dev/null; then
+        echo "ERROR: agentpod-base:dev not found. Run without --skip-base first."
         exit 1
     fi
 fi
@@ -158,10 +158,10 @@ for flavor in $SELECTED_FLAVORS; do
     fi
     
     echo ""
-    if build_image "codeopen-${flavor}:dev" \
+    if build_image "agentpod-${flavor}:dev" \
                    "$dockerfile" \
                    "$DOCKER_DIR/flavors/$flavor" \
-                   "--build-arg BASE_IMAGE=codeopen-base:dev"; then
+                   "--build-arg BASE_IMAGE=agentpod-base:dev"; then
         SUCCESS_IMAGES="$SUCCESS_IMAGES $flavor"
         BUILD_SUCCESS=$((BUILD_SUCCESS + 1))
     else
@@ -184,14 +184,14 @@ echo "=============================================="
 echo ""
 echo "  Successful ($BUILD_SUCCESS):"
 for img in $SUCCESS_IMAGES; do
-    echo "    ✓ codeopen-${img}:dev"
+    echo "    ✓ agentpod-${img}:dev"
 done
 
 if [ -n "$FAILED_IMAGES" ]; then
     echo ""
     echo "  Failed ($BUILD_FAILED):"
     for img in $FAILED_IMAGES; do
-        echo "    ✗ codeopen-${img}:dev"
+        echo "    ✗ agentpod-${img}:dev"
     done
 fi
 
@@ -199,7 +199,7 @@ echo ""
 echo "  Time: ${MINUTES}m ${SECONDS}s"
 echo ""
 echo "  Built Images:"
-docker images --format "    {{.Repository}}:{{.Tag}}  {{.Size}}" | grep "codeopen.*:dev" | sort
+docker images --format "    {{.Repository}}:{{.Tag}}  {{.Size}}" | grep "agentpod.*:dev" | sort
 echo ""
 echo "=============================================="
 

@@ -42,7 +42,7 @@ Rust development environment.
 ## Usage
 
 ```bash
-docker run -it codeopen-rust:latest
+docker run -it agentpod-rust:latest
 ```
 
 ### Creating a New Project

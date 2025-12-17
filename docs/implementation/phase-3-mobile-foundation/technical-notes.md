@@ -34,14 +34,14 @@ Update `src-tauri/Cargo.toml`:
 
 ```toml
 [package]
-name = "codeopen"
+name = "agentpod"
 version = "0.1.0"
 description = "Portable Command Center for OpenCode"
 authors = ["you"]
 edition = "2021"
 
 [lib]
-name = "codeopen_lib"
+name = "agentpod_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
@@ -245,7 +245,7 @@ impl ApiClient {
 use keyring::Entry;
 use thiserror::Error;
 
-const SERVICE_NAME: &str = "codeopen";
+const SERVICE_NAME: &str = "agentpod";
 
 #[derive(Error, Debug)]
 pub enum StorageError {

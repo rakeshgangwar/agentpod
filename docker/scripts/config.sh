@@ -22,9 +22,9 @@ export FLAVORS_DIR="$DOCKER_DIR/flavors"
 
 # Base image (local by default)
 if [ -n "$CONTAINER_REGISTRY" ]; then
-    export BASE_IMAGE="${CONTAINER_REGISTRY}/codeopen-base:${CONTAINER_VERSION}"
+    export BASE_IMAGE="${CONTAINER_REGISTRY}/agentpod-base:${CONTAINER_VERSION}"
 else
-    export BASE_IMAGE="codeopen-base:${CONTAINER_VERSION}"
+    export BASE_IMAGE="agentpod-base:${CONTAINER_VERSION}"
 fi
 
 # Available flavors
@@ -35,14 +35,14 @@ export DEFAULT_FLAVOR="fullstack"
 # Default to native platform for better performance (especially on Apple Silicon)
 export BUILD_PLATFORM="${BUILD_PLATFORM:-linux/$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')}"
 
-# Image naming convention: codeopen-{flavor}:{version}
+# Image naming convention: agentpod-{flavor}:{version}
 # Returns local name by default, or registry-prefixed name if CONTAINER_REGISTRY is set
 get_image_name() {
     local flavor="$1"
     if [ -n "$CONTAINER_REGISTRY" ]; then
-        echo "${CONTAINER_REGISTRY}/codeopen-${flavor}"
+        echo "${CONTAINER_REGISTRY}/agentpod-${flavor}"
     else
-        echo "codeopen-${flavor}"
+        echo "agentpod-${flavor}"
     fi
 }
 

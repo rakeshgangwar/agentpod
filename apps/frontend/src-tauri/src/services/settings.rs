@@ -1,6 +1,6 @@
 //! Settings storage service
 //! 
-//! Manages local app settings in ~/.config/codeopen/settings.json
+//! Manages local app settings in ~/.config/agentpod/settings.json
 
 use crate::models::{AppError, AppSettings};
 use std::fs;
@@ -15,7 +15,7 @@ impl SettingsService {
         let config_dir = dirs::config_dir()
             .ok_or_else(|| AppError::StorageError("Could not find config directory".to_string()))?;
         
-        let app_config_dir = config_dir.join("codeopen");
+        let app_config_dir = config_dir.join("agentpod");
         if !app_config_dir.exists() {
             fs::create_dir_all(&app_config_dir)
                 .map_err(|e| AppError::StorageError(format!("Failed to create config dir: {}", e)))?;
@@ -74,7 +74,7 @@ mod tests {
         let path = SettingsService::get_settings_path();
         assert!(path.is_ok());
         let path = path.unwrap();
-        assert!(path.to_string_lossy().contains("codeopen"));
+        assert!(path.to_string_lossy().contains("agentpod"));
         assert!(path.to_string_lossy().contains("settings.json"));
     }
     

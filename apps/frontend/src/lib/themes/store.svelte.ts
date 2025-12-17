@@ -1,5 +1,5 @@
 /**
- * Theme Store for CodeOpen
+ * Theme Store for AgentPod
  * 
  * Modular theme management system that allows independent selection of:
  * - Color schemes (UI colors, accent colors)
@@ -19,12 +19,12 @@ import type { ThemeStyleProps, ThemeFonts, CustomThemeConfig } from "./presets/t
 // Storage Keys
 // =============================================================================
 
-const THEME_MODE_KEY = "codeopen-theme-mode";
-const THEME_COLOR_SCHEME_KEY = "codeopen-color-scheme";
-const THEME_FONT_PAIRING_KEY = "codeopen-font-pairing";
-const THEME_CUSTOM_THEMES_KEY = "codeopen-custom-themes";
+const THEME_MODE_KEY = "agentpod-theme-mode";
+const THEME_COLOR_SCHEME_KEY = "agentpod-color-scheme";
+const THEME_FONT_PAIRING_KEY = "agentpod-font-pairing";
+const THEME_CUSTOM_THEMES_KEY = "agentpod-custom-themes";
 
-// Legacy key (for migration)
+// Legacy key (for migration from old codeopen keys)
 const LEGACY_THEME_PRESET_KEY = "codeopen-theme-preset";
 
 // =============================================================================

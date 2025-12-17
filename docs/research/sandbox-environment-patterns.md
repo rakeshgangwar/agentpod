@@ -603,7 +603,7 @@ code-server = true
 
 | agentpod.toml | Current Docker System |
 |---------------|----------------------|
-| `base = "fullstack"` | `codeopen-fullstack` image |
+| `base = "fullstack"` | `agentpod-fullstack` image |
 | `services.postgres` | `databases` addon |
 | `addons.gui = true` | `gui` addon |
 | `addons.code-server = true` | `code-server` addon |
@@ -615,7 +615,7 @@ For users who need full control, support devcontainer.json directly:
 ```json
 {
   "name": "Advanced Project",
-  "image": "forgejo.superchotu.com/rakeshgangwar/codeopen-fullstack:latest",
+  "image": "forgejo.superchotu.com/rakeshgangwar/agentpod-fullstack:latest",
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
     "ghcr.io/agentpod/features/mcp-servers:1": {}
@@ -701,7 +701,7 @@ ephemeral:
 version: '3.8'
 services:
   dev:
-    image: codeopen-fullstack:latest
+    image: agentpod-fullstack:latest
     volumes:
       - .:/home/workspace
       - npm-cache:/home/.npm
@@ -823,7 +823,7 @@ agentpod logs                    # Stream logs
 │  └── Docker multi-stage builds with feature composition             │
 │                                                                      │
 │  Base Images:                                                        │
-│  └── Current codeopen-{flavor} images                               │
+│  └── Current agentpod-{flavor} images                               │
 │                                                                      │
 │  Runtime:                                                            │
 │  └── Docker (local) OR Coolify/K8s (production)                     │

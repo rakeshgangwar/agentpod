@@ -8,7 +8,7 @@ use crate::models::{AppError, ConnectionConfig};
 use std::fs;
 use std::path::PathBuf;
 
-const SERVICE_NAME: &str = "codeopen";
+const SERVICE_NAME: &str = "agentpod";
 const CONFIG_KEY: &str = "connection_config";
 
 /// Storage service for managing connection configuration
@@ -20,7 +20,7 @@ impl StorageService {
         let config_dir = dirs::config_dir()
             .ok_or_else(|| AppError::StorageError("Could not find config directory".to_string()))?;
         
-        let app_config_dir = config_dir.join("codeopen");
+        let app_config_dir = config_dir.join("agentpod");
         if !app_config_dir.exists() {
             fs::create_dir_all(&app_config_dir)
                 .map_err(|e| AppError::StorageError(format!("Failed to create config dir: {}", e)))?;
@@ -113,6 +113,6 @@ mod tests {
         let path = StorageService::get_config_path();
         assert!(path.is_ok());
         let path = path.unwrap();
-        assert!(path.to_string_lossy().contains("codeopen"));
+        assert!(path.to_string_lossy().contains("agentpod"));
     }
 }

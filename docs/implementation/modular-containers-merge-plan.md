@@ -24,7 +24,7 @@ This document outlines the plan to merge the `feature/modular-containers` branch
 
 | Current (monorepo) | Modular Branch | Target |
 |--------------------|----------------|--------|
-| `docker/containers/cli/` | `docker/codeopen-base/` | `docker/base/` |
+| `docker/containers/cli/` | `docker/agentpod-base/` | `docker/base/` |
 | `docker/containers/desktop/` | `docker/flavors/*` | `docker/flavors/*` |
 | - | `docker/addons/*` | `docker/addons/*` |
 | `docker/scripts/` | `docker/scripts/` | `docker/scripts/` |
@@ -65,13 +65,13 @@ Extract from `feature/modular-containers`:
 
 ```bash
 # Base image
-git show origin/feature/modular-containers:docker/codeopen-base/Dockerfile > docker/base/Dockerfile
-git show origin/feature/modular-containers:docker/codeopen-base/README.md > docker/base/README.md
-git show origin/feature/modular-containers:docker/codeopen-base/entrypoint.sh > docker/base/entrypoint.sh
+git show origin/feature/modular-containers:docker/agentpod-base/Dockerfile > docker/base/Dockerfile
+git show origin/feature/modular-containers:docker/agentpod-base/README.md > docker/base/README.md
+git show origin/feature/modular-containers:docker/agentpod-base/entrypoint.sh > docker/base/entrypoint.sh
 
 # Copy scripts
 mkdir -p docker/base/scripts
-git show origin/feature/modular-containers:docker/codeopen-base/scripts/common-setup.sh > docker/base/scripts/common-setup.sh
+git show origin/feature/modular-containers:docker/agentpod-base/scripts/common-setup.sh > docker/base/scripts/common-setup.sh
 
 # Copy ACP Gateway
 mkdir -p docker/base/acp-gateway/src
@@ -82,7 +82,7 @@ mkdir -p docker/base/acp-gateway/src
 
 ```
 docker/
-├── base/                          # codeopen-base image
+├── base/                          # agentpod-base image
 │   ├── Dockerfile
 │   ├── README.md
 │   ├── entrypoint.sh

@@ -46,7 +46,7 @@ push_image() {
 }
 
 push_base() {
-    push_image "${REGISTRY_URL}/codeopen-base"
+    push_image "${REGISTRY_URL}/agentpod-base"
 }
 
 push_flavor() {
@@ -64,7 +64,7 @@ push_flavor() {
         exit 1
     fi
     
-    push_image "${REGISTRY_URL}/codeopen-${flavor}"
+    push_image "${REGISTRY_URL}/agentpod-${flavor}"
 }
 
 push_addon() {
@@ -83,7 +83,7 @@ push_addon() {
         exit 1
     fi
     
-    push_image "${REGISTRY_URL}/codeopen-${base_flavor}-${addon}"
+    push_image "${REGISTRY_URL}/agentpod-${base_flavor}-${addon}"
 }
 
 push_all() {

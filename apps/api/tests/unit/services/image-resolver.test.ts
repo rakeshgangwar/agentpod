@@ -47,7 +47,7 @@ describe('Image Resolver Service', () => {
       const result = resolveImage({ flavorId: 'js' });
       
       expect(result.flavor.id).toBe('js');
-      expect(result.imageName).toContain('codeopen-js');
+      expect(result.imageName).toContain('agentpod-js');
     });
 
     test('should add warning for non-existent flavor', () => {

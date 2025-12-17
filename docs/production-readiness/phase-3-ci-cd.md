@@ -389,7 +389,7 @@ jobs:
           else
             echo "dockerfile=docker/flavors/${{ matrix.image }}/Dockerfile" >> $GITHUB_OUTPUT
             echo "context=docker/flavors/${{ matrix.image }}" >> $GITHUB_OUTPUT
-            echo "build_args=BASE_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/codeopen-base:${{ steps.version.outputs.VERSION }}" >> $GITHUB_OUTPUT
+            echo "build_args=BASE_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/agentpod-base:${{ steps.version.outputs.VERSION }}" >> $GITHUB_OUTPUT
           fi
 
       - name: Build and push
@@ -402,8 +402,8 @@ jobs:
             CONTAINER_VERSION=${{ steps.version.outputs.VERSION }}
             ${{ steps.context.outputs.build_args }}
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/codeopen-${{ matrix.image }}:${{ steps.version.outputs.VERSION }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/codeopen-${{ matrix.image }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/agentpod-${{ matrix.image }}:${{ steps.version.outputs.VERSION }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/agentpod-${{ matrix.image }}:latest
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
           platforms: linux/amd64
@@ -611,12 +611,12 @@ Configure these in GitHub repository settings → Branches:
 The workflow automatically pushes to GitHub Container Registry (ghcr.io). Images are available at:
 
 ```
-ghcr.io/<owner>/codeopen/api:latest
-ghcr.io/<owner>/codeopen/codeopen-base:latest
-ghcr.io/<owner>/codeopen/codeopen-js:latest
-ghcr.io/<owner>/codeopen/codeopen-python:latest
-ghcr.io/<owner>/codeopen/codeopen-rust:latest
-ghcr.io/<owner>/codeopen/codeopen-fullstack:latest
+ghcr.io/<owner>/agentpod/api:latest
+ghcr.io/<owner>/agentpod/agentpod-base:latest
+ghcr.io/<owner>/agentpod/agentpod-js:latest
+ghcr.io/<owner>/agentpod/agentpod-python:latest
+ghcr.io/<owner>/agentpod/agentpod-rust:latest
+ghcr.io/<owner>/agentpod/agentpod-fullstack:latest
 ```
 
 ### Making Images Public (Optional)

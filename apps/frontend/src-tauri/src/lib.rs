@@ -63,7 +63,7 @@ pub fn run() {
     // Initialize tracing subscriber for logging
     tracing_subscriber::registry()
         .with(fmt::layer())
-        .with(EnvFilter::from_default_env().add_directive("codeopen_lib=debug".parse().unwrap()))
+        .with(EnvFilter::from_default_env().add_directive("agentpod_lib=debug".parse().unwrap()))
         .init();
     
     tracing::info!("Starting AgentPod with tracing enabled");
