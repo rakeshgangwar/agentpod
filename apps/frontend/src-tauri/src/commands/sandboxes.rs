@@ -661,8 +661,13 @@ pub async fn sandbox_opencode_connect_stream(
                         Some(Ok(bytes)) => {
                             chunk_count += 1;
                             let text = String::from_utf8_lossy(&bytes);
-                            tracing::debug!("SSE chunk #{} ({} bytes): {:?}", chunk_count, bytes.len(), 
-                                if text.len() > 200 { format!("{}...", &text[..200]) } else { text.to_string() });
+                            tracing::info!(
+                                "SSE chunk #{} for {}: {} bytes, raw={:?}",
+                                chunk_count,
+                                sandbox_id,
+                                bytes.len(),
+                                if text.len() > 500 { format!("{}...", &text[..500]) } else { text.to_string() }
+                            );
                             buffer.push_str(&text);
                             
                             // Process complete SSE events from buffer
@@ -683,7 +688,21 @@ pub async fn sandbox_opencode_connect_stream(
                             }
                         }
                         Some(Err(e)) => {
-                            tracing::error!("SSE stream error for sandbox {}: {}", sandbox_id, e);
+                            tracing::error!(
+                                "SSE stream error for sandbox {}: error={:?}, \
+                                 chunks_received={}, events_emitted={}, \
+                                 buffer_len={}, buffer_preview={:?}",
+                                sandbox_id,
+                                e,
+                                chunk_count,
+                                event_count,
+                                buffer.len(),
+                                if buffer.len() > 500 { 
+                                    format!("{}...", &buffer[..500]) 
+                                } else { 
+                                    buffer.clone() 
+                                }
+                            );
                             // Emit error status
                             let _ = app_clone.emit(
                                 "opencode:stream-status",

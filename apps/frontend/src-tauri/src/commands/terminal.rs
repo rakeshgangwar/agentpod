@@ -250,7 +250,7 @@ pub async fn terminal_connect(
                         }
                     };
 
-                    if let Err(e) = ws_write.send(Message::Text(json)).await {
+                    if let Err(e) = ws_write.send(Message::Text(json.into())).await {
                         tracing::error!("Failed to send WebSocket message: {}", e);
                         break;
                     }

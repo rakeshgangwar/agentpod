@@ -312,8 +312,8 @@ pub async fn upsert_user_opencode_file(
         extension: Option<String>,
     }
     
-    // API returns the file fields directly (not wrapped in "file" object)
     #[derive(serde::Deserialize)]
+    #[allow(dead_code)]
     struct Response {
         #[serde(default)]
         success: bool,
