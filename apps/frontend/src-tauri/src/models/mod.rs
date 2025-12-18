@@ -411,6 +411,121 @@ pub struct GitCommitResponse {
     pub message: String,
 }
 
+// =============================================================================
+// Git Branch and Diff Types
+// =============================================================================
+
+/// Git branch info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitBranch {
+    pub name: String,
+    #[serde(rename = "ref")]
+    pub git_ref: String,
+    pub sha: String,
+    pub current: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub upstream: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ahead: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub behind: Option<u32>,
+}
+
+/// Git branches list response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitBranchesResponse {
+    pub branches: Vec<GitBranch>,
+    pub current: String,
+}
+
+/// Git create branch input
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitCreateBranchInput {
+    pub name: String,
+    #[serde(rename = "ref", skip_serializing_if = "Option::is_none")]
+    pub from_ref: Option<String>,
+}
+
+/// Git checkout input
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitCheckoutInput {
+    pub branch: String,
+}
+
+/// Git diff summary (changed files)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitDiffSummary {
+    pub added: Vec<String>,
+    pub modified: Vec<String>,
+    pub deleted: Vec<String>,
+    pub renamed: Vec<GitRenamedFile>,
+}
+
+/// Git renamed file info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitRenamedFile {
+    pub from: String,
+    pub to: String,
+}
+
+/// Git diff summary response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitDiffResponse {
+    pub diff: GitDiffSummary,
+}
+
+/// A single line in a diff hunk
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitDiffLine {
+    /// Type of change: "context", "addition", "deletion"
+    #[serde(rename = "type")]
+    pub line_type: String,
+    pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub old_line_number: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub new_line_number: Option<u32>,
+}
+
+/// A hunk represents a contiguous section of changes
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitDiffHunk {
+    pub old_start: u32,
+    pub old_lines: u32,
+    pub new_start: u32,
+    pub new_lines: u32,
+    pub lines: Vec<GitDiffLine>,
+}
+
+/// Git file diff with structured hunks
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitFileDiff {
+    pub path: String,
+    /// Status: "added", "modified", "deleted", "renamed"
+    pub status: String,
+    pub additions: u32,
+    pub deletions: u32,
+    #[serde(default)]
+    pub hunks: Vec<GitDiffHunk>,
+}
+
+/// Git file diff response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitFileDiffResponse {
+    pub file_diff: GitFileDiff,
+}
+
 /// Docker health response
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

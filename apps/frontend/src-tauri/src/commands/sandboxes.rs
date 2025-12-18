@@ -7,6 +7,7 @@ use crate::models::{
     AppError, CreateSandboxInput, DockerHealthResponse, ExecCommandInput, ExecResult,
     GitCommitInput, GitCommitResponse, GitLogResponse, GitStatusResponse, Sandbox,
     SandboxInfo, SandboxLogsResponse, SandboxStats, SandboxStatsResponse, SandboxWithRepo,
+    SuccessResponse,
 };
 use crate::services::ApiClient;
 
@@ -247,6 +248,102 @@ pub async fn commit_sandbox_changes(id: String, message: String) -> Result<GitCo
     let input = GitCommitInput { message };
     client
         .post(&format!("/api/v2/sandboxes/{}/git/commit", id), &input)
+        .await
+}
+
+// =============================================================================
+// Git Branch Operations
+// =============================================================================
+
+use crate::models::{
+    GitBranchesResponse, GitCheckoutInput, GitCreateBranchInput, 
+    GitDiffResponse, GitFileDiffResponse,
+};
+
+/// List all branches in a sandbox's repository
+#[tauri::command]
+pub async fn list_sandbox_branches(id: String) -> Result<GitBranchesResponse, AppError> {
+    let client = get_client()?;
+    client
+        .get(&format!("/api/v2/sandboxes/{}/git/branches", id))
+        .await
+}
+
+/// Create a new branch in a sandbox's repository
+#[tauri::command]
+pub async fn create_sandbox_branch(
+    id: String,
+    name: String,
+    from_ref: Option<String>,
+) -> Result<(), AppError> {
+    let client = get_client()?;
+    let input = GitCreateBranchInput { name, from_ref };
+    let _: SuccessResponse = client
+        .post(&format!("/api/v2/sandboxes/{}/git/branches", id), &input)
+        .await?;
+    Ok(())
+}
+
+/// Checkout a branch in a sandbox's repository
+#[tauri::command]
+pub async fn checkout_sandbox_branch(id: String, branch: String) -> Result<(), AppError> {
+    let client = get_client()?;
+    let input = GitCheckoutInput { branch };
+    let _: SuccessResponse = client
+        .post(&format!("/api/v2/sandboxes/{}/git/checkout", id), &input)
+        .await?;
+    Ok(())
+}
+
+/// Delete a branch in a sandbox's repository
+#[tauri::command]
+pub async fn delete_sandbox_branch(id: String, branch: String) -> Result<(), AppError> {
+    let client = get_client()?;
+    // URL encode the branch name in case it contains slashes
+    let encoded_branch = urlencoding::encode(&branch);
+    let _: SuccessResponse = client
+        .delete(&format!("/api/v2/sandboxes/{}/git/branches/{}", id, encoded_branch))
+        .await?;
+    Ok(())
+}
+
+// =============================================================================
+// Git Diff Operations
+// =============================================================================
+
+/// Get diff summary for a sandbox's repository (list of changed files)
+#[tauri::command]
+pub async fn get_sandbox_diff(
+    id: String,
+    from_ref: Option<String>,
+    to_ref: Option<String>,
+) -> Result<GitDiffResponse, AppError> {
+    let client = get_client()?;
+    let mut url = format!("/api/v2/sandboxes/{}/git/diff", id);
+    let mut params = Vec::new();
+    
+    if let Some(from) = from_ref {
+        params.push(format!("from={}", urlencoding::encode(&from)));
+    }
+    if let Some(to) = to_ref {
+        params.push(format!("to={}", urlencoding::encode(&to)));
+    }
+    
+    if !params.is_empty() {
+        url.push('?');
+        url.push_str(&params.join("&"));
+    }
+    
+    client.get(&url).await
+}
+
+/// Get detailed diff for a specific file with hunks
+#[tauri::command]
+pub async fn get_sandbox_file_diff(id: String, file_path: String) -> Result<GitFileDiffResponse, AppError> {
+    let client = get_client()?;
+    let encoded_path = urlencoding::encode(&file_path);
+    client
+        .get(&format!("/api/v2/sandboxes/{}/git/diff/file?path={}", id, encoded_path))
         .await
 }
 

@@ -26,7 +26,14 @@ import type {
   FileDiff,
   GitConfig,
   GitError,
+  DiffHunk,
 } from "./types";
+import {
+  parseUnifiedDiff,
+  createAddedFileHunks,
+  createDeletedFileHunks,
+  countChanges,
+} from "./diff-parser";
 
 // =============================================================================
 // Configuration
@@ -1225,15 +1232,73 @@ flavor = "js"
       return null; // File doesn't exist in either
     }
 
-    // Count additions and deletions (simple line-based)
-    const fromLines = fromContent?.split("\n") ?? [];
-    const toLines = toContent?.split("\n") ?? [];
+    // Generate hunks based on file type
+    let hunks: DiffHunk[] = [];
+    
+    if (type === "add" && toContent) {
+      // New file - entire content is additions
+      hunks = createAddedFileHunks(toContent);
+    } else if (type === "delete" && fromContent) {
+      // Deleted file - entire content is deletions
+      hunks = createDeletedFileHunks(fromContent);
+    } else if (type === "modify" && fromContent && toContent) {
+      // Modified file - compute diff using git diff
+      // Use exec to get unified diff from git
+      try {
+        const { execSync } = await import("child_process");
+        const diffOutput = execSync(
+          `git diff --no-color HEAD -- "${filePath}"`,
+          { 
+            cwd: repoPath, 
+            encoding: "utf-8",
+            maxBuffer: 10 * 1024 * 1024, // 10MB buffer
+          }
+        );
+        hunks = parseUnifiedDiff(diffOutput);
+      } catch {
+        // Fallback: simple line-by-line comparison
+        // This creates a basic hunk showing all changes
+        const fromLines = fromContent.split("\n");
+        const toLines = toContent.split("\n");
+        
+        // Remove trailing empty lines
+        while (fromLines.length > 0 && fromLines[fromLines.length - 1] === "") {
+          fromLines.pop();
+        }
+        while (toLines.length > 0 && toLines[toLines.length - 1] === "") {
+          toLines.pop();
+        }
+        
+        hunks = [{
+          oldStart: 1,
+          oldLines: fromLines.length,
+          newStart: 1,
+          newLines: toLines.length,
+          lines: [
+            ...fromLines.map((line, i) => ({
+              type: "deletion" as const,
+              content: line,
+              oldLineNumber: i + 1,
+            })),
+            ...toLines.map((line, i) => ({
+              type: "addition" as const,
+              content: line,
+              newLineNumber: i + 1,
+            })),
+          ],
+        }];
+      }
+    }
+
+    // Count additions and deletions from hunks
+    const { additions, deletions } = countChanges(hunks);
 
     return {
       path: filePath,
       type,
-      additions: type === "delete" ? 0 : toLines.length,
-      deletions: type === "add" ? 0 : fromLines.length,
+      additions,
+      deletions,
+      hunks,
     };
   }
 

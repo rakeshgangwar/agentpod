@@ -381,6 +381,46 @@ export interface FileDiff {
 
   /** Number of lines deleted */
   deletions: number;
+
+  /** Structured hunks for rich diff display */
+  hunks?: DiffHunk[];
+}
+
+/**
+ * A hunk represents a contiguous section of changes in a diff
+ */
+export interface DiffHunk {
+  /** Starting line number in the old file */
+  oldStart: number;
+
+  /** Number of lines in the old file for this hunk */
+  oldLines: number;
+
+  /** Starting line number in the new file */
+  newStart: number;
+
+  /** Number of lines in the new file for this hunk */
+  newLines: number;
+
+  /** The individual lines in this hunk */
+  lines: DiffLine[];
+}
+
+/**
+ * A single line in a diff hunk
+ */
+export interface DiffLine {
+  /** Type of change */
+  type: "context" | "addition" | "deletion";
+
+  /** The content of the line (without the +/- prefix) */
+  content: string;
+
+  /** Line number in the old file (for context and deletion) */
+  oldLineNumber?: number;
+
+  /** Line number in the new file (for context and addition) */
+  newLineNumber?: number;
 }
 
 // ============================================================================

@@ -854,6 +854,76 @@ export interface GitCommitResponse {
   message: string;
 }
 
+// =============================================================================
+// Git Branch Types
+// =============================================================================
+
+export interface GitBranch {
+  name: string;
+  ref: string;
+  sha: string;
+  current: boolean;
+  upstream?: string;
+  ahead?: number;
+  behind?: number;
+}
+
+export interface GitBranchesResponse {
+  branches: GitBranch[];
+  current: string;
+}
+
+// =============================================================================
+// Git Diff Types
+// =============================================================================
+
+export interface GitRenamedFile {
+  from: string;
+  to: string;
+}
+
+export interface GitDiffSummary {
+  added: string[];
+  modified: string[];
+  deleted: string[];
+  renamed: GitRenamedFile[];
+}
+
+export interface GitDiffResponse {
+  diff: GitDiffSummary;
+}
+
+export type DiffLineType = "context" | "addition" | "deletion";
+
+export interface GitDiffLine {
+  type: DiffLineType;
+  content: string;
+  oldLineNumber?: number;
+  newLineNumber?: number;
+}
+
+export interface GitDiffHunk {
+  oldStart: number;
+  oldLines: number;
+  newStart: number;
+  newLines: number;
+  lines: GitDiffLine[];
+}
+
+export type GitDiffFileStatus = "added" | "modified" | "deleted" | "renamed";
+
+export interface GitFileDiff {
+  path: string;
+  status: GitDiffFileStatus;
+  additions: number;
+  deletions: number;
+  hunks: GitDiffHunk[];
+}
+
+export interface GitFileDiffResponse {
+  fileDiff: GitFileDiff;
+}
+
 export interface DockerContainerStats {
   running: number;
   stopped: number;
@@ -1008,6 +1078,72 @@ export async function getSandboxGitLog(id: string): Promise<GitLogResponse> {
  */
 export async function commitSandboxChanges(id: string, message: string): Promise<GitCommitResponse> {
   return invoke<GitCommitResponse>("commit_sandbox_changes", { id, message });
+}
+
+// =============================================================================
+// Git Branch Commands
+// =============================================================================
+
+/**
+ * List all branches in a sandbox's repository
+ */
+export async function listSandboxBranches(id: string): Promise<GitBranchesResponse> {
+  return invoke<GitBranchesResponse>("list_sandbox_branches", { id });
+}
+
+/**
+ * Create a new branch in a sandbox's repository
+ * @param id - Sandbox ID
+ * @param name - New branch name
+ * @param fromRef - Optional ref (commit SHA or branch name) to create branch from
+ */
+export async function createSandboxBranch(id: string, name: string, fromRef?: string): Promise<void> {
+  return invoke("create_sandbox_branch", { id, name, fromRef });
+}
+
+/**
+ * Checkout a branch in a sandbox's repository
+ * @param id - Sandbox ID
+ * @param branch - Branch name to checkout
+ */
+export async function checkoutSandboxBranch(id: string, branch: string): Promise<void> {
+  return invoke("checkout_sandbox_branch", { id, branch });
+}
+
+/**
+ * Delete a branch in a sandbox's repository
+ * @param id - Sandbox ID
+ * @param branch - Branch name to delete
+ */
+export async function deleteSandboxBranch(id: string, branch: string): Promise<void> {
+  return invoke("delete_sandbox_branch", { id, branch });
+}
+
+// =============================================================================
+// Git Diff Commands
+// =============================================================================
+
+/**
+ * Get diff summary for a sandbox's repository (list of changed files)
+ * @param id - Sandbox ID
+ * @param fromRef - Optional starting ref (defaults to HEAD)
+ * @param toRef - Optional ending ref (defaults to working tree)
+ */
+export async function getSandboxDiff(
+  id: string,
+  fromRef?: string,
+  toRef?: string
+): Promise<GitDiffResponse> {
+  return invoke<GitDiffResponse>("get_sandbox_diff", { id, fromRef, toRef });
+}
+
+/**
+ * Get detailed diff for a specific file with hunks
+ * @param id - Sandbox ID
+ * @param filePath - Path to the file relative to repo root
+ */
+export async function getSandboxFileDiff(id: string, filePath: string): Promise<GitFileDiffResponse> {
+  return invoke<GitFileDiffResponse>("get_sandbox_file_diff", { id, filePath });
 }
 
 // =============================================================================

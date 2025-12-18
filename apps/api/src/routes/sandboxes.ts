@@ -25,6 +25,8 @@ import { getSandboxManager } from "../services/sandbox-manager.ts";
 import { opencodeV2, OpenCodeV2Error, cachePermission, uncachePermission } from "../services/opencode-v2.ts";
 import type { Permission } from "../services/opencode-v2.ts";
 import { createLogger } from "../utils/logger.ts";
+import { getFlavorById, getDefaultFlavor } from "../models/container-flavor.ts";
+import { getResourceTierById, getDefaultResourceTier } from "../models/resource-tier.ts";
 
 const log = createLogger("sandbox-routes");
 
@@ -52,8 +54,9 @@ const createSandboxSchema = z.object({
   description: z.string().max(500).optional(),
   githubUrl: z.string().url().optional(),
   userId: z.string().min(1),
-  flavor: z.enum(["js", "python", "go", "rust", "fullstack", "polyglot"]).optional(),
-  resourceTier: z.enum(["starter", "builder", "creator", "power"]).optional(),
+  // Dynamic validation: accept any string, validate against DB in handler
+  flavor: z.string().optional(),
+  resourceTier: z.string().optional(),
   addons: z.array(z.string()).optional(),
   autoStart: z.boolean().optional(),
 });
@@ -116,14 +119,43 @@ export const sandboxRoutes = new Hono()
     log.info("Creating sandbox", { name: body.name, userId: body.userId });
 
     try {
+      // Validate flavor against database
+      let flavorId = body.flavor;
+      if (flavorId) {
+        const flavor = await getFlavorById(flavorId);
+        if (!flavor) {
+          return c.json({ error: `Invalid flavor: '${flavorId}'. Flavor does not exist.` }, 400);
+        }
+        if (!flavor.enabled) {
+          return c.json({ error: `Flavor '${flavorId}' is currently disabled.` }, 400);
+        }
+      } else {
+        // Use default flavor if not specified
+        const defaultFlavor = await getDefaultFlavor();
+        flavorId = defaultFlavor?.id;
+      }
+
+      // Validate resourceTier against database
+      let resourceTierId = body.resourceTier;
+      if (resourceTierId) {
+        const tier = await getResourceTierById(resourceTierId);
+        if (!tier) {
+          return c.json({ error: `Invalid resource tier: '${resourceTierId}'. Tier does not exist.` }, 400);
+        }
+      } else {
+        // Use default tier if not specified
+        const defaultTier = await getDefaultResourceTier();
+        resourceTierId = defaultTier?.id;
+      }
+
       const manager = getSandboxManager();
       const result = await manager.createSandbox({
         name: body.name,
         description: body.description,
         githubUrl: body.githubUrl,
         userId: body.userId,
-        flavor: body.flavor,
-        resourceTier: body.resourceTier,
+        flavor: flavorId,
+        resourceTier: resourceTierId,
         addons: body.addons,
         autoStart: body.autoStart,
       });
@@ -473,6 +505,153 @@ export const sandboxRoutes = new Hono()
       return c.json(
         { error: "Failed to get git log", details: error instanceof Error ? error.message : "Unknown error" },
         500
+      );
+    }
+  })
+
+  // ===========================================================================
+  // Git Operations: List Branches
+  // ===========================================================================
+  .get("/:id/git/branches", async (c) => {
+    const id = c.req.param("id");
+
+    try {
+      const manager = getSandboxManager();
+      const result = await manager.listBranches(id);
+
+      return c.json(result);
+    } catch (error) {
+      log.error("Failed to list branches", { id, error });
+      return c.json(
+        { error: "Failed to list branches", details: error instanceof Error ? error.message : "Unknown error" },
+        500
+      );
+    }
+  })
+
+  // ===========================================================================
+  // Git Operations: Create Branch
+  // ===========================================================================
+  .post("/:id/git/branches", zValidator("json", z.object({
+    name: z.string().min(1).max(200).regex(/^[a-zA-Z0-9._/-]+$/, "Invalid branch name"),
+    ref: z.string().optional(),
+  })), async (c) => {
+    const id = c.req.param("id");
+    const { name, ref } = c.req.valid("json");
+
+    log.info("Creating branch in sandbox", { id, branchName: name, ref });
+
+    try {
+      const manager = getSandboxManager();
+      await manager.createBranch(id, name, ref);
+
+      return c.json({ success: true, branch: name, message: "Branch created" }, 201);
+    } catch (error) {
+      log.error("Failed to create branch", { id, error });
+      return c.json(
+        { error: "Failed to create branch", details: error instanceof Error ? error.message : "Unknown error" },
+        500
+      );
+    }
+  })
+
+  // ===========================================================================
+  // Git Operations: Checkout Branch
+  // ===========================================================================
+  .post("/:id/git/checkout", zValidator("json", z.object({
+    branch: z.string().min(1).max(200),
+  })), async (c) => {
+    const id = c.req.param("id");
+    const { branch } = c.req.valid("json");
+
+    log.info("Checking out branch in sandbox", { id, branch });
+
+    try {
+      const manager = getSandboxManager();
+      await manager.checkoutBranch(id, branch);
+
+      return c.json({ success: true, branch, message: "Branch checked out" });
+    } catch (error) {
+      log.error("Failed to checkout branch", { id, error });
+      return c.json(
+        { error: "Failed to checkout branch", details: error instanceof Error ? error.message : "Unknown error" },
+        500
+      );
+    }
+  })
+
+  // ===========================================================================
+  // Git Operations: Delete Branch
+  // ===========================================================================
+  .delete("/:id/git/branches/:branch", async (c) => {
+    const id = c.req.param("id");
+    // URL decode the branch name in case it contains slashes (e.g., feature/my-branch)
+    const branch = decodeURIComponent(c.req.param("branch"));
+
+    log.info("Deleting branch in sandbox", { id, branch });
+
+    try {
+      const manager = getSandboxManager();
+      await manager.deleteBranch(id, branch);
+
+      return c.json({ success: true, message: `Branch '${branch}' deleted` });
+    } catch (error) {
+      log.error("Failed to delete branch", { id, error });
+      const message = error instanceof Error ? error.message : "Unknown error";
+      // Return 400 if trying to delete current branch
+      const status = message.includes("Cannot delete the current branch") ? 400 : 500;
+      return c.json(
+        { error: "Failed to delete branch", details: message },
+        status
+      );
+    }
+  })
+
+  // ===========================================================================
+  // Git Operations: Get Diff Summary
+  // ===========================================================================
+  .get("/:id/git/diff", async (c) => {
+    const id = c.req.param("id");
+    const from = c.req.query("from");
+    const to = c.req.query("to");
+
+    try {
+      const manager = getSandboxManager();
+      const diff = await manager.getDiff(id, { from, to });
+
+      return c.json({ diff });
+    } catch (error) {
+      log.error("Failed to get diff", { id, error });
+      return c.json(
+        { error: "Failed to get diff", details: error instanceof Error ? error.message : "Unknown error" },
+        500
+      );
+    }
+  })
+
+  // ===========================================================================
+  // Git Operations: Get File Diff
+  // ===========================================================================
+  .get("/:id/git/diff/file", async (c) => {
+    const id = c.req.param("id");
+    const filePath = c.req.query("path");
+
+    if (!filePath) {
+      return c.json({ error: "Path query parameter is required" }, 400);
+    }
+
+    try {
+      const manager = getSandboxManager();
+      const fileDiff = await manager.getFileDiff(id, decodeURIComponent(filePath));
+
+      return c.json({ fileDiff });
+    } catch (error) {
+      log.error("Failed to get file diff", { id, filePath, error });
+      const message = error instanceof Error ? error.message : "Unknown error";
+      const status = message.includes("File not found") ? 404 : 500;
+      return c.json(
+        { error: "Failed to get file diff", details: message },
+        status
       );
     }
   })

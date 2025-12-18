@@ -20,6 +20,9 @@ use commands::{
     get_sandbox_logs, get_sandbox_stats, get_sandbox_status,
     exec_in_sandbox,
     get_sandbox_git_status, get_sandbox_git_log, commit_sandbox_changes,
+    // Git branch and diff commands
+    list_sandbox_branches, create_sandbox_branch, checkout_sandbox_branch,
+    delete_sandbox_branch, get_sandbox_diff, get_sandbox_file_diff,
     // Sandbox OpenCode commands (v2)
     sandbox_opencode_get_app_info, sandbox_opencode_health_check, sandbox_opencode_get_providers,
     sandbox_opencode_get_agents,
@@ -107,6 +110,13 @@ pub fn run() {
             get_sandbox_git_status,
             get_sandbox_git_log,
             commit_sandbox_changes,
+            // Git branch and diff commands
+            list_sandbox_branches,
+            create_sandbox_branch,
+            checkout_sandbox_branch,
+            delete_sandbox_branch,
+            get_sandbox_diff,
+            get_sandbox_file_diff,
             // Sandbox OpenCode commands (v2)
             sandbox_opencode_get_app_info,
             sandbox_opencode_health_check,

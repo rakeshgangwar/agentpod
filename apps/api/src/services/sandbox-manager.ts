@@ -36,6 +36,7 @@ import * as SandboxModel from "../models/sandbox.ts";
 import type { Sandbox as DbSandbox, SandboxStatus as DbSandboxStatus } from "../models/sandbox.ts";
 import { getOpenCodeSyncService } from "./sync/opencode-sync.ts";
 import { onboardingService } from "./onboarding-service.ts";
+import { getResourceTierById } from "../models/resource-tier.ts";
 
 const log = createLogger("sandbox-manager");
 
@@ -443,7 +444,7 @@ export class SandboxManager {
 
     // Override with explicit options if provided
     containerSpec.image = this.getImageForFlavor(flavor);
-    const tierResources = this.getResourcesForTier(resourceTier);
+    const tierResources = await this.getResourcesForTier(resourceTier);
     containerSpec.resources = {
       ...containerSpec.resources,
       ...tierResources,
@@ -1013,6 +1014,116 @@ export class SandboxManager {
     return this.gitBackend.getLog(repo.name, options);
   }
 
+  /**
+   * List all branches in a sandbox's repository
+   */
+  async listBranches(sandboxId: string) {
+    const repo = await this.getRepository(sandboxId);
+    if (!repo) {
+      throw new Error(`Repository not found for sandbox: ${sandboxId}`);
+    }
+
+    const branches = await this.gitBackend.listBranches(repo.name);
+    const current = await this.gitBackend.getCurrentBranch(repo.name);
+
+    return { branches, current };
+  }
+
+  /**
+   * Create a new branch in a sandbox's repository
+   */
+  async createBranch(sandboxId: string, branchName: string, ref?: string) {
+    const repo = await this.getRepository(sandboxId);
+    if (!repo) {
+      throw new Error(`Repository not found for sandbox: ${sandboxId}`);
+    }
+
+    await this.gitBackend.createBranch(repo.name, branchName, ref ?? "HEAD");
+  }
+
+  /**
+   * Checkout a branch in a sandbox's repository
+   */
+  async checkoutBranch(sandboxId: string, branchName: string) {
+    const repo = await this.getRepository(sandboxId);
+    if (!repo) {
+      throw new Error(`Repository not found for sandbox: ${sandboxId}`);
+    }
+
+    await this.gitBackend.checkout(repo.name, branchName);
+  }
+
+  /**
+   * Delete a branch in a sandbox's repository
+   */
+  async deleteBranch(sandboxId: string, branchName: string) {
+    const repo = await this.getRepository(sandboxId);
+    if (!repo) {
+      throw new Error(`Repository not found for sandbox: ${sandboxId}`);
+    }
+
+    // Don't allow deleting the current branch
+    const current = await this.gitBackend.getCurrentBranch(repo.name);
+    if (current === branchName) {
+      throw new Error(`Cannot delete the current branch: ${branchName}`);
+    }
+
+    await this.gitBackend.deleteBranch(repo.name, branchName);
+  }
+
+  /**
+   * Get diff summary for a sandbox's repository
+   */
+  async getDiff(sandboxId: string, options?: { from?: string; to?: string }) {
+    const repo = await this.getRepository(sandboxId);
+    if (!repo) {
+      throw new Error(`Repository not found for sandbox: ${sandboxId}`);
+    }
+
+    return this.gitBackend.getDiff(repo.name, options);
+  }
+
+  /**
+   * Get detailed diff for a specific file in a sandbox's repository
+   */
+  async getFileDiff(sandboxId: string, filePath: string) {
+    const repo = await this.getRepository(sandboxId);
+    if (!repo) {
+      throw new Error(`Repository not found for sandbox: ${sandboxId}`);
+    }
+
+    // Get the status to determine if file exists in working directory
+    const status = await this.gitBackend.getStatus(repo.name);
+    const fileStatus = status.find(f => f.path === filePath);
+    
+    if (!fileStatus) {
+      throw new Error(`File not found in working directory: ${filePath}`);
+    }
+
+    // Get the detailed file diff with hunks from the git backend
+    const fileDiff = await this.gitBackend.getFileDiff(repo.name, filePath);
+    
+    if (!fileDiff) {
+      throw new Error(`Unable to compute diff for file: ${filePath}`);
+    }
+
+    // Map the type to a status string for API compatibility
+    const statusMap: Record<string, "added" | "modified" | "deleted" | "renamed"> = {
+      "add": "added",
+      "modify": "modified",
+      "delete": "deleted",
+      "rename": "renamed",
+    };
+
+    return {
+      path: fileDiff.path,
+      status: statusMap[fileDiff.type] ?? "modified",
+      additions: fileDiff.additions,
+      deletions: fileDiff.deletions,
+      hunks: fileDiff.hunks ?? [],
+    };
+  }
+
   // ===========================================================================
   // Health & Docker Info
   // ===========================================================================
@@ -1037,18 +1148,12 @@ export class SandboxManager {
 
   /**
    * Get Docker image for a flavor
+   * Dynamically generates image name based on flavor ID (agentpod-{flavor})
    */
   private getImageForFlavor(flavor: string): string {
-    const flavorImages: Record<string, string> = {
-      js: "agentpod-js",
-      python: "agentpod-python",
-      go: "agentpod-go",
-      rust: "agentpod-rust",
-      fullstack: "agentpod-fullstack",
-      polyglot: "agentpod-polyglot",
-    };
-
-    const imageName = flavorImages[flavor] ?? flavorImages.fullstack;
+    // Image naming convention: agentpod-{flavorId}
+    // This is dynamic - any flavor in the database will work as long as the image exists
+    const imageName = `agentpod-${flavor}`;
 
     // In development mode, use local images with :latest or :dev tag
     if (config.nodeEnv === "development") {
@@ -1072,16 +1177,25 @@ export class SandboxManager {
 
   /**
    * Get resource limits for a tier
+   * Dynamically reads from database - any tier in the database will work
    */
-  private getResourcesForTier(tier: string) {
-    const tierResources: Record<string, { cpus: string; memory: string; pidsLimit?: number }> = {
-      starter: { cpus: "0.5", memory: "512m", pidsLimit: 128 },
-      builder: { cpus: "1", memory: "2g", pidsLimit: 256 },
-      creator: { cpus: "2", memory: "4g", pidsLimit: 512 },
-      power: { cpus: "4", memory: "8g", pidsLimit: 1024 },
-    };
-
-    return tierResources[tier] ?? tierResources.builder;
+  private async getResourcesForTier(tier: string): Promise<{ cpus: string; memory: string; pidsLimit?: number }> {
+    const tierData = await getResourceTierById(tier);
+    
+    if (tierData) {
+      // Calculate PID limit based on memory (roughly 64 PIDs per GB of RAM)
+      const pidsLimit = Math.max(128, Math.floor(tierData.memoryGb * 64));
+      
+      return {
+        cpus: String(tierData.cpuCores),
+        memory: `${tierData.memoryGb}g`,
+        pidsLimit,
+      };
+    }
+    
+    // Fallback to reasonable defaults if tier not found
+    log.warn("Resource tier not found, using defaults", { tier });
+    return { cpus: "1", memory: "2g", pidsLimit: 256 };
   }
 }
 
