@@ -136,17 +136,6 @@ jobs:
         env:
           HOMEBREW_NO_AUTO_UPDATE: 1
 
-      # Set macOS deployment target for whisper.cpp (requires 10.15+ for C++17 filesystem)
-      - name: Set macOS deployment target
-        if: runner.os == 'macOS'
-        run: |
-          # Apple Silicon requires macOS 11.0+, Intel can go down to 10.15
-          if [[ "${{ matrix.platform.target }}" == "aarch64-apple-darwin" ]]; then
-            echo "MACOSX_DEPLOYMENT_TARGET=11.0" >> $GITHUB_ENV
-          else
-            echo "MACOSX_DEPLOYMENT_TARGET=10.15" >> $GITHUB_ENV
-          fi
-
       # Windows dependencies for whisper-rs build
       - name: Install Windows dependencies
         if: runner.os == 'Windows'
@@ -167,13 +156,14 @@ jobs:
           # macOS deployment target - whisper.cpp requires 10.15+ for std::filesystem
           # This is ignored on non-macOS platforms
           MACOSX_DEPLOYMENT_TARGET: '10.15'
-          # macOS signing (optional - requires secrets)
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # NOTE: macOS code signing is disabled until certificates are configured
+          # To enable, add the following secrets to GitHub:
+          # - APPLE_CERTIFICATE (base64 encoded .p12 file)
+          # - APPLE_CERTIFICATE_PASSWORD
+          # - APPLE_SIGNING_IDENTITY
+          # - APPLE_ID
+          # - APPLE_PASSWORD (app-specific password)
+          # - APPLE_TEAM_ID
           # Windows signing (optional - requires secrets)
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
