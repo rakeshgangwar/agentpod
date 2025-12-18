@@ -8,6 +8,9 @@ pub mod commands;
 pub mod models;
 pub mod services;
 
+#[cfg(feature = "voice")]
+pub mod voice;
+
 use commands::{
     // Auth commands (Better Auth session tokens)
     auth_store_session, auth_get_status, auth_logout,
@@ -61,6 +64,27 @@ use commands::{
     start_onboarding, skip_onboarding, complete_onboarding,
     apply_onboarding_config, reset_onboarding,
 };
+
+#[cfg(feature = "voice")]
+use commands::{
+    // Voice input commands
+    voice_start_recording, voice_stop_recording, voice_cancel_recording,
+    voice_get_audio_level, voice_is_recording, voice_get_recording_duration,
+    voice_list_available_models, voice_list_downloaded_models,
+    voice_download_model, voice_delete_model, voice_load_model, voice_unload_model,
+    voice_is_model_loaded, voice_is_model_downloaded,
+    voice_get_config, voice_set_config, voice_set_enabled, voice_set_mode,
+    voice_set_language, voice_set_push_to_talk_key,
+    voice_list_input_devices, voice_get_default_input_device,
+    // Wake word commands
+    wakeword_are_models_downloaded, wakeword_download_feature_models,
+    wakeword_init_processor, wakeword_is_initialized,
+    wakeword_list_models, wakeword_download_builtin, wakeword_load_model,
+    wakeword_unload_model, wakeword_get_loaded_models,
+    wakeword_get_config, wakeword_set_config,
+    wakeword_is_listening, wakeword_start_listening, wakeword_stop_listening,
+    wakeword_reset,
+};
 use tauri::{Manager, RunEvent, WindowEvent};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
@@ -74,15 +98,23 @@ pub fn run() {
     
     tracing::info!("Starting AgentPod with tracing enabled");
     
-    tauri::Builder::default()
+    #[allow(unused_mut)]
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_oauth::init())
-        .plugin(tauri_plugin_http::init())
-        .invoke_handler(tauri::generate_handler![
+        .plugin(tauri_plugin_http::init());
+    
+    // Voice input state (only when voice feature is enabled)
+    #[cfg(feature = "voice")]
+    {
+        builder = builder.manage(voice::VoiceState::new());
+    }
+    
+    builder.invoke_handler(tauri::generate_handler![
             // Auth commands (Better Auth session tokens)
             auth_store_session,
             auth_get_status,
@@ -198,6 +230,82 @@ pub fn run() {
             complete_onboarding,
             apply_onboarding_config,
             reset_onboarding,
+            // Voice input commands (only when voice feature is enabled)
+            #[cfg(feature = "voice")]
+            voice_start_recording,
+            #[cfg(feature = "voice")]
+            voice_stop_recording,
+            #[cfg(feature = "voice")]
+            voice_cancel_recording,
+            #[cfg(feature = "voice")]
+            voice_get_audio_level,
+            #[cfg(feature = "voice")]
+            voice_is_recording,
+            #[cfg(feature = "voice")]
+            voice_get_recording_duration,
+            #[cfg(feature = "voice")]
+            voice_list_available_models,
+            #[cfg(feature = "voice")]
+            voice_list_downloaded_models,
+            #[cfg(feature = "voice")]
+            voice_download_model,
+            #[cfg(feature = "voice")]
+            voice_delete_model,
+            #[cfg(feature = "voice")]
+            voice_load_model,
+            #[cfg(feature = "voice")]
+            voice_unload_model,
+            #[cfg(feature = "voice")]
+            voice_is_model_loaded,
+            #[cfg(feature = "voice")]
+            voice_is_model_downloaded,
+            #[cfg(feature = "voice")]
+            voice_get_config,
+            #[cfg(feature = "voice")]
+            voice_set_config,
+            #[cfg(feature = "voice")]
+            voice_set_enabled,
+            #[cfg(feature = "voice")]
+            voice_set_mode,
+            #[cfg(feature = "voice")]
+            voice_set_language,
+            #[cfg(feature = "voice")]
+            voice_set_push_to_talk_key,
+            #[cfg(feature = "voice")]
+            voice_list_input_devices,
+            #[cfg(feature = "voice")]
+            voice_get_default_input_device,
+            // Wake word commands
+            #[cfg(feature = "voice")]
+            wakeword_are_models_downloaded,
+            #[cfg(feature = "voice")]
+            wakeword_download_feature_models,
+            #[cfg(feature = "voice")]
+            wakeword_init_processor,
+            #[cfg(feature = "voice")]
+            wakeword_is_initialized,
+            #[cfg(feature = "voice")]
+            wakeword_list_models,
+            #[cfg(feature = "voice")]
+            wakeword_download_builtin,
+            #[cfg(feature = "voice")]
+            wakeword_load_model,
+            #[cfg(feature = "voice")]
+            wakeword_unload_model,
+            #[cfg(feature = "voice")]
+            wakeword_get_loaded_models,
+            #[cfg(feature = "voice")]
+            wakeword_get_config,
+            #[cfg(feature = "voice")]
+            wakeword_set_config,
+            #[cfg(feature = "voice")]
+            wakeword_is_listening,
+            #[cfg(feature = "voice")]
+            wakeword_start_listening,
+            #[cfg(feature = "voice")]
+            wakeword_stop_listening,
+            #[cfg(feature = "voice")]
+            wakeword_reset,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

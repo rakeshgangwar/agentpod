@@ -43,6 +43,7 @@
   import * as Dialog from "$lib/components/ui/dialog";
   import LlmProvidersSettings from "$lib/components/llm-providers-settings.svelte";
   import ThemeSettings from "$lib/components/theme-settings.svelte";
+  import VoiceSettings from "$lib/components/voice-settings.svelte";
   import PageHeader from "$lib/components/page-header.svelte";
   import type { Tab } from "$lib/components/page-header.svelte";
   import ThemeToggle from "$lib/components/theme-toggle.svelte";
@@ -52,6 +53,7 @@
   import PaletteIcon from "@lucide/svelte/icons/palette";
   import BrainIcon from "@lucide/svelte/icons/brain";
   import TerminalIcon from "@lucide/svelte/icons/terminal";
+  import MicIcon from "@lucide/svelte/icons/mic";
   import InfoIcon from "@lucide/svelte/icons/info";
   import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
   import SettingsIcon from "@lucide/svelte/icons/settings";
@@ -65,6 +67,10 @@
     }
   }
 
+  // Initialization flags to prevent duplicate effect executions
+  let settingsInitialized = $state(false);
+  let opencodeConfigInitialized = $state(false);
+
   // Redirect if not connected
   $effect(() => {
     if (!connection.isConnected) {
@@ -72,18 +78,15 @@
     }
   });
 
-  // Load sandboxes for stats
+  // Initialize settings, providers, and sandboxes (runs once)
   $effect(() => {
-    if (connection.isConnected && sandboxes.list.length === 0) {
-      fetchSandboxes();
-    }
-  });
-
-  // Initialize settings and load providers
-  $effect(() => {
-    if (connection.isConnected) {
+    if (connection.isConnected && !settingsInitialized) {
+      settingsInitialized = true;
       initSettings();
       loadProviders();
+      if (sandboxes.list.length === 0) {
+        fetchSandboxes();
+      }
     }
   });
 
@@ -130,9 +133,10 @@
   let fileToDelete = $state<UserOpencodeFile | null>(null);
   let fileDeleting = $state(false);
   
-  // Load OpenCode config on mount
+  // Load OpenCode config on mount (runs once)
   $effect(() => {
-    if (connection.isConnected) {
+    if (connection.isConnected && auth.user && !opencodeConfigInitialized) {
+      opencodeConfigInitialized = true;
       loadOpencodeConfig();
     }
   });
@@ -483,6 +487,7 @@ export default {
     { id: "connection", label: "Connection", icon: PlugIcon },
     { id: "appearance", label: "Appearance", icon: PaletteIcon },
     { id: "ai-models", label: "AI Models", icon: BrainIcon },
+    { id: "voice", label: "Voice", icon: MicIcon },
     { id: "opencode", label: "OpenCode", icon: TerminalIcon },
     { id: "about", label: "About", icon: InfoIcon },
   ];
@@ -628,6 +633,18 @@ export default {
         </div>
         <div class="p-4 space-y-4">
           <LlmProvidersSettings />
+        </div>
+      </div>
+    {:else if activeTab === "voice"}
+      <!-- Voice Tab -->
+      <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-1">
+        <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+          <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+            [voice_input]
+          </h3>
+        </div>
+        <div class="p-4">
+          <VoiceSettings />
         </div>
       </div>
     {:else if activeTab === "opencode"}

@@ -8,6 +8,9 @@ pub mod sandboxes;
 pub mod settings;
 pub mod terminal;
 
+#[cfg(feature = "voice")]
+pub mod voice;
+
 pub use auth::*;
 pub use connection::*;
 pub use docker::*;
@@ -15,3 +18,6 @@ pub use onboarding::*;
 pub use sandboxes::*;
 pub use settings::*;
 pub use terminal::*;
+
+#[cfg(feature = "voice")]
+pub use voice::*;

@@ -14,6 +14,7 @@
   import OnboardingBanner from "$lib/components/onboarding-banner.svelte";
   import SandboxNotRunning from "$lib/components/sandbox-not-running.svelte";
   import { X, Menu, RefreshCw, CornerDownRight, MessageSquare } from "@lucide/svelte";
+  import WakewordToggle from "$lib/components/wakeword-toggle.svelte";
   import { sandboxes } from "$lib/stores/sandboxes.svelte";
 import {
     sandboxOpencodeListSessions,
@@ -671,6 +672,7 @@ import {
               {selectedSession ? getSessionTitle(selectedSession) : "No session"}
             </p>
           </div>
+          <WakewordToggle />
           <Button
             size="sm"
             onclick={createNewSession}
@@ -998,8 +1000,10 @@ import {
               </div>
             </div>
 
-            <!-- Keyboard hints (desktop only) -->
+            <!-- Wake word toggle and keyboard hints (desktop only) -->
             <div class="hidden lg:flex items-center gap-3 text-xs font-mono text-muted-foreground/50 flex-shrink-0">
+              <WakewordToggle />
+              <span class="border-l border-border/30 h-4"></span>
               <span>Alt+,/. model</span>
               <span>Cmd+,/. agent</span>
             </div>

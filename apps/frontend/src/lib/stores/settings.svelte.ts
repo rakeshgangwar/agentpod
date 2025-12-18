@@ -24,6 +24,7 @@ let currentSettings = $state<AppSettings>({ ...defaultSettings });
 let providers = $state<Provider[]>([]);
 let isLoading = $state(false);
 let isInitialized = $state(false);
+let providersLoaded = $state(false);
 let error = $state<string | null>(null);
 
 // =============================================================================
@@ -118,19 +119,33 @@ export async function initSettings(): Promise<void> {
 
 /**
  * Load providers from the Management API
+ * This function is idempotent - it only fetches once unless forceRefresh is true
  */
-export async function loadProviders(): Promise<void> {
+export async function loadProviders(forceRefresh = false): Promise<void> {
+  // Skip if already loaded (unless force refresh)
+  if (providersLoaded && !forceRefresh) return;
+  
   isLoading = true;
   error = null;
   
   try {
     providers = await api.listProviders();
+    providersLoaded = true;
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to load providers";
     providers = [];
+    // Don't mark as loaded on error so retry is possible
+    providersLoaded = false;
   } finally {
     isLoading = false;
   }
+}
+
+/**
+ * Force refresh providers from the Management API
+ */
+export async function refreshProviders(): Promise<void> {
+  return loadProviders(true);
 }
 
 /**

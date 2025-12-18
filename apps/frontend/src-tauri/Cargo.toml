@@ -44,8 +44,34 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tauri-plugin-http = "2"
 
+# Voice input dependencies (optional)
+# Note: On Linux, we use ALSA. The alsa-sys crate will link dynamically by default.
+# For static linking (no runtime deps), build with ALSA_STATIC=1 environment variable.
+# Most desktop Linux distros have libasound2 pre-installed.
+cpal = { version = "0.15", optional = true }                    # Cross-platform audio I/O
+hound = { version = "3.5", optional = true }                    # WAV file I/O
+whisper-rs = { git = "https://codeberg.org/tazz4843/whisper-rs.git", default-features = false, features = ["tracing_backend"], optional = true }
+parking_lot = "0.12"             # Fast synchronization primitives (always needed)
+eyre = { version = "0.6", optional = true }                     # Error handling for voice
+hf-hub = { version = "0.4", optional = true }                   # Hugging Face model download
+# rustpotter - disabled due to candle-core 0.2.2 rand version conflict (requires rand 0.8, half uses rand 0.9)
+# Wake word detection now uses OpenWakeWord via ONNX Runtime instead
+ort = { version = "2.0.0-rc.9", optional = true }             # ONNX Runtime for wake word detection
+ndarray = { version = "0.16", optional = true }               # N-dimensional arrays for ONNX model I/O
+
 [dev-dependencies]
 tokio-test = "0.4"
 pretty_assertions = "1"
 dotenv = "0.15"
+
+[features]
+default = []
+
+# Voice input feature (requires system audio libraries: libasound2-dev on Linux, CoreAudio on macOS)
+voice = ["cpal", "hound", "whisper-rs", "eyre", "hf-hub", "ort", "ndarray"]
+
+# Voice input GPU acceleration (enable based on target platform)
+voice-metal = ["voice", "whisper-rs/metal"]      # macOS GPU acceleration
+voice-cuda = ["voice", "whisper-rs/cuda"]        # NVIDIA GPU acceleration
+voice-vulkan = ["voice", "whisper-rs/vulkan"]    # Cross-platform GPU (AMD, Intel, etc.)
 

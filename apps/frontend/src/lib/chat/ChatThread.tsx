@@ -22,6 +22,9 @@ import { CommandPicker, type Command } from "./CommandPicker";
 import { FilePicker } from "./FilePicker";
 import { FileAttachmentButton, FileAttachmentPreview, type AttachedFile } from "./FileAttachment";
 import { useAttachments, useSessionStatus } from "./RuntimeProvider";
+import { VoiceInputButton } from "../voice/VoiceInputButton";
+import { VoiceSetupDialog } from "../voice/VoiceSetupDialog";
+import { useVoiceInput } from "../voice/useVoiceInput";
 
 // Import new components for OpenCode-specific content
 import {
@@ -773,6 +776,8 @@ interface ComposerProps {
   onFilePickerRequest?: () => void;
   pendingFilePath?: string | null;
   onPendingFilePathClear?: () => void;
+  /** Callback when voice transcription is ready */
+  onVoiceTranscript?: (text: string) => void;
 }
 
 function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, onPendingFilePathClear }: ComposerProps) {
@@ -790,6 +795,61 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
   
   // File attachments state
   const [attachments, setAttachments] = useState<AttachedFile[]>([]);
+  
+  // Wake word detection state for visual feedback
+  const [wakeWordDetected, setWakeWordDetected] = useState<string | null>(null);
+  const wakeWordTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  // Voice input hook - append transcript to input, with wake word support
+  // Auto-load whisper model if previously downloaded (avoids having to manually load each time)
+  const [voiceState, voiceActions] = useVoiceInput({
+    onTranscript: (result) => {
+      // Append transcript to existing input (or set if empty)
+      setInputValue(prev => prev ? `${prev} ${result.text}` : result.text);
+      inputRef.current?.focus();
+    },
+    onError: (error) => {
+      console.error("[Voice] Error:", error);
+    },
+    autoLoadModel: true, // Auto-load whisper model if downloaded
+    enableWakeWord: true,
+    onWakeWordDetected: (detection) => {
+      console.log("[Voice] Wake word detected:", detection.name, "score:", detection.score);
+      // Show visual feedback
+      setWakeWordDetected(detection.name);
+      // Clear previous timeout if any
+      if (wakeWordTimeoutRef.current) {
+        clearTimeout(wakeWordTimeoutRef.current);
+      }
+      // Auto-hide after 2 seconds
+      wakeWordTimeoutRef.current = setTimeout(() => {
+        setWakeWordDetected(null);
+      }, 2000);
+    },
+    // Auto-stop recording after 2 seconds of silence
+    // Your background noise is ~0.03-0.04, speech is ~0.05-0.10
+    silenceTimeout: 2,
+    silenceThreshold: 0.045, // Just below background noise level
+  });
+  
+  // Cleanup wake word timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (wakeWordTimeoutRef.current) {
+        clearTimeout(wakeWordTimeoutRef.current);
+      }
+    };
+  }, []);
+  
+  // Voice setup dialog state (shown when model not loaded)
+  const [showVoiceSetup, setShowVoiceSetup] = useState(false);
+  
+  // Handle voice button click when no model loaded - show setup dialog
+  const handleVoiceButtonClick = useCallback(() => {
+    if (!voiceState.isModelLoaded) {
+      setShowVoiceSetup(true);
+    }
+  }, [voiceState.isModelLoaded]);
   
   // Track cursor position for @ detection
   const [cursorPosition, setCursorPosition] = useState(0);
@@ -1008,6 +1068,19 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
       ref={composerRef}
       className="border-t border-[var(--cyber-cyan)]/20 p-4 bg-background/80 backdrop-blur-sm relative"
     >
+      {/* Wake word detection notification */}
+      {wakeWordDetected && (
+        <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-4 py-2 bg-[var(--cyber-cyan)]/20 border border-[var(--cyber-cyan)]/50 rounded-full backdrop-blur-sm animate-pulse flex items-center gap-2 z-50">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--cyber-cyan)] opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--cyber-cyan)]"></span>
+          </span>
+          <span className="font-mono text-xs text-[var(--cyber-cyan)]">
+            "{wakeWordDetected}" detected - Listening...
+          </span>
+        </div>
+      )}
+      
       {/* Command Picker */}
       <CommandPicker
         query={commandQuery}
@@ -1055,6 +1128,51 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
             hasAttachments={attachments.length > 0}
           />
           
+          {/* Voice input button - only shown if voice feature is available */}
+          {voiceState.isAvailable && (
+            <>
+              {!voiceState.isModelLoaded ? (
+                /* When model not loaded, show a button that opens setup dialog */
+                <button
+                  type="button"
+                  onClick={handleVoiceButtonClick}
+                  className="relative flex items-center justify-center w-10 h-10 rounded-full bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-150 flex-shrink-0"
+                  title="Click to set up voice input"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="w-5 h-5"
+                  >
+                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                    <line x1="12" x2="12" y1="19" y2="22" />
+                  </svg>
+                  {/* Setup indicator dot */}
+                  <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-[var(--cyber-amber)] rounded-full border-2 border-background" />
+                </button>
+              ) : (
+                <VoiceInputButton
+                  mode={voiceState.config?.mode || "push-to-talk"}
+                  isRecording={voiceState.isRecording}
+                  isProcessing={voiceState.isProcessing}
+                  audioLevel={voiceState.audioLevel}
+                  isModelLoaded={voiceState.isModelLoaded}
+                  shortcut={voiceState.config?.pushToTalkKey}
+                  onPushToTalkStart={voiceActions.startRecording}
+                  onPushToTalkEnd={() => voiceActions.stopRecording()}
+                  onToggleClick={() => voiceActions.toggleRecording()}
+                  className="flex-shrink-0"
+                />
+              )}
+            </>
+          )}
+          
           <textarea
             ref={inputRef}
             value={inputValue}
@@ -1077,7 +1195,20 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
       {/* Hints - simplified, shown only on larger screens */}
       <p className="hidden md:block font-mono text-xs text-muted-foreground/50 mt-1.5">
         <span className="text-muted-foreground/70">/</span> commands · <span className="text-muted-foreground/70">@</span> files
+        {voiceState.isAvailable && (
+          <span> · <span className="text-muted-foreground/70">{voiceState.config?.pushToTalkKey || "Ctrl+Shift+M"}</span> voice</span>
+        )}
       </p>
+      
+      {/* Voice setup dialog - shown when user clicks voice button without a model loaded */}
+      <VoiceSetupDialog
+        open={showVoiceSetup}
+        onClose={() => setShowVoiceSetup(false)}
+        onComplete={() => {
+          // Model loaded successfully, user can now use voice
+          console.log("[Voice] Model loaded, voice input ready");
+        }}
+      />
     </div>
   );
 }
