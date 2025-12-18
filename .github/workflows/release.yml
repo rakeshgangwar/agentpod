@@ -164,6 +164,9 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # macOS deployment target - whisper.cpp requires 10.15+ for std::filesystem
+          # This is ignored on non-macOS platforms
+          MACOSX_DEPLOYMENT_TARGET: '10.15'
           # macOS signing (optional - requires secrets)
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
