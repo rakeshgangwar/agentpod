@@ -62,7 +62,7 @@
 #     ./test-containers.sh
 #
 # =============================================================================
-# Available Flavors: js, python, go, rust, fullstack, polyglot
+# Available Flavors: bare, js, python, go, rust, fullstack, polyglot
 # Available Addons:  gui, code-server, databases, cloud, gpu
 #
 # Note: GPU addon is automatically skipped if no NVIDIA GPU is detected.

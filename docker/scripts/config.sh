@@ -28,7 +28,7 @@ else
 fi
 
 # Available flavors
-export FLAVORS=("js" "python" "go" "rust" "fullstack" "polyglot")
+export FLAVORS=("bare" "js" "python" "go" "rust" "fullstack" "polyglot")
 export DEFAULT_FLAVOR="fullstack"
 
 # Build platform

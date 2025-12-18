@@ -5,7 +5,7 @@
 # Usage: ./build-flavor.sh <flavor> [--no-cache] [--push] [--base <base-image>]
 #
 # Arguments:
-#   flavor      - js, python, go, rust, fullstack, polyglot
+#   flavor      - bare, js, python, go, rust, fullstack, polyglot
 #   --no-cache  - Build without Docker cache
 #   --push      - Push to registry after build
 #   --base      - Specify base image (default: agentpod-base:latest)

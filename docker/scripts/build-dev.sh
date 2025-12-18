@@ -19,7 +19,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOCKER_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Available flavors
-ALL_FLAVORS="js python go rust fullstack polyglot"
+ALL_FLAVORS="bare js python go rust fullstack polyglot"
 
 # Parse arguments
 NO_CACHE=""

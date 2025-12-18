@@ -18,7 +18,7 @@ import { authHandler } from './auth-handler.ts';
 
 // Configuration
 const PORT = parseInt(process.env.ACP_GATEWAY_PORT || '4097');
-const WORKING_DIRECTORY = process.env.WORKSPACE_DIR || '/workspace';
+const WORKING_DIRECTORY = process.env.WORKSPACE_DIR || '/home/workspace';
 
 // Create Hono app
 const app = new Hono();

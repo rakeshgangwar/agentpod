@@ -67,6 +67,7 @@ interface AddonSpec {
  * Docker image names for each flavor
  */
 const FLAVOR_IMAGES: Record<FlavorId, string> = {
+  bare: "agentpod-bare",
   js: "agentpod-js",
   python: "agentpod-python",
   go: "agentpod-go",
@@ -89,6 +90,7 @@ const ADDON_PORTS: Partial<Record<AddonId, number>> = {
 const DEFAULT_ENV: Record<string, string> = {
   TERM: "xterm-256color",
   LANG: "en_US.UTF-8",
+  WORKSPACE_DIR: "/home/workspace",
 };
 
 /**

@@ -143,6 +143,7 @@ export const terminalRoutes = new Hono()
             session = await manager.execInteractive(sandboxId, {
               cols: 80,
               rows: 24,
+              workingDir: "/home/workspace",
             });
             log.debug("Interactive session started", { sandboxId });
 

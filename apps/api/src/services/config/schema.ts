@@ -15,6 +15,7 @@ import { z } from "zod";
  * Available container flavors
  */
 export const FlavorId = z.enum([
+  "bare",
   "js",
   "python",
   "go",
@@ -32,6 +33,7 @@ export type FlavorId = z.infer<typeof FlavorId>;
  * Available resource tiers
  */
 export const ResourceTierId = z.enum([
+  "micro",
   "starter",
   "builder",
   "creator",
