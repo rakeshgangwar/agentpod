@@ -133,6 +133,19 @@ jobs:
           brew install cmake
           # Ensure Xcode command line tools are available (provides Metal SDK)
           xcode-select --print-path
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: 1
+
+      # Set macOS deployment target for whisper.cpp (requires 10.15+ for C++17 filesystem)
+      - name: Set macOS deployment target
+        if: runner.os == 'macOS'
+        run: |
+          # Apple Silicon requires macOS 11.0+, Intel can go down to 10.15
+          if [[ "${{ matrix.platform.target }}" == "aarch64-apple-darwin" ]]; then
+            echo "MACOSX_DEPLOYMENT_TARGET=11.0" >> $GITHUB_ENV
+          else
+            echo "MACOSX_DEPLOYMENT_TARGET=10.15" >> $GITHUB_ENV
+          fi
 
       # Windows dependencies for whisper-rs build
       - name: Install Windows dependencies
