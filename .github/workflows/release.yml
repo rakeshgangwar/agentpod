@@ -57,13 +57,13 @@ jobs:
       matrix:
         platform:
           - name: macOS (Intel)
-            os: macos-13
+            os: macos-15-intel
             target: x86_64-apple-darwin
             args: '--target x86_64-apple-darwin --features voice-metal'
             rust_features: voice-metal
             
           - name: macOS (Apple Silicon)
-            os: macos-latest
+            os: macos-15
             target: aarch64-apple-darwin
             args: '--target aarch64-apple-darwin --features voice-metal'
             rust_features: voice-metal
@@ -125,17 +125,23 @@ jobs:
             clang \
             libclang-dev
 
-      # macOS dependencies
+      # macOS dependencies for whisper-rs Metal build
       - name: Install macOS dependencies
         if: runner.os == 'macOS'
         run: |
+          # Install cmake for whisper.cpp build
           brew install cmake
+          # Ensure Xcode command line tools are available (provides Metal SDK)
+          xcode-select --print-path
 
-      # Windows dependencies
+      # Windows dependencies for whisper-rs build
       - name: Install Windows dependencies
         if: runner.os == 'Windows'
         run: |
+          # Install cmake and LLVM (provides clang for whisper.cpp compilation)
           choco install cmake llvm -y
+          # Add LLVM to PATH for the build
+          echo "C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
         shell: pwsh
 
       - name: Install frontend dependencies
