@@ -8,6 +8,9 @@
 // Authentication (Better Auth tables)
 export * from "./auth";
 
+// Admin (user management, resource limits, audit log)
+export * from "./admin";
+
 // Core entities
 export * from "./sandboxes";
 export * from "./chat";

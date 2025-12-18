@@ -1,17 +1,20 @@
 /**
- * Better Auth Configuration
+ * Better Auth Configuration (SQLite - Development Only)
  *
  * Replaces Keycloak with Better Auth - a simpler, embedded authentication solution.
- * Uses SQLite for development and PostgreSQL for production.
+ * Uses SQLite for development. For production, use drizzle-auth.ts with PostgreSQL.
  *
  * Features:
  * - GitHub OAuth (primary authentication method)
  * - Session management with secure cookies
- * - API key fallback for backward compatibility
+ * - Admin plugin for user management
+ * - First user becomes admin automatically
+ * 
+ * NOTE: For development only. Production uses PostgreSQL via drizzle-auth.ts
  */
 
 import { betterAuth } from "better-auth";
-import { bearer } from "better-auth/plugins";
+import { bearer, admin } from "better-auth/plugins";
 import { Database } from "bun:sqlite";
 import { config } from "../config";
 import { createLogger } from "../utils/logger";
@@ -128,7 +131,43 @@ export const auth = betterAuth({
     // Bearer token plugin - allows using session tokens as Bearer tokens
     // This is needed for Tauri/native apps that can't use cookies
     bearer(),
+    
+    // Admin plugin - enables user management, banning, role management
+    admin({
+      defaultRole: "user",
+      adminRoles: ["admin"],
+    }),
   ],
+  
+  // ==========================================================================
+  // User Additional Fields
+  // ==========================================================================
+  user: {
+    additionalFields: {
+      role: {
+        type: "string",
+        required: false,
+        defaultValue: "user",
+        input: false,
+      },
+      banned: {
+        type: "boolean",
+        required: false,
+        defaultValue: false,
+        input: false,
+      },
+      bannedReason: {
+        type: "string",
+        required: false,
+        input: false,
+      },
+      bannedAt: {
+        type: "date",
+        required: false,
+        input: false,
+      },
+    },
+  },
 
   // ==========================================================================
   // Advanced Options

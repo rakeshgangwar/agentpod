@@ -3,14 +3,24 @@
  *
  * Replaces SQLite with PostgreSQL via Drizzle ORM.
  * Used when DATABASE_URL is set (PostgreSQL mode).
+ * 
+ * Features:
+ * - GitHub OAuth (primary authentication method)
+ * - Email/Password (optional)
+ * - Admin plugin for user management
+ * - First user becomes admin automatically
+ * - Default resource limits created for new users
  */
 
 import { betterAuth } from "better-auth";
-import { bearer } from "better-auth/plugins";
+import { bearer, admin, customSession } from "better-auth/plugins";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "../db/drizzle";
+import { user as userTable, userResourceLimits, DEFAULT_RESOURCE_LIMITS } from "../db/schema";
 import { config } from "../config";
 import { createLogger } from "../utils/logger";
+import { count, eq } from "drizzle-orm";
+import { disableSignup } from "../models/system-settings";
 
 const log = createLogger("auth");
 
@@ -103,7 +113,137 @@ export const auth = betterAuth({
     // Bearer token plugin - allows using session tokens as Bearer tokens
     // This is needed for Tauri/native apps that can't use cookies
     bearer(),
+    
+    // Admin plugin - enables user management, banning, role management
+    admin({
+      defaultRole: "user",
+      adminRoles: ["admin"],
+    }),
+    
+    // Custom session plugin - includes additional user fields in session response
+    // This ensures the frontend can access role, banned etc. from getSession()
+    customSession(async ({ user, session }) => {
+      // Fetch the full user record from DB to get all custom fields
+      const fullUser = await db
+        .select()
+        .from(userTable)
+        .where(eq(userTable.id, user.id))
+        .limit(1)
+        .then(rows => rows[0]);
+      
+      return {
+        user: {
+          ...user,
+          role: fullUser?.role ?? "user",
+          banned: fullUser?.banned ?? false,
+          bannedReason: fullUser?.bannedReason ?? null,
+          bannedAt: fullUser?.bannedAt ?? null,
+        },
+        session,
+      };
+    }),
   ],
+  
+  // ==========================================================================
+  // User Additional Fields
+  // ==========================================================================
+  user: {
+    additionalFields: {
+      role: {
+        type: "string",
+        required: false,
+        defaultValue: "user",
+        input: false, // Users can't set their own role
+      },
+      // Ban status
+      banned: {
+        type: "boolean",
+        required: false,
+        defaultValue: false,
+        input: false,
+      },
+      bannedReason: {
+        type: "string",
+        required: false,
+        input: false,
+      },
+      bannedAt: {
+        type: "date",
+        required: false,
+        input: false,
+      },
+    },
+  },
+  
+  // ==========================================================================
+  // Database Hooks
+  // ==========================================================================
+  databaseHooks: {
+    user: {
+      create: {
+        before: async (userData) => {
+          // Check if this is the first user - make them admin
+          const result = await db.select({ value: count() }).from(userTable);
+          const userCount = result[0]?.value ?? 0;
+          
+          if (userCount === 0) {
+            log.info("First user signup - assigning admin role", { email: userData.email });
+            return {
+              data: {
+                ...userData,
+                role: "admin",
+              },
+            };
+          }
+          
+          log.info("New user signup", { email: userData.email });
+          return { data: userData };
+        },
+        after: async (createdUser) => {
+          // Create default resource limits for the new user
+          try {
+            await db.insert(userResourceLimits).values({
+              id: crypto.randomUUID(),
+              userId: createdUser.id,
+              maxSandboxes: DEFAULT_RESOURCE_LIMITS.maxSandboxes,
+              maxConcurrentRunning: DEFAULT_RESOURCE_LIMITS.maxConcurrentRunning,
+              allowedTierIds: JSON.stringify(DEFAULT_RESOURCE_LIMITS.allowedTierIds),
+              maxTierId: DEFAULT_RESOURCE_LIMITS.maxTierId,
+              maxTotalStorageGb: DEFAULT_RESOURCE_LIMITS.maxTotalStorageGb,
+              maxTotalCpuCores: DEFAULT_RESOURCE_LIMITS.maxTotalCpuCores,
+              maxTotalMemoryGb: DEFAULT_RESOURCE_LIMITS.maxTotalMemoryGb,
+              allowedAddonIds: DEFAULT_RESOURCE_LIMITS.allowedAddonIds 
+                ? JSON.stringify(DEFAULT_RESOURCE_LIMITS.allowedAddonIds)
+                : null,
+            });
+            log.info("Created default resource limits for user", { userId: createdUser.id });
+          } catch (error) {
+            log.error("Failed to create default resource limits", { 
+              userId: createdUser.id, 
+              error 
+            });
+            // Don't throw - user creation should still succeed
+          }
+          
+          // If this is the first user (now admin), disable public signup
+          if (createdUser.role === "admin") {
+            try {
+              await disableSignup(createdUser.id);
+              log.info("Public signup disabled after first user creation", { 
+                userId: createdUser.id 
+              });
+            } catch (error) {
+              log.error("Failed to disable signup after first user", { 
+                userId: createdUser.id, 
+                error 
+              });
+              // Don't throw - user creation should still succeed
+            }
+          }
+        },
+      },
+    },
+  },
 
   // ==========================================================================
   // Advanced Options

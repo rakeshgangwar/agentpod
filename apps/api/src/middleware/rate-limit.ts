@@ -21,9 +21,9 @@ setInterval(() => {
 }, 60_000);
 
 const LIMITS = {
-  auth: { requests: 5, windowMs: 60_000 },
-  api: { requests: 100, windowMs: 60_000 },
-  sse: { requests: 10, windowMs: 60_000 },
+  auth: { requests: 20, windowMs: 60_000 },      // 20 auth requests per minute
+  api: { requests: 300, windowMs: 60_000 },      // 300 API requests per minute
+  sse: { requests: 30, windowMs: 60_000 },       // 30 SSE connections per minute
 } as const;
 
 function getClientIdentifier(c: Context): string {

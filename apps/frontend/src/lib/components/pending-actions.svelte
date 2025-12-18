@@ -28,11 +28,22 @@
   import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
 
   // =============================================================================
+  // Props
+  // =============================================================================
+  
+  interface Props {
+    /** Pre-loaded permissions from parent (skip initial load if provided) */
+    initialPermissions?: PendingPermission[];
+  }
+  
+  let { initialPermissions }: Props = $props();
+
+  // =============================================================================
   // State
   // =============================================================================
   
-  let pendingPermissions = $state<PendingPermission[]>([]);
-  let isLoading = $state(true);
+  let pendingPermissions = $state<PendingPermission[]>(initialPermissions ?? []);
+  let isLoading = $state(initialPermissions === undefined);
   let error = $state<string | null>(null);
   let refreshInterval: ReturnType<typeof setInterval> | undefined;
 
@@ -41,7 +52,10 @@
   // =============================================================================
 
   onMount(() => {
-    fetchPendingPermissions();
+    // Only fetch on mount if no initial permissions were provided
+    if (initialPermissions === undefined) {
+      fetchPendingPermissions();
+    }
     
     // Refresh every 10 seconds to catch new permissions
     refreshInterval = setInterval(fetchPendingPermissions, 10000);

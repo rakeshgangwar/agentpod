@@ -21,6 +21,7 @@
     importSettingsJson,
     resetSettings 
   } from "$lib/stores/settings.svelte";
+  import { checkIsAdmin } from "$lib/api/admin";
   import type { 
     PermissionLevel, 
     PermissionSettings, 
@@ -57,6 +58,7 @@
   import InfoIcon from "@lucide/svelte/icons/info";
   import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
   import SettingsIcon from "@lucide/svelte/icons/settings";
+  import ShieldIcon from "@lucide/svelte/icons/shield";
 
   // Back navigation helper - uses browser history for proper back behavior
   function goBack() {
@@ -70,6 +72,10 @@
   // Initialization flags to prevent duplicate effect executions
   let settingsInitialized = $state(false);
   let opencodeConfigInitialized = $state(false);
+  
+  // Admin status
+  let isAdmin = $state(false);
+  let adminCheckDone = $state(false);
 
   // Redirect if not connected
   $effect(() => {
@@ -78,7 +84,7 @@
     }
   });
 
-  // Initialize settings, providers, and sandboxes (runs once)
+  // Initialize settings, providers, sandboxes, and check admin status (runs once)
   $effect(() => {
     if (connection.isConnected && !settingsInitialized) {
       settingsInitialized = true;
@@ -87,6 +93,14 @@
       if (sandboxes.list.length === 0) {
         fetchSandboxes();
       }
+      // Check admin status
+      checkIsAdmin().then(result => {
+        isAdmin = result;
+        adminCheckDone = true;
+      }).catch(() => {
+        isAdmin = false;
+        adminCheckDone = true;
+      });
     }
   });
 
@@ -607,6 +621,34 @@ export default {
               </p>
             </div>
           </div>
+          
+          <!-- Admin Panel Link (only visible to admins) -->
+          {#if adminCheckDone && isAdmin}
+            <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-3 md:col-span-2">
+              <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+                <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-magenta)]">
+                  [admin_panel]
+                </h3>
+              </div>
+              <div class="p-4">
+                <div class="flex items-center justify-between">
+                  <div class="space-y-1">
+                    <p class="text-sm font-mono">Administration</p>
+                    <p class="text-xs text-muted-foreground font-mono">
+                      Manage users, view audit logs, and configure system settings
+                    </p>
+                  </div>
+                  <Button 
+                    onclick={() => goto("/admin")}
+                    class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-magenta)] hover:bg-[var(--cyber-magenta)]/90 text-white"
+                  >
+                    <ShieldIcon class="h-4 w-4 mr-2" />
+                    Open Admin Panel
+                  </Button>
+                </div>
+              </div>
+            </div>
+          {/if}
         </div>
     {:else if activeTab === "appearance"}
       <!-- Appearance Tab -->

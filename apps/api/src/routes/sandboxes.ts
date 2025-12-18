@@ -27,6 +27,11 @@ import type { Permission } from "../services/opencode-v2.ts";
 import { createLogger } from "../utils/logger.ts";
 import { getFlavorById, getDefaultFlavor } from "../models/container-flavor.ts";
 import { getResourceTierById, getDefaultResourceTier } from "../models/resource-tier.ts";
+import { 
+  checkAllLimitsForSandboxCreation, 
+  checkAllLimitsForSandboxStart,
+} from "../models/user-resource-limits.ts";
+import { getSandboxById } from "../models/sandbox.ts";
 
 const log = createLogger("sandbox-routes");
 
@@ -148,6 +153,28 @@ export const sandboxRoutes = new Hono()
         resourceTierId = defaultTier?.id;
       }
 
+      // Check user resource limits before creating sandbox
+      const limitCheck = await checkAllLimitsForSandboxCreation(
+        body.userId,
+        resourceTierId ?? "starter",
+        body.addons ?? []
+      );
+      
+      if (!limitCheck.allowed) {
+        log.warn("Sandbox creation blocked by resource limits", { 
+          userId: body.userId, 
+          reason: limitCheck.reason,
+          current: limitCheck.current,
+          limit: limitCheck.limit,
+        });
+        return c.json({ 
+          error: "Resource limit exceeded",
+          message: limitCheck.reason,
+          current: limitCheck.current,
+          limit: limitCheck.limit,
+        }, 403);
+      }
+
       const manager = getSandboxManager();
       const result = await manager.createSandbox({
         name: body.name,
@@ -235,6 +262,34 @@ export const sandboxRoutes = new Hono()
     log.info("Starting sandbox", { id });
 
     try {
+      // Get sandbox to check user and tier
+      const sandboxInfo = await getSandboxById(id);
+      if (!sandboxInfo) {
+        return c.json({ error: "Sandbox not found" }, 404);
+      }
+
+      // Check user resource limits before starting sandbox
+      const limitCheck = await checkAllLimitsForSandboxStart(
+        sandboxInfo.userId,
+        sandboxInfo.resourceTierId ?? "starter"
+      );
+      
+      if (!limitCheck.allowed) {
+        log.warn("Sandbox start blocked by resource limits", { 
+          sandboxId: id,
+          userId: sandboxInfo.userId, 
+          reason: limitCheck.reason,
+          current: limitCheck.current,
+          limit: limitCheck.limit,
+        });
+        return c.json({ 
+          error: "Resource limit exceeded",
+          message: limitCheck.reason,
+          current: limitCheck.current,
+          limit: limitCheck.limit,
+        }, 403);
+      }
+
       const manager = getSandboxManager();
       await manager.startSandbox(id);
       const sandbox = await manager.getSandbox(id);

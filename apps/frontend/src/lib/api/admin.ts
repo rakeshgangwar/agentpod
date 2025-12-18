@@ -1,0 +1,380 @@
+/**
+ * Admin API Client
+ * 
+ * Frontend client for admin functionality. Makes direct HTTP calls to the
+ * Management API using the auth token from Tauri storage.
+ */
+
+import { authGetToken, getConnectionStatus } from "./tauri";
+import type {
+  AdminUserView,
+  AdminStats,
+  UserResourceLimits,
+  UpdateUserResourceLimitsInput,
+  ListUsersResponse,
+  GetUserResponse,
+  GetUserLimitsResponse,
+  AuditLogResponse,
+  UserRole,
+} from "@agentpod/types";
+import type { Sandbox } from "./tauri";
+
+// =============================================================================
+// API Client Helper
+// =============================================================================
+
+/**
+ * Get the base URL for API calls
+ */
+async function getApiBaseUrl(): Promise<string> {
+  const status = await getConnectionStatus();
+  if (!status.connected || !status.apiUrl) {
+    throw new Error("Not connected to Management API");
+  }
+  return status.apiUrl;
+}
+
+/**
+ * Make an authenticated API request
+ */
+async function apiRequest<T>(
+  path: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const baseUrl = await getApiBaseUrl();
+  const token = await authGetToken();
+  
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options.headers as Record<string, string> || {}),
+  };
+  
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${baseUrl}${path}`, {
+    ...options,
+    headers,
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    let errorMessage: string;
+    
+    try {
+      const parsed = JSON.parse(errorBody);
+      errorMessage = parsed.message || parsed.error || `API Error: ${response.status}`;
+    } catch {
+      errorMessage = errorBody || `API Error: ${response.status}`;
+    }
+    
+    throw new Error(errorMessage);
+  }
+
+  // Handle empty responses
+  const text = await response.text();
+  if (!text) {
+    return {} as T;
+  }
+
+  return JSON.parse(text) as T;
+}
+
+// =============================================================================
+// User Management
+// =============================================================================
+
+/**
+ * List users options
+ */
+export interface ListUsersOptions {
+  search?: string;
+  role?: UserRole;
+  banned?: boolean;
+  limit?: number;
+  offset?: number;
+  sortBy?: "email" | "name" | "createdAt" | "role";
+  sortDirection?: "asc" | "desc";
+}
+
+/**
+ * List all users (admin only)
+ */
+export async function listUsers(options: ListUsersOptions = {}): Promise<ListUsersResponse> {
+  const params = new URLSearchParams();
+  
+  if (options.search) params.set("search", options.search);
+  if (options.role) params.set("role", options.role);
+  if (options.banned !== undefined) params.set("banned", String(options.banned));
+  if (options.limit) params.set("limit", String(options.limit));
+  if (options.offset) params.set("offset", String(options.offset));
+  if (options.sortBy) params.set("sortBy", options.sortBy);
+  if (options.sortDirection) params.set("sortDirection", options.sortDirection);
+
+  const queryString = params.toString();
+  const path = queryString ? `/api/admin/users?${queryString}` : "/api/admin/users";
+  
+  return apiRequest<ListUsersResponse>(path);
+}
+
+/**
+ * Get a user by ID (admin only)
+ */
+export async function getUser(userId: string): Promise<GetUserResponse> {
+  return apiRequest<GetUserResponse>(`/api/admin/users/${userId}`);
+}
+
+/**
+ * Ban a user (admin only)
+ */
+export async function banUser(userId: string, reason: string): Promise<AdminUserView> {
+  const response = await apiRequest<{ user: AdminUserView }>(
+    `/api/admin/users/${userId}/ban`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }
+  );
+  return response.user;
+}
+
+/**
+ * Unban a user (admin only)
+ */
+export async function unbanUser(userId: string): Promise<AdminUserView> {
+  const response = await apiRequest<{ user: AdminUserView }>(
+    `/api/admin/users/${userId}/unban`,
+    {
+      method: "POST",
+    }
+  );
+  return response.user;
+}
+
+/**
+ * Update user role (admin only)
+ */
+export async function updateUserRole(userId: string, role: UserRole): Promise<AdminUserView> {
+  const response = await apiRequest<{ user: AdminUserView }>(
+    `/api/admin/users/${userId}/role`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ role }),
+    }
+  );
+  return response.user;
+}
+
+// =============================================================================
+// Resource Limits
+// =============================================================================
+
+/**
+ * Get user resource limits (admin only)
+ */
+export async function getUserLimits(userId: string): Promise<GetUserLimitsResponse> {
+  return apiRequest<GetUserLimitsResponse>(`/api/admin/users/${userId}/limits`);
+}
+
+/**
+ * Update user resource limits (admin only)
+ */
+export async function updateUserLimits(
+  userId: string,
+  limits: UpdateUserResourceLimitsInput
+): Promise<UserResourceLimits> {
+  const response = await apiRequest<{ limits: UserResourceLimits }>(
+    `/api/admin/users/${userId}/limits`,
+    {
+      method: "PUT",
+      body: JSON.stringify(limits),
+    }
+  );
+  return response.limits;
+}
+
+// =============================================================================
+// Sandbox Management
+// =============================================================================
+
+/**
+ * Get user's sandboxes (admin only)
+ */
+export async function getUserSandboxes(userId: string): Promise<Sandbox[]> {
+  const response = await apiRequest<{ sandboxes: Sandbox[] }>(
+    `/api/admin/users/${userId}/sandboxes`
+  );
+  return response.sandboxes;
+}
+
+/**
+ * List all sandboxes options
+ */
+export interface ListAllSandboxesOptions {
+  userId?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * List all sandboxes (admin only)
+ */
+export async function listAllSandboxes(options: ListAllSandboxesOptions = {}): Promise<{
+  sandboxes: Sandbox[];
+  total: number;
+}> {
+  const params = new URLSearchParams();
+  
+  if (options.userId) params.set("userId", options.userId);
+  if (options.status) params.set("status", options.status);
+  if (options.limit) params.set("limit", String(options.limit));
+  if (options.offset) params.set("offset", String(options.offset));
+
+  const queryString = params.toString();
+  const path = queryString ? `/api/admin/sandboxes?${queryString}` : "/api/admin/sandboxes";
+  
+  return apiRequest<{ sandboxes: Sandbox[]; total: number }>(path);
+}
+
+/**
+ * Force delete a sandbox (admin only)
+ */
+export async function forceDeleteSandbox(sandboxId: string): Promise<void> {
+  await apiRequest<void>(`/api/admin/sandboxes/${sandboxId}`, {
+    method: "DELETE",
+  });
+}
+
+/**
+ * Force stop a sandbox (admin only)
+ */
+export async function forceStopSandbox(sandboxId: string): Promise<Sandbox> {
+  const response = await apiRequest<{ sandbox: Sandbox }>(
+    `/api/admin/sandboxes/${sandboxId}/stop`,
+    {
+      method: "POST",
+    }
+  );
+  return response.sandbox;
+}
+
+// =============================================================================
+// Statistics & Audit Log
+// =============================================================================
+
+/**
+ * Get admin statistics (admin only)
+ */
+export async function getAdminStats(): Promise<AdminStats> {
+  const response = await apiRequest<{ stats: AdminStats }>("/api/admin/stats");
+  return response.stats;
+}
+
+/**
+ * Audit log options
+ */
+export interface AuditLogOptions {
+  limit?: number;
+  offset?: number;
+  userId?: string;
+  action?: string;
+}
+
+/**
+ * Get audit log (admin only)
+ */
+export async function getAuditLog(options: AuditLogOptions = {}): Promise<AuditLogResponse> {
+  const params = new URLSearchParams();
+  
+  if (options.limit) params.set("limit", String(options.limit));
+  if (options.offset) params.set("offset", String(options.offset));
+  if (options.userId) params.set("userId", options.userId);
+  if (options.action) params.set("action", options.action);
+
+  const queryString = params.toString();
+  const path = queryString ? `/api/admin/audit-log?${queryString}` : "/api/admin/audit-log";
+  
+  return apiRequest<AuditLogResponse>(path);
+}
+
+// =============================================================================
+// Current User Admin Check
+// =============================================================================
+
+/**
+ * Check if current user is admin
+ * This can be used to determine if admin UI should be shown
+ */
+export async function checkIsAdmin(): Promise<boolean> {
+  try {
+    console.log("[Admin] Checking admin status...");
+    // Try to fetch admin stats - this will fail if not admin
+    const stats = await getAdminStats();
+    console.log("[Admin] Admin check succeeded, stats:", stats);
+    return true;
+  } catch (err) {
+    console.log("[Admin] Admin check failed:", err);
+    return false;
+  }
+}
+
+// =============================================================================
+// Settings Management
+// =============================================================================
+
+/**
+ * Get signup status
+ */
+export async function getSignupStatus(): Promise<{ enabled: boolean }> {
+  return apiRequest<{ enabled: boolean }>("/api/admin/settings/signup");
+}
+
+/**
+ * Enable public signup
+ */
+export async function enableSignup(): Promise<{ enabled: boolean }> {
+  const response = await apiRequest<{ enabled: boolean }>(
+    "/api/admin/settings/signup/enable",
+    { method: "POST" }
+  );
+  return response;
+}
+
+/**
+ * Disable public signup
+ */
+export async function disableSignup(): Promise<{ enabled: boolean }> {
+  const response = await apiRequest<{ enabled: boolean }>(
+    "/api/admin/settings/signup/disable",
+    { method: "POST" }
+  );
+  return response;
+}
+
+// =============================================================================
+// User Creation
+// =============================================================================
+
+/**
+ * Create a new user (admin only)
+ */
+export interface CreateUserInput {
+  email: string;
+  password: string;
+  name: string;
+  role?: UserRole;
+}
+
+export async function createUser(input: CreateUserInput): Promise<AdminUserView> {
+  const response = await apiRequest<{ user: AdminUserView }>(
+    "/api/admin/users",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    }
+  );
+  return response.user;
+}

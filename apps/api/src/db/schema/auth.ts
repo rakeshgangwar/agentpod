@@ -16,9 +16,25 @@ export const user = pgTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   image: text("image"),
+  
+  // Role and admin fields
+  role: text("role").notNull().default("user"),
+  
+  // Ban status
+  banned: boolean("banned").notNull().default(false),
+  bannedReason: text("banned_reason"),
+  bannedAt: timestamp("banned_at"),
+  
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+// =============================================================================
+// Type Exports
+// =============================================================================
+export type User = typeof user.$inferSelect;
+export type InsertUser = typeof user.$inferInsert;
+export type UserRole = "user" | "admin";
 
 // =============================================================================
 // Session Table

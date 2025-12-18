@@ -30,6 +30,9 @@ import { terminalRoutes, terminalWebsocket, cleanupTerminalSessions } from './ro
 import { knowledgeRoutes } from './routes/knowledge.ts';
 import { onboardingRoutes } from './routes/onboarding.ts';
 import { mcpKnowledgeRoutes } from './routes/mcp-knowledge.ts';
+// Admin routes
+import { adminRouter } from './routes/admin.ts';
+import { banCheckMiddleware, signupCheckMiddleware } from './auth/admin-middleware.ts';
 // Middleware
 import { activityLoggerMiddleware } from './middleware/activity-logger.ts';
 // Sync services
@@ -75,11 +78,14 @@ origin: (origin) => {
   .use('*', securityHeadersMiddleware)
   .use('*', rateLimitMiddleware)
   .route('/', healthRoutes)
+  // Signup check middleware - block signup if disabled (runs before auth handler)
+  .use('/api/auth/*', signupCheckMiddleware)
   // Better Auth routes - handle authentication (public, no auth middleware)
   .on(['GET', 'POST'], '/api/auth/*', (c) => {
     return auth.handler(c.req.raw);
   })
   .use('/api/*', authMiddleware)
+  .use('/api/*', banCheckMiddleware) // Block banned users
   .use('/api/*', csrfMiddleware)
   .use('/api/*', activityLoggerMiddleware)
   // User configuration endpoints
@@ -104,7 +110,9 @@ origin: (origin) => {
   // Onboarding system endpoints
   .route('/api/knowledge', knowledgeRoutes) // Knowledge documents
   .route('/api/onboarding', onboardingRoutes) // Onboarding sessions
-  .route('/api/mcp/knowledge', mcpKnowledgeRoutes);
+  .route('/api/mcp/knowledge', mcpKnowledgeRoutes)
+  // Admin endpoints (require admin role)
+  .route('/api/admin', adminRouter);
 
 app.onError((err, c) => {
   const requestId = c.req.header('x-request-id') || crypto.randomUUID();
@@ -286,6 +294,21 @@ console.log(`
 ║    - tools/list: List available tools                         ║
 ║    - tools/call: search_knowledge, get_project_template,      ║
 ║                  get_agent_pattern, list_project_types, etc.  ║
+╠═══════════════════════════════════════════════════════════════╣
+║  Admin Endpoints (require admin role):                        ║
+║  - GET  /api/admin/users                List all users        ║
+║  - GET  /api/admin/users/:id            Get user details      ║
+║  - POST /api/admin/users/:id/ban        Ban user              ║
+║  - POST /api/admin/users/:id/unban      Unban user            ║
+║  - PUT  /api/admin/users/:id/role       Update user role      ║
+║  - GET  /api/admin/users/:id/limits     Get user limits       ║
+║  - PUT  /api/admin/users/:id/limits     Update user limits    ║
+║  - GET  /api/admin/users/:id/sandboxes  List user sandboxes   ║
+║  - GET  /api/admin/sandboxes            List all sandboxes    ║
+║  - DELETE /api/admin/sandboxes/:id      Force delete sandbox  ║
+║  - POST /api/admin/sandboxes/:id/stop   Force stop sandbox    ║
+║  - GET  /api/admin/stats                System statistics     ║
+║  - GET  /api/admin/audit-log            Admin audit log       ║
 ╚═══════════════════════════════════════════════════════════════╝
 `);
 

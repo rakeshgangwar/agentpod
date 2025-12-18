@@ -31,3 +31,6 @@ export * from "./api";
 
 // Onboarding system types
 export * from "./onboarding";
+
+// Admin types
+export * from "./admin";

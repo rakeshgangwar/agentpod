@@ -26,7 +26,7 @@
   import { Button } from "$lib/components/ui/button";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
   import { Avatar, AvatarFallback } from "$lib/components/ui/avatar";
-  import { Skeleton } from "$lib/components/ui/skeleton";
+  import { getAllPendingPermissions, type PendingPermission } from "$lib/api/tauri";
 
   // Icons
   import PlusIcon from "@lucide/svelte/icons/plus";
@@ -39,6 +39,33 @@
   import RocketIcon from "@lucide/svelte/icons/rocket";
   import ZapIcon from "@lucide/svelte/icons/zap";
   import CheckCircleIcon from "@lucide/svelte/icons/check-circle";
+
+  // =============================================================================
+  // Loading Screen State
+  // =============================================================================
+  
+  const MINIMUM_LOADING_TIME = 2500; // 2.5 seconds minimum
+  
+  let isInitialLoading = $state(true);
+  let minimumTimeElapsed = $state(false);
+  let apiCallsComplete = $state(false);
+  let loadingMessageIndex = $state(0);
+  
+  // Playful loading messages
+  const loadingMessages = [
+    { text: "Warming up the engines...", emoji: "🚀" },
+    { text: "Connecting to your sandboxes...", emoji: "🔌" },
+    { text: "Summoning the AI agents...", emoji: "🤖" },
+    { text: "Checking Docker vitals...", emoji: "🐳" },
+    { text: "Preparing your command center...", emoji: "⚡" },
+    { text: "Almost there...", emoji: "✨" },
+  ];
+  
+  // Cycle through messages
+  let messageInterval: ReturnType<typeof setInterval> | undefined;
+  
+  // Show loading screen while initial load is happening
+  let showLoadingScreen = $derived(isInitialLoading && (!minimumTimeElapsed || !apiCallsComplete));
 
   // Track if we're on mobile (for FAB visibility)
   let isMobile = $state(false);
@@ -63,6 +90,9 @@
   let unseenIds = $state<Set<string>>(new Set());
   let unsubscribeActivity: (() => void) | undefined;
   let unsubscribeUnseen: (() => void) | undefined;
+  
+  // Pre-fetched pending permissions (loaded during splash screen)
+  let initialPendingPermissions = $state<PendingPermission[] | undefined>(undefined);
   
   // Track previous active sandbox IDs to detect completions
   let previousActiveSandboxIds = $state<Set<string>>(new Set());
@@ -195,7 +225,17 @@
     unseenIds = new Set(getUnseenCompletionIds());
   }
 
-  onMount(() => {
+  onMount(async () => {
+    // Start minimum time timer
+    setTimeout(() => {
+      minimumTimeElapsed = true;
+    }, MINIMUM_LOADING_TIME);
+    
+    // Start cycling through loading messages
+    messageInterval = setInterval(() => {
+      loadingMessageIndex = (loadingMessageIndex + 1) % loadingMessages.length;
+    }, 800);
+    
     // Subscribe to activity changes (for immediate updates from chat pages)
     unsubscribeActivity = subscribeToActivityChanges(() => {
       refreshBusyIds();
@@ -218,6 +258,26 @@
     staleCheckInterval = setInterval(() => {
       refreshBusyIds();
     }, 3000);
+    
+    // Perform initial data loading during splash screen
+    if (connection.isConnected) {
+      try {
+        const [, , permissions] = await Promise.all([
+          checkDockerHealth(),
+          fetchSandboxes(),
+          getAllPendingPermissions().catch(() => [] as PendingPermission[])
+        ]);
+        initialPendingPermissions = permissions;
+      } catch (e) {
+        console.error("Initial data loading error:", e);
+        initialPendingPermissions = [];
+      }
+    } else {
+      initialPendingPermissions = [];
+    }
+    
+    // Mark API calls as complete
+    apiCallsComplete = true;
   });
 
   onDestroy(() => {
@@ -226,20 +286,25 @@
     if (staleCheckInterval) {
       clearInterval(staleCheckInterval);
     }
+    if (messageInterval) {
+      clearInterval(messageInterval);
+    }
+  });
+  
+  // When loading screen is dismissed, mark initial loading as done
+  $effect(() => {
+    if (minimumTimeElapsed && apiCallsComplete && isInitialLoading) {
+      // Small delay for smooth transition
+      setTimeout(() => {
+        isInitialLoading = false;
+      }, 300);
+    }
   });
 
   // Redirect if not connected or not authenticated
   $effect(() => {
     if (!connection.isConnected) {
       goto("/login");
-    }
-  });
-
-  // Check Docker health and load sandboxes when connected
-  $effect(() => {
-    if (connection.isConnected) {
-      checkDockerHealth();
-      fetchSandboxes();
     }
   });
 
@@ -333,6 +398,71 @@
 <!-- Noise overlay for atmosphere -->
 <div class="noise-overlay"></div>
 
+<!-- Loading Screen -->
+{#if showLoadingScreen}
+  <div class="fixed inset-0 z-50 grid-bg mesh-gradient flex items-center justify-center">
+    <div class="text-center animate-fade-in-up max-w-md px-6">
+      <!-- Animated Logo/Icon -->
+      <div class="relative mb-8">
+        <div class="w-24 h-24 mx-auto relative">
+          <!-- Outer spinning ring -->
+          <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
+          <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] border-r-[var(--cyber-cyan)]/50 animate-spin" style="animation-duration: 1.5s;"></div>
+          
+          <!-- Inner pulsing core -->
+          <div class="absolute inset-4 rounded-full bg-gradient-to-br from-[var(--cyber-cyan)]/20 to-[var(--cyber-magenta)]/20 
+                      flex items-center justify-center border border-[var(--cyber-cyan)]/30">
+            <RocketIcon class="w-8 h-8 text-[var(--cyber-cyan)] animate-pulse" />
+          </div>
+          
+          <!-- Orbiting dots -->
+          <div class="absolute inset-0 animate-spin" style="animation-duration: 3s;">
+            <div class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1 w-2 h-2 rounded-full bg-[var(--cyber-amber)]"></div>
+          </div>
+          <div class="absolute inset-0 animate-spin" style="animation-duration: 4s; animation-direction: reverse;">
+            <div class="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1 w-2 h-2 rounded-full bg-[var(--cyber-magenta)]"></div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- App Name -->
+      <h1 class="text-3xl font-bold mb-2">
+        AgentPod<span class="typing-cursor"></span>
+      </h1>
+      
+      <!-- Loading Message -->
+      <div class="h-8 flex items-center justify-center">
+        {#key loadingMessageIndex}
+          <p class="text-sm font-mono text-muted-foreground animate-fade-in">
+            <span class="mr-2">{loadingMessages[loadingMessageIndex].emoji}</span>
+            {loadingMessages[loadingMessageIndex].text}
+          </p>
+        {/key}
+      </div>
+      
+      <!-- Progress bar -->
+      <div class="mt-6 w-48 mx-auto h-1 bg-border/30 rounded-full overflow-hidden">
+        <div class="h-full bg-gradient-to-r from-[var(--cyber-cyan)] to-[var(--cyber-magenta)] rounded-full animate-loading-progress"></div>
+      </div>
+      
+      <!-- Subtle hint -->
+      <p class="mt-8 text-xs font-mono text-muted-foreground/50">
+        // initializing command center
+      </p>
+    </div>
+  </div>
+  
+  <style>
+    @keyframes loading-progress {
+      0% { width: 0%; }
+      50% { width: 70%; }
+      100% { width: 100%; }
+    }
+    .animate-loading-progress {
+      animation: loading-progress 2.5s ease-in-out;
+    }
+  </style>
+{:else}
 <main class="flex flex-col grid-bg mesh-gradient overflow-hidden h-full md:h-screen -mb-16 md:mb-0">
   <!-- Fixed Header Section -->
   <div class="shrink-0 px-4 sm:px-6 pt-6 sm:pt-8 pb-4 sm:pb-6 max-w-7xl mx-auto w-full">
@@ -513,25 +643,10 @@
       {/if}
 
       <!-- Pending Actions Section (shows permission requests needing user attention) -->
-      <PendingActions />
+      <PendingActions initialPermissions={initialPendingPermissions} />
 
-      <!-- Loading State -->
-      {#if sandboxes.isLoading && sandboxes.list.length === 0}
-        <div class="space-y-4 animate-fade-in-up">
-          <Skeleton class="h-5 w-40" />
-          <div class="cyber-card p-4 space-y-3">
-            {#each [1, 2, 3] as _}
-              <div class="flex items-center gap-3">
-                <Skeleton class="h-10 w-10 rounded" />
-                <div class="flex-1 space-y-2">
-                  <Skeleton class="h-4 w-1/3" />
-                  <Skeleton class="h-3 w-1/2" />
-                </div>
-              </div>
-            {/each}
-          </div>
-        </div>
-      {:else if !hasProjects}
+      <!-- Content - Skip skeleton since data was loaded during splash screen -->
+      {#if !hasProjects}
         <!-- Empty State - Playful Welcome -->
         <div class="animate-fade-in-up py-8 sm:py-12">
           <div class="cyber-card p-8 sm:p-12 text-center relative overflow-hidden">
@@ -796,3 +911,4 @@
     </button>
   {/if}
 </main>
+{/if}
