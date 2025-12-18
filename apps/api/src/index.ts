@@ -15,6 +15,7 @@ import { userRoutes } from './routes/users.ts';
 import { resourceTiersRouter } from './routes/resource-tiers.ts';
 import { flavorsRouter } from './routes/flavors.ts';
 import { addonsRouter } from './routes/addons.ts';
+import { dockerRouter } from './routes/docker.ts';
 import { providerRoutes } from './routes/providers.ts';
 import { preferencesRoutes } from './routes/preferences.ts';
 import { activityRoutes } from './routes/activity.ts';
@@ -92,6 +93,7 @@ origin: (origin) => {
   .route('/api/resource-tiers', resourceTiersRouter) // Resource tiers (CPU, memory, storage)
   .route('/api/flavors', flavorsRouter) // Container flavors (language environments)
   .route('/api/addons', addonsRouter) // Container addons (optional features)
+  .route('/api/docker', dockerRouter) // Docker image management
   // v2 API routes (direct Docker orchestrator)
   .route('/api/v2/sandboxes', sandboxRoutes) // Sandbox management
   .route('/api/v2/sandboxes', chatRoutes) // Chat history (persisted)

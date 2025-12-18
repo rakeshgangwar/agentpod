@@ -111,7 +111,7 @@ const HOMEPAGE_PORT = 4000;
  * Get the full Docker image name for a flavor
  */
 export function getFlavorImage(flavor: FlavorId): string {
-  const imageName = FLAVOR_IMAGES[flavor] ?? FLAVOR_IMAGES.fullstack;
+  const imageName = FLAVOR_IMAGES[flavor] ?? FLAVOR_IMAGES.js;
   const hasRegistry = config.registry.url && config.registry.owner;
   return hasRegistry
     ? `${config.registry.url}/${config.registry.owner}/${imageName}:${config.registry.version}`
@@ -328,7 +328,7 @@ function generateLabels(
   // Add additional metadata labels
   labels["agentpod.sandbox.user"] = options.userId;
   labels["agentpod.project.name"] = agentConfig.project.name;
-  labels["agentpod.flavor"] = agentConfig.environment?.base ?? "fullstack";
+  labels["agentpod.flavor"] = agentConfig.environment?.base ?? "js";
   labels["agentpod.tier"] = agentConfig.resources?.tier ?? "builder";
 
   // Add addon labels
@@ -389,7 +389,7 @@ export function configToContainerSpec(
   options: ContainerSpecOptions
 ): SandboxConfig {
   // Determine flavor and get image
-  const flavor = agentConfig.environment?.base ?? "fullstack";
+  const flavor = agentConfig.environment?.base ?? "js";
   const image = getFlavorImage(flavor);
 
   // Get resource limits
@@ -477,7 +477,7 @@ export function createMinimalContainerSpec(
       name: projectName,
     },
     environment: {
-      base: "fullstack",
+      base: "js",
     },
   };
 

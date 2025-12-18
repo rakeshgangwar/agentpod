@@ -148,11 +148,11 @@ export async function seedReferenceData(): Promise<void> {
   // Container Flavors
   const flavorData = [
     { id: "bare", name: "Bare", description: "Minimal workspace with OpenCode only. No language runtimes.", languages: '[]', imageSizeMb: 500, isDefault: false, enabled: true, sortOrder: 0 },
-    { id: "js", name: "JavaScript", description: "JavaScript and TypeScript development", languages: '["javascript","typescript"]', imageSizeMb: 800, isDefault: false, enabled: true, sortOrder: 1 },
+    { id: "js", name: "JavaScript", description: "JavaScript and TypeScript development", languages: '["javascript","typescript"]', imageSizeMb: 800, isDefault: true, enabled: true, sortOrder: 1 },
     { id: "python", name: "Python", description: "Python development with data science tools", languages: '["python"]', imageSizeMb: 1200, isDefault: false, enabled: true, sortOrder: 2 },
-    { id: "go", name: "Go", description: "Go development environment", languages: '["go"]', imageSizeMb: 900, isDefault: false, enabled: false, sortOrder: 3 },
+    { id: "go", name: "Go", description: "Go development environment", languages: '["go"]', imageSizeMb: 900, isDefault: false, enabled: true, sortOrder: 3 },
     { id: "rust", name: "Rust", description: "Rust development environment", languages: '["rust"]', imageSizeMb: 1100, isDefault: false, enabled: true, sortOrder: 4 },
-    { id: "fullstack", name: "Fullstack", description: "JavaScript + Python for full-stack development", languages: '["javascript","typescript","python"]', imageSizeMb: 1800, isDefault: true, enabled: true, sortOrder: 5 },
+    { id: "fullstack", name: "Fullstack", description: "JavaScript + Python for full-stack development", languages: '["javascript","typescript","python"]', imageSizeMb: 1800, isDefault: false, enabled: true, sortOrder: 5 },
     { id: "polyglot", name: "Polyglot", description: "All languages for maximum flexibility", languages: '["javascript","typescript","python","go","rust"]', imageSizeMb: 3000, isDefault: false, enabled: false, sortOrder: 6 },
   ];
 

@@ -14,6 +14,9 @@ use commands::{
     auth_get_user, auth_get_token, auth_is_authenticated,
     // Connection commands
     connect, disconnect, get_connection_status, test_connection,
+    // Docker image management commands
+    get_flavor_images, check_image_exists, pull_image_sync,
+    get_docker_info, check_docker_health,
     // Sandbox commands (v2, direct Docker orchestration)
     docker_health, list_sandboxes, get_sandbox, create_sandbox, delete_sandbox,
     start_sandbox, stop_sandbox, restart_sandbox, pause_sandbox, unpause_sandbox,
@@ -148,6 +151,12 @@ pub fn run() {
             terminal_disconnect,
             terminal_list,
             terminal_disconnect_all,
+            // Docker image management commands
+            get_flavor_images,
+            check_image_exists,
+            pull_image_sync,
+            get_docker_info,
+            check_docker_health,
             // Resource tier commands (modular containers)
             list_resource_tiers,
             get_default_resource_tier,

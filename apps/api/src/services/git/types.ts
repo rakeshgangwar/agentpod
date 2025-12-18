@@ -71,6 +71,12 @@ export interface RepositoryTemplate {
 
   /** Additional files to create */
   files?: Record<string, string>;
+  
+  /** Project display name (used in README, AGENTS.md) */
+  projectName?: string;
+  
+  /** Project description (used in README, AGENTS.md) */
+  projectDescription?: string;
 }
 
 /**

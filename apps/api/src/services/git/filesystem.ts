@@ -172,14 +172,62 @@ export class FileSystemGitBackend implements GitBackend {
   ): Promise<void> {
     if (!template) return;
 
+    // Use project name/description if provided, otherwise fall back to repo name
+    const displayName = template.projectName || name;
+    const description = template.projectDescription || "A new AgentPod project.";
+
     // Create README.md
     if (template.readme) {
       const readmeContent =
         typeof template.readme === "string"
           ? template.readme
-          : `# ${name}\n\nA new AgentPod project.\n`;
+          : `# ${displayName}
+
+${description}
+
+## Getting Started
+
+This project was created with [AgentPod](https://agentpod.dev), an AI-powered development environment.
+
+### Development
+
+Your AI coding assistant is ready to help. Open the chat to start collaborating on your code.
+
+## Project Structure
+
+\`\`\`
+.
+├── README.md          # This file
+├── AGENTS.md          # Instructions for AI assistants
+└── ...                # Your project files
+\`\`\`
+
+## AI Assistance
+
+This project includes an \`AGENTS.md\` file that provides context to AI assistants about your project's goals and requirements.
+`;
       fs.writeFileSync(path.join(repoPath, "README.md"), readmeContent);
     }
+    
+    // Create AGENTS.md with project context
+    const agentsContent = `# ${displayName}
+
+## Project Description
+
+${description}
+
+## Development Guidelines
+
+- Follow best practices for the chosen technology stack
+- Write clean, maintainable code with appropriate comments
+- Include error handling and input validation
+- Write tests for new functionality when appropriate
+
+## Getting Help
+
+If you need clarification about the project requirements or have questions, please ask!
+`;
+    fs.writeFileSync(path.join(repoPath, "AGENTS.md"), agentsContent);
 
     // Create .gitignore
     if (template.gitignore) {
@@ -216,7 +264,8 @@ Thumbs.db
 # https://agentpod.dev/docs/configuration
 
 [project]
-name = "${name}"
+name = "${displayName}"
+${template.projectDescription ? `description = "${template.projectDescription.replace(/"/g, '\\"')}"` : '# description = "Your project description"'}
 
 [container]
 flavor = "js"

@@ -145,7 +145,7 @@ export type PackagesConfig = z.infer<typeof PackagesConfigSchema>;
  */
 export const EnvironmentConfigSchema = z.object({
   /** Base flavor: js, python, go, rust, fullstack, polyglot */
-  base: FlavorId.default("fullstack"),
+  base: FlavorId.default("js"),
 
   /** Language version specifications */
   languages: LanguageVersionsSchema.optional(),
@@ -455,7 +455,7 @@ export interface ConfigValidationError {
  */
 export const DEFAULT_CONFIG: Partial<AgentPodConfig> = {
   environment: {
-    base: "fullstack",
+    base: "js",
   },
   resources: {
     tier: "builder",

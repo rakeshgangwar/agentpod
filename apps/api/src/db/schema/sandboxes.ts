@@ -40,7 +40,7 @@ export const sandboxes = pgTable(
 
     // Container configuration (modular system)
     resourceTierId: text("resource_tier_id").default("starter"),
-    flavorId: text("flavor_id").default("fullstack"),
+    flavorId: text("flavor_id").default("js"),
     addonIds: text("addon_ids").default("[]"), // JSON array
 
     // Container runtime info

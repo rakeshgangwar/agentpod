@@ -945,6 +945,110 @@ export interface DockerHealthResponse {
 }
 
 // =============================================================================
+// Docker Image Management Types
+// =============================================================================
+
+/** Image availability status for a single flavor */
+export interface FlavorImageStatus {
+  available: boolean;
+  imageName: string;
+  size?: number;
+  error?: string;
+}
+
+/** Response from flavor images endpoint */
+export interface FlavorImagesResponse {
+  success: boolean;
+  images: Record<string, FlavorImageStatus>;
+}
+
+/** Docker image info */
+export interface DockerImageDetail {
+  name: string;
+  id: string;
+  size: number;
+  created: string;
+}
+
+/** Response for single image check */
+export interface ImageExistsResponse {
+  exists: boolean;
+  imageName?: string;
+  image?: DockerImageDetail;
+}
+
+/** Response for image pull (sync) */
+export interface ImagePullResponse {
+  success: boolean;
+  imageName: string;
+  error?: string;
+  image?: DockerImageDetail;
+}
+
+/** Docker daemon info (from image management endpoint) */
+export interface DockerDaemonInfo {
+  version: string;
+  apiVersion: string;
+  os: string;
+  arch: string;
+  containers: DockerContainerStats;
+  images: number;
+}
+
+/** Docker health check response (from image management endpoint) */
+export interface DockerHealthCheckResponse {
+  healthy: boolean;
+  timestamp: string;
+  error?: string;
+}
+
+// =============================================================================
+// Docker Image Management Commands
+// =============================================================================
+
+/**
+ * Get availability status of all flavor images
+ * Returns a map of flavor ID to image availability status
+ */
+export async function getFlavorImages(): Promise<FlavorImagesResponse> {
+  return invoke<FlavorImagesResponse>("get_flavor_images");
+}
+
+/**
+ * Check if a specific Docker image exists locally
+ * @param imageName - Full image name with tag (e.g., "agentpod-fullstack:0.4.0")
+ */
+export async function checkImageExists(imageName: string): Promise<ImageExistsResponse> {
+  return invoke<ImageExistsResponse>("check_image_exists", { imageName });
+}
+
+/**
+ * Pull a Docker image synchronously (without streaming progress)
+ * @param imageName - Full image name with tag (optional if flavorId provided)
+ * @param flavorId - Flavor ID to pull image for (optional if imageName provided)
+ */
+export async function pullImageSync(
+  imageName?: string,
+  flavorId?: string
+): Promise<ImagePullResponse> {
+  return invoke<ImagePullResponse>("pull_image_sync", { imageName, flavorId });
+}
+
+/**
+ * Get Docker daemon information
+ */
+export async function getDockerDaemonInfo(): Promise<DockerDaemonInfo> {
+  return invoke<DockerDaemonInfo>("get_docker_info");
+}
+
+/**
+ * Check Docker daemon health
+ */
+export async function checkDockerDaemonHealth(): Promise<DockerHealthCheckResponse> {
+  return invoke<DockerHealthCheckResponse>("check_docker_health");
+}
+
+// =============================================================================
 // V2 Sandbox Commands
 // =============================================================================
 

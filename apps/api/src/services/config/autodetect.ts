@@ -191,8 +191,8 @@ function determineFlavor(features: DetectedFeatures): FlavorId {
     return "rust";
   }
 
-  // Default to fullstack
-  return "fullstack";
+  // Default to js
+  return "js";
 }
 
 /**

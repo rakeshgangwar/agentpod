@@ -239,7 +239,7 @@ export class SandboxManager {
           repoName: labels["agentpod.sandbox.repo"] ?? `repo-${sandboxId}`,
           githubUrl: labels["agentpod.sandbox.github"],
           resourceTierId: 'starter', // Default, not stored in labels
-          flavorId: 'fullstack', // Default, not stored in labels
+          flavorId: 'js', // Default, not stored in labels
           addonIds: ['code-server'], // Default
         });
 
@@ -336,7 +336,7 @@ export class SandboxManager {
       description,
       githubUrl,
       userId,
-      flavor = "fullstack",
+      flavor = "js",
       resourceTier = "starter",
       addons = ["code-server"],
       autoStart = false,
@@ -366,6 +366,9 @@ export class SandboxManager {
             readme: true,
             gitignore: true,
             agentpodConfig: true,
+            // Pass project name and description for README, AGENTS.md, etc.
+            projectName: name,
+            projectDescription: description,
           },
           initialCommit: true,
         });
@@ -1140,6 +1143,111 @@ export class SandboxManager {
    */
   async getDockerInfo() {
     return this.orchestrator.getInfo();
+  }
+
+  // ===========================================================================
+  // Image Management
+  // ===========================================================================
+
+  /**
+   * Check if a Docker image exists locally
+   */
+  async imageExists(imageName: string): Promise<boolean> {
+    return this.orchestrator.imageExists(imageName);
+  }
+
+  /**
+   * Get information about a Docker image
+   */
+  async getImageInfo(imageName: string) {
+    return this.orchestrator.getImage(imageName);
+  }
+
+  /**
+   * List all Docker images matching a filter
+   */
+  async listImages(filter?: string) {
+    return this.orchestrator.listImages(filter);
+  }
+
+  /**
+   * Check availability of all flavor images
+   * Returns a map of flavor ID to availability status
+   */
+  async checkFlavorImageAvailability(): Promise<Record<string, {
+    available: boolean;
+    imageName: string;
+    size?: number;
+    error?: string;
+  }>> {
+    const { getAllFlavorsIncludingDisabled } = await import("../models/container-flavor.ts");
+    const flavors = await getAllFlavorsIncludingDisabled();
+    const result: Record<string, { available: boolean; imageName: string; size?: number; error?: string }> = {};
+
+    for (const flavor of flavors) {
+      const imageName = this.getImageForFlavor(flavor.id);
+      try {
+        const imageInfo = await this.orchestrator.getImage(imageName);
+        if (imageInfo) {
+          result[flavor.id] = {
+            available: true,
+            imageName,
+            size: imageInfo.size,
+          };
+        } else {
+          result[flavor.id] = {
+            available: false,
+            imageName,
+          };
+        }
+      } catch (err) {
+        result[flavor.id] = {
+          available: false,
+          imageName,
+          error: err instanceof Error ? err.message : "Unknown error",
+        };
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Pull a Docker image with progress callback
+   */
+  async pullImage(
+    imageName: string,
+    onProgress?: (progress: { status: string; progress?: string; id?: string }) => void
+  ): Promise<void> {
+    return this.orchestrator.pullImage(imageName, onProgress);
+  }
+
+  /**
+   * Pull a flavor image by flavor ID
+   */
+  async pullFlavorImage(
+    flavorId: string,
+    onProgress?: (progress: { status: string; progress?: string; id?: string }) => void
+  ): Promise<{ success: boolean; imageName: string; error?: string }> {
+    const imageName = this.getImageForFlavor(flavorId);
+    
+    try {
+      await this.orchestrator.pullImage(imageName, onProgress);
+      return { success: true, imageName };
+    } catch (err) {
+      return {
+        success: false,
+        imageName,
+        error: err instanceof Error ? err.message : "Failed to pull image",
+      };
+    }
+  }
+
+  /**
+   * Get the image name for a flavor (exposed for API use)
+   */
+  getFlavorImageName(flavorId: string): string {
+    return this.getImageForFlavor(flavorId);
   }
 
   // ===========================================================================

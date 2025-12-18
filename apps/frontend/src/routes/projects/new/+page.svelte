@@ -3,12 +3,13 @@
   import { connection } from "$lib/stores/connection.svelte";
   import { auth } from "$lib/stores/auth.svelte";
   import { createSandbox } from "$lib/stores/sandboxes.svelte";
-  import { sandboxOpencodeHealthCheck, sandboxOpencodeCreateSession } from "$lib/api/tauri";
+  import { sandboxOpencodeHealthCheck, sandboxOpencodeCreateSession, getFlavorImages, type FlavorImageStatus } from "$lib/api/tauri";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
   import * as Tabs from "$lib/components/ui/tabs";
-  import { Check, ArrowLeft } from "@lucide/svelte";
+  import * as Collapsible from "$lib/components/ui/collapsible";
+  import { Check, ArrowLeft, ChevronDown, Settings2, Sparkles, Globe, Server, Smartphone, Bot, Wrench } from "@lucide/svelte";
   import ResourceTierSelector from "$lib/components/resource-tier-selector.svelte";
   import FlavorSelector from "$lib/components/flavor-selector.svelte";
   import AddonSelector from "$lib/components/addon-selector.svelte";
@@ -40,6 +41,135 @@
   let selectedResourceTierId = $state("");
   let selectedFlavorId = $state("");
   let selectedAddonIds = $state<string[]>([]);
+  
+  // Advanced options state (collapsed by default)
+  let advancedOptionsOpen = $state(false);
+  
+  // Flavor image availability tracking
+  let flavorImageStatus = $state<Record<string, FlavorImageStatus>>({});
+  let flavorStatusLoaded = $state(false);
+  
+  // Load flavor image status on mount
+  $effect(() => {
+    loadFlavorStatus();
+  });
+  
+  async function loadFlavorStatus() {
+    try {
+      const response = await getFlavorImages();
+      if (response.success) {
+        flavorImageStatus = response.images;
+      }
+    } catch (err) {
+      console.warn("Failed to load flavor image status:", err);
+    } finally {
+      flavorStatusLoaded = true;
+    }
+  }
+  
+  function isFlavorAvailable(flavorId: string): boolean {
+    return flavorImageStatus[flavorId]?.available ?? false;
+  }
+  
+  // Template definitions
+  interface ProjectTemplate {
+    id: string;
+    name: string;
+    description: string;
+    icon: typeof Globe;
+    flavor: string;
+    resourceTier?: string;      // Optional resource tier override
+    addons?: string[];          // Optional addon presets
+    suggestedName: string;
+    suggestedDescription: string;
+    tags: string[];
+  }
+  
+  const projectTemplates: ProjectTemplate[] = [
+    {
+      id: "web-app",
+      name: "Web Application",
+      description: "Full-stack web app with modern frameworks",
+      icon: Globe,
+      flavor: "js",
+      resourceTier: "starter",   // Light: just needs Node.js
+      addons: ["code-server"],
+      suggestedName: "my-web-app",
+      suggestedDescription: "A modern web application",
+      tags: ["React", "Next.js", "TypeScript"],
+    },
+    {
+      id: "api-server",
+      name: "API Server",
+      description: "RESTful or GraphQL backend service",
+      icon: Server,
+      flavor: "js",
+      resourceTier: "builder",   // Medium: may run database locally
+      addons: ["code-server"],
+      suggestedName: "my-api",
+      suggestedDescription: "Backend API service",
+      tags: ["Node.js", "Express", "PostgreSQL"],
+    },
+    {
+      id: "ai-agent",
+      name: "AI Agent",
+      description: "LLM-powered agent or chatbot",
+      icon: Bot,
+      flavor: "python",
+      resourceTier: "builder",   // Medium: ML libraries need more RAM
+      addons: ["code-server"],
+      suggestedName: "my-agent",
+      suggestedDescription: "AI-powered agent application",
+      tags: ["Python", "LangChain", "OpenAI"],
+    },
+    {
+      id: "cli-tool",
+      name: "CLI Tool",
+      description: "Command-line utility or automation",
+      icon: Wrench,
+      flavor: "go",
+      resourceTier: "starter",   // Light: Go compiles efficiently
+      addons: ["code-server"],
+      suggestedName: "my-cli",
+      suggestedDescription: "Command-line tool",
+      tags: ["Go", "Cobra", "Cross-platform"],
+    },
+    {
+      id: "mobile-app",
+      name: "Mobile App",
+      description: "Cross-platform mobile application",
+      icon: Smartphone,
+      flavor: "js",
+      resourceTier: "builder",   // Medium: mobile dev tooling is heavy
+      addons: ["code-server"],
+      suggestedName: "my-mobile-app",
+      suggestedDescription: "Cross-platform mobile application",
+      tags: ["React Native", "Expo", "TypeScript"],
+    },
+  ];
+  
+  let selectedTemplateId = $state<string | null>(null);
+  
+  // Apply template when selected
+  function applyTemplate(template: ProjectTemplate) {
+    selectedTemplateId = template.id;
+    projectName = template.suggestedName;
+    projectDescription = template.suggestedDescription;
+    selectedFlavorId = template.flavor;
+    
+    // Apply resource tier if specified
+    if (template.resourceTier) {
+      selectedResourceTierId = template.resourceTier;
+    }
+    
+    // Apply addons if specified
+    if (template.addons) {
+      selectedAddonIds = [...template.addons];
+    }
+    
+    // Switch to scratch tab to show the pre-filled form
+    activeTab = "scratch";
+  }
   
   // Submission state
   let isSubmitting = $state(false);
@@ -124,8 +254,32 @@
     githubUrl.trim().length > 0 && 
     (githubUrl.includes("github.com/") || githubUrl.includes("gitlab.com/"))
   );
+  
+  // Check if selected flavor is available (downloaded)
+  const isFlavorValid = $derived(() => {
+    // If no flavor selected, it will use default (which should be available)
+    if (!selectedFlavorId) return true;
+    // If status not loaded yet, allow (will validate on submit)
+    if (!flavorStatusLoaded) return true;
+    return isFlavorAvailable(selectedFlavorId);
+  });
+  
+  // Get the name of the selected flavor for error messages
+  const selectedFlavorName = $derived(() => {
+    const flavorNames: Record<string, string> = {
+      js: "JavaScript",
+      python: "Python",
+      go: "Go",
+      rust: "Rust",
+      fullstack: "Fullstack",
+      polyglot: "Polyglot",
+      bare: "Bare",
+    };
+    return flavorNames[selectedFlavorId] || selectedFlavorId;
+  });
+  
   const isFormValid = $derived(
-    activeTab === "scratch" ? isFromScratchValid : isGithubUrlValid
+    (activeTab === "scratch" ? isFromScratchValid : isGithubUrlValid) && isFlavorValid()
   );
 
   // Extract repo name from GitHub URL
@@ -236,16 +390,18 @@
           await new Promise(resolve => setTimeout(resolve, 500));
           
           // Navigate to chat with the new session
+          // Use replaceState so back button goes to homepage, not back to /projects/new
           if (sessionId) {
-            await goto(`/projects/${sandboxId}/chat?session=${sessionId}`);
+            await goto(`/projects/${sandboxId}/chat?session=${sessionId}`, { replaceState: true });
           } else {
-            await goto(`/projects/${sandboxId}/chat`);
+            await goto(`/projects/${sandboxId}/chat`, { replaceState: true });
           }
         } else {
           // Container didn't become healthy in time
           errorMessage = "Container took too long to start. Please try again or check your sandbox in the dashboard.";
           // Still navigate to the project page so user can see their sandbox
-          await goto(`/projects/${sandboxId}`);
+          // Use replaceState so back button goes to homepage, not back to /projects/new
+          await goto(`/projects/${sandboxId}`, { replaceState: true });
         }
       }
     } catch (err) {
@@ -341,24 +497,35 @@
         <Tabs.Root bind:value={activeTab}>
           <!-- Tab Header -->
           <div class="border-b border-border/30 bg-background/30 backdrop-blur-sm">
-            <Tabs.List class="grid w-full grid-cols-2 p-0 h-auto bg-transparent">
+            <Tabs.List class="grid w-full grid-cols-3 p-0 h-auto bg-transparent">
               <Tabs.Trigger 
                 value="scratch" 
-                class="py-3 px-4 font-mono text-xs uppercase tracking-wider rounded-none border-b-2 
+                class="py-3 px-2 sm:px-4 font-mono text-[10px] sm:text-xs uppercase tracking-wider rounded-none border-b-2 
                        data-[state=active]:border-[var(--cyber-cyan)] data-[state=active]:text-[var(--cyber-cyan)]
                        data-[state=inactive]:border-transparent data-[state=inactive]:text-muted-foreground
                        hover:text-foreground transition-colors bg-transparent"
               >
-                From Scratch
+                Blank
+              </Tabs.Trigger>
+              <Tabs.Trigger 
+                value="templates"
+                class="py-3 px-2 sm:px-4 font-mono text-[10px] sm:text-xs uppercase tracking-wider rounded-none border-b-2 
+                       data-[state=active]:border-[var(--cyber-cyan)] data-[state=active]:text-[var(--cyber-cyan)]
+                       data-[state=inactive]:border-transparent data-[state=inactive]:text-muted-foreground
+                       hover:text-foreground transition-colors bg-transparent flex items-center justify-center gap-1"
+              >
+                <Sparkles class="w-3 h-3" />
+                <span class="hidden sm:inline">Templates</span>
+                <span class="sm:hidden">Quick</span>
               </Tabs.Trigger>
               <Tabs.Trigger 
                 value="github"
-                class="py-3 px-4 font-mono text-xs uppercase tracking-wider rounded-none border-b-2 
+                class="py-3 px-2 sm:px-4 font-mono text-[10px] sm:text-xs uppercase tracking-wider rounded-none border-b-2 
                        data-[state=active]:border-[var(--cyber-cyan)] data-[state=active]:text-[var(--cyber-cyan)]
                        data-[state=inactive]:border-transparent data-[state=inactive]:text-muted-foreground
                        hover:text-foreground transition-colors bg-transparent"
               >
-                Import from GitHub
+                GitHub
               </Tabs.Trigger>
             </Tabs.List>
           </div>
@@ -430,22 +597,126 @@
                     bind:selectedFlavorId
                     disabled={isSubmitting}
                   />
+                  
+                  <!-- Warning if selected flavor is not available -->
+                  {#if selectedFlavorId && flavorStatusLoaded && !isFlavorAvailable(selectedFlavorId)}
+                    <div class="p-3 rounded border border-[var(--cyber-amber)]/50 bg-[var(--cyber-amber)]/5">
+                      <p class="text-sm text-[var(--cyber-amber)] font-mono">
+                        <span class="font-bold">{selectedFlavorName()}</span> environment is not downloaded.
+                        Please download it from the list above before creating your project.
+                      </p>
+                    </div>
+                  {/if}
                 </div>
                 
-                <!-- Resource Tier selector -->
-                <div class="space-y-2 border-t border-border/30 pt-4">
-                  <ResourceTierSelector
-                    bind:selectedTierId={selectedResourceTierId}
+                <!-- Advanced Options (Collapsible) -->
+                <Collapsible.Root bind:open={advancedOptionsOpen} class="border-t border-border/30 pt-4">
+                  <Collapsible.Trigger 
+                    class="flex items-center justify-between w-full py-2 px-3 -mx-3 rounded 
+                           hover:bg-[var(--cyber-cyan)]/5 transition-colors group"
                     disabled={isSubmitting}
-                  />
-                </div>
-                
-                <!-- Addon selector -->
-                <div class="space-y-2 border-t border-border/30 pt-4">
-                  <AddonSelector
-                    bind:selectedAddonIds
-                    disabled={isSubmitting}
-                  />
+                  >
+                    <div class="flex items-center gap-2">
+                      <Settings2 class="w-4 h-4 text-muted-foreground group-hover:text-[var(--cyber-cyan)] transition-colors" />
+                      <span class="font-mono text-xs uppercase tracking-wider text-muted-foreground group-hover:text-foreground transition-colors">
+                        Advanced Options
+                      </span>
+                      {#if selectedAddonIds.length > 0 || selectedResourceTierId}
+                        <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--cyber-cyan)]/10 text-[var(--cyber-cyan)] border border-[var(--cyber-cyan)]/30">
+                          {#if selectedResourceTierId && selectedAddonIds.length > 0}
+                            Configured
+                          {:else if selectedAddonIds.length > 0}
+                            {selectedAddonIds.length} addon{selectedAddonIds.length > 1 ? 's' : ''}
+                          {:else}
+                            Custom tier
+                          {/if}
+                        </span>
+                      {/if}
+                    </div>
+                    <ChevronDown 
+                      class="w-4 h-4 text-muted-foreground transition-transform duration-200
+                             {advancedOptionsOpen ? 'rotate-180' : ''}" 
+                    />
+                  </Collapsible.Trigger>
+                  
+                  <Collapsible.Content class="pt-4 space-y-4">
+                    <!-- Resource Tier selector -->
+                    <div class="space-y-2">
+                      <ResourceTierSelector
+                        bind:selectedTierId={selectedResourceTierId}
+                        disabled={isSubmitting}
+                      />
+                    </div>
+                    
+                    <!-- Addon selector -->
+                    <div class="space-y-2 border-t border-border/30 pt-4">
+                      <AddonSelector
+                        bind:selectedAddonIds
+                        disabled={isSubmitting}
+                      />
+                    </div>
+                  </Collapsible.Content>
+                </Collapsible.Root>
+              </Tabs.Content>
+              
+              <!-- Templates Tab -->
+              <Tabs.Content value="templates" class="space-y-4 mt-0">
+                <div class="space-y-3">
+                  <p class="text-xs text-muted-foreground font-mono">
+                    Start with a pre-configured template to get going quickly
+                  </p>
+                  
+                  <!-- Template cards -->
+                  <div class="grid gap-2">
+                    {#each projectTemplates as template (template.id)}
+                      {@const isSelected = selectedTemplateId === template.id}
+                      <button
+                        type="button"
+                        class="w-full text-left p-3 rounded border transition-all
+                          {isSelected 
+                            ? 'border-[var(--cyber-cyan)] bg-[var(--cyber-cyan)]/10 shadow-[0_0_12px_var(--cyber-cyan)/15]' 
+                            : 'border-border/30 hover:border-[var(--cyber-cyan)]/50 hover:bg-[var(--cyber-cyan)]/5'}"
+                        onclick={() => applyTemplate(template)}
+                        disabled={isSubmitting}
+                      >
+                        <div class="flex items-start gap-3">
+                          <!-- Icon -->
+                          <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-[var(--cyber-cyan)]/10 border border-[var(--cyber-cyan)]/30 
+                                      flex items-center justify-center">
+                            <template.icon class="w-5 h-5 text-[var(--cyber-cyan)]" />
+                          </div>
+                          
+                          <!-- Content -->
+                          <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 mb-0.5">
+                              <span class="font-medium text-sm {isSelected ? 'text-[var(--cyber-cyan)]' : ''}">
+                                {template.name}
+                              </span>
+                            </div>
+                            <p class="text-xs text-muted-foreground mb-2">
+                              {template.description}
+                            </p>
+                            <div class="flex flex-wrap gap-1">
+                              {#each template.tags as tag}
+                                <span class="text-[10px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground border border-border/30">
+                                  {tag}
+                                </span>
+                              {/each}
+                            </div>
+                          </div>
+                          
+                          <!-- Arrow indicator -->
+                          <div class="flex-shrink-0 self-center">
+                            <ChevronDown class="w-4 h-4 -rotate-90 text-muted-foreground" />
+                          </div>
+                        </div>
+                      </button>
+                    {/each}
+                  </div>
+                  
+                  <p class="text-[10px] text-muted-foreground/70 font-mono">
+                    Selecting a template will pre-fill the project form. You can customize before creating.
+                  </p>
                 </div>
               </Tabs.Content>
               
@@ -499,23 +770,66 @@
                     bind:selectedFlavorId
                     disabled={isSubmitting}
                   />
+                  
+                  <!-- Warning if selected flavor is not available -->
+                  {#if selectedFlavorId && flavorStatusLoaded && !isFlavorAvailable(selectedFlavorId)}
+                    <div class="p-3 rounded border border-[var(--cyber-amber)]/50 bg-[var(--cyber-amber)]/5">
+                      <p class="text-sm text-[var(--cyber-amber)] font-mono">
+                        <span class="font-bold">{selectedFlavorName()}</span> environment is not downloaded.
+                        Please download it from the list above before creating your project.
+                      </p>
+                    </div>
+                  {/if}
                 </div>
                 
-                <!-- Resource Tier selector -->
-                <div class="space-y-2 border-t border-border/30 pt-4">
-                  <ResourceTierSelector
-                    bind:selectedTierId={selectedResourceTierId}
+                <!-- Advanced Options (Collapsible) -->
+                <Collapsible.Root bind:open={advancedOptionsOpen} class="border-t border-border/30 pt-4">
+                  <Collapsible.Trigger 
+                    class="flex items-center justify-between w-full py-2 px-3 -mx-3 rounded 
+                           hover:bg-[var(--cyber-cyan)]/5 transition-colors group"
                     disabled={isSubmitting}
-                  />
-                </div>
-                
-                <!-- Addon selector -->
-                <div class="space-y-2 border-t border-border/30 pt-4">
-                  <AddonSelector
-                    bind:selectedAddonIds
-                    disabled={isSubmitting}
-                  />
-                </div>
+                  >
+                    <div class="flex items-center gap-2">
+                      <Settings2 class="w-4 h-4 text-muted-foreground group-hover:text-[var(--cyber-cyan)] transition-colors" />
+                      <span class="font-mono text-xs uppercase tracking-wider text-muted-foreground group-hover:text-foreground transition-colors">
+                        Advanced Options
+                      </span>
+                      {#if selectedAddonIds.length > 0 || selectedResourceTierId}
+                        <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--cyber-cyan)]/10 text-[var(--cyber-cyan)] border border-[var(--cyber-cyan)]/30">
+                          {#if selectedResourceTierId && selectedAddonIds.length > 0}
+                            Configured
+                          {:else if selectedAddonIds.length > 0}
+                            {selectedAddonIds.length} addon{selectedAddonIds.length > 1 ? 's' : ''}
+                          {:else}
+                            Custom tier
+                          {/if}
+                        </span>
+                      {/if}
+                    </div>
+                    <ChevronDown 
+                      class="w-4 h-4 text-muted-foreground transition-transform duration-200
+                             {advancedOptionsOpen ? 'rotate-180' : ''}" 
+                    />
+                  </Collapsible.Trigger>
+                  
+                  <Collapsible.Content class="pt-4 space-y-4">
+                    <!-- Resource Tier selector -->
+                    <div class="space-y-2">
+                      <ResourceTierSelector
+                        bind:selectedTierId={selectedResourceTierId}
+                        disabled={isSubmitting}
+                      />
+                    </div>
+                    
+                    <!-- Addon selector -->
+                    <div class="space-y-2 border-t border-border/30 pt-4">
+                      <AddonSelector
+                        bind:selectedAddonIds
+                        disabled={isSubmitting}
+                      />
+                    </div>
+                  </Collapsible.Content>
+                </Collapsible.Root>
               </Tabs.Content>
               
               <!-- Submit Button -->
@@ -542,10 +856,10 @@
                       <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-black animate-spin"></div>
                     </div>
                     Creating...
-                  {:else if activeTab === "scratch"}
-                    Create Project
-                  {:else}
+                  {:else if activeTab === "github"}
                     Import Project
+                  {:else}
+                    Create Project
                   {/if}
                 </Button>
               </div>
@@ -560,6 +874,8 @@
       <p class="text-xs font-mono text-muted-foreground/70">
         {#if activeTab === "scratch"}
           A new Git repository will be created and a sandbox container will be provisioned.
+        {:else if activeTab === "templates"}
+          Choose a template to pre-configure your project settings.
         {:else}
           The repository will be cloned and a sandbox container will be set up with the code.
         {/if}

@@ -10,6 +10,7 @@
     restartSandbox,
     getSandbox 
   } from "$lib/stores/sandboxes.svelte";
+  import { markAsSeen } from "$lib/stores/unseen-completions.svelte";
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
   import PageHeader, { type PageIcon } from "$lib/components/page-header.svelte";
@@ -39,6 +40,13 @@
 
   // Get current sandbox from list
   let sandbox = $derived(sandboxId ? getSandbox(sandboxId) : undefined);
+  
+  // Clear unseen completion indicator when user visits the project
+  $effect(() => {
+    if (sandboxId) {
+      markAsSeen(sandboxId);
+    }
+  });
 
   // Get current tab from URL path
   let currentTab = $derived(() => {

@@ -19,8 +19,11 @@ type SessionActivityState = {
 // Simple Map for activity tracking (completely non-reactive)
 const activityMap = new Map<string, SessionActivityState>();
 
-// Stale threshold - 30 seconds
-const STALE_THRESHOLD_MS = 30000;
+// Stale threshold - 10 seconds
+// This determines how long a session is considered "active" without updates
+// Lower values = faster detection when user leaves chat page, but may cause
+// flickering if updates are delayed
+const STALE_THRESHOLD_MS = 10000;
 
 // Subscribers for change notifications
 type Subscriber = () => void;

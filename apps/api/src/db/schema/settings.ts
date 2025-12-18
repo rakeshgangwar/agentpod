@@ -125,7 +125,7 @@ export const userPreferences = pgTable(
 
     // Default sandbox configuration
     defaultResourceTierId: text("default_resource_tier_id").default("starter"),
-    defaultFlavorId: text("default_flavor_id").default("fullstack"),
+    defaultFlavorId: text("default_flavor_id").default("js"),
     defaultAddonIds: text("default_addon_ids").default('["code-server"]'), // JSON
     defaultAgentId: text("default_agent_id").default("opencode"),
 
