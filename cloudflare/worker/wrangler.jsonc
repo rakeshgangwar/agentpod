@@ -35,6 +35,6 @@
     }
   ],
   "vars": {
-    "AGENTPOD_API_URL": "http://localhost:3001"
+    "AGENTPOD_API_URL": "https://api.agentpod.local"
   }
 }
