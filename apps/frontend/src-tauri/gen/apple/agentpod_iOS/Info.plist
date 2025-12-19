@@ -45,5 +45,7 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>AgentPod needs microphone access for voice input and wake word detection</string>
 </dict>
 </plist>
