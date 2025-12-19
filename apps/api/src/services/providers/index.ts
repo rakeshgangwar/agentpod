@@ -29,6 +29,7 @@ export {
 
 import type { SandboxProvider, SandboxProviderType, ProviderSelectionOptions } from "./types";
 import { getDockerProvider } from "./docker-provider";
+import { getCloudflareProvider, isCloudflareConfigured } from "./cloudflare-provider";
 import { config } from "../../config";
 import { createLogger } from "../../utils/logger";
 
@@ -42,6 +43,11 @@ interface ProviderRegistry {
 const providers: ProviderRegistry = {
   docker: getDockerProvider,
 };
+
+if (isCloudflareConfigured()) {
+  providers.cloudflare = getCloudflareProvider;
+  log.info("Cloudflare sandbox provider enabled");
+}
 
 export function registerProvider(type: SandboxProviderType, factory: () => SandboxProvider): void {
   if (type === "docker") {

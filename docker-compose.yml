@@ -203,6 +203,13 @@ services:
       - OPENCODE_CONTAINER_VERSION=${OPENCODE_CONTAINER_VERSION:-latest}
 
       # =======================================================================
+      # Cloudflare Sandbox Integration
+      # =======================================================================
+      - ENABLE_CLOUDFLARE_SANDBOXES=${ENABLE_CLOUDFLARE_SANDBOXES:-false}
+      - CLOUDFLARE_WORKER_URL=${CLOUDFLARE_WORKER_URL:-}
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:-}
+
+      # =======================================================================
       # Preview Configuration
       # =======================================================================
       - TRAEFIK_DYNAMIC_DIR=/data/traefik/dynamic

@@ -7,13 +7,17 @@ import { createLogger } from "../utils/logger";
 
 const log = createLogger("agents-routes");
 
+function getAuthenticatedUserId(c: { get: (key: string) => unknown }): string | null {
+  const user = c.get("user") as { id?: string } | undefined;
+  return user?.id ?? null;
+}
+
 export const agentRoutes = new Hono()
   .post(
     "/task",
     zValidator(
       "json",
       z.object({
-        userId: z.string(),
         message: z.string(),
         gitUrl: z.string().url().optional(),
         gitBranch: z.string().optional(),
@@ -30,8 +34,13 @@ export const agentRoutes = new Hono()
     async (c) => {
       const body = c.req.valid("json");
       const taskId = nanoid(12);
+      const userId = getAuthenticatedUserId(c);
 
-      log.info("Creating agent task", { taskId, userId: body.userId, provider: body.provider });
+      if (!userId) {
+        return c.json({ error: "Authentication required" }, 401);
+      }
+
+      log.info("Creating agent task", { taskId, userId, provider: body.provider });
 
       if (!isCloudflareConfigured() && body.provider === "cloudflare") {
         return c.json({ error: "Cloudflare sandboxes not configured" }, 400);
@@ -47,7 +56,7 @@ export const agentRoutes = new Hono()
         if (!sandboxId) {
           const sandbox = await provider.createSandbox({
             id: `task-${taskId}`,
-            userId: body.userId,
+            userId,
             gitUrl: body.gitUrl,
             gitBranch: body.gitBranch,
           });
@@ -104,7 +113,6 @@ export const agentRoutes = new Hono()
     zValidator(
       "json",
       z.object({
-        userId: z.string(),
         agents: z.array(
           z.object({
             role: z.string(),
@@ -124,8 +132,13 @@ export const agentRoutes = new Hono()
     async (c) => {
       const body = c.req.valid("json");
       const teamId = nanoid(12);
+      const userId = getAuthenticatedUserId(c);
 
-      log.info("Creating multi-agent team task", { teamId, agentCount: body.agents.length });
+      if (!userId) {
+        return c.json({ error: "Authentication required" }, 401);
+      }
+
+      log.info("Creating multi-agent team task", { teamId, userId, agentCount: body.agents.length });
 
       if (!isCloudflareConfigured()) {
         return c.json({ error: "Multi-agent teams require Cloudflare sandboxes" }, 400);
@@ -137,7 +150,7 @@ export const agentRoutes = new Hono()
         const agentPromises = body.agents.map(async (agent, index) => {
           const sandbox = await provider.createSandbox({
             id: `team-${teamId}-agent-${index}`,
-            userId: body.userId,
+            userId,
             gitUrl: body.gitUrl,
             gitBranch: body.gitBranch,
           });
