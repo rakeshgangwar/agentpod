@@ -342,29 +342,118 @@ export const previewRoutes = new Hono()
     }
   });
 
+async function validatePublicToken(token: string): Promise<{ sandbox: NonNullable<Awaited<ReturnType<typeof getSandboxById>>>; previewPort: PreviewPort } | null> {
+  const previewPort = await getPreviewPortByPublicToken(token);
+  if (!previewPort || !previewPort.isPublic) {
+    return null;
+  }
+
+  if (previewPort.publicExpiresAt && new Date() > previewPort.publicExpiresAt) {
+    return null;
+  }
+
+  const sandbox = await getSandboxById(previewPort.sandboxId);
+  if (!sandbox) {
+    return null;
+  }
+
+  return { sandbox, previewPort };
+}
+
+function buildInternalProxyUrl(slug: string, port: number, path: string): string {
+  const protocol = config.domain.protocol;
+  const baseDomain = config.domain.base;
+  return `${protocol}://preview-${slug}-${port}.${baseDomain}${path}`;
+}
+
+// Hop-by-hop headers that must not be forwarded (RFC 2616)
+const EXCLUDED_REQUEST_HEADERS = new Set([
+  'host',
+  'connection',
+  'keep-alive',
+  'transfer-encoding',
+  'te',
+  'trailer',
+  'upgrade',
+  'proxy-authorization',
+  'proxy-authenticate',
+]);
+
+const EXCLUDED_RESPONSE_HEADERS = new Set([
+  'transfer-encoding',
+  'connection',
+  'keep-alive',
+  'content-encoding',
+]);
+
+// Proxy mode: validates token on EVERY request, making revocation immediate
 export const publicPreviewRoutes = new Hono()
-  .get("/:token", async (c) => {
-    const token = c.req.param("token");
+  .all("/:token{.*}", async (c) => {
+    const fullPath = c.req.param("token");
+    const slashIndex = fullPath.indexOf('/');
+    const token = slashIndex === -1 ? fullPath : fullPath.substring(0, slashIndex);
+    const subPath = slashIndex === -1 ? '/' : fullPath.substring(slashIndex);
 
     try {
-      const previewPort = await getPreviewPortByPublicToken(token);
-      if (!previewPort || !previewPort.isPublic) {
-        return c.text("Preview not found or expired", 404);
+      const result = await validatePublicToken(token);
+      if (!result) {
+        return c.text("Preview not found, expired, or revoked", 404);
       }
 
-      if (previewPort.publicExpiresAt && new Date() > previewPort.publicExpiresAt) {
-        return c.text("Preview link expired", 410);
+      const { sandbox, previewPort } = result;
+      
+      if (sandbox.status !== "running") {
+        return c.text("Sandbox is not running", 503);
       }
 
-      const sandbox = await getSandboxById(previewPort.sandboxId);
-      if (!sandbox) {
-        return c.text("Sandbox not found", 404);
-      }
+      const targetUrl = buildInternalProxyUrl(sandbox.slug, previewPort.port, subPath);
+      const queryString = c.req.url.split('?')[1];
+      const fullTargetUrl = queryString ? `${targetUrl}?${queryString}` : targetUrl;
 
-      const previewUrl = buildPreviewUrl(sandbox.slug, previewPort.port);
-      return c.redirect(previewUrl);
+      log.debug("Proxying public preview request", { 
+        token: token.substring(0, 8) + "...", 
+        method: c.req.method,
+        targetUrl: fullTargetUrl 
+      });
+
+      const proxyHeaders: Record<string, string> = {};
+      c.req.raw.headers.forEach((value, key) => {
+        if (!EXCLUDED_REQUEST_HEADERS.has(key.toLowerCase())) {
+          proxyHeaders[key] = value;
+        }
+      });
+
+      proxyHeaders['X-Forwarded-For'] = c.req.header('x-forwarded-for') || c.req.header('cf-connecting-ip') || 'unknown';
+      proxyHeaders['X-Forwarded-Proto'] = config.domain.protocol;
+      proxyHeaders['X-Forwarded-Host'] = c.req.header('host') || '';
+
+      const proxyResponse = await fetch(fullTargetUrl, {
+        method: c.req.method,
+        headers: proxyHeaders,
+        body: c.req.method !== 'GET' && c.req.method !== 'HEAD' ? c.req.raw.body : undefined,
+        // @ts-ignore - Bun supports duplex
+        duplex: c.req.method !== 'GET' && c.req.method !== 'HEAD' ? 'half' : undefined,
+      });
+
+      const responseHeaders = new Headers();
+      proxyResponse.headers.forEach((value, key) => {
+        if (!EXCLUDED_RESPONSE_HEADERS.has(key.toLowerCase())) {
+          responseHeaders.set(key, value);
+        }
+      });
+
+      return new Response(proxyResponse.body, {
+        status: proxyResponse.status,
+        statusText: proxyResponse.statusText,
+        headers: responseHeaders,
+      });
     } catch (error) {
-      log.error("Failed to access public preview", { token, error });
+      log.error("Failed to proxy public preview", { token: token.substring(0, 8) + "...", error });
+      
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        return c.text("Preview service unavailable", 503);
+      }
+      
       return c.text("Internal server error", 500);
     }
   });

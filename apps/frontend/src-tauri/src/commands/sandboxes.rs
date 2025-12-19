@@ -663,6 +663,7 @@ pub async fn sandbox_opencode_find_files(sandbox_id: String, query: String) -> R
 
 use crate::models::{
     DetectPortsResponse, PreviewPort, PreviewPortsResponse, RegisterPreviewPortInput,
+    SharePreviewPortInput, SharePreviewPortResponse,
 };
 
 #[tauri::command]
@@ -700,6 +701,28 @@ pub async fn delete_sandbox_preview_port(sandbox_id: String, port: i32) -> Resul
     let client = get_client()?;
     let _: SuccessResponse = client
         .delete(&format!("/api/v2/sandboxes/{}/preview/{}", sandbox_id, port))
+        .await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn share_sandbox_preview_port(
+    sandbox_id: String,
+    port: i32,
+    expires_in: Option<String>,
+) -> Result<SharePreviewPortResponse, AppError> {
+    let client = get_client()?;
+    let input = SharePreviewPortInput { expires_in };
+    client
+        .post(&format!("/api/v2/sandboxes/{}/preview/{}/share", sandbox_id, port), &input)
+        .await
+}
+
+#[tauri::command]
+pub async fn unshare_sandbox_preview_port(sandbox_id: String, port: i32) -> Result<(), AppError> {
+    let client = get_client()?;
+    let _: SuccessResponse = client
+        .delete(&format!("/api/v2/sandboxes/{}/preview/{}/share", sandbox_id, port))
         .await?;
     Ok(())
 }

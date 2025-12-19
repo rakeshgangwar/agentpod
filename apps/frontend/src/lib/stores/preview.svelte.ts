@@ -16,6 +16,12 @@ export interface DetectPortsResponse {
   ports: PreviewPort[];
 }
 
+export interface ShareResponse {
+  url: string;
+  token: string;
+  expiresAt: string | null;
+}
+
 let portsMap = $state<Record<string, PreviewPort[]>>({});
 let selectedPorts = $state<Record<string, number | null>>({});
 let isLoading = $state(false);
@@ -114,6 +120,60 @@ export async function registerPort(sandboxId: string, port: number, label?: stri
     error = e instanceof Error ? e.message : "Failed to register port";
     console.error("Register port error:", e);
     return null;
+  } finally {
+    isLoading = false;
+  }
+}
+
+
+export async function sharePort(sandboxId: string, port: number, expiresIn: string): Promise<ShareResponse | null> {
+  isLoading = true;
+  error = null;
+  try {
+    const result = await api.invoke<ShareResponse>("share_sandbox_preview_port", { 
+      sandboxId, 
+      port, 
+      expiresIn 
+    });
+    
+    const currentPorts = portsMap[sandboxId] || [];
+    portsMap[sandboxId] = currentPorts.map(p => 
+      p.port === port 
+        ? { ...p, isPublic: true, publicToken: result.token, publicExpiresAt: result.expiresAt ?? undefined } 
+        : p
+    );
+    
+    return result;
+  } catch (e) {
+    error = e instanceof Error ? e.message : "Failed to share port";
+    console.error("Share port error:", e);
+    return null;
+  } finally {
+    isLoading = false;
+  }
+}
+
+export async function unsharePort(sandboxId: string, port: number): Promise<boolean> {
+  isLoading = true;
+  error = null;
+  try {
+    await api.invoke("unshare_sandbox_preview_port", { 
+      sandboxId, 
+      port 
+    });
+    
+    const currentPorts = portsMap[sandboxId] || [];
+    portsMap[sandboxId] = currentPorts.map(p => 
+      p.port === port 
+        ? { ...p, isPublic: false, publicToken: undefined, publicExpiresAt: undefined } 
+        : p
+    );
+    
+    return true;
+  } catch (e) {
+    error = e instanceof Error ? e.message : "Failed to unshare port";
+    console.error("Unshare port error:", e);
+    return false;
   } finally {
     isLoading = false;
   }

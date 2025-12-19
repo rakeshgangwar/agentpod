@@ -612,6 +612,24 @@ pub struct RegisterPreviewPortInput {
     pub label: Option<String>,
 }
 
+/// Input for creating a share link
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SharePreviewPortInput {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_in: Option<String>,
+}
+
+/// Response for creating a share link
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SharePreviewPortResponse {
+    pub url: String,
+    pub token: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<String>,
+}
+
 // =============================================================================
 // OpenCode Types
 // =============================================================================

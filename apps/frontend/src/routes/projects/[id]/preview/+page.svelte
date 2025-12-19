@@ -5,7 +5,9 @@
     previewStore, 
     fetchPorts, 
     detectPorts, 
-    selectPort 
+    selectPort,
+    sharePort,
+    unsharePort
   } from "$lib/stores/preview.svelte";
   import { getSandbox, sandboxes } from "$lib/stores/sandboxes.svelte";
   import PreviewFrame from "$lib/components/preview/PreviewFrame.svelte";
@@ -15,11 +17,12 @@
   import SandboxNotRunning from "$lib/components/sandbox-not-running.svelte";
   import { toast } from "svelte-sonner";
 
-  let sandboxId = $derived($page.params.id);
+  let sandboxId = $derived($page.params.id ?? "");
   let sandbox = $derived(getSandbox(sandboxId));
   
   let ports = $derived(previewStore.getPorts(sandboxId));
   let selectedPort = $derived(previewStore.getSelectedPort(sandboxId));
+  let currentPort = $derived(ports.find(p => p.port === selectedPort));
   let isLoading = $derived(previewStore.isLoading);
   let previewUrl = $derived(
     selectedPort && sandbox 
@@ -30,6 +33,8 @@
   let logs = $state<ConsoleLog[]>([]);
   let isRefreshing = $state(false);
   let isDetecting = $state(false);
+  let isSharing = $state(false);
+  let shareUrl = $state<string | undefined>(undefined);
 
   onMount(() => {
     if (sandboxId) {
@@ -94,6 +99,46 @@
   function handleClearConsole() {
     logs = [];
   }
+  
+  async function handleShare(expiresIn: string) {
+    if (!selectedPort) return;
+    
+    isSharing = true;
+    try {
+      const result = await sharePort(sandboxId, selectedPort, expiresIn);
+      if (result) {
+        shareUrl = result.url;
+        toast.success(`Port ${selectedPort} is now public`);
+      } else {
+        toast.error("Failed to share port");
+      }
+    } catch (e) {
+      toast.error("Error sharing port");
+      console.error(e);
+    } finally {
+      isSharing = false;
+    }
+  }
+
+  async function handleUnshare() {
+    if (!selectedPort) return;
+    
+    isSharing = true;
+    try {
+      const result = await unsharePort(sandboxId, selectedPort);
+      if (result) {
+        shareUrl = undefined;
+        toast.success(`Revoked public access for port ${selectedPort}`);
+      } else {
+        toast.error("Failed to revoke access");
+      }
+    } catch (e) {
+      toast.error("Error revoking access");
+      console.error(e);
+    } finally {
+      isSharing = false;
+    }
+  }
 </script>
 
 <div class="h-full flex flex-col overflow-hidden">
@@ -119,11 +164,19 @@
           onRefresh={handleRefresh}
           onOpenExternal={handleOpenExternal}
           {isRefreshing}
+          isPublic={currentPort?.isPublic ?? false}
+          publicToken={currentPort?.publicToken}
+          publicExpiresAt={currentPort?.publicExpiresAt}
+          {shareUrl}
+          onShare={selectedPort ? handleShare : undefined}
+          onUnshare={selectedPort ? handleUnshare : undefined}
+          {isSharing}
         />
       </div>
     </div>
 
     <div class="flex-1 min-h-0 flex flex-col bg-background relative">
+
       {#if previewUrl}
         {#key isRefreshing} 
           <PreviewFrame 

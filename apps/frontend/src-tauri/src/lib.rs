@@ -42,6 +42,7 @@ use commands::{
     // Preview port commands (web preview)
     get_sandbox_preview_ports, detect_sandbox_preview_ports,
     register_sandbox_preview_port, delete_sandbox_preview_port,
+    share_sandbox_preview_port, unshare_sandbox_preview_port,
     // Terminal commands (interactive shell)
     terminal_connect, terminal_send_input, terminal_resize, terminal_disconnect,
     terminal_list, terminal_disconnect_all,
@@ -184,6 +185,8 @@ pub fn run() {
             detect_sandbox_preview_ports,
             register_sandbox_preview_port,
             delete_sandbox_preview_port,
+            share_sandbox_preview_port,
+            unshare_sandbox_preview_port,
             // Terminal commands (interactive shell)
             terminal_connect,
             terminal_send_input,
