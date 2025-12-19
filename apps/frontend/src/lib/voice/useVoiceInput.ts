@@ -306,37 +306,52 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): [VoiceInputSt
                     peakLevelRef.current = level;
                   }
                   
-                  // Track if user has started speaking (significant audio above noise floor)
-                  // Consider "speaking" when level is notably higher than threshold
-                  if (!hasSpokenRef.current && level >= 0.06) {
+                  // Track if user has started speaking (RMS level above noise floor)
+                  // RMS values are much lower than peak - typical speech RMS is 0.003-0.01
+                  if (!hasSpokenRef.current && level >= 0.003) {
                     hasSpokenRef.current = true;
                     console.log('[Voice] User started speaking (wake word mode), level:', level.toFixed(4));
                   }
                   
                   // Only start silence timer after user has spoken
                   if (hasSpokenRef.current) {
-                    // Adaptive silence detection: silence is when level drops to less than 50% of peak
-                    // or below the configured threshold, whichever is higher
-                    const adaptiveThreshold = Math.max(silenceThreshold, peakLevelRef.current * 0.4);
-                    const isSilent = level < adaptiveThreshold;
+                    // Use fixed threshold for silence detection (adaptive was too sensitive)
+                    // Silence = level below threshold
+                    const isSilent = level < silenceThreshold;
+                    // Only reset timer if level is significantly above threshold (hysteresis)
+                    const isSpeaking = level > silenceThreshold * 1.5;
                     
                     if (isSilent) {
                       if (silenceStartTime.current === null) {
                         silenceStartTime.current = Date.now();
-                        console.log(`[Voice] Silence detected (level ${level.toFixed(4)} < threshold ${adaptiveThreshold.toFixed(4)})`);
+                        console.log(`[Voice] Silence detected (level ${level.toFixed(4)} < threshold ${silenceThreshold.toFixed(4)})`);
                       } else {
                         const silenceDuration = (Date.now() - silenceStartTime.current) / 1000;
-                        if (silenceDuration >= silenceTimeout) {
+                        if (silenceDuration >= silenceTimeout && isRecordingRef.current) {
                           console.log(`[Voice] Auto-stopping after ${silenceTimeout}s of silence (wake word mode)`);
-                          stopRecordingRef.current?.();
+                          if (audioLevelInterval.current) {
+                            clearInterval(audioLevelInterval.current);
+                            audioLevelInterval.current = null;
+                          }
+                          if (durationInterval.current) {
+                            clearInterval(durationInterval.current);
+                            durationInterval.current = null;
+                          }
+                          if (stopRecordingRef.current) {
+                            stopRecordingRef.current();
+                          } else {
+                            console.error('[Voice] stopRecordingRef is null, cannot auto-stop');
+                          }
                         }
                       }
-                    } else {
+                    } else if (isSpeaking) {
+                      // Only reset if clearly speaking (hysteresis prevents noise oscillation)
                       if (silenceStartTime.current !== null) {
                         console.log('[Voice] Speech resumed, resetting silence timer');
                       }
                       silenceStartTime.current = null;
                     }
+                    // If between thresholds, don't change state (hysteresis zone)
                   }
                 }
               } catch {
@@ -401,22 +416,20 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): [VoiceInputSt
               peakLevelRef.current = level;
             }
             
-            // Track if user has started speaking
-            if (!hasSpokenRef.current && level >= 0.06) {
+            if (!hasSpokenRef.current && level >= 0.003) {
               hasSpokenRef.current = true;
               console.log('[Voice] User started speaking, level:', level.toFixed(4));
             }
             
             // Only start silence timer after user has spoken
             if (hasSpokenRef.current) {
-              // Adaptive silence detection
-              const adaptiveThreshold = Math.max(silenceThreshold, peakLevelRef.current * 0.4);
-              const isSilent = level < adaptiveThreshold;
+              const isSilent = level < silenceThreshold;
+              const isSpeaking = level > silenceThreshold * 1.5;
               
               if (isSilent) {
                 if (silenceStartTime.current === null) {
                   silenceStartTime.current = Date.now();
-                  console.log(`[Voice] Silence detected (level ${level.toFixed(4)} < threshold ${adaptiveThreshold.toFixed(4)})`);
+                  console.log(`[Voice] Silence detected (level ${level.toFixed(4)} < threshold ${silenceThreshold.toFixed(4)})`);
                 } else {
                   const silenceDuration = (Date.now() - silenceStartTime.current) / 1000;
                   if (silenceDuration >= silenceTimeout) {
@@ -424,11 +437,11 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): [VoiceInputSt
                     stopRecordingRef.current?.();
                   }
                 }
-              } else {
+              } else if (isSpeaking) {
                 if (silenceStartTime.current !== null) {
                   console.log('[Voice] Speech resumed, resetting silence timer');
-                  silenceStartTime.current = null;
                 }
+                silenceStartTime.current = null;
               }
             }
           }

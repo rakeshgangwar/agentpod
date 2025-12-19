@@ -827,9 +827,9 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
       }, 2000);
     },
     // Auto-stop recording after 2 seconds of silence
-    // Your background noise is ~0.03-0.04, speech is ~0.05-0.10
+    // Audio level is RMS (not peak) - typical speech RMS: 0.003-0.01, silence: <0.001
     silenceTimeout: 2,
-    silenceThreshold: 0.045, // Just below background noise level
+    silenceThreshold: 0.002, // RMS level below which is considered silence
   });
   
   // Cleanup wake word timeout on unmount

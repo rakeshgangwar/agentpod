@@ -6,6 +6,7 @@
  */
 
 import { type FC, useState, useCallback, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useVoiceModels, useVoiceInput } from "./useVoiceInput";
 import type { DownloadProgress, ModelSize } from "./types";
 
@@ -113,9 +114,10 @@ export const VoiceSetupDialog: FC<VoiceSetupDialogProps> = ({ open, onClose, onC
 
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-md mx-4 bg-background border border-[var(--cyber-cyan)]/30 rounded-lg shadow-[0_0_30px_var(--cyber-cyan)/10] overflow-hidden">
+  // Portal escapes backdrop-blur containing block that breaks fixed positioning
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="w-full max-w-md bg-background border border-[var(--cyber-cyan)]/30 rounded-lg shadow-[0_0_30px_var(--cyber-cyan)/10] overflow-hidden">
         {/* Header */}
         <div className="px-4 py-3 border-b border-border/30 bg-background/50">
           <h2 className="font-mono text-sm uppercase tracking-wider text-[var(--cyber-cyan)]">
@@ -259,7 +261,8 @@ export const VoiceSetupDialog: FC<VoiceSetupDialogProps> = ({ open, onClose, onC
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
