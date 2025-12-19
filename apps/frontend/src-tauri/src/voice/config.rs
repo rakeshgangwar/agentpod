@@ -38,18 +38,18 @@ impl ModelSize {
             ModelSize::Medium => "ggml-medium.bin",
         }
     }
-    
+
     /// Get the Hugging Face model ID
     pub fn hf_model_id(&self) -> &'static str {
         // Using ggerganov's whisper.cpp compatible models
         "ggerganov/whisper.cpp"
     }
-    
+
     /// Get the file path within the HF repo
     pub fn hf_file_path(&self) -> &'static str {
         self.filename()
     }
-    
+
     /// Get approximate model size in bytes
     pub fn size_bytes(&self) -> u64 {
         match self {
@@ -59,7 +59,7 @@ impl ModelSize {
             ModelSize::Medium => 1_500_000_000,
         }
     }
-    
+
     /// Get human-readable size description
     pub fn size_display(&self) -> &'static str {
         match self {
@@ -69,7 +69,7 @@ impl ModelSize {
             ModelSize::Medium => "~1.5 GB",
         }
     }
-    
+
     /// Get description of speed/accuracy trade-off
     pub fn description(&self) -> &'static str {
         match self {
@@ -87,22 +87,22 @@ impl ModelSize {
 pub struct VoiceConfig {
     /// Whether voice input is enabled
     pub enabled: bool,
-    
+
     /// Voice input mode (push-to-talk or toggle)
     pub mode: VoiceMode,
-    
+
     /// Selected whisper model size
     pub model: ModelSize,
-    
+
     /// Language code for transcription (e.g., "en", "auto")
     pub language: String,
-    
+
     /// Whether wake word detection is enabled
     pub wake_word_enabled: bool,
-    
+
     /// Wake phrases to listen for
     pub wake_phrases: Vec<String>,
-    
+
     /// Keyboard shortcut for push-to-talk
     /// Format: modifier+key (e.g., "Alt+Space", "Ctrl+Shift+V")
     pub push_to_talk_key: String,
@@ -128,13 +128,13 @@ impl VoiceConfig {
         self.wake_word_enabled = enabled;
         self
     }
-    
+
     /// Set the model size
     pub fn with_model(mut self, model: ModelSize) -> Self {
         self.model = model;
         self
     }
-    
+
     /// Set the language
     pub fn with_language(mut self, language: impl Into<String>) -> Self {
         self.language = language.into();

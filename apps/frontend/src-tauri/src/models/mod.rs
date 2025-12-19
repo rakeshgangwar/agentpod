@@ -9,8 +9,8 @@ pub mod settings;
 pub use error::AppError;
 pub use onboarding::*;
 pub use opencode::*;
-pub use settings::*;
 use serde::{Deserialize, Serialize};
+pub use settings::*;
 
 /// Connection configuration stored securely
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -189,12 +189,12 @@ pub struct Sandbox {
     pub slug: String,
     #[serde(default)]
     pub description: Option<String>,
-    
+
     // Git/Repository info
     pub repo_name: String,
     #[serde(default)]
     pub github_url: Option<String>,
-    
+
     // Container configuration
     #[serde(default)]
     pub resource_tier_id: Option<String>,
@@ -202,7 +202,7 @@ pub struct Sandbox {
     pub flavor_id: Option<String>,
     #[serde(default)]
     pub addon_ids: Vec<String>,
-    
+
     // Container runtime info
     #[serde(default)]
     pub container_id: Option<String>,
@@ -211,7 +211,7 @@ pub struct Sandbox {
     pub status: SandboxStatus,
     #[serde(default)]
     pub error_message: Option<String>,
-    
+
     // Individual URL fields from DB
     #[serde(default)]
     pub opencode_url: Option<String>,
@@ -221,17 +221,17 @@ pub struct Sandbox {
     pub vnc_url: Option<String>,
     #[serde(default)]
     pub code_server_url: Option<String>,
-    
+
     // URLs object (for backward compatibility)
     #[serde(default)]
     pub urls: Option<SandboxUrls>,
-    
+
     // Timestamps
     pub created_at: String,
     pub updated_at: String,
     #[serde(default)]
     pub last_accessed_at: Option<String>,
-    
+
     // Additional Docker runtime info (enriched at runtime, may not always be present)
     #[serde(default)]
     pub image: Option<String>,

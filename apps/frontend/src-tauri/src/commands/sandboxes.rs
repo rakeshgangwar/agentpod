@@ -5,9 +5,8 @@
 
 use crate::models::{
     AppError, CreateSandboxInput, DockerHealthResponse, ExecCommandInput, ExecResult,
-    GitCommitInput, GitCommitResponse, GitLogResponse, GitStatusResponse, Sandbox,
-    SandboxInfo, SandboxLogsResponse, SandboxStats, SandboxStatsResponse, SandboxWithRepo,
-    SuccessResponse,
+    GitCommitInput, GitCommitResponse, GitLogResponse, GitStatusResponse, Sandbox, SandboxInfo,
+    SandboxLogsResponse, SandboxStats, SandboxStatsResponse, SandboxWithRepo, SuccessResponse,
 };
 use crate::services::ApiClient;
 
@@ -59,7 +58,7 @@ pub async fn create_sandbox(
     auto_start: Option<bool>,
 ) -> Result<SandboxWithRepo, AppError> {
     let client = get_client()?;
-    
+
     let input = CreateSandboxInput {
         name,
         description,
@@ -70,7 +69,7 @@ pub async fn create_sandbox(
         addons,
         auto_start,
     };
-    
+
     client.post("/api/v2/sandboxes", &input).await
 }
 
@@ -78,9 +77,8 @@ pub async fn create_sandbox(
 #[tauri::command]
 pub async fn delete_sandbox(id: String) -> Result<(), AppError> {
     let client = get_client()?;
-    let _: crate::models::SuccessResponse = client
-        .delete(&format!("/api/v2/sandboxes/{}", id))
-        .await?;
+    let _: crate::models::SuccessResponse =
+        client.delete(&format!("/api/v2/sandboxes/{}", id)).await?;
     Ok(())
 }
 
@@ -243,7 +241,10 @@ pub async fn get_sandbox_git_log(id: String) -> Result<GitLogResponse, AppError>
 
 /// Commit changes in a sandbox
 #[tauri::command]
-pub async fn commit_sandbox_changes(id: String, message: String) -> Result<GitCommitResponse, AppError> {
+pub async fn commit_sandbox_changes(
+    id: String,
+    message: String,
+) -> Result<GitCommitResponse, AppError> {
     let client = get_client()?;
     let input = GitCommitInput { message };
     client
@@ -256,8 +257,8 @@ pub async fn commit_sandbox_changes(id: String, message: String) -> Result<GitCo
 // =============================================================================
 
 use crate::models::{
-    GitBranchesResponse, GitCheckoutInput, GitCreateBranchInput, 
-    GitDiffResponse, GitFileDiffResponse,
+    GitBranchesResponse, GitCheckoutInput, GitCreateBranchInput, GitDiffResponse,
+    GitFileDiffResponse,
 };
 
 /// List all branches in a sandbox's repository
@@ -302,7 +303,10 @@ pub async fn delete_sandbox_branch(id: String, branch: String) -> Result<(), App
     // URL encode the branch name in case it contains slashes
     let encoded_branch = urlencoding::encode(&branch);
     let _: SuccessResponse = client
-        .delete(&format!("/api/v2/sandboxes/{}/git/branches/{}", id, encoded_branch))
+        .delete(&format!(
+            "/api/v2/sandboxes/{}/git/branches/{}",
+            id, encoded_branch
+        ))
         .await?;
     Ok(())
 }
@@ -321,29 +325,35 @@ pub async fn get_sandbox_diff(
     let client = get_client()?;
     let mut url = format!("/api/v2/sandboxes/{}/git/diff", id);
     let mut params = Vec::new();
-    
+
     if let Some(from) = from_ref {
         params.push(format!("from={}", urlencoding::encode(&from)));
     }
     if let Some(to) = to_ref {
         params.push(format!("to={}", urlencoding::encode(&to)));
     }
-    
+
     if !params.is_empty() {
         url.push('?');
         url.push_str(&params.join("&"));
     }
-    
+
     client.get(&url).await
 }
 
 /// Get detailed diff for a specific file with hunks
 #[tauri::command]
-pub async fn get_sandbox_file_diff(id: String, file_path: String) -> Result<GitFileDiffResponse, AppError> {
+pub async fn get_sandbox_file_diff(
+    id: String,
+    file_path: String,
+) -> Result<GitFileDiffResponse, AppError> {
     let client = get_client()?;
     let encoded_path = urlencoding::encode(&file_path);
     client
-        .get(&format!("/api/v2/sandboxes/{}/git/diff/file?path={}", id, encoded_path))
+        .get(&format!(
+            "/api/v2/sandboxes/{}/git/diff/file?path={}",
+            id, encoded_path
+        ))
         .await
 }
 
@@ -352,8 +362,7 @@ pub async fn get_sandbox_file_diff(id: String, file_path: String) -> Result<GitF
 // =============================================================================
 
 use crate::models::{
-    AppInfo, FileContent, FileNode, Message, OpenCodeHealth, 
-    SendMessageInput, Session,
+    AppInfo, FileContent, FileNode, Message, OpenCodeHealth, SendMessageInput, Session,
 };
 
 /// Get OpenCode app info for a sandbox
@@ -376,30 +385,37 @@ pub async fn sandbox_opencode_health_check(sandbox_id: String) -> Result<OpenCod
 
 /// Get configured LLM providers for a sandbox
 #[tauri::command]
-pub async fn sandbox_opencode_get_providers(sandbox_id: String) -> Result<Vec<crate::models::OpenCodeProvider>, AppError> {
+pub async fn sandbox_opencode_get_providers(
+    sandbox_id: String,
+) -> Result<Vec<crate::models::OpenCodeProvider>, AppError> {
     let client = get_client()?;
-    
+
     #[derive(serde::Deserialize)]
     struct Response {
         providers: Vec<crate::models::OpenCodeProvider>,
     }
-    
+
     let response: Response = client
-        .get(&format!("/api/v2/sandboxes/{}/opencode/providers", sandbox_id))
+        .get(&format!(
+            "/api/v2/sandboxes/{}/opencode/providers",
+            sandbox_id
+        ))
         .await?;
     Ok(response.providers)
 }
 
 /// Get available agents for a sandbox
 #[tauri::command]
-pub async fn sandbox_opencode_get_agents(sandbox_id: String) -> Result<Vec<crate::models::OpenCodeAgent>, AppError> {
+pub async fn sandbox_opencode_get_agents(
+    sandbox_id: String,
+) -> Result<Vec<crate::models::OpenCodeAgent>, AppError> {
     let client = get_client()?;
-    
+
     #[derive(serde::Deserialize)]
     struct Response {
         agents: Vec<crate::models::OpenCodeAgent>,
     }
-    
+
     let response: Response = client
         .get(&format!("/api/v2/sandboxes/{}/opencode/agents", sandbox_id))
         .await?;
@@ -411,13 +427,19 @@ pub async fn sandbox_opencode_get_agents(sandbox_id: String) -> Result<Vec<crate
 pub async fn sandbox_opencode_list_sessions(sandbox_id: String) -> Result<Vec<Session>, AppError> {
     let client = get_client()?;
     client
-        .get(&format!("/api/v2/sandboxes/{}/opencode/session", sandbox_id))
+        .get(&format!(
+            "/api/v2/sandboxes/{}/opencode/session",
+            sandbox_id
+        ))
         .await
 }
 
 /// Create a new OpenCode session in a sandbox
 #[tauri::command]
-pub async fn sandbox_opencode_create_session(sandbox_id: String, title: Option<String>) -> Result<Session, AppError> {
+pub async fn sandbox_opencode_create_session(
+    sandbox_id: String,
+    title: Option<String>,
+) -> Result<Session, AppError> {
     let client = get_client()?;
     // Only include title if it's Some, otherwise send empty object
     let body = match title {
@@ -425,35 +447,59 @@ pub async fn sandbox_opencode_create_session(sandbox_id: String, title: Option<S
         None => serde_json::json!({}),
     };
     client
-        .post(&format!("/api/v2/sandboxes/{}/opencode/session", sandbox_id), &body)
+        .post(
+            &format!("/api/v2/sandboxes/{}/opencode/session", sandbox_id),
+            &body,
+        )
         .await
 }
 
 /// Get an OpenCode session by ID
 #[tauri::command]
-pub async fn sandbox_opencode_get_session(sandbox_id: String, session_id: String) -> Result<Session, AppError> {
+pub async fn sandbox_opencode_get_session(
+    sandbox_id: String,
+    session_id: String,
+) -> Result<Session, AppError> {
     let client = get_client()?;
     client
-        .get(&format!("/api/v2/sandboxes/{}/opencode/session/{}", sandbox_id, session_id))
+        .get(&format!(
+            "/api/v2/sandboxes/{}/opencode/session/{}",
+            sandbox_id, session_id
+        ))
         .await
 }
 
 /// Delete an OpenCode session
 #[tauri::command]
-pub async fn sandbox_opencode_delete_session(sandbox_id: String, session_id: String) -> Result<(), AppError> {
+pub async fn sandbox_opencode_delete_session(
+    sandbox_id: String,
+    session_id: String,
+) -> Result<(), AppError> {
     let client = get_client()?;
     let _: crate::models::SuccessResponse = client
-        .delete(&format!("/api/v2/sandboxes/{}/opencode/session/{}", sandbox_id, session_id))
+        .delete(&format!(
+            "/api/v2/sandboxes/{}/opencode/session/{}",
+            sandbox_id, session_id
+        ))
         .await?;
     Ok(())
 }
 
 /// Abort a running OpenCode session
 #[tauri::command]
-pub async fn sandbox_opencode_abort_session(sandbox_id: String, session_id: String) -> Result<(), AppError> {
+pub async fn sandbox_opencode_abort_session(
+    sandbox_id: String,
+    session_id: String,
+) -> Result<(), AppError> {
     let client = get_client()?;
     let _: crate::models::SuccessResponse = client
-        .post(&format!("/api/v2/sandboxes/{}/opencode/session/{}/abort", sandbox_id, session_id), &())
+        .post(
+            &format!(
+                "/api/v2/sandboxes/{}/opencode/session/{}/abort",
+                sandbox_id, session_id
+            ),
+            &(),
+        )
         .await?;
     Ok(())
 }
@@ -470,7 +516,10 @@ pub async fn sandbox_opencode_respond_permission(
     let body = serde_json::json!({ "response": response });
     let _: crate::models::SuccessResponse = client
         .post(
-            &format!("/api/v2/sandboxes/{}/opencode/session/{}/permissions/{}", sandbox_id, session_id, permission_id),
+            &format!(
+                "/api/v2/sandboxes/{}/opencode/session/{}/permissions/{}",
+                sandbox_id, session_id, permission_id
+            ),
             &body,
         )
         .await?;
@@ -486,12 +535,12 @@ pub async fn sandbox_opencode_get_pending_permissions(
     session_id: String,
 ) -> Result<Vec<crate::models::PermissionRequest>, AppError> {
     let client = get_client()?;
-    
+
     #[derive(serde::Deserialize)]
     struct Response {
         permissions: Vec<crate::models::PermissionRequest>,
     }
-    
+
     let response: Response = client
         .get(&format!(
             "/api/v2/sandboxes/{}/opencode/session/{}/permissions",
@@ -504,17 +553,16 @@ pub async fn sandbox_opencode_get_pending_permissions(
 /// Get all pending permission requests across all sandboxes.
 /// This is used by the home page to show a global view of pending actions.
 #[tauri::command]
-pub async fn get_all_pending_permissions() -> Result<Vec<crate::models::PendingPermission>, AppError> {
+pub async fn get_all_pending_permissions() -> Result<Vec<crate::models::PendingPermission>, AppError>
+{
     let client = get_client()?;
-    
+
     #[derive(serde::Deserialize)]
     struct Response {
         permissions: Vec<crate::models::PendingPermission>,
     }
-    
-    let response: Response = client
-        .get("/api/v2/pending-actions/permissions")
-        .await?;
+
+    let response: Response = client.get("/api/v2/pending-actions/permissions").await?;
     Ok(response.permissions)
 }
 
@@ -533,7 +581,10 @@ pub async fn sandbox_opencode_fork_session(
     };
     client
         .post(
-            &format!("/api/v2/sandboxes/{}/opencode/session/{}/fork", sandbox_id, session_id),
+            &format!(
+                "/api/v2/sandboxes/{}/opencode/session/{}/fork",
+                sandbox_id, session_id
+            ),
             &body,
         )
         .await
@@ -555,7 +606,10 @@ pub async fn sandbox_opencode_revert_message(
     };
     client
         .post(
-            &format!("/api/v2/sandboxes/{}/opencode/session/{}/revert", sandbox_id, session_id),
+            &format!(
+                "/api/v2/sandboxes/{}/opencode/session/{}/revert",
+                sandbox_id, session_id
+            ),
             &body,
         )
         .await
@@ -571,7 +625,10 @@ pub async fn sandbox_opencode_unrevert_session(
     let client = get_client()?;
     client
         .post(
-            &format!("/api/v2/sandboxes/{}/opencode/session/{}/unrevert", sandbox_id, session_id),
+            &format!(
+                "/api/v2/sandboxes/{}/opencode/session/{}/unrevert",
+                sandbox_id, session_id
+            ),
             &(),
         )
         .await
@@ -579,10 +636,16 @@ pub async fn sandbox_opencode_unrevert_session(
 
 /// List messages in an OpenCode session
 #[tauri::command]
-pub async fn sandbox_opencode_list_messages(sandbox_id: String, session_id: String) -> Result<Vec<Message>, AppError> {
+pub async fn sandbox_opencode_list_messages(
+    sandbox_id: String,
+    session_id: String,
+) -> Result<Vec<Message>, AppError> {
     let client = get_client()?;
     client
-        .get(&format!("/api/v2/sandboxes/{}/opencode/session/{}/message", sandbox_id, session_id))
+        .get(&format!(
+            "/api/v2/sandboxes/{}/opencode/session/{}/message",
+            sandbox_id, session_id
+        ))
         .await
 }
 
@@ -596,7 +659,10 @@ pub async fn sandbox_opencode_send_message(
     let client = get_client()?;
     client
         .post(
-            &format!("/api/v2/sandboxes/{}/opencode/session/{}/message", sandbox_id, session_id),
+            &format!(
+                "/api/v2/sandboxes/{}/opencode/session/{}/message",
+                sandbox_id, session_id
+            ),
             &input,
         )
         .await
@@ -620,7 +686,10 @@ pub async fn sandbox_opencode_get_message(
 
 /// List files in a sandbox directory via OpenCode
 #[tauri::command]
-pub async fn sandbox_opencode_list_files(sandbox_id: String, path: String) -> Result<Vec<FileNode>, AppError> {
+pub async fn sandbox_opencode_list_files(
+    sandbox_id: String,
+    path: String,
+) -> Result<Vec<FileNode>, AppError> {
     let client = get_client()?;
     client
         .get(&format!(
@@ -633,7 +702,10 @@ pub async fn sandbox_opencode_list_files(sandbox_id: String, path: String) -> Re
 
 /// Get file content via OpenCode
 #[tauri::command]
-pub async fn sandbox_opencode_get_file_content(sandbox_id: String, path: String) -> Result<FileContent, AppError> {
+pub async fn sandbox_opencode_get_file_content(
+    sandbox_id: String,
+    path: String,
+) -> Result<FileContent, AppError> {
     let client = get_client()?;
     client
         .get(&format!(
@@ -646,7 +718,10 @@ pub async fn sandbox_opencode_get_file_content(sandbox_id: String, path: String)
 
 /// Find files by query via OpenCode
 #[tauri::command]
-pub async fn sandbox_opencode_find_files(sandbox_id: String, query: String) -> Result<Vec<String>, AppError> {
+pub async fn sandbox_opencode_find_files(
+    sandbox_id: String,
+    query: String,
+) -> Result<Vec<String>, AppError> {
     let client = get_client()?;
     client
         .get(&format!(
@@ -685,12 +760,12 @@ fn get_stream_handles(app: &AppHandle) -> StreamAbortHandles {
 }
 
 /// Connect to OpenCode SSE event stream for a sandbox
-/// 
+///
 /// This starts a background task that:
 /// 1. Connects to the Management API's SSE endpoint
 /// 2. Emits "opencode:event" events to the frontend for each SSE message
 /// 3. Emits "opencode:stream-status" events for connection status changes
-/// 
+///
 /// Returns a StreamConnection with a unique stream_id that can be used to disconnect.
 #[tauri::command]
 pub async fn sandbox_opencode_connect_stream(
@@ -701,30 +776,30 @@ pub async fn sandbox_opencode_connect_stream(
     let stream_id = uuid::Uuid::new_v4().to_string();
     let stream_id_clone = stream_id.clone();
     let sandbox_id_clone = sandbox_id.clone();
-    
+
     // Create abort channel
     let (abort_tx, mut abort_rx) = tokio::sync::oneshot::channel::<()>();
-    
+
     // Store the abort handle
     let handles = get_stream_handles(&app);
     {
         let mut handles_guard = handles.lock().await;
         handles_guard.insert(stream_id.clone(), abort_tx);
     }
-    
+
     // Get the SSE stream response
     let response = client
         .sse_get(&format!("/api/v2/sandboxes/{}/opencode/event", sandbox_id))
         .await?;
-    
+
     // Spawn background task to process the stream
     let app_clone = app.clone();
     let handles_clone = handles.clone();
-    
+
     tokio::spawn(async move {
         let stream_id = stream_id_clone;
         let sandbox_id = sandbox_id_clone;
-        
+
         // Emit connected status
         let _ = app_clone.emit(
             "opencode:stream-status",
@@ -735,15 +810,15 @@ pub async fn sandbox_opencode_connect_stream(
                 error: None,
             },
         );
-        
+
         // Process the stream
         let mut bytes_stream = response.bytes_stream();
         let mut buffer = String::new();
         let mut chunk_count = 0u64;
         let mut event_count = 0u64;
-        
+
         tracing::info!("Starting SSE stream processing for sandbox {}", sandbox_id);
-        
+
         loop {
             tokio::select! {
                 // Check for abort signal
@@ -751,7 +826,7 @@ pub async fn sandbox_opencode_connect_stream(
                     tracing::info!("SSE stream aborted for sandbox {}", sandbox_id);
                     break;
                 }
-                
+
                 // Process stream data
                 chunk = bytes_stream.next() => {
                     match chunk {
@@ -766,7 +841,7 @@ pub async fn sandbox_opencode_connect_stream(
                                 if text.len() > 500 { format!("{}...", &text[..500]) } else { text.to_string() }
                             );
                             buffer.push_str(&text);
-                            
+
                             // Process complete SSE events from buffer
                             while let Some(event) = parse_sse_event(&mut buffer) {
                                 event_count += 1;
@@ -794,10 +869,10 @@ pub async fn sandbox_opencode_connect_stream(
                                 chunk_count,
                                 event_count,
                                 buffer.len(),
-                                if buffer.len() > 500 { 
-                                    format!("{}...", &buffer[..500]) 
-                                } else { 
-                                    buffer.clone() 
+                                if buffer.len() > 500 {
+                                    format!("{}...", &buffer[..500])
+                                } else {
+                                    buffer.clone()
                                 }
                             );
                             // Emit error status
@@ -813,7 +888,7 @@ pub async fn sandbox_opencode_connect_stream(
                             break;
                         }
                         None => {
-                            tracing::info!("SSE stream ended for sandbox {} (chunks={}, events={})", 
+                            tracing::info!("SSE stream ended for sandbox {} (chunks={}, events={})",
                                 sandbox_id, chunk_count, event_count);
                             break;
                         }
@@ -821,13 +896,13 @@ pub async fn sandbox_opencode_connect_stream(
                 }
             }
         }
-        
+
         // Clean up and emit disconnected status
         {
             let mut handles_guard = handles_clone.lock().await;
             handles_guard.remove(&stream_id);
         }
-        
+
         let _ = app_clone.emit(
             "opencode:stream-status",
             StreamStatusPayload {
@@ -838,7 +913,7 @@ pub async fn sandbox_opencode_connect_stream(
             },
         );
     });
-    
+
     Ok(StreamConnection {
         stream_id,
         project_id: sandbox_id,
@@ -853,12 +928,12 @@ pub async fn sandbox_opencode_disconnect_stream(
 ) -> Result<(), AppError> {
     let handles = get_stream_handles(&app);
     let mut handles_guard = handles.lock().await;
-    
+
     if let Some(abort_tx) = handles_guard.remove(&stream_id) {
         // Send abort signal (ignore error if receiver is already dropped)
         let _ = abort_tx.send(());
     }
-    
+
     Ok(())
 }
 
@@ -868,19 +943,21 @@ fn parse_sse_event(buffer: &mut String) -> Option<OpenCodeEvent> {
     if let Some(event_end) = buffer.find("\n\n") {
         let event_str = buffer[..event_end].to_string();
         buffer.drain(..event_end + 2);
-        
+
         // Skip SSE comments (lines starting with ':')
         // The server sends ": connected" as a keep-alive/connection confirmation
-        let is_comment = event_str.lines().all(|line| line.starts_with(':') || line.is_empty());
+        let is_comment = event_str
+            .lines()
+            .all(|line| line.starts_with(':') || line.is_empty());
         if is_comment {
             tracing::debug!("Skipping SSE comment: {:?}", event_str);
             return None;
         }
-        
+
         // Parse the SSE event
         let mut event_type = String::new();
         let mut data = String::new();
-        
+
         for line in event_str.lines() {
             if let Some(value) = line.strip_prefix("event:") {
                 event_type = value.trim().to_string();
@@ -892,22 +969,26 @@ fn parse_sse_event(buffer: &mut String) -> Option<OpenCodeEvent> {
             }
             // Ignore comment lines starting with ':'
         }
-        
+
         // If no data, skip this event
         if data.is_empty() {
             tracing::debug!("Skipping SSE event with no data: {:?}", event_str);
             return None;
         }
-        
+
         // Store data length for logging before it might be moved
         let data_len = data.len();
-        
+
         // Try to parse data as JSON
         let data_value = serde_json::from_str(&data).unwrap_or_else(|e| {
-            tracing::warn!("Failed to parse SSE data as JSON: {} - data: {:?}", e, &data);
+            tracing::warn!(
+                "Failed to parse SSE data as JSON: {} - data: {:?}",
+                e,
+                &data
+            );
             serde_json::Value::String(data)
         });
-        
+
         // If no event type specified via `event:` line, try to extract from JSON data
         // OpenCode sends events like: data: {"type":"message.part.updated","properties":{...}}
         if event_type.is_empty() {
@@ -919,14 +1000,18 @@ fn parse_sse_event(buffer: &mut String) -> Option<OpenCodeEvent> {
                 }
             }
         }
-        
+
         // Default to "message" if still no event type
         if event_type.is_empty() {
             event_type = "message".to_string();
         }
-        
-        tracing::debug!("Parsed SSE event: type={}, data_len={}", event_type, data_len);
-        
+
+        tracing::debug!(
+            "Parsed SSE event: type={}, data_len={}",
+            event_type,
+            data_len
+        );
+
         Some(OpenCodeEvent {
             event_type,
             data: data_value,

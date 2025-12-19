@@ -1,13 +1,13 @@
 //! Settings commands for the AgentPod app
-//! 
+//!
 //! Handles local settings storage and Management API provider operations.
 
 use crate::models::{
-    AppError, AppSettings, ExportData, Provider, ProvidersResponse,
-    ProviderWithModels, ProvidersWithModelsResponse, OAuthFlowInit, OAuthFlowStatus,
-    UserOpencodeConfig, UserOpencodeSettings, UserOpencodeFile, SettingsUpdateResponse, FilesListResponse,
-    ResourceTier, ResourceTiersResponse, ContainerFlavor, ContainerFlavorsResponse, 
-    ContainerAddon, ContainerAddonsResponse,
+    AppError, AppSettings, ContainerAddon, ContainerAddonsResponse, ContainerFlavor,
+    ContainerFlavorsResponse, ExportData, FilesListResponse, OAuthFlowInit, OAuthFlowStatus,
+    Provider, ProviderWithModels, ProvidersResponse, ProvidersWithModelsResponse, ResourceTier,
+    ResourceTiersResponse, SettingsUpdateResponse, UserOpencodeConfig, UserOpencodeFile,
+    UserOpencodeSettings,
 };
 use crate::services::{ApiClient, SettingsService};
 use chrono::Utc;
@@ -34,12 +34,14 @@ pub async fn list_providers() -> Result<Vec<Provider>, AppError> {
 
 /// List LLM providers with models from Models.dev (new endpoint)
 #[tauri::command]
-pub async fn list_providers_with_models(popular_only: Option<bool>) -> Result<Vec<ProviderWithModels>, AppError> {
+pub async fn list_providers_with_models(
+    popular_only: Option<bool>,
+) -> Result<Vec<ProviderWithModels>, AppError> {
     let client = ApiClient::new()?;
-    
+
     let popular = popular_only.unwrap_or(true);
     let path = format!("/api/providers?popularOnly={}", popular);
-    
+
     let response: ProvidersWithModelsResponse = client.get(&path).await?;
     Ok(response.providers)
 }
@@ -56,31 +58,34 @@ pub async fn list_configured_providers() -> Result<Vec<ProviderWithModels>, AppE
 #[tauri::command]
 pub async fn get_default_provider() -> Result<Option<Provider>, AppError> {
     let client = ApiClient::new()?;
-    
+
     // The API returns { provider: Provider | null }
     #[derive(serde::Deserialize)]
     struct Response {
         provider: Option<Provider>,
     }
-    
+
     let response: Response = client.get("/api/providers/default").await?;
     Ok(response.provider)
 }
 
 /// Configure a provider with an API key
 #[tauri::command]
-pub async fn configure_provider_api_key(provider_id: String, api_key: String) -> Result<(), AppError> {
+pub async fn configure_provider_api_key(
+    provider_id: String,
+    api_key: String,
+) -> Result<(), AppError> {
     let client = ApiClient::new()?;
-    
+
     #[derive(serde::Serialize)]
     #[serde(rename_all = "camelCase")]
     struct Body {
         api_key: String,
     }
-    
+
     let path = format!("/api/providers/{}/configure", provider_id);
     let _: serde_json::Value = client.post(&path, &Body { api_key }).await?;
-    
+
     Ok(())
 }
 
@@ -88,7 +93,7 @@ pub async fn configure_provider_api_key(provider_id: String, api_key: String) ->
 #[tauri::command]
 pub async fn init_oauth_flow(provider_id: String) -> Result<OAuthFlowInit, AppError> {
     let client = ApiClient::new()?;
-    
+
     #[derive(serde::Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct Response {
@@ -98,10 +103,10 @@ pub async fn init_oauth_flow(provider_id: String) -> Result<OAuthFlowInit, AppEr
         expires_at: String,
         interval: u32,
     }
-    
+
     let path = format!("/api/providers/{}/oauth/init", provider_id);
     let response: Response = client.post(&path, &serde_json::json!({})).await?;
-    
+
     Ok(OAuthFlowInit {
         state_id: response.state_id,
         user_code: response.user_code,
@@ -113,18 +118,21 @@ pub async fn init_oauth_flow(provider_id: String) -> Result<OAuthFlowInit, AppEr
 
 /// Poll OAuth device flow status
 #[tauri::command]
-pub async fn poll_oauth_flow(provider_id: String, state_id: String) -> Result<OAuthFlowStatus, AppError> {
+pub async fn poll_oauth_flow(
+    provider_id: String,
+    state_id: String,
+) -> Result<OAuthFlowStatus, AppError> {
     let client = ApiClient::new()?;
-    
+
     #[derive(serde::Serialize)]
     #[serde(rename_all = "camelCase")]
     struct Body {
         state_id: String,
     }
-    
+
     let path = format!("/api/providers/{}/oauth/poll", provider_id);
     let response: OAuthFlowStatus = client.post(&path, &Body { state_id }).await?;
-    
+
     Ok(response)
 }
 
@@ -132,20 +140,25 @@ pub async fn poll_oauth_flow(provider_id: String, state_id: String) -> Result<OA
 #[tauri::command]
 pub async fn cancel_oauth_flow(provider_id: String, state_id: String) -> Result<(), AppError> {
     let client = ApiClient::new()?;
-    
+
     let path = format!("/api/providers/{}/oauth/{}", provider_id, state_id);
-    
+
     // DELETE request - we'll need to add a delete method to ApiClient
     let url = format!("{}{}", client.base_url(), path);
     let request = client.client().delete(&url);
     let request = client.add_auth_header(request).await;
-    let response = request.send().await
+    let response = request
+        .send()
+        .await
         .map_err(|e| AppError::NetworkError(e.to_string()))?;
-    
+
     if !response.status().is_success() {
-        return Err(AppError::ApiError(format!("Failed to cancel OAuth flow: {}", response.status())));
+        return Err(AppError::ApiError(format!(
+            "Failed to cancel OAuth flow: {}",
+            response.status()
+        )));
     }
-    
+
     Ok(())
 }
 
@@ -153,20 +166,25 @@ pub async fn cancel_oauth_flow(provider_id: String, state_id: String) -> Result<
 #[tauri::command]
 pub async fn remove_provider_credentials(provider_id: String) -> Result<(), AppError> {
     let client = ApiClient::new()?;
-    
+
     let path = format!("/api/providers/{}", provider_id);
-    
+
     // DELETE request
     let url = format!("{}{}", client.base_url(), path);
     let request = client.client().delete(&url);
     let request = client.add_auth_header(request).await;
-    let response = request.send().await
+    let response = request
+        .send()
+        .await
         .map_err(|e| AppError::NetworkError(e.to_string()))?;
-    
+
     if !response.status().is_success() {
-        return Err(AppError::ApiError(format!("Failed to remove credentials: {}", response.status())));
+        return Err(AppError::ApiError(format!(
+            "Failed to remove credentials: {}",
+            response.status()
+        )));
     }
-    
+
     Ok(())
 }
 
@@ -174,10 +192,10 @@ pub async fn remove_provider_credentials(provider_id: String) -> Result<(), AppE
 #[tauri::command]
 pub async fn set_default_provider(provider_id: String) -> Result<(), AppError> {
     let client = ApiClient::new()?;
-    
+
     let path = format!("/api/providers/{}/set-default", provider_id);
     let _: serde_json::Value = client.post(&path, &serde_json::json!({})).await?;
-    
+
     Ok(())
 }
 
@@ -186,14 +204,14 @@ pub async fn set_default_provider(provider_id: String) -> Result<(), AppError> {
 pub async fn export_settings() -> Result<String, AppError> {
     let settings = SettingsService::load_settings()?;
     let api_url = crate::services::StorageService::load_config()?.map(|c| c.api_url);
-    
+
     let export_data = ExportData {
         version: env!("CARGO_PKG_VERSION").to_string(),
         exported_at: Utc::now().to_rfc3339(),
         settings,
         api_url,
     };
-    
+
     serde_json::to_string_pretty(&export_data)
         .map_err(|e| AppError::SerializationError(e.to_string()))
 }
@@ -203,10 +221,10 @@ pub async fn export_settings() -> Result<String, AppError> {
 pub async fn import_settings(json: String) -> Result<AppSettings, AppError> {
     let export_data: ExportData = serde_json::from_str(&json)
         .map_err(|e| AppError::SerializationError(format!("Invalid settings file: {}", e)))?;
-    
+
     // Save the imported settings
     SettingsService::save_settings(&export_data.settings)?;
-    
+
     // Optionally update the API URL if provided and different
     if let Some(api_url) = export_data.api_url {
         if let Ok(Some(mut config)) = crate::services::StorageService::load_config() {
@@ -217,7 +235,7 @@ pub async fn import_settings(json: String) -> Result<AppSettings, AppError> {
             }
         }
     }
-    
+
     Ok(export_data.settings)
 }
 
@@ -230,10 +248,10 @@ pub async fn import_settings(json: String) -> Result<AppSettings, AppError> {
 #[tauri::command]
 pub async fn get_user_opencode_config(user_id: String) -> Result<UserOpencodeConfig, AppError> {
     let client = ApiClient::new()?;
-    
+
     let path = format!("/api/users/{}/opencode/config", user_id);
     let response: UserOpencodeConfig = client.get(&path).await?;
-    
+
     Ok(response)
 }
 
@@ -241,38 +259,35 @@ pub async fn get_user_opencode_config(user_id: String) -> Result<UserOpencodeCon
 #[tauri::command]
 pub async fn update_user_opencode_settings(
     user_id: String,
-    settings: UserOpencodeSettings
+    settings: UserOpencodeSettings,
 ) -> Result<UserOpencodeSettings, AppError> {
     let client = ApiClient::new()?;
-    
+
     // API expects { "settings": {...} } wrapper
     #[derive(serde::Serialize)]
     struct Body {
         settings: UserOpencodeSettings,
     }
-    
+
     let path = format!("/api/users/{}/opencode/settings", user_id);
     let response: SettingsUpdateResponse = client.put(&path, &Body { settings }).await?;
-    
+
     Ok(response.settings)
 }
 
 /// Update user's AGENTS.md content
 #[tauri::command]
-pub async fn update_user_agents_md(
-    user_id: String,
-    content: String
-) -> Result<(), AppError> {
+pub async fn update_user_agents_md(user_id: String, content: String) -> Result<(), AppError> {
     let client = ApiClient::new()?;
-    
+
     #[derive(serde::Serialize)]
     struct Body {
         content: String,
     }
-    
+
     let path = format!("/api/users/{}/opencode/agents-md", user_id);
     let _: serde_json::Value = client.put(&path, &Body { content }).await?;
-    
+
     Ok(())
 }
 
@@ -280,17 +295,17 @@ pub async fn update_user_agents_md(
 #[tauri::command]
 pub async fn list_user_opencode_files(
     user_id: String,
-    file_type: Option<String>
+    file_type: Option<String>,
 ) -> Result<Vec<UserOpencodeFile>, AppError> {
     let client = ApiClient::new()?;
-    
+
     let mut path = format!("/api/users/{}/opencode/files", user_id);
     if let Some(ft) = file_type {
         path = format!("{}?type={}", path, ft);
     }
-    
+
     let response: FilesListResponse = client.get(&path).await?;
-    
+
     Ok(response.files)
 }
 
@@ -301,17 +316,17 @@ pub async fn upsert_user_opencode_file(
     file_type: String,
     name: String,
     content: String,
-    extension: Option<String>
+    extension: Option<String>,
 ) -> Result<UserOpencodeFile, AppError> {
     let client = ApiClient::new()?;
-    
+
     #[derive(serde::Serialize)]
     struct Body {
         content: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         extension: Option<String>,
     }
-    
+
     #[derive(serde::Deserialize)]
     #[allow(dead_code)]
     struct Response {
@@ -328,10 +343,13 @@ pub async fn upsert_user_opencode_file(
         #[serde(default)]
         message: Option<String>,
     }
-    
-    let path = format!("/api/users/{}/opencode/files/{}/{}", user_id, file_type, name);
+
+    let path = format!(
+        "/api/users/{}/opencode/files/{}/{}",
+        user_id, file_type, name
+    );
     let response: Response = client.put(&path, &Body { content, extension }).await?;
-    
+
     Ok(UserOpencodeFile {
         name: response.name,
         file_type: response.file_type,
@@ -348,23 +366,31 @@ pub async fn upsert_user_opencode_file(
 pub async fn delete_user_opencode_file(
     user_id: String,
     file_type: String,
-    name: String
+    name: String,
 ) -> Result<(), AppError> {
     let client = ApiClient::new()?;
-    
-    let path = format!("/api/users/{}/opencode/files/{}/{}", user_id, file_type, name);
-    
+
+    let path = format!(
+        "/api/users/{}/opencode/files/{}/{}",
+        user_id, file_type, name
+    );
+
     // DELETE request
     let url = format!("{}{}", client.base_url(), path);
     let request = client.client().delete(&url);
     let request = client.add_auth_header(request).await;
-    let response = request.send().await
+    let response = request
+        .send()
+        .await
         .map_err(|e| AppError::NetworkError(e.to_string()))?;
-    
+
     if !response.status().is_success() {
-        return Err(AppError::ApiError(format!("Failed to delete file: {}", response.status())));
+        return Err(AppError::ApiError(format!(
+            "Failed to delete file: {}",
+            response.status()
+        )));
     }
-    
+
     Ok(())
 }
 

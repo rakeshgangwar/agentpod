@@ -44,13 +44,19 @@ const FEATURE_BUFFER_SIZE: usize = 120;
 
 /// URLs for downloading OpenWakeWord models
 pub mod model_urls {
-    pub const MELSPECTROGRAM: &str = "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/melspectrogram.onnx";
-    pub const EMBEDDING: &str = "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/embedding_model.onnx";
-    pub const SILERO_VAD: &str = "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/silero_vad.onnx";
+    pub const MELSPECTROGRAM: &str =
+        "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/melspectrogram.onnx";
+    pub const EMBEDDING: &str =
+        "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/embedding_model.onnx";
+    pub const SILERO_VAD: &str =
+        "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/silero_vad.onnx";
     // Pre-trained wakeword models
-    pub const ALEXA: &str = "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/alexa_v0.1.onnx";
-    pub const HEY_JARVIS: &str = "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/hey_jarvis_v0.1.onnx";
-    pub const HEY_MYCROFT: &str = "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/hey_mycroft_v0.1.onnx";
+    pub const ALEXA: &str =
+        "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/alexa_v0.1.onnx";
+    pub const HEY_JARVIS: &str =
+        "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/hey_jarvis_v0.1.onnx";
+    pub const HEY_MYCROFT: &str =
+        "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/hey_mycroft_v0.1.onnx";
 }
 
 /// Wake word detection event
@@ -228,7 +234,8 @@ impl AudioFeatureProcessor {
 
             // Extract samples from buffer
             let start_idx = self.raw_buffer.len() - total_samples;
-            let audio_samples: Vec<f32> = self.raw_buffer
+            let audio_samples: Vec<f32> = self
+                .raw_buffer
                 .iter()
                 .skip(start_idx)
                 .take(total_samples)
@@ -244,7 +251,7 @@ impl AudioFeatureProcessor {
                 // Shift buffer and append new frames
                 let new_frames = melspec_len / MELSPEC_BINS;
                 let shift = new_frames * MELSPEC_BINS;
-                
+
                 if shift < self.melspec_buffer.len() {
                     self.melspec_buffer.drain(0..shift);
                     self.melspec_buffer.extend(melspec);
@@ -254,7 +261,7 @@ impl AudioFeatureProcessor {
             // Compute embedding if we have enough melspec frames
             if self.melspec_buffer.len() >= EMBEDDING_INPUT_FRAMES * MELSPEC_BINS {
                 let embedding = self.compute_embedding()?;
-                
+
                 // Add to feature buffer
                 self.feature_buffer.extend(embedding);
                 new_embeddings += 1;
@@ -276,14 +283,17 @@ impl AudioFeatureProcessor {
         let input_tensor = Tensor::from_array(([1, audio.len()], audio.to_vec()))
             .map_err(|e| VoiceError::Transcription(format!("Tensor error: {}", e)))?;
 
-        let outputs = self.melspec_session.run(
-            ort::inputs!["input" => input_tensor]
-        ).map_err(|e| VoiceError::Transcription(format!("Melspec inference error: {}", e)))?;
+        let outputs = self
+            .melspec_session
+            .run(ort::inputs!["input" => input_tensor])
+            .map_err(|e| VoiceError::Transcription(format!("Melspec inference error: {}", e)))?;
 
-        let output = outputs.get("output")
+        let output = outputs
+            .get("output")
             .ok_or_else(|| VoiceError::Transcription("Missing melspec output".to_string()))?;
 
-        let tensor_data = output.try_extract_array::<f32>()
+        let tensor_data = output
+            .try_extract_array::<f32>()
             .map_err(|e| VoiceError::Transcription(format!("Extract error: {}", e)))?;
 
         // Apply transform: x/10 + 2 (matches Python implementation)
@@ -299,20 +309,24 @@ impl AudioFeatureProcessor {
         let melspec_window: Vec<f32> = self.melspec_buffer[start..].to_vec();
 
         // Reshape to (1, 76, 32, 1)
-        let input_tensor = Tensor::from_array((
-            [1, EMBEDDING_INPUT_FRAMES, MELSPEC_BINS, 1],
-            melspec_window,
-        )).map_err(|e| VoiceError::Transcription(format!("Tensor error: {}", e)))?;
+        let input_tensor =
+            Tensor::from_array(([1, EMBEDDING_INPUT_FRAMES, MELSPEC_BINS, 1], melspec_window))
+                .map_err(|e| VoiceError::Transcription(format!("Tensor error: {}", e)))?;
 
-        let outputs = self.embedding_session.run(
-            ort::inputs!["input_1" => input_tensor]
-        ).map_err(|e| VoiceError::Transcription(format!("Embedding inference error: {}", e)))?;
+        let outputs = self
+            .embedding_session
+            .run(ort::inputs!["input_1" => input_tensor])
+            .map_err(|e| VoiceError::Transcription(format!("Embedding inference error: {}", e)))?;
 
         // Get first output
-        let output = outputs.iter().next()
+        let output = outputs
+            .iter()
+            .next()
             .ok_or_else(|| VoiceError::Transcription("No embedding output".to_string()))?;
 
-        let tensor_data = output.1.try_extract_array::<f32>()
+        let tensor_data = output
+            .1
+            .try_extract_array::<f32>()
             .map_err(|e| VoiceError::Transcription(format!("Extract error: {}", e)))?;
 
         Ok(tensor_data.iter().cloned().collect())
@@ -387,7 +401,7 @@ impl WakewordService {
 
         if !melspec_path.exists() || !embedding_path.exists() {
             return Err(VoiceError::Config(
-                "Feature models not downloaded. Call download_feature_models() first.".to_string()
+                "Feature models not downloaded. Call download_feature_models() first.".to_string(),
             ));
         }
 
@@ -408,14 +422,25 @@ impl WakewordService {
 
     /// Download feature models (melspectrogram + embedding)
     pub async fn download_feature_models(&self) -> Result<(), VoiceError> {
-        download_model(model_urls::MELSPECTROGRAM, &self.models_dir.join("melspectrogram.onnx")).await?;
-        download_model(model_urls::EMBEDDING, &self.models_dir.join("embedding_model.onnx")).await?;
+        download_model(
+            model_urls::MELSPECTROGRAM,
+            &self.models_dir.join("melspectrogram.onnx"),
+        )
+        .await?;
+        download_model(
+            model_urls::EMBEDDING,
+            &self.models_dir.join("embedding_model.onnx"),
+        )
+        .await?;
         tracing::info!("Feature models downloaded successfully");
         Ok(())
     }
 
     /// Download a built-in wakeword model
-    pub async fn download_builtin_model(&self, model: BuiltinWakeword) -> Result<PathBuf, VoiceError> {
+    pub async fn download_builtin_model(
+        &self,
+        model: BuiltinWakeword,
+    ) -> Result<PathBuf, VoiceError> {
         let filename = format!("{}_v0.1.onnx", model.name());
         let path = self.models_dir.join(&filename);
         download_model(model.url(), &path).await?;
@@ -439,12 +464,16 @@ impl WakewordService {
         // Determine input frames from model input shape
         // Input shape is typically [1, n_frames, embedding_dim]
         let mut input_frames = 16; // Default to 16 frames
-        
+
         // Try to get actual input shape from model
         if let Some(input) = session.inputs.first() {
-            tracing::info!("Wakeword model '{}' input: name='{}', type={:?}", 
-                name, input.name, input.input_type);
-            
+            tracing::info!(
+                "Wakeword model '{}' input: name='{}', type={:?}",
+                name,
+                input.name,
+                input.input_type
+            );
+
             // Extract dimensions from tensor type
             if let ort::value::ValueType::Tensor { shape, .. } = &input.input_type {
                 tracing::info!("Wakeword model '{}' input shape: {:?}", name, shape);
@@ -457,11 +486,16 @@ impl WakewordService {
                 }
             }
         }
-        
+
         // Log outputs too
         for (i, output) in session.outputs.iter().enumerate() {
-            tracing::info!("Wakeword model '{}' output[{}]: name='{}', type={:?}", 
-                name, i, output.name, output.output_type);
+            tracing::info!(
+                "Wakeword model '{}' output[{}]: name='{}', type={:?}",
+                name,
+                i,
+                output.name,
+                output.output_type
+            );
         }
 
         self.models.push(LoadedWakewordModel {
@@ -472,7 +506,11 @@ impl WakewordService {
 
         self.prediction_buffers.push(VecDeque::with_capacity(30));
 
-        tracing::info!("Loaded wakeword model '{}' (input_frames={})", name, input_frames);
+        tracing::info!(
+            "Loaded wakeword model '{}' (input_frames={})",
+            name,
+            input_frames
+        );
 
         Ok(())
     }
@@ -481,7 +519,7 @@ impl WakewordService {
     pub fn load_builtin(&mut self, model: BuiltinWakeword) -> Result<(), VoiceError> {
         let filename = format!("{}_v0.1.onnx", model.name());
         let path = self.models_dir.join(&filename);
-        
+
         if !path.exists() {
             return Err(VoiceError::Config(format!(
                 "Model '{}' not downloaded. Call download_builtin_model() first.",
@@ -523,11 +561,16 @@ impl WakewordService {
         }
 
         // Log periodically to confirm processing is happening
-        static PROCESS_COUNT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        static PROCESS_COUNT: std::sync::atomic::AtomicUsize =
+            std::sync::atomic::AtomicUsize::new(0);
         let count = PROCESS_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         if count % 50 == 0 {
-            tracing::debug!("Processing wakeword (count={}, new_embeddings={}, feature_buffer_len={})", 
-                count, new_embeddings, processor.feature_buffer.len() / EMBEDDING_DIM);
+            tracing::debug!(
+                "Processing wakeword (count={}, new_embeddings={}, feature_buffer_len={})",
+                count,
+                new_embeddings,
+                processor.feature_buffer.len() / EMBEDDING_DIM
+            );
         }
 
         // Run each wakeword model
@@ -536,33 +579,38 @@ impl WakewordService {
                 Some(f) => f,
                 None => {
                     if count % 50 == 0 {
-                        tracing::debug!("Not enough features yet for model '{}' (need {} frames)", 
-                            model.name, model.input_frames);
+                        tracing::debug!(
+                            "Not enough features yet for model '{}' (need {} frames)",
+                            model.name,
+                            model.input_frames
+                        );
                     }
                     continue;
                 }
             };
 
             // Create input tensor with shape [1, n_frames, embedding_dim]
-            let input_tensor = match Tensor::from_array((
-                [1, model.input_frames, EMBEDDING_DIM],
-                features,
-            )) {
-                Ok(t) => t,
-                Err(e) => {
-                    tracing::error!("Failed to create input tensor: {}", e);
-                    continue;
-                }
-            };
+            let input_tensor =
+                match Tensor::from_array(([1, model.input_frames, EMBEDDING_DIM], features)) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        tracing::error!("Failed to create input tensor: {}", e);
+                        continue;
+                    }
+                };
 
             // Get input name (clone to avoid borrow conflict)
-            let input_name: String = model.session.inputs.first()
+            let input_name: String = model
+                .session
+                .inputs
+                .first()
                 .map(|i| i.name.clone())
                 .unwrap_or_else(|| "input".to_string());
 
-            let outputs = match model.session.run(
-                ort::inputs![input_name.as_str() => input_tensor]
-            ) {
+            let outputs = match model
+                .session
+                .run(ort::inputs![input_name.as_str() => input_tensor])
+            {
                 Ok(o) => o,
                 Err(e) => {
                     tracing::error!("Failed to run wakeword model '{}': {}", model.name, e);
@@ -578,7 +626,7 @@ impl WakewordService {
                     continue;
                 }
             };
-            
+
             let tensor_data = match output.1.try_extract_array::<f32>() {
                 Ok(t) => t,
                 Err(e) => {
@@ -586,13 +634,17 @@ impl WakewordService {
                     continue;
                 }
             };
-            
+
             let score = tensor_data.iter().cloned().next().unwrap_or(0.0);
 
             // Log score periodically for debugging
             if count % 25 == 0 {
-                tracing::debug!("Wakeword '{}' score: {:.4} (threshold: {:.2})", 
-                    model.name, score, self.config.threshold);
+                tracing::debug!(
+                    "Wakeword '{}' score: {:.4} (threshold: {:.2})",
+                    model.name,
+                    score,
+                    self.config.threshold
+                );
             }
 
             // Update prediction buffer
@@ -668,7 +720,11 @@ impl WakewordService {
             models.push(WakewordInfo {
                 name: builtin.display_name().to_string(),
                 model_id: builtin.name().to_string(),
-                path: if is_downloaded { Some(path.to_string_lossy().to_string()) } else { None },
+                path: if is_downloaded {
+                    Some(path.to_string_lossy().to_string())
+                } else {
+                    None
+                },
                 is_builtin: true,
                 is_loaded,
             });
@@ -680,19 +736,19 @@ impl WakewordService {
                 let path = entry.path();
                 if let Some(ext) = path.extension() {
                     if ext == "onnx" {
-                        let filename = path.file_name()
-                            .and_then(|s| s.to_str())
-                            .unwrap_or("");
-                        
+                        let filename = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
+
                         // Skip builtin models and feature models
-                        if filename.contains("_v0.1") 
+                        if filename.contains("_v0.1")
                             || filename == "melspectrogram.onnx"
                             || filename == "embedding_model.onnx"
-                            || filename == "silero_vad.onnx" {
+                            || filename == "silero_vad.onnx"
+                        {
                             continue;
                         }
 
-                        let name = path.file_stem()
+                        let name = path
+                            .file_stem()
                             .and_then(|s| s.to_str())
                             .unwrap_or("unknown")
                             .to_string();
@@ -763,7 +819,8 @@ async fn download_model(url: &str, path: &PathBuf) -> Result<(), VoiceError> {
         )));
     }
 
-    let bytes = response.bytes()
+    let bytes = response
+        .bytes()
         .await
         .map_err(|e| VoiceError::ModelDownload(format!("Failed to read response: {}", e)))?;
 
@@ -798,11 +855,11 @@ impl WakewordListenerState {
 // ============================================================================
 
 /// Start continuous wake word listening
-/// 
+///
 /// This spawns a background thread that continuously captures audio and
 /// processes it through the wake word detection pipeline. When a wake word
 /// is detected, the provided callback is called.
-/// 
+///
 /// On Linux, uses parec for reliable PipeWire/PulseAudio capture.
 /// On other platforms, uses cpal.
 pub fn start_wakeword_listening<F>(
@@ -814,17 +871,23 @@ where
 {
     // Check if already listening
     if wakeword_service.lock().is_listening() {
-        return Err(super::VoiceError::Recording("Already listening for wake words".to_string()));
+        return Err(super::VoiceError::Recording(
+            "Already listening for wake words".to_string(),
+        ));
     }
 
     // Check if processor is initialized
     if !wakeword_service.lock().is_initialized() {
-        return Err(super::VoiceError::Config("Wake word processor not initialized".to_string()));
+        return Err(super::VoiceError::Config(
+            "Wake word processor not initialized".to_string(),
+        ));
     }
 
     // Check if any models are loaded
     if wakeword_service.lock().get_loaded_models().is_empty() {
-        return Err(super::VoiceError::Config("No wake word models loaded".to_string()));
+        return Err(super::VoiceError::Config(
+            "No wake word models loaded".to_string(),
+        ));
     }
 
     // Set listening state
@@ -889,7 +952,7 @@ mod linux_wakeword_listener {
     {
         if !is_parec_available() {
             return Err(super::super::VoiceError::AudioDevice(
-                "parec not found. Install pulseaudio-utils or pipewire-pulse.".to_string()
+                "parec not found. Install pulseaudio-utils or pipewire-pulse.".to_string(),
             ));
         }
 
@@ -899,19 +962,23 @@ mod linux_wakeword_listener {
         const WAKEWORD_SAMPLE_RATE: u32 = 16000;
 
         let mut child = Command::new("parec")
-            .args([
-                "--raw",
-                "--latency-msec=100",
-            ])
+            .args(["--raw", "--latency-msec=100"])
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .spawn()
-            .map_err(|e| super::super::VoiceError::AudioDevice(format!("Failed to start parec: {}", e)))?;
+            .map_err(|e| {
+                super::super::VoiceError::AudioDevice(format!("Failed to start parec: {}", e))
+            })?;
 
-        let mut stdout = child.stdout.take()
-            .ok_or_else(|| super::super::VoiceError::AudioDevice("Failed to get parec stdout".to_string()))?;
+        let mut stdout = child.stdout.take().ok_or_else(|| {
+            super::super::VoiceError::AudioDevice("Failed to get parec stdout".to_string())
+        })?;
 
-        tracing::info!("Wake word listener started (parec s16le {}ch {}Hz)", PAREC_CHANNELS, PAREC_SAMPLE_RATE);
+        tracing::info!(
+            "Wake word listener started (parec s16le {}ch {}Hz)",
+            PAREC_CHANNELS,
+            PAREC_SAMPLE_RATE
+        );
 
         // Buffer for reading audio data
         // s16le stereo = 4 bytes per frame
@@ -932,7 +999,7 @@ mod linux_wakeword_listener {
                 Ok(bytes_read) => {
                     // Convert s16le stereo bytes to i16 samples for wake word (expects i16)
                     let frame_count = bytes_read / 4;
-                    
+
                     // Convert to f32 first for resampling
                     let stereo_f32: Vec<f32> = (0..frame_count * 2)
                         .map(|i| {
@@ -947,7 +1014,8 @@ mod linux_wakeword_listener {
                         .collect();
 
                     // Convert stereo to mono
-                    let mono_f32: Vec<f32> = stereo_f32.chunks(2)
+                    let mono_f32: Vec<f32> = stereo_f32
+                        .chunks(2)
                         .map(|chunk| {
                             if chunk.len() == 2 {
                                 (chunk[0] + chunk[1]) / 2.0
@@ -958,21 +1026,36 @@ mod linux_wakeword_listener {
                         .collect();
 
                     // Resample from 44100Hz to 16000Hz
-                    let resampled = super::super::audio_utils::resample(&mono_f32, PAREC_SAMPLE_RATE, WAKEWORD_SAMPLE_RATE);
+                    let resampled = super::super::audio_utils::resample(
+                        &mono_f32,
+                        PAREC_SAMPLE_RATE,
+                        WAKEWORD_SAMPLE_RATE,
+                    );
 
                     // Convert back to i16 for wake word processor
-                    let samples_i16: Vec<i16> = resampled.iter()
+                    let samples_i16: Vec<i16> = resampled
+                        .iter()
                         .map(|&s| (s * i16::MAX as f32) as i16)
                         .collect();
 
                     // Log audio stats periodically
-                    static AUDIO_COUNT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-                    let audio_count = AUDIO_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    static AUDIO_COUNT: std::sync::atomic::AtomicUsize =
+                        std::sync::atomic::AtomicUsize::new(0);
+                    let audio_count =
+                        AUDIO_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     if audio_count % 100 == 0 {
                         let max_sample = samples_i16.iter().map(|&s| s.abs()).max().unwrap_or(0);
-                        let rms: f32 = (samples_i16.iter().map(|&s| (s as f32).powi(2)).sum::<f32>() / samples_i16.len() as f32).sqrt();
-                        tracing::debug!("Audio stats: bytes={}, samples={}, max={}, rms={:.1}", 
-                            bytes_read, samples_i16.len(), max_sample, rms);
+                        let rms: f32 =
+                            (samples_i16.iter().map(|&s| (s as f32).powi(2)).sum::<f32>()
+                                / samples_i16.len() as f32)
+                                .sqrt();
+                        tracing::debug!(
+                            "Audio stats: bytes={}, samples={}, max={}, rms={:.1}",
+                            bytes_read,
+                            samples_i16.len(),
+                            max_sample,
+                            rms
+                        );
                     }
 
                     // Process through wake word detector
@@ -980,7 +1063,11 @@ mod linux_wakeword_listener {
                     if let Some(detection) = service.process_samples(&samples_i16) {
                         // Check cooldown
                         if last_detection_time.elapsed() >= detection_cooldown {
-                            tracing::info!("Wake word detected: {} (score={:.3})", detection.name, detection.score);
+                            tracing::info!(
+                                "Wake word detected: {} (score={:.3})",
+                                detection.name,
+                                detection.score
+                            );
                             last_detection_time = std::time::Instant::now();
                             drop(service); // Release lock before callback
                             on_detection(detection);
@@ -1024,11 +1111,13 @@ mod cpal_wakeword_listener {
         F: Fn(WakewordDetection) + Send + 'static,
     {
         let host = cpal::default_host();
-        let device = host.default_input_device()
-            .ok_or_else(|| super::super::VoiceError::AudioDevice("No default input device".to_string()))?;
+        let device = host.default_input_device().ok_or_else(|| {
+            super::super::VoiceError::AudioDevice("No default input device".to_string())
+        })?;
 
-        let supported_config = device.default_input_config()
-            .map_err(|e| super::super::VoiceError::AudioDevice(format!("Failed to get input config: {}", e)))?;
+        let supported_config = device.default_input_config().map_err(|e| {
+            super::super::VoiceError::AudioDevice(format!("Failed to get input config: {}", e))
+        })?;
 
         let config: cpal::StreamConfig = supported_config.clone().into();
         let device_sample_rate = config.sample_rate.0;
@@ -1047,44 +1136,59 @@ mod cpal_wakeword_listener {
         let is_listening_stream = Arc::clone(&is_listening);
 
         // Build the input stream
-        let stream = device.build_input_stream(
-            &config,
-            move |data: &[f32], _: &cpal::InputCallbackInfo| {
-                if !is_listening_stream.load(Ordering::Relaxed) {
-                    return;
-                }
+        let stream = device
+            .build_input_stream(
+                &config,
+                move |data: &[f32], _: &cpal::InputCallbackInfo| {
+                    if !is_listening_stream.load(Ordering::Relaxed) {
+                        return;
+                    }
 
-                // Convert to mono if stereo
-                let mono_data: Vec<f32> = if device_channels > 1 {
-                    data.chunks(device_channels as usize)
-                        .map(|chunk| chunk.iter().sum::<f32>() / chunk.len() as f32)
-                        .collect()
-                } else {
-                    data.to_vec()
-                };
+                    // Convert to mono if stereo
+                    let mono_data: Vec<f32> = if device_channels > 1 {
+                        data.chunks(device_channels as usize)
+                            .map(|chunk| chunk.iter().sum::<f32>() / chunk.len() as f32)
+                            .collect()
+                    } else {
+                        data.to_vec()
+                    };
 
-                // Resample to 16kHz if needed
-                let resampled = if device_sample_rate != WAKEWORD_SAMPLE_RATE as u32 {
-                    super::super::audio_utils::resample(&mono_data, device_sample_rate, WAKEWORD_SAMPLE_RATE as u32)
-                } else {
-                    mono_data
-                };
+                    // Resample to 16kHz if needed
+                    let resampled = if device_sample_rate != WAKEWORD_SAMPLE_RATE as u32 {
+                        super::super::audio_utils::resample(
+                            &mono_data,
+                            device_sample_rate,
+                            WAKEWORD_SAMPLE_RATE as u32,
+                        )
+                    } else {
+                        mono_data
+                    };
 
-                // Convert to i16
-                let samples_i16: Vec<i16> = resampled.iter()
-                    .map(|&s| (s * i16::MAX as f32).clamp(i16::MIN as f32, i16::MAX as f32) as i16)
-                    .collect();
+                    // Convert to i16
+                    let samples_i16: Vec<i16> = resampled
+                        .iter()
+                        .map(|&s| {
+                            (s * i16::MAX as f32).clamp(i16::MIN as f32, i16::MAX as f32) as i16
+                        })
+                        .collect();
 
-                let _ = tx.send(samples_i16);
-            },
-            |err| {
-                tracing::error!("Audio stream error: {}", err);
-            },
-            None,
-        ).map_err(|e| super::super::VoiceError::AudioDevice(format!("Failed to build input stream: {}", e)))?;
+                    let _ = tx.send(samples_i16);
+                },
+                |err| {
+                    tracing::error!("Audio stream error: {}", err);
+                },
+                None,
+            )
+            .map_err(|e| {
+                super::super::VoiceError::AudioDevice(format!(
+                    "Failed to build input stream: {}",
+                    e
+                ))
+            })?;
 
-        stream.play()
-            .map_err(|e| super::super::VoiceError::Recording(format!("Failed to start stream: {}", e)))?;
+        stream.play().map_err(|e| {
+            super::super::VoiceError::Recording(format!("Failed to start stream: {}", e))
+        })?;
 
         // Track last detection time
         let mut last_detection_time = std::time::Instant::now();
@@ -1097,7 +1201,11 @@ mod cpal_wakeword_listener {
                     let mut service = wakeword_service.lock();
                     if let Some(detection) = service.process_samples(&samples) {
                         if last_detection_time.elapsed() >= detection_cooldown {
-                            tracing::info!("Wake word detected: {} (score={:.3})", detection.name, detection.score);
+                            tracing::info!(
+                                "Wake word detected: {} (score={:.3})",
+                                detection.name,
+                                detection.score
+                            );
                             last_detection_time = std::time::Instant::now();
                             drop(service);
                             on_detection(detection);

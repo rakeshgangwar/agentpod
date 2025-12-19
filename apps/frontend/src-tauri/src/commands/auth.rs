@@ -9,7 +9,7 @@ use crate::services::auth::{AuthService, AuthStatus, SessionData, UserInfo};
 use tauri::command;
 
 /// Store a session token from Better Auth
-/// 
+///
 /// Called by the frontend after successful login to store the session
 /// token for use in subsequent API calls.
 #[command]
@@ -42,7 +42,7 @@ pub fn auth_get_status() -> Result<AuthStatus, AppError> {
 }
 
 /// Logout the current user
-/// 
+///
 /// Clears the stored session token.
 #[command]
 pub fn auth_logout() -> Result<(), AppError> {
@@ -60,7 +60,7 @@ pub fn auth_get_user() -> Result<Option<UserInfo>, AppError> {
 }
 
 /// Get the current session token
-/// 
+///
 /// Returns the stored session token for API calls.
 #[command]
 pub fn auth_get_token() -> Result<Option<String>, AppError> {

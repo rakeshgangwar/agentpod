@@ -3,29 +3,34 @@
 //! These commands communicate with the Management API's onboarding endpoints.
 
 use crate::models::{
-    AppError, OnboardingSession, OnboardingSessionResponse,
-    ApplyConfigResult, CompleteOnboardingInput, ResetOnboardingInput,
-    CreateOnboardingInput, GeneratedConfig,
+    AppError, ApplyConfigResult, CompleteOnboardingInput, CreateOnboardingInput, GeneratedConfig,
+    OnboardingSession, OnboardingSessionResponse, ResetOnboardingInput,
 };
 use crate::services::ApiClient;
 
 /// Get onboarding session for a sandbox
 #[tauri::command]
-pub async fn get_onboarding_session(sandbox_id: String) -> Result<Option<OnboardingSession>, AppError> {
+pub async fn get_onboarding_session(
+    sandbox_id: String,
+) -> Result<Option<OnboardingSession>, AppError> {
     let client = ApiClient::new()?;
     let path = format!("/api/onboarding/sandbox/{}", sandbox_id);
-    
+
     // The API returns 404 if no session exists, which we treat as None
     match client.get::<OnboardingSessionResponse>(&path).await {
         Ok(response) => Ok(Some(response.session)),
-        Err(AppError::ApiError(msg)) if msg.contains("404") || msg.contains("not found") => Ok(None),
+        Err(AppError::ApiError(msg)) if msg.contains("404") || msg.contains("not found") => {
+            Ok(None)
+        }
         Err(e) => Err(e),
     }
 }
 
 /// Get onboarding session by ID
 #[tauri::command]
-pub async fn get_onboarding_session_by_id(session_id: String) -> Result<OnboardingSession, AppError> {
+pub async fn get_onboarding_session_by_id(
+    session_id: String,
+) -> Result<OnboardingSession, AppError> {
     let client = ApiClient::new()?;
     let path = format!("/api/onboarding/{}", session_id);
     let response: OnboardingSessionResponse = client.get(&path).await?;
@@ -80,7 +85,10 @@ pub async fn apply_onboarding_config(
 ) -> Result<ApplyConfigResult, AppError> {
     let client = ApiClient::new()?;
     let reload_param = reload.unwrap_or(true);
-    let path = format!("/api/onboarding/{}/apply?reload={}", session_id, reload_param);
+    let path = format!(
+        "/api/onboarding/{}/apply?reload={}",
+        session_id, reload_param
+    );
     let result: ApplyConfigResult = client.post(&path, &serde_json::json!({})).await?;
     Ok(result)
 }

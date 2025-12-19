@@ -1,5 +1,5 @@
 //! Settings storage service
-//! 
+//!
 //! Manages local app settings in ~/.config/agentpod/settings.json
 
 use crate::models::{AppError, AppSettings};
@@ -14,25 +14,28 @@ impl SettingsService {
     fn get_settings_path() -> Result<PathBuf, AppError> {
         let config_dir = dirs::config_dir()
             .ok_or_else(|| AppError::StorageError("Could not find config directory".to_string()))?;
-        
+
         let app_config_dir = config_dir.join("agentpod");
         if !app_config_dir.exists() {
-            fs::create_dir_all(&app_config_dir)
-                .map_err(|e| AppError::StorageError(format!("Failed to create config dir: {}", e)))?;
+            fs::create_dir_all(&app_config_dir).map_err(|e| {
+                AppError::StorageError(format!("Failed to create config dir: {}", e))
+            })?;
         }
-        
+
         Ok(app_config_dir.join("settings.json"))
     }
 
     /// Load settings from storage, or return defaults if not found
     pub fn load_settings() -> Result<AppSettings, AppError> {
         let path = Self::get_settings_path()?;
-        
+
         if path.exists() {
-            let json = fs::read_to_string(&path)
-                .map_err(|e| AppError::StorageError(format!("Failed to read settings file: {}", e)))?;
-            let settings: AppSettings = serde_json::from_str(&json)
-                .map_err(|e| AppError::SerializationError(format!("Failed to parse settings: {}", e)))?;
+            let json = fs::read_to_string(&path).map_err(|e| {
+                AppError::StorageError(format!("Failed to read settings file: {}", e))
+            })?;
+            let settings: AppSettings = serde_json::from_str(&json).map_err(|e| {
+                AppError::SerializationError(format!("Failed to parse settings: {}", e))
+            })?;
             Ok(settings)
         } else {
             // Return defaults if no settings file exists
@@ -43,24 +46,26 @@ impl SettingsService {
     /// Save settings to storage
     pub fn save_settings(settings: &AppSettings) -> Result<(), AppError> {
         let path = Self::get_settings_path()?;
-        let json = serde_json::to_string_pretty(settings)
-            .map_err(|e| AppError::SerializationError(format!("Failed to serialize settings: {}", e)))?;
-        
+        let json = serde_json::to_string_pretty(settings).map_err(|e| {
+            AppError::SerializationError(format!("Failed to serialize settings: {}", e))
+        })?;
+
         fs::write(&path, &json)
             .map_err(|e| AppError::StorageError(format!("Failed to write settings file: {}", e)))?;
-        
+
         Ok(())
     }
 
     /// Delete settings file
     pub fn delete_settings() -> Result<(), AppError> {
         let path = Self::get_settings_path()?;
-        
+
         if path.exists() {
-            fs::remove_file(&path)
-                .map_err(|e| AppError::StorageError(format!("Failed to delete settings file: {}", e)))?;
+            fs::remove_file(&path).map_err(|e| {
+                AppError::StorageError(format!("Failed to delete settings file: {}", e))
+            })?;
         }
-        
+
         Ok(())
     }
 }
@@ -77,7 +82,7 @@ mod tests {
         assert!(path.to_string_lossy().contains("agentpod"));
         assert!(path.to_string_lossy().contains("settings.json"));
     }
-    
+
     #[test]
     fn test_default_settings() {
         let settings = AppSettings::default();

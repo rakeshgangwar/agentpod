@@ -65,8 +65,9 @@ impl AuthService {
 
         let app_config_dir = config_dir.join("agentpod");
         if !app_config_dir.exists() {
-            fs::create_dir_all(&app_config_dir)
-                .map_err(|e| AppError::StorageError(format!("Failed to create config dir: {}", e)))?;
+            fs::create_dir_all(&app_config_dir).map_err(|e| {
+                AppError::StorageError(format!("Failed to create config dir: {}", e))
+            })?;
         }
 
         Ok(app_config_dir.join("session.json"))
@@ -96,8 +97,9 @@ impl AuthService {
         let path = Self::get_auth_path()?;
 
         if path.exists() {
-            let json = fs::read_to_string(&path)
-                .map_err(|e| AppError::StorageError(format!("Failed to read session file: {}", e)))?;
+            let json = fs::read_to_string(&path).map_err(|e| {
+                AppError::StorageError(format!("Failed to read session file: {}", e))
+            })?;
             let data: SessionData = serde_json::from_str(&json)?;
             return Ok(Some(data));
         }
@@ -159,5 +161,3 @@ impl AuthService {
         }
     }
 }
-
-

@@ -355,53 +355,54 @@ pub async fn wakeword_download_feature_models(
     state: State<'_, VoiceState>,
 ) -> Result<(), String> {
     tracing::info!("wakeword_download_feature_models called");
-    
+
     // Get the models directory while holding the lock briefly
     let models_dir = state.wakeword.lock().models_dir().clone();
-    
+
     // Download melspectrogram model
     let melspec_url = crate::voice::wakeword::model_urls::MELSPECTROGRAM;
     let melspec_path = models_dir.join("melspectrogram.onnx");
     download_wakeword_model(melspec_url, &melspec_path).await?;
-    
+
     // Download embedding model
     let embedding_url = crate::voice::wakeword::model_urls::EMBEDDING;
     let embedding_path = models_dir.join("embedding_model.onnx");
     download_wakeword_model(embedding_url, &embedding_path).await?;
-    
+
     let _ = app.emit("wakeword:feature_models_downloaded", ());
-    
+
     Ok(())
 }
 
 /// Helper function to download a wakeword model
 async fn download_wakeword_model(url: &str, path: &std::path::PathBuf) -> Result<(), String> {
     use std::io::Write;
-    
+
     // Create parent directory if needed
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    
+
     tracing::info!("Downloading model from {}", url);
-    
+
     let response = reqwest::get(url)
         .await
         .map_err(|e| format!("HTTP request failed: {}", e))?;
-    
+
     if !response.status().is_success() {
         return Err(format!("HTTP error: {}", response.status()));
     }
-    
-    let bytes = response.bytes()
+
+    let bytes = response
+        .bytes()
         .await
         .map_err(|e| format!("Failed to read response: {}", e))?;
-    
+
     let mut file = std::fs::File::create(path).map_err(|e| e.to_string())?;
     file.write_all(&bytes).map_err(|e| e.to_string())?;
-    
+
     tracing::info!("Model saved to {:?}", path);
-    
+
     Ok(())
 }
 
@@ -409,7 +410,11 @@ async fn download_wakeword_model(url: &str, path: &std::path::PathBuf) -> Result
 #[command]
 pub fn wakeword_init_processor(state: State<'_, VoiceState>) -> Result<(), String> {
     tracing::info!("wakeword_init_processor called");
-    state.wakeword.lock().init_processor().map_err(|e| e.to_string())
+    state
+        .wakeword
+        .lock()
+        .init_processor()
+        .map_err(|e| e.to_string())
 }
 
 /// Check if the wake word processor is initialized
@@ -432,25 +437,25 @@ pub async fn wakeword_download_builtin(
     model_id: String,
 ) -> Result<String, String> {
     tracing::info!("wakeword_download_builtin called for: {}", model_id);
-    
+
     let builtin = match model_id.as_str() {
         "alexa" => BuiltinWakeword::Alexa,
         "hey_jarvis" => BuiltinWakeword::HeyJarvis,
         "hey_mycroft" => BuiltinWakeword::HeyMycroft,
         _ => return Err(format!("Unknown builtin model: {}", model_id)),
     };
-    
+
     // Get the models directory while holding the lock briefly
     let models_dir = state.wakeword.lock().models_dir().clone();
-    
+
     // Construct path and download
     let filename = format!("{}_v0.1.onnx", builtin.name());
     let path = models_dir.join(&filename);
-    
+
     download_wakeword_model(builtin.url(), &path).await?;
-    
+
     let _ = app.emit("wakeword:model_downloaded", &model_id);
-    
+
     Ok(path.to_string_lossy().to_string())
 }
 
@@ -462,23 +467,29 @@ pub fn wakeword_load_model(
     model_id: String,
 ) -> Result<(), String> {
     tracing::info!("wakeword_load_model called for: {}", model_id);
-    
+
     // Try as builtin first
     let result = match model_id.as_str() {
         "alexa" => state.wakeword.lock().load_builtin(BuiltinWakeword::Alexa),
-        "hey_jarvis" => state.wakeword.lock().load_builtin(BuiltinWakeword::HeyJarvis),
-        "hey_mycroft" => state.wakeword.lock().load_builtin(BuiltinWakeword::HeyMycroft),
+        "hey_jarvis" => state
+            .wakeword
+            .lock()
+            .load_builtin(BuiltinWakeword::HeyJarvis),
+        "hey_mycroft" => state
+            .wakeword
+            .lock()
+            .load_builtin(BuiltinWakeword::HeyMycroft),
         _ => {
             // Try as custom model path
             let path = std::path::PathBuf::from(&model_id);
             state.wakeword.lock().load_wakeword(&model_id, &path)
         }
     };
-    
+
     result.map_err(|e| e.to_string())?;
-    
+
     let _ = app.emit("wakeword:model_loaded", &model_id);
-    
+
     Ok(())
 }
 
@@ -490,12 +501,15 @@ pub fn wakeword_unload_model(
     model_id: String,
 ) -> Result<(), String> {
     tracing::info!("wakeword_unload_model called for: {}", model_id);
-    
-    state.wakeword.lock().unload_wakeword(&model_id)
+
+    state
+        .wakeword
+        .lock()
+        .unload_wakeword(&model_id)
         .map_err(|e| e.to_string())?;
-    
+
     let _ = app.emit("wakeword:model_unloaded", &model_id);
-    
+
     Ok(())
 }
 
@@ -529,7 +543,7 @@ pub fn wakeword_is_listening(state: State<'_, VoiceState>) -> bool {
 }
 
 /// Start wake word listening (continuous monitoring)
-/// 
+///
 /// This starts a background thread that continuously monitors audio
 /// and emits "wakeword:detected" events when a wake word is detected.
 #[command]
@@ -538,45 +552,41 @@ pub fn wakeword_start_listening(
     state: State<'_, VoiceState>,
 ) -> Result<(), String> {
     tracing::info!("wakeword_start_listening called");
-    
+
     // Clone what we need for the callback
     let app_for_callback = app.clone();
     let wakeword_service = state.wakeword.clone();
-    
+
     // Start continuous listening with detection callback
-    let handle = crate::voice::wakeword::start_wakeword_listening(
-        wakeword_service,
-        move |detection| {
+    let handle =
+        crate::voice::wakeword::start_wakeword_listening(wakeword_service, move |detection| {
             tracing::info!("Emitting wakeword:detected event for '{}'", detection.name);
             let _ = app_for_callback.emit("wakeword:detected", &detection);
-        },
-    ).map_err(|e| e.to_string())?;
-    
+        })
+        .map_err(|e| e.to_string())?;
+
     // Store the handle
     *state.wakeword_handle.lock() = Some(handle);
-    
+
     let _ = app.emit("wakeword:listening_started", ());
-    
+
     Ok(())
 }
 
 /// Stop wake word listening
 #[command]
-pub fn wakeword_stop_listening(
-    app: AppHandle,
-    state: State<'_, VoiceState>,
-) -> Result<(), String> {
+pub fn wakeword_stop_listening(app: AppHandle, state: State<'_, VoiceState>) -> Result<(), String> {
     tracing::info!("wakeword_stop_listening called");
-    
+
     state.wakeword.lock().set_listening(false);
-    
+
     // Wait for listener thread to finish
     if let Some(handle) = state.wakeword_handle.lock().take() {
         let _ = handle.join();
     }
-    
+
     let _ = app.emit("wakeword:listening_stopped", ());
-    
+
     Ok(())
 }
 

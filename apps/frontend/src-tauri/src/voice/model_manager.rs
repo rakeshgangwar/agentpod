@@ -47,7 +47,7 @@ impl WhisperModel {
             ModelSize::Medium => Self::Medium,
         }
     }
-    
+
     pub fn to_size(&self) -> ModelSize {
         match self {
             Self::Tiny => ModelSize::Tiny,
@@ -56,7 +56,7 @@ impl WhisperModel {
             Self::Medium => ModelSize::Medium,
         }
     }
-    
+
     pub fn all() -> Vec<Self> {
         vec![Self::Tiny, Self::Base, Self::Small, Self::Medium]
     }
@@ -74,7 +74,7 @@ impl ModelManager {
         let models_dir = Self::default_models_dir();
         Self { models_dir }
     }
-    
+
     /// Get the default models directory
     pub fn default_models_dir() -> PathBuf {
         dirs::data_dir()
@@ -83,12 +83,12 @@ impl ModelManager {
             .join("models")
             .join("whisper")
     }
-    
+
     /// Get the models directory
     pub fn models_dir(&self) -> &PathBuf {
         &self.models_dir
     }
-    
+
     /// Ensure the models directory exists
     pub fn ensure_models_dir(&self) -> Result<(), VoiceError> {
         if !self.models_dir.exists() {
@@ -97,39 +97,46 @@ impl ModelManager {
         }
         Ok(())
     }
-    
+
     /// Get the local path for a model
     pub fn model_path(&self, size: ModelSize) -> PathBuf {
         self.models_dir.join(size.filename())
     }
-    
+
     /// Check if a model is downloaded
     pub fn is_model_downloaded(&self, size: ModelSize) -> bool {
         self.model_path(size).exists()
     }
-    
+
     /// Get info for a specific model
     pub fn get_model_info(&self, size: ModelSize) -> ModelInfo {
         let local_path = self.model_path(size);
         let is_downloaded = local_path.exists();
-        
+
         ModelInfo {
             id: format!("whisper-{}", size.filename().replace(".bin", "")),
-            name: format!("Whisper {}", match size {
-                ModelSize::Tiny => "Tiny",
-                ModelSize::Base => "Base",
-                ModelSize::Small => "Small",
-                ModelSize::Medium => "Medium",
-            }),
+            name: format!(
+                "Whisper {}",
+                match size {
+                    ModelSize::Tiny => "Tiny",
+                    ModelSize::Base => "Base",
+                    ModelSize::Small => "Small",
+                    ModelSize::Medium => "Medium",
+                }
+            ),
             size,
             size_display: size.size_display().to_string(),
             size_bytes: size.size_bytes(),
             description: size.description().to_string(),
             is_downloaded,
-            local_path: if is_downloaded { Some(local_path) } else { None },
+            local_path: if is_downloaded {
+                Some(local_path)
+            } else {
+                None
+            },
         }
     }
-    
+
     /// List all available models
     pub fn list_available_models(&self) -> Vec<ModelInfo> {
         vec![
@@ -139,7 +146,7 @@ impl ModelManager {
             self.get_model_info(ModelSize::Medium),
         ]
     }
-    
+
     /// List downloaded models
     pub fn list_downloaded_models(&self) -> Vec<ModelInfo> {
         self.list_available_models()
@@ -147,7 +154,7 @@ impl ModelManager {
             .filter(|m| m.is_downloaded)
             .collect()
     }
-    
+
     /// Delete a downloaded model
     pub fn delete_model(&self, size: ModelSize) -> Result<(), VoiceError> {
         let path = self.model_path(size);
@@ -157,9 +164,9 @@ impl ModelManager {
         }
         Ok(())
     }
-    
+
     /// Download a model from Hugging Face
-    /// 
+    ///
     /// This function blocks while downloading. For UI responsiveness,
     /// call this from a background thread and use progress_callback.
     pub async fn download_model<F>(
@@ -171,9 +178,9 @@ impl ModelManager {
         F: Fn(DownloadProgress) + Send + 'static,
     {
         self.ensure_models_dir()?;
-        
+
         let destination = self.model_path(size);
-        
+
         // Check if already downloaded
         if destination.exists() {
             tracing::info!("Model already downloaded: {:?}", destination);
@@ -185,42 +192,42 @@ impl ModelManager {
             });
             return Ok(destination);
         }
-        
+
         tracing::info!("Downloading model {} to {:?}", size.filename(), destination);
-        
+
         // Use hf-hub to download the model
         let api = hf_hub::api::tokio::Api::new()
             .map_err(|e| VoiceError::ModelDownload(format!("Failed to create HF API: {}", e)))?;
-        
+
         let repo = api.model(size.hf_model_id().to_string());
-        
+
         progress_callback(DownloadProgress {
             stage: DownloadStage::Downloading,
             bytes_downloaded: 0,
             total_bytes: size.size_bytes(),
             percent: 0,
         });
-        
+
         // Download the model file
         let downloaded_path = repo
             .get(size.hf_file_path())
             .await
             .map_err(|e| VoiceError::ModelDownload(format!("Failed to download model: {}", e)))?;
-        
+
         // Copy to our models directory
         std::fs::copy(&downloaded_path, &destination)?;
-        
+
         progress_callback(DownloadProgress {
             stage: DownloadStage::Complete,
             bytes_downloaded: size.size_bytes(),
             total_bytes: size.size_bytes(),
             percent: 100,
         });
-        
+
         tracing::info!("Model downloaded successfully: {:?}", destination);
         Ok(destination)
     }
-    
+
     /// Synchronous version of download_model for use in blocking contexts
     pub fn download_model_sync<F>(
         &self,
@@ -231,9 +238,9 @@ impl ModelManager {
         F: Fn(DownloadProgress) + Send + 'static,
     {
         self.ensure_models_dir()?;
-        
+
         let destination = self.model_path(size);
-        
+
         // Check if already downloaded
         if destination.exists() {
             tracing::info!("Model already downloaded: {:?}", destination);
@@ -245,37 +252,37 @@ impl ModelManager {
             });
             return Ok(destination);
         }
-        
+
         tracing::info!("Downloading model {} to {:?}", size.filename(), destination);
-        
+
         // Use hf-hub sync API
         let api = hf_hub::api::sync::Api::new()
             .map_err(|e| VoiceError::ModelDownload(format!("Failed to create HF API: {}", e)))?;
-        
+
         let repo = api.model(size.hf_model_id().to_string());
-        
+
         progress_callback(DownloadProgress {
             stage: DownloadStage::Downloading,
             bytes_downloaded: 0,
             total_bytes: size.size_bytes(),
             percent: 0,
         });
-        
+
         // Download the model file
         let downloaded_path = repo
             .get(size.hf_file_path())
             .map_err(|e| VoiceError::ModelDownload(format!("Failed to download model: {}", e)))?;
-        
+
         // Copy to our models directory
         std::fs::copy(&downloaded_path, &destination)?;
-        
+
         progress_callback(DownloadProgress {
             stage: DownloadStage::Complete,
             bytes_downloaded: size.size_bytes(),
             total_bytes: size.size_bytes(),
             percent: 100,
         });
-        
+
         tracing::info!("Model downloaded successfully: {:?}", destination);
         Ok(destination)
     }

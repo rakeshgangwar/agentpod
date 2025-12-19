@@ -24,7 +24,7 @@ fn find_best_input_device(host: &Host, device_names: &[String]) -> Result<Device
     // which PipeWire supports well. The "pipewire" ALSA plugin often doesn't work correctly.
     // Priority: pulse > pipewire > default
     let preferred_devices = ["pulse", "pipewire"];
-    
+
     // Try preferred devices first
     for preferred in preferred_devices {
         if device_names.contains(&preferred.to_string()) {
@@ -37,7 +37,10 @@ fn find_best_input_device(host: &Host, device_names: &[String]) -> Result<Device
                                 tracing::info!("Using preferred audio device: {}", name);
                                 return Ok(device);
                             } else {
-                                tracing::warn!("Device {} doesn't support input config, skipping", name);
+                                tracing::warn!(
+                                    "Device {} doesn't support input config, skipping",
+                                    name
+                                );
                             }
                         }
                     }
@@ -45,7 +48,7 @@ fn find_best_input_device(host: &Host, device_names: &[String]) -> Result<Device
             }
         }
     }
-    
+
     // Try hw: devices which might work better on some systems
     if let Ok(devices) = host.input_devices() {
         for device in devices {
@@ -64,7 +67,7 @@ fn find_best_input_device(host: &Host, device_names: &[String]) -> Result<Device
             }
         }
     }
-    
+
     // Fall back to default device
     tracing::info!("No preferred device found, using default");
     host.default_input_device()
@@ -93,17 +96,19 @@ mod linux_recorder {
     }
 
     /// Start recording using parec on Linux
-    /// 
+    ///
     /// parec captures audio from PulseAudio/PipeWire and writes raw audio to stdout.
     /// We request f32le format at 16kHz mono which is what Whisper needs.
-    pub fn start_parec_recording(state: Arc<RecordingState>) -> Result<std::thread::JoinHandle<()>, VoiceError> {
+    pub fn start_parec_recording(
+        state: Arc<RecordingState>,
+    ) -> Result<std::thread::JoinHandle<()>, VoiceError> {
         if state.is_recording.load(Ordering::Relaxed) {
             return Err(VoiceError::AlreadyRecording);
         }
 
         if !is_parec_available() {
             return Err(VoiceError::AudioDevice(
-                "parec not found. Install pulseaudio-utils or pipewire-pulse.".to_string()
+                "parec not found. Install pulseaudio-utils or pipewire-pulse.".to_string(),
             ));
         }
 
@@ -111,7 +116,7 @@ mod linux_recorder {
 
         // Clear previous samples
         state.clear();
-        
+
         // Set recording flag
         state.is_recording.store(true, Ordering::Relaxed);
         *state.device_sample_rate.lock() = WHISPER_SAMPLE_RATE;
@@ -132,25 +137,31 @@ mod linux_recorder {
         // parec with --raw defaults to s16le stereo 44100Hz.
         // This is the most reliable format across PipeWire/PulseAudio systems.
         // We convert stereo to mono and resample to 16kHz for Whisper.
-        
+
         // Audio format constants (parec default with --raw)
         const PAREC_SAMPLE_RATE: u32 = 44100;
         const PAREC_CHANNELS: u16 = 2;
-        
+
         let mut child = Command::new("parec")
             .args([
                 "--raw",
-                "--latency-msec=100",  // 100ms latency for stable capture
+                "--latency-msec=100", // 100ms latency for stable capture
             ])
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .spawn()
             .map_err(|e| VoiceError::AudioDevice(format!("Failed to start parec: {}", e)))?;
 
-        let mut stdout = child.stdout.take()
+        let mut stdout = child
+            .stdout
+            .take()
             .ok_or_else(|| VoiceError::AudioDevice("Failed to get parec stdout".to_string()))?;
 
-        tracing::info!("parec started (s16le {}ch {}Hz), reading audio data...", PAREC_CHANNELS, PAREC_SAMPLE_RATE);
+        tracing::info!(
+            "parec started (s16le {}ch {}Hz), reading audio data...",
+            PAREC_CHANNELS,
+            PAREC_SAMPLE_RATE
+        );
 
         // Buffer for reading audio data
         // s16le stereo = 4 bytes per frame (2 bytes * 2 channels)
@@ -187,7 +198,11 @@ mod linux_recorder {
                     let mono_samples = audio_utils::stereo_to_mono(&stereo_samples);
 
                     // Resample from 44100Hz to 16000Hz
-                    let samples = audio_utils::resample(&mono_samples, PAREC_SAMPLE_RATE, WHISPER_SAMPLE_RATE);
+                    let samples = audio_utils::resample(
+                        &mono_samples,
+                        PAREC_SAMPLE_RATE,
+                        WHISPER_SAMPLE_RATE,
+                    );
 
                     // Log first batch for debugging
                     if !logged_first && !samples.is_empty() {
@@ -288,18 +303,20 @@ unsafe impl Send for RecordingState {}
 unsafe impl Sync for RecordingState {}
 
 /// Start recording audio from the microphone
-/// 
+///
 /// This function spawns a recording thread and returns immediately.
 /// The recording continues until `stop_recording` is called.
-/// 
+///
 /// Returns a handle that must be used to stop the recording.
-pub fn start_recording(state: Arc<RecordingState>) -> Result<std::thread::JoinHandle<()>, VoiceError> {
+pub fn start_recording(
+    state: Arc<RecordingState>,
+) -> Result<std::thread::JoinHandle<()>, VoiceError> {
     // On Linux, use parec for reliable PipeWire/PulseAudio capture
     #[cfg(target_os = "linux")]
     {
         return linux_recorder::start_parec_recording(state);
     }
-    
+
     // On other platforms (macOS, Windows), use cpal
     #[cfg(not(target_os = "linux"))]
     {
@@ -314,7 +331,7 @@ pub fn start_recording(state: Arc<RecordingState>) -> Result<std::thread::JoinHa
 
         // Clone state for the recording thread
         let state_clone = Arc::clone(&state);
-        
+
         // Set recording flag before spawning thread
         state.is_recording.store(true, Ordering::Relaxed);
 
@@ -334,7 +351,7 @@ pub fn start_recording(state: Arc<RecordingState>) -> Result<std::thread::JoinHa
 fn run_recording_loop(state: Arc<RecordingState>) -> Result<(), VoiceError> {
     let host = cpal::default_host();
     tracing::info!("Using audio host: {}", host.id().name());
-    
+
     // List all available input devices for debugging
     let device_names: Vec<String> = if let Ok(devices) = host.input_devices() {
         devices.filter_map(|d| d.name().ok()).collect()
@@ -346,8 +363,11 @@ fn run_recording_loop(state: Arc<RecordingState>) -> Result<(), VoiceError> {
     // Try to find a working input device
     // Priority: pipewire > pulse > default > any hw device
     let device = find_best_input_device(&host, &device_names)?;
-    
-    tracing::info!("Selected input device: {:?}", device.name().unwrap_or_default());
+
+    tracing::info!(
+        "Selected input device: {:?}",
+        device.name().unwrap_or_default()
+    );
 
     let supported_config = device
         .default_input_config()
@@ -375,45 +395,41 @@ fn run_recording_loop(state: Arc<RecordingState>) -> Result<(), VoiceError> {
     };
 
     let stream = match supported_config.sample_format() {
-        SampleFormat::F32 => {
-            device.build_input_stream(
-                &config,
-                move |data: &[f32], _: &cpal::InputCallbackInfo| {
-                    if !is_recording.load(Ordering::Relaxed) {
-                        return;
-                    }
-                    process_samples(
-                        data,
-                        &samples,
-                        &audio_level,
-                        device_sample_rate,
-                        device_channels,
-                    );
-                },
-                err_fn,
-                None,
-            )
-        }
-        SampleFormat::I16 => {
-            device.build_input_stream(
-                &config,
-                move |data: &[i16], _: &cpal::InputCallbackInfo| {
-                    if !is_recording.load(Ordering::Relaxed) {
-                        return;
-                    }
-                    let f32_data = audio_utils::convert_i16_to_f32(data);
-                    process_samples(
-                        &f32_data,
-                        &samples,
-                        &audio_level,
-                        device_sample_rate,
-                        device_channels,
-                    );
-                },
-                err_fn,
-                None,
-            )
-        }
+        SampleFormat::F32 => device.build_input_stream(
+            &config,
+            move |data: &[f32], _: &cpal::InputCallbackInfo| {
+                if !is_recording.load(Ordering::Relaxed) {
+                    return;
+                }
+                process_samples(
+                    data,
+                    &samples,
+                    &audio_level,
+                    device_sample_rate,
+                    device_channels,
+                );
+            },
+            err_fn,
+            None,
+        ),
+        SampleFormat::I16 => device.build_input_stream(
+            &config,
+            move |data: &[i16], _: &cpal::InputCallbackInfo| {
+                if !is_recording.load(Ordering::Relaxed) {
+                    return;
+                }
+                let f32_data = audio_utils::convert_i16_to_f32(data);
+                process_samples(
+                    &f32_data,
+                    &samples,
+                    &audio_level,
+                    device_sample_rate,
+                    device_channels,
+                );
+            },
+            err_fn,
+            None,
+        ),
         SampleFormat::U16 => {
             device.build_input_stream(
                 &config,
@@ -485,7 +501,7 @@ fn process_samples(
             device_channels
         );
     }
-    
+
     // Convert to mono if stereo
     let mono_data = if device_channels > 1 {
         audio_utils::stereo_to_mono(data)
@@ -528,7 +544,7 @@ pub fn stop_recording(state: &RecordingState) -> Result<Vec<f32>, VoiceError> {
     let samples = state.take_samples();
 
     let duration_secs = samples.len() as f32 / WHISPER_SAMPLE_RATE as f32;
-    
+
     // Calculate audio statistics for debugging
     let max_amplitude = samples.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
     let rms = if !samples.is_empty() {
@@ -536,7 +552,7 @@ pub fn stop_recording(state: &RecordingState) -> Result<Vec<f32>, VoiceError> {
     } else {
         0.0
     };
-    
+
     tracing::info!(
         "Recording complete. Captured {} samples ({:.2}s), max_amplitude={:.4}, rms={:.4}",
         samples.len(),
@@ -544,15 +560,20 @@ pub fn stop_recording(state: &RecordingState) -> Result<Vec<f32>, VoiceError> {
         max_amplitude,
         rms
     );
-    
+
     // Warn if audio seems too quiet
     if max_amplitude < 0.01 {
-        tracing::warn!("Recording appears to be very quiet (max_amplitude < 0.01). Check microphone.");
+        tracing::warn!(
+            "Recording appears to be very quiet (max_amplitude < 0.01). Check microphone."
+        );
     }
-    
+
     // Warn if recording is too short
     if duration_secs < 0.5 {
-        tracing::warn!("Recording is very short ({:.2}s). May not produce good transcription.", duration_secs);
+        tracing::warn!(
+            "Recording is very short ({:.2}s). May not produce good transcription.",
+            duration_secs
+        );
     }
 
     Ok(samples)
@@ -585,7 +606,7 @@ pub fn list_input_devices() -> Result<Vec<String>, VoiceError> {
         // On Linux, use pactl to list sources
         list_pulseaudio_sources()
     }
-    
+
     #[cfg(not(target_os = "linux"))]
     {
         let host = cpal::default_host();
@@ -606,7 +627,7 @@ pub fn get_default_input_device_name() -> Result<String, VoiceError> {
         // On Linux, use pactl to get default source
         get_pulseaudio_default_source()
     }
-    
+
     #[cfg(not(target_os = "linux"))]
     {
         let host = cpal::default_host();
@@ -627,17 +648,19 @@ pub fn get_default_input_device_name() -> Result<String, VoiceError> {
 #[cfg(target_os = "linux")]
 fn list_pulseaudio_sources() -> Result<Vec<String>, VoiceError> {
     use std::process::Command;
-    
+
     // Use pactl to list sources (input devices)
     let output = Command::new("pactl")
         .args(["list", "sources", "short"])
         .output()
         .map_err(|e| VoiceError::AudioDevice(format!("Failed to run pactl: {}", e)))?;
-    
+
     if !output.status.success() {
-        return Err(VoiceError::AudioDevice("pactl failed to list sources".to_string()));
+        return Err(VoiceError::AudioDevice(
+            "pactl failed to list sources".to_string(),
+        ));
     }
-    
+
     let stdout = String::from_utf8_lossy(&output.stdout);
     let sources: Vec<String> = stdout
         .lines()
@@ -654,7 +677,7 @@ fn list_pulseaudio_sources() -> Result<Vec<String>, VoiceError> {
             None
         })
         .collect();
-    
+
     if sources.is_empty() {
         // Fallback: just say we use the default
         Ok(vec!["default".to_string()])
@@ -666,18 +689,18 @@ fn list_pulseaudio_sources() -> Result<Vec<String>, VoiceError> {
 #[cfg(target_os = "linux")]
 fn get_pulseaudio_default_source() -> Result<String, VoiceError> {
     use std::process::Command;
-    
+
     // Use pactl to get the default source
     let output = Command::new("pactl")
         .args(["get-default-source"])
         .output()
         .map_err(|e| VoiceError::AudioDevice(format!("Failed to run pactl: {}", e)))?;
-    
+
     if !output.status.success() {
         // Fallback to "default" if pactl fails
         return Ok("default".to_string());
     }
-    
+
     let source = String::from_utf8_lossy(&output.stdout).trim().to_string();
     if source.is_empty() {
         Ok("default".to_string())

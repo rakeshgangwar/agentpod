@@ -13,7 +13,7 @@ pub enum AppError {
 
     #[error("API error: {0}")]
     ApiError(String),
-    
+
     #[error("Unauthorized: {0}")]
     Unauthorized(String),
 
@@ -28,7 +28,7 @@ pub enum AppError {
 
     #[error("Network error: {0}")]
     NetworkError(String),
-    
+
     #[error("Serialization error: {0}")]
     SerializationError(String),
 }

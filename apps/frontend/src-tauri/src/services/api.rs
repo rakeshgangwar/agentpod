@@ -4,14 +4,12 @@
 //! Authentication is handled via session tokens from Better Auth.
 
 use crate::models::{
-    AppError, ConnectionConfig, 
-    ContainerFlavor, ContainerFlavorsResponse, ContainerAddon, ContainerAddonsResponse,
-    ResourceTier, ResourceTiersResponse,
-    ErrorResponse, HealthResponse,
+    AppError, ConnectionConfig, ContainerAddon, ContainerAddonsResponse, ContainerFlavor,
+    ContainerFlavorsResponse, ErrorResponse, HealthResponse, ResourceTier, ResourceTiersResponse,
 };
 use crate::services::auth::AuthService;
-use tauri_plugin_http::reqwest::{self, Client};
 use std::time::Duration;
+use tauri_plugin_http::reqwest::{self, Client};
 
 /// API client for the Management API
 pub struct ApiClient {
@@ -27,14 +25,14 @@ pub struct ApiClient {
 
 impl ApiClient {
     /// Create a new API client using stored connection config
-    /// 
+    ///
     /// This is a convenience method that loads the connection config from storage.
     pub fn new() -> Result<Self, AppError> {
         let config = crate::services::StorageService::load_config()?
             .ok_or_else(|| AppError::InvalidConfig("No connection configured".to_string()))?;
         Self::with_config(&config)
     }
-    
+
     /// Create a new API client with the given configuration
     pub fn with_config(config: &ConnectionConfig) -> Result<Self, AppError> {
         let client = Client::builder()
@@ -52,7 +50,9 @@ impl ApiClient {
         let long_running_client = Client::builder()
             .timeout(Duration::from_secs(300)) // 5 minute timeout
             .build()
-            .map_err(|e| AppError::NetworkError(format!("Failed to create long-running client: {}", e)))?;
+            .map_err(|e| {
+                AppError::NetworkError(format!("Failed to create long-running client: {}", e))
+            })?;
 
         Ok(Self {
             client,
@@ -62,7 +62,7 @@ impl ApiClient {
             api_key: config.api_key.clone(),
         })
     }
-    
+
     /// Get a valid auth token (Better Auth session token or legacy API key)
     async fn get_auth_token(&self) -> Option<String> {
         // First try to get Better Auth session token
@@ -78,7 +78,7 @@ impl ApiClient {
                 tracing::debug!("Failed to get session token: {}", e);
             }
         }
-        
+
         // Fall back to legacy API key
         if self.api_key.is_some() {
             tracing::debug!("Falling back to legacy API key");
@@ -87,27 +87,27 @@ impl ApiClient {
         }
         self.api_key.clone()
     }
-    
+
     /// Get the base URL
     pub fn base_url(&self) -> &str {
         &self.base_url
     }
-    
+
     /// Get a reference to the HTTP client
     pub fn client(&self) -> &Client {
         &self.client
     }
-    
+
     /// Get a reference to the SSE client
     pub fn sse_client(&self) -> &Client {
         &self.sse_client
     }
-    
+
     /// Get a reference to the long-running client
     pub fn long_running_client(&self) -> &Client {
         &self.long_running_client
     }
-    
+
     /// Make a GET request to the API
     pub async fn get<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<T, AppError> {
         let url = format!("{}{}", self.base_url, path);
@@ -115,7 +115,7 @@ impl ApiClient {
         let response = request.send().await?;
         self.handle_response(response).await
     }
-    
+
     /// Make a POST request to the API
     pub async fn post<T: serde::de::DeserializeOwned, B: serde::Serialize>(
         &self,
@@ -149,7 +149,10 @@ impl ApiClient {
     }
 
     /// Add authorization header (uses OAuth token or legacy API key)
-    pub async fn add_auth_header(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+    pub async fn add_auth_header(
+        &self,
+        request: reqwest::RequestBuilder,
+    ) -> reqwest::RequestBuilder {
         self.add_auth(request).await
     }
 
@@ -160,17 +163,18 @@ impl ApiClient {
             None => request,
         }
     }
-    
+
     /// Make an SSE GET request (returns Response for streaming)
     pub async fn sse_get(&self, path: &str) -> Result<reqwest::Response, AppError> {
         let url = format!("{}{}", self.base_url, path);
-        let request = self.add_auth(self.sse_client.get(&url))
+        let request = self
+            .add_auth(self.sse_client.get(&url))
             .await
             .header("Accept", "text/event-stream")
             .header("Accept-Encoding", "identity")
             .header("Cache-Control", "no-cache");
         let response = request.send().await?;
-        
+
         if response.status().is_success() {
             Ok(response)
         } else {
@@ -183,7 +187,7 @@ impl ApiClient {
             Err(AppError::ApiError(error_text))
         }
     }
-    
+
     /// Create a POST request with a specific client and add auth
     pub async fn add_auth_to_client(&self, client: &Client, url: &str) -> reqwest::RequestBuilder {
         let request = client.post(url);
@@ -209,7 +213,7 @@ impl ApiClient {
                 .await
                 .map(|e| e.error)
                 .unwrap_or_else(|_| "Session expired or invalid".to_string());
-            
+
             Err(AppError::Unauthorized(error_text))
         } else if status == reqwest::StatusCode::FORBIDDEN {
             // 403 Forbidden - also treat as unauthorized
@@ -218,7 +222,7 @@ impl ApiClient {
                 .await
                 .map(|e| e.error)
                 .unwrap_or_else(|_| "Access forbidden".to_string());
-            
+
             Err(AppError::Unauthorized(error_text))
         } else {
             let error_text = response

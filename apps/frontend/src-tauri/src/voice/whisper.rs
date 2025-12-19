@@ -180,7 +180,7 @@ impl WhisperService {
         params.set_suppress_blank(true);
         params.set_suppress_nst(true);
         params.set_token_timestamps(true);
-        
+
         // Lower the no_speech threshold to be less aggressive about detecting silence
         params.set_no_speech_thold(0.6);
 
@@ -217,10 +217,11 @@ impl WhisperService {
 
                     // Filter out blank/silence tokens and other special tokens
                     let trimmed = text_str.trim();
-                    if !trimmed.is_empty() 
+                    if !trimmed.is_empty()
                         && !trimmed.contains("[BLANK_AUDIO]")
                         && !trimmed.contains("[SILENCE]")
-                        && !trimmed.starts_with('[')  // Filter any special tokens
+                        && !trimmed.starts_with('[')
+                    // Filter any special tokens
                     {
                         full_text.push_str(&text_str);
                         segments.push(TranscriptSegment {

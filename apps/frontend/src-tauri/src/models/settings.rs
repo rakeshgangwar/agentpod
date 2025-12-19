@@ -1,5 +1,5 @@
 //! Settings models for the AgentPod app
-//! 
+//!
 //! Local settings are stored in ~/.config/agentpod/settings.json
 
 use serde::{Deserialize, Serialize};
@@ -20,17 +20,17 @@ pub enum Theme {
 pub struct AppSettings {
     /// Theme preference (light, dark, system)
     pub theme: Theme,
-    
+
     /// Default LLM provider ID (from Management API)
     pub default_provider_id: Option<String>,
-    
+
     /// Auto-refresh interval in seconds (0 = disabled)
     pub auto_refresh_interval: u32,
-    
+
     /// Whether in-app toast notifications are enabled
     #[serde(default = "default_true")]
     pub in_app_notifications: bool,
-    
+
     /// Whether system/OS notifications are enabled
     #[serde(default = "default_true")]
     pub system_notifications: bool,
@@ -59,7 +59,7 @@ pub struct Provider {
     pub id: String,
     pub name: String,
     #[serde(rename = "type")]
-    pub provider_type: String,  // "api-key" or "oauth"
+    pub provider_type: String, // "api-key" or "oauth"
     pub is_configured: bool,
     pub is_default: bool,
 }
@@ -100,7 +100,7 @@ pub struct ModelInfo {
 pub struct ProviderWithModels {
     pub id: String,
     pub name: String,
-    pub auth_type: String,  // "api_key", "oauth", or "device_flow"
+    pub auth_type: String, // "api_key", "oauth", or "device_flow"
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_key_env_var: Option<String>,
     pub is_configured: bool,
@@ -135,7 +135,7 @@ pub struct OAuthFlowInit {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OAuthFlowStatus {
-    pub status: String,  // "pending", "completed", "expired", "error"
+    pub status: String, // "pending", "completed", "expired", "error"
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     #[serde(default)]
@@ -160,13 +160,13 @@ pub struct ProviderResponse {
 pub struct ExportData {
     /// App version for compatibility checking
     pub version: String,
-    
+
     /// Export timestamp
     pub exported_at: String,
-    
+
     /// App settings
     pub settings: AppSettings,
-    
+
     /// API URL (not the key for security)
     pub api_url: Option<String>,
 }
@@ -212,11 +212,11 @@ pub struct UserOpencodeSettings {
     /// Theme: "opencode", "gruvbox", "catppuccin", etc.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub theme: Option<String>,
-    
+
     /// Permission settings
     #[serde(skip_serializing_if = "Option::is_none")]
     pub permission: Option<PermissionSettings>,
-    
+
     /// Provider configuration
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider: Option<serde_json::Value>,
@@ -229,9 +229,9 @@ pub struct UserOpencodeFile {
     #[serde(default)]
     pub name: String,
     #[serde(rename = "type", default)]
-    pub file_type: String,  // "agent", "command", "tool", "plugin"
+    pub file_type: String, // "agent", "command", "tool", "plugin"
     #[serde(default)]
-    pub extension: String,  // "md" or "ts"
+    pub extension: String, // "md" or "ts"
     #[serde(default)]
     pub content: String,
     // These fields are optional - only present in file list response, not in full config

@@ -136,7 +136,9 @@ pub async fn check_image_exists(image_name: String) -> Result<ImageExistsRespons
     let client = get_client()?;
     // URL-encode the image name to handle colons in tags
     let encoded_name = urlencoding::encode(&image_name);
-    client.get(&format!("/api/docker/images/{}", encoded_name)).await
+    client
+        .get(&format!("/api/docker/images/{}", encoded_name))
+        .await
 }
 
 /// Pull an image synchronously (without streaming progress)
@@ -146,22 +148,28 @@ pub async fn pull_image_sync(
     flavor_id: Option<String>,
 ) -> Result<ImagePullResponse, AppError> {
     if image_name.is_none() && flavor_id.is_none() {
-        return Err(AppError::InvalidConfig("Either image_name or flavor_id is required".to_string()));
+        return Err(AppError::InvalidConfig(
+            "Either image_name or flavor_id is required".to_string(),
+        ));
     }
-    
+
     let client = get_client()?;
-    
+
     let body = ImagePullRequest {
         image_name,
         flavor_id,
     };
-    
+
     let response: ImagePullResponse = client.post("/api/docker/images/pull/sync", &body).await?;
-    
+
     if !response.success {
-        return Err(AppError::ApiError(response.error.unwrap_or_else(|| "Failed to pull image".to_string())));
+        return Err(AppError::ApiError(
+            response
+                .error
+                .unwrap_or_else(|| "Failed to pull image".to_string()),
+        ));
     }
-    
+
     Ok(response)
 }
 
@@ -169,14 +177,20 @@ pub async fn pull_image_sync(
 #[tauri::command]
 pub async fn get_docker_info() -> Result<DockerImageInfo2, AppError> {
     let client = get_client()?;
-    
+
     let response: DockerInfoResponse = client.get("/api/docker/info").await?;
-    
+
     if !response.success {
-        return Err(AppError::ApiError(response.error.unwrap_or_else(|| "Failed to get Docker info".to_string())));
+        return Err(AppError::ApiError(
+            response
+                .error
+                .unwrap_or_else(|| "Failed to get Docker info".to_string()),
+        ));
     }
-    
-    response.info.ok_or_else(|| AppError::ApiError("No Docker info returned".to_string()))
+
+    response
+        .info
+        .ok_or_else(|| AppError::ApiError("No Docker info returned".to_string()))
 }
 
 /// Check Docker daemon health

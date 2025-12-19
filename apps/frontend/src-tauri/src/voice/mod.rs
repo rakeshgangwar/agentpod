@@ -30,7 +30,9 @@ pub mod whisper;
 pub use config::VoiceConfig;
 pub use model_manager::{ModelInfo, ModelManager, WhisperModel};
 pub use recorder::RecordingState;
-pub use wakeword::{WakewordConfig, WakewordDetection, WakewordInfo, WakewordService, BuiltinWakeword};
+pub use wakeword::{
+    BuiltinWakeword, WakewordConfig, WakewordDetection, WakewordInfo, WakewordService,
+};
 pub use whisper::WhisperService;
 
 use parking_lot::Mutex;
@@ -84,24 +86,24 @@ impl VoiceState {
     /// Stop recording and get samples
     pub fn stop_recording(&self) -> Result<Vec<f32>, VoiceError> {
         let samples = recorder::stop_recording(&self.recording)?;
-        
+
         // Wait for recording thread to finish
         if let Some(handle) = self.recording_handle.lock().take() {
             let _ = handle.join();
         }
-        
+
         Ok(samples)
     }
 
     /// Cancel recording
     pub fn cancel_recording(&self) -> Result<(), VoiceError> {
         recorder::cancel_recording(&self.recording)?;
-        
+
         // Wait for recording thread to finish
         if let Some(handle) = self.recording_handle.lock().take() {
             let _ = handle.join();
         }
-        
+
         Ok(())
     }
 }

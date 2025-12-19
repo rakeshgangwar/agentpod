@@ -13,15 +13,15 @@
 //! - Session is closed via `terminal_disconnect`
 
 use crate::models::AppError;
-use crate::services::{ApiClient, auth::AuthService};
+use crate::services::{auth::AuthService, ApiClient};
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::{mpsc, RwLock};
-use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 // =============================================================================
 // Types
@@ -156,7 +156,9 @@ pub async fn terminal_connect(
             sandbox_id
         )
     } else {
-        return Err(AppError::InvalidConfig("Invalid API URL format".to_string()));
+        return Err(AppError::InvalidConfig(
+            "Invalid API URL format".to_string(),
+        ));
     };
 
     tracing::info!("Connecting to terminal WebSocket: {}", ws_url);
@@ -175,30 +177,30 @@ pub async fn terminal_connect(
     );
 
     // Get auth token for WebSocket connection
-    let auth_token = AuthService::get_token()
-        .ok()
-        .flatten();
+    let auth_token = AuthService::get_token().ok().flatten();
 
     // Build WebSocket request using IntoClientRequest trait
     // This properly generates all required WebSocket headers (Sec-WebSocket-Key, etc.)
-    let mut request = ws_url.into_client_request()
-        .map_err(|e| AppError::InvalidConfig(format!("Failed to build WebSocket request: {}", e)))?;
-    
+    let mut request = ws_url.into_client_request().map_err(|e| {
+        AppError::InvalidConfig(format!("Failed to build WebSocket request: {}", e))
+    })?;
+
     // Add custom headers
     let headers = request.headers_mut();
     headers.insert("Sec-WebSocket-Protocol", "terminal".parse().unwrap());
-    
+
     if let Some(token) = auth_token {
-        headers.insert("Authorization", format!("Bearer {}", token).parse().unwrap());
+        headers.insert(
+            "Authorization",
+            format!("Bearer {}", token).parse().unwrap(),
+        );
     }
 
     // Connect to WebSocket
-    let (ws_stream, _response) = connect_async(request)
-        .await
-        .map_err(|e| {
-            tracing::error!("WebSocket connection failed: {}", e);
-            AppError::ConnectionFailed(format!("WebSocket connection failed: {}", e))
-        })?;
+    let (ws_stream, _response) = connect_async(request).await.map_err(|e| {
+        tracing::error!("WebSocket connection failed: {}", e);
+        AppError::ConnectionFailed(format!("WebSocket connection failed: {}", e))
+    })?;
 
     tracing::info!("WebSocket connected for terminal {}", terminal_id);
 
