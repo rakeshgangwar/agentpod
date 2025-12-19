@@ -132,12 +132,19 @@ export const config = {
   
   // Container Registry
   registry: {
-    // Registry URL (without protocol, used for docker pull)
     url: getEnv('OPENCODE_REGISTRY_URL', 'forgejo.superchotu.com'),
-    // Registry owner/namespace
     owner: getEnv('OPENCODE_REGISTRY_OWNER', 'rakeshgangwar'),
-    // Current container version to deploy
     version: getEnv('OPENCODE_CONTAINER_VERSION', '0.4.0'),
+  },
+
+  cloudflare: {
+    enabled: getEnvBool('ENABLE_CLOUDFLARE_SANDBOXES', false),
+    accountId: getEnv('CLOUDFLARE_ACCOUNT_ID', ''),
+    apiToken: getEnv('CLOUDFLARE_API_TOKEN', ''),
+    workerUrl: getEnv('CLOUDFLARE_WORKER_URL', ''),
+    r2Bucket: getEnv('CLOUDFLARE_R2_BUCKET', 'agentpod-workspaces'),
+    defaultProvider: getEnv('DEFAULT_SANDBOX_PROVIDER', 'docker') as 'docker' | 'cloudflare',
+    autoSelect: getEnvBool('AUTO_SELECT_PROVIDER', false),
   },
 
   // Database

@@ -1,0 +1,290 @@
+import type {
+  SandboxProvider,
+  SandboxProviderOptions,
+  SandboxInfo,
+  SandboxProviderStatus,
+  OpenCodeClient,
+  OpenCodeConfig,
+} from "./types";
+import { openCodeConfigToCloudflare } from "./config-adapter";
+import { config } from "../../config";
+import { createLogger } from "../../utils/logger";
+
+const log = createLogger("cloudflare-provider");
+
+interface CloudflareWorkerResponse {
+  success?: boolean;
+  error?: string;
+  sandboxId?: string;
+  status?: string;
+  hasWorkspace?: boolean;
+  serverPort?: number;
+  sessionId?: string;
+  response?: string;
+  parts?: unknown[];
+}
+
+export class CloudflareSandboxProvider implements SandboxProvider {
+  readonly type = "cloudflare" as const;
+  private workerUrl: string;
+  private apiToken: string;
+
+  constructor(workerUrl?: string, apiToken?: string) {
+    this.workerUrl = workerUrl ?? config.cloudflare.workerUrl;
+    this.apiToken = apiToken ?? config.cloudflare.apiToken;
+
+    if (!this.workerUrl) {
+      throw new Error("Cloudflare worker URL not configured");
+    }
+  }
+
+  private async workerFetch(
+    path: string,
+    options: RequestInit = {}
+  ): Promise<CloudflareWorkerResponse> {
+    const url = `${this.workerUrl}${path}`;
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...(options.headers as Record<string, string>),
+    };
+
+    if (this.apiToken) {
+      headers["Authorization"] = `Bearer ${this.apiToken}`;
+    }
+
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Cloudflare Worker error: ${response.status} - ${error}`);
+    }
+
+    return response.json() as Promise<CloudflareWorkerResponse>;
+  }
+
+  async createSandbox(options: SandboxProviderOptions): Promise<SandboxInfo> {
+    log.info("Creating Cloudflare sandbox", { sandboxId: options.id, userId: options.userId });
+
+    const cloudflareConfig = options.config
+      ? openCodeConfigToCloudflare(options.config)
+      : undefined;
+
+    const result = await this.workerFetch("/sandbox", {
+      method: "POST",
+      body: JSON.stringify({
+        id: options.id,
+        userId: options.userId,
+        config: cloudflareConfig,
+        directory: options.directory ?? "/home/user/workspace",
+        gitUrl: options.gitUrl,
+        gitBranch: options.gitBranch,
+      }),
+    });
+
+    if (!result.success) {
+      throw new Error(result.error ?? "Failed to create sandbox");
+    }
+
+    return {
+      id: options.id,
+      status: "running",
+      provider: "cloudflare",
+      opencodeUrl: `${this.workerUrl}/sandbox/${options.id}/opencode`,
+      createdAt: new Date(),
+      lastActiveAt: new Date(),
+      metadata: {
+        serverPort: result.serverPort,
+      },
+    };
+  }
+
+  async startSandbox(id: string): Promise<void> {
+    log.info("Starting/waking Cloudflare sandbox", { sandboxId: id });
+
+    await this.workerFetch(`/sandbox/${id}/wake`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+  }
+
+  async stopSandbox(id: string): Promise<void> {
+    log.info("Stopping Cloudflare sandbox (no-op, auto-hibernates)", { sandboxId: id });
+  }
+
+  async deleteSandbox(id: string): Promise<void> {
+    log.info("Deleting Cloudflare sandbox", { sandboxId: id });
+
+    await this.workerFetch(`/sandbox/${id}`, {
+      method: "DELETE",
+    });
+  }
+
+  async getSandbox(id: string): Promise<SandboxInfo | null> {
+    try {
+      const result = await this.workerFetch(`/sandbox/${id}`, {
+        method: "GET",
+      });
+
+      const statusMap: Record<string, SandboxProviderStatus> = {
+        running: "running",
+        sleeping: "sleeping",
+        stopped: "stopped",
+        error: "error",
+      };
+
+      return {
+        id,
+        status: statusMap[result.status ?? "sleeping"] ?? "sleeping",
+        provider: "cloudflare",
+        opencodeUrl: `${this.workerUrl}/sandbox/${id}/opencode`,
+        metadata: {
+          hasWorkspace: result.hasWorkspace,
+        },
+      };
+    } catch (error) {
+      log.debug("Failed to get sandbox", { sandboxId: id, error });
+      return null;
+    }
+  }
+
+  async listSandboxes(_userId: string): Promise<SandboxInfo[]> {
+    log.warn("listSandboxes not implemented for Cloudflare provider - use database");
+    return [];
+  }
+
+  async getOpenCodeClient(id: string): Promise<OpenCodeClient> {
+    return {
+      session: {
+        create: async (options) => {
+          const response = await this.workerFetch(`/sandbox/${id}/message`, {
+            method: "POST",
+            body: JSON.stringify({
+              message: "Initialize session",
+              ...options.body,
+            }),
+          });
+          return {
+            data: {
+              id: response.sessionId ?? "",
+              title: options.body.title,
+            },
+          };
+        },
+
+        prompt: async (options) => {
+          const response = await this.workerFetch(`/sandbox/${id}/message`, {
+            method: "POST",
+            body: JSON.stringify({
+              sessionId: options.path.id,
+              message: options.body.parts.find((p) => p.type === "text")?.text ?? "",
+              model: options.body.model,
+            }),
+          });
+          return {
+            data: {
+              parts: response.parts as Array<{ type: string; text?: string }>,
+            },
+          };
+        },
+
+        list: async () => {
+          return { data: [] };
+        },
+
+        get: async (options) => {
+          return {
+            data: {
+              id: options.path.id,
+              title: "Session",
+            },
+          };
+        },
+
+        abort: async () => {
+          log.debug("Session abort not implemented for Cloudflare", { sandboxId: id });
+        },
+      },
+    };
+  }
+
+  async proxyRequest(id: string, request: Request): Promise<Response> {
+    const url = new URL(request.url);
+    const targetUrl = `${this.workerUrl}/sandbox/${id}/opencode${url.pathname}${url.search}`;
+
+    try {
+      const headers = new Headers(request.headers);
+      if (this.apiToken) {
+        headers.set("Authorization", `Bearer ${this.apiToken}`);
+      }
+
+      const proxyResponse = await fetch(targetUrl, {
+        method: request.method,
+        headers,
+        body: request.body,
+      });
+
+      return new Response(proxyResponse.body, {
+        status: proxyResponse.status,
+        statusText: proxyResponse.statusText,
+        headers: proxyResponse.headers,
+      });
+    } catch (error) {
+      log.error("Failed to proxy request to Cloudflare", { sandboxId: id, error });
+      return new Response("Proxy error", { status: 502 });
+    }
+  }
+
+  async healthCheck(id: string): Promise<boolean> {
+    try {
+      const sandbox = await this.getSandbox(id);
+      return sandbox?.status === "running";
+    } catch {
+      return false;
+    }
+  }
+
+  async sendMessage(
+    sandboxId: string,
+    message: string,
+    options?: {
+      sessionId?: string;
+      model?: { providerID: string; modelID: string };
+      config?: OpenCodeConfig;
+    }
+  ): Promise<{ sessionId: string; response: string }> {
+    const cloudflareConfig = options?.config
+      ? openCodeConfigToCloudflare(options.config)
+      : undefined;
+
+    const result = await this.workerFetch(`/sandbox/${sandboxId}/message`, {
+      method: "POST",
+      body: JSON.stringify({
+        sessionId: options?.sessionId,
+        message,
+        model: options?.model,
+        config: cloudflareConfig,
+      }),
+    });
+
+    return {
+      sessionId: result.sessionId ?? "",
+      response: result.response ?? "",
+    };
+  }
+}
+
+let cloudflareProviderInstance: CloudflareSandboxProvider | null = null;
+
+export function getCloudflareProvider(): CloudflareSandboxProvider {
+  if (!cloudflareProviderInstance) {
+    cloudflareProviderInstance = new CloudflareSandboxProvider();
+  }
+  return cloudflareProviderInstance;
+}
+
+export function isCloudflareConfigured(): boolean {
+  return !!config.cloudflare.enabled && !!config.cloudflare.workerUrl;
+}
