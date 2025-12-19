@@ -67,7 +67,7 @@
     "plan": {
       "description": "Planning mode - read-only exploration and design",
       "mode": "primary",
-      "model": "anthropic/claude-haiku-4-20250514",
+      "model": "anthropic/claude-haiku-4-5",
       "tools": {
         "write": false,
         "edit": false,
@@ -116,7 +116,7 @@
   
   "mode": {
     "plan": {
-      "model": "anthropic/claude-haiku-4-20250514"
+      "model": "anthropic/claude-haiku-4-5"
     }
   },
   
