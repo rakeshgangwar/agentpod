@@ -21,6 +21,7 @@
   import ScrollTextIcon from "@lucide/svelte/icons/scroll-text";
   import TerminalIcon from "@lucide/svelte/icons/terminal";
   import GitBranchIcon from "@lucide/svelte/icons/git-branch";
+  import GlobeIcon from "@lucide/svelte/icons/globe";
   import SettingsIcon from "@lucide/svelte/icons/settings";
   import { getProjectIcon } from "$lib/utils/project-icons";
   import { getAnimatedIcon } from "$lib/utils/animated-icons";
@@ -55,6 +56,7 @@
     if (path.includes("/files")) return "files";
     if (path.includes("/logs")) return "logs";
     if (path.includes("/terminal")) return "terminal";
+    if (path.includes("/preview")) return "preview";
     if (path.includes("/sync")) return "sync";
     if (path.includes("/settings")) return "settings";
     return "chat";
@@ -174,6 +176,7 @@
     { id: "files", label: "Files", icon: FolderIcon },
     { id: "logs", label: "Logs", icon: ScrollTextIcon },
     { id: "terminal", label: "Terminal", icon: TerminalIcon },
+    { id: "preview", label: "Preview", icon: GlobeIcon },
     { id: "sync", label: "Git", icon: GitBranchIcon },
     { id: "settings", label: "Settings", icon: SettingsIcon },
   ];

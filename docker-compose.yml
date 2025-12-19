@@ -76,6 +76,9 @@ services:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=agentpod-net"
+      # File provider for dynamic preview routes
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
       # Entrypoints
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
@@ -98,6 +101,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       # Let's Encrypt certificates
       - letsencrypt-data:/letsencrypt
+      # Dynamic configuration for preview routes
+      - ./config/traefik/dynamic:/etc/traefik/dynamic:ro
     networks:
       - agentpod-net
     labels:
@@ -172,7 +177,7 @@ services:
       # Host path prefix for bind mounts (required when API runs in Docker)
       # This translates container paths to host paths for sandbox bind mounts
       # Set to the absolute path of this project on the host machine
-      - HOST_PATH_PREFIX=${HOST_PATH_PREFIX:-}
+      - HOST_PATH_PREFIX=${HOST_PATH_PREFIX:-${PWD}}
 
       # =======================================================================
       # PostgreSQL Database
@@ -198,6 +203,11 @@ services:
       - OPENCODE_CONTAINER_VERSION=${OPENCODE_CONTAINER_VERSION:-latest}
 
       # =======================================================================
+      # Preview Configuration
+      # =======================================================================
+      - TRAEFIK_DYNAMIC_DIR=/data/traefik/dynamic
+
+      # =======================================================================
       # Legacy Configuration (deprecated, kept for migration)
       # =======================================================================
       - COOLIFY_URL=
@@ -215,6 +225,8 @@ services:
       - ./data/repos:/data/repos
       # Volumes directory (use host path for same reason)
       - ./data/volumes:/data/volumes
+      # Traefik dynamic config (shared with traefik for preview routes)
+      - ./config/traefik/dynamic:/data/traefik/dynamic
       # Source code for hot reload (development only)
       - ./apps/api/src:/app/apps/api/src:ro
     networks:

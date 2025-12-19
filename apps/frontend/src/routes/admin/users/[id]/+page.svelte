@@ -21,7 +21,11 @@
     UserRole,
     UpdateUserResourceLimitsInput,
   } from "@agentpod/types";
-  import type { Sandbox } from "$lib/api/tauri";
+  import {
+    listResourceTiers,
+    type Sandbox,
+    type ResourceTier,
+  } from "$lib/api/tauri";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
@@ -51,6 +55,7 @@
   let limits = $state<UserResourceLimits | null>(null);
   let usage = $state<UserResourceUsage | null>(null);
   let sandboxes = $state<Sandbox[]>([]);
+  let resourceTiers = $state<ResourceTier[]>([]);
   let error = $state<string | null>(null);
 
   // Edit state
@@ -83,16 +88,18 @@
 
     try {
       const currentUserId = userId;
-      const [userResponse, limitsResponse, sandboxesResponse] = await Promise.all([
+      const [userResponse, limitsResponse, sandboxesResponse, tiersResponse] = await Promise.all([
         getUser(currentUserId),
         getUserLimits(currentUserId),
         getUserSandboxes(currentUserId),
+        listResourceTiers(),
       ]);
 
       user = userResponse.user;
       usage = userResponse.usage;
       limits = limitsResponse.limits;
       sandboxes = sandboxesResponse;
+      resourceTiers = tiersResponse;
 
       // Initialize edit limits with current values
       editLimits = {
@@ -241,6 +248,15 @@
   }
 
   // Check if limits have changed
+  function areArraysEqual(arr1: string[] | undefined, arr2: string[] | undefined): boolean {
+    const a = arr1 || [];
+    const b = arr2 || [];
+    if (a.length !== b.length) return false;
+    const sortedA = [...a].sort();
+    const sortedB = [...b].sort();
+    return sortedA.every((val, index) => val === sortedB[index]);
+  }
+
   let limitsChanged = $derived(
     limits &&
     (editLimits.maxSandboxes !== limits.maxSandboxes ||
@@ -248,6 +264,8 @@
       editLimits.maxTotalStorageGb !== limits.maxTotalStorageGb ||
       editLimits.maxTotalCpuCores !== limits.maxTotalCpuCores ||
       editLimits.maxTotalMemoryGb !== limits.maxTotalMemoryGb ||
+      !areArraysEqual(editLimits.allowedTierIds, limits.allowedTierIds) ||
+      editLimits.maxTierId !== limits.maxTierId ||
       editLimits.notes !== limits.notes)
   );
 </script>
@@ -534,6 +552,34 @@
                           bind:value={editLimits.maxTierId}
                           class="font-mono bg-background/50 border-border/50 focus:border-[var(--cyber-cyan)]"
                         />
+                      </div>
+                      <div class="md:col-span-2">
+                        <h3 class="font-mono text-xs text-[var(--cyber-cyan)] uppercase tracking-wider mb-2">[allowed_tiers]</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {#each resourceTiers as tier (tier.id)}
+                            <label class="flex items-center gap-3 p-3 border border-border/30 rounded bg-background/50 hover:border-[var(--cyber-cyan)]/50 transition-colors cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={editLimits.allowedTierIds?.includes(tier.id)}
+                                onchange={(e: Event & { currentTarget: HTMLInputElement }) => {
+                                  const checked = e.currentTarget.checked;
+                                  if (checked) {
+                                    editLimits.allowedTierIds = [...(editLimits.allowedTierIds || []), tier.id];
+                                  } else {
+                                    editLimits.allowedTierIds = (editLimits.allowedTierIds || []).filter(id => id !== tier.id);
+                                  }
+                                }}
+                                class="w-4 h-4 rounded border-border/50 text-[var(--cyber-cyan)] focus:ring-[var(--cyber-cyan)] bg-background/50"
+                              />
+                              <div class="flex-1">
+                                <span class="font-mono text-sm block">{tier.name}</span>
+                                <p class="text-xs text-muted-foreground font-mono">
+                                  {tier.resources.cpuCores} CPU, {tier.resources.memoryGb}GB RAM
+                                </p>
+                              </div>
+                            </label>
+                          {/each}
+                        </div>
                       </div>
                       <div class="md:col-span-2 space-y-2">
                         <Label class="font-mono text-xs uppercase tracking-wider">Admin Notes</Label>

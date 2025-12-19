@@ -39,6 +39,9 @@ use commands::{
     sandbox_opencode_list_messages, sandbox_opencode_send_message, sandbox_opencode_get_message,
     sandbox_opencode_list_files, sandbox_opencode_get_file_content, sandbox_opencode_find_files,
     sandbox_opencode_connect_stream, sandbox_opencode_disconnect_stream,
+    // Preview port commands (web preview)
+    get_sandbox_preview_ports, detect_sandbox_preview_ports,
+    register_sandbox_preview_port, delete_sandbox_preview_port,
     // Terminal commands (interactive shell)
     terminal_connect, terminal_send_input, terminal_resize, terminal_disconnect,
     terminal_list, terminal_disconnect_all,
@@ -176,6 +179,11 @@ pub fn run() {
             sandbox_opencode_find_files,
             sandbox_opencode_connect_stream,
             sandbox_opencode_disconnect_stream,
+            // Preview port commands (web preview)
+            get_sandbox_preview_ports,
+            detect_sandbox_preview_ports,
+            register_sandbox_preview_port,
+            delete_sandbox_preview_port,
             // Terminal commands (interactive shell)
             terminal_connect,
             terminal_send_input,
