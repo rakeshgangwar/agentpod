@@ -13,7 +13,7 @@
   import { markAsSeen } from "$lib/stores/unseen-completions.svelte";
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
-  import PageHeader, { type PageIcon } from "$lib/components/page-header.svelte";
+  import PageHeader, { type PageIcon, type Tab } from "$lib/components/page-header.svelte";
   import ThemeToggle from "$lib/components/theme-toggle.svelte";
   import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
   import MessageSquareIcon from "@lucide/svelte/icons/message-square";
@@ -111,11 +111,12 @@
     goto(`/projects/${sandboxId}/${tab}`, { replaceState: true });
   }
 
-  function getStatusVariant(status: string): "running" | "starting" | "stopped" | "error" {
+  function getStatusVariant(status: string): "running" | "starting" | "stopped" | "error" | "sleeping" {
     switch (status) {
       case "running": return "running";
       case "starting":
       case "stopping": return "starting";
+      case "sleeping": return "sleeping";
       case "created":
       case "stopped": return "stopped";
       case "error":
@@ -129,6 +130,7 @@
     switch (status) {
       case "exited": return "stopped";
       case "created": return "ready";
+      case "sleeping": return "hibernating";
       default: return status;
     }
   }
@@ -171,15 +173,43 @@
     return staticIcon?.component;
   }
 
-  const tabs = [
-    { id: "chat", label: "Chat", icon: MessageSquareIcon },
-    { id: "files", label: "Files", icon: FolderIcon },
-    { id: "logs", label: "Logs", icon: ScrollTextIcon },
-    { id: "terminal", label: "Terminal", icon: TerminalIcon },
-    { id: "preview", label: "Preview", icon: GlobeIcon },
-    { id: "sync", label: "Git", icon: GitBranchIcon },
-    { id: "settings", label: "Settings", icon: SettingsIcon },
-  ];
+  const tabs = $derived.by(() => {
+    const isCloudflare = sandbox?.provider === "cloudflare";
+    
+    return [
+      { id: "chat", label: "Chat", icon: MessageSquareIcon },
+      { id: "files", label: "Files", icon: FolderIcon },
+      { 
+        id: "logs", 
+        label: "Logs", 
+        icon: ScrollTextIcon,
+        disabled: isCloudflare,
+        disabledReason: isCloudflare ? "Logs are not available for Cloudflare Workers" : undefined
+      },
+      { 
+        id: "terminal", 
+        label: "Terminal", 
+        icon: TerminalIcon,
+        disabled: isCloudflare,
+        disabledReason: isCloudflare ? "Terminal access is not available for Cloudflare Workers" : undefined
+      },
+      { 
+        id: "preview", 
+        label: "Preview", 
+        icon: GlobeIcon,
+        disabled: isCloudflare,
+        disabledReason: isCloudflare ? "Preview is not available for Cloudflare Workers" : undefined
+      },
+      { 
+        id: "sync", 
+        label: "Git", 
+        icon: GitBranchIcon,
+        disabled: isCloudflare,
+        disabledReason: isCloudflare ? "Git sync is not available for Cloudflare Workers" : undefined
+      },
+      { id: "settings", label: "Settings", icon: SettingsIcon },
+    ];
+  });
 
   // Back navigation - uses browser history for proper back behavior
   // Tab changes use replaceState so they don't pollute history

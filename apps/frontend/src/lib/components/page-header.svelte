@@ -3,6 +3,7 @@
   import type { Component } from "svelte";
   import ChevronUpIcon from "@lucide/svelte/icons/chevron-up";
   import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
+  import LockIcon from "@lucide/svelte/icons/lock";
   import LottieIcon from "$lib/components/lottie-icon.svelte";
   import * as Tooltip from "$lib/components/ui/tooltip";
 
@@ -14,6 +15,8 @@
     id: string;
     label: string;
     icon?: Component | string;
+    disabled?: boolean;
+    disabledReason?: string;
   }
 
   /** Icon can be a static component, emoji string, or animated lottie path */
@@ -36,7 +39,7 @@
     /** Optional status indicator */
     status?: {
       label: string;
-      variant: "running" | "starting" | "stopped" | "error";
+      variant: "running" | "starting" | "stopped" | "error" | "sleeping";
       animate?: boolean;
     };
     /** Tabs configuration */
@@ -127,6 +130,7 @@
       case "running": return "status-running";
       case "starting": return "status-starting";
       case "stopped": return "status-stopped";
+      case "sleeping": return "status-sleeping";
       case "error": return "status-error";
       default: return "status-stopped";
     }
@@ -215,14 +219,19 @@
               <Tooltip.Trigger>
                 <button
                   type="button"
+                  disabled={tab.disabled}
                   class="px-2.5 sm:px-4 py-2 sm:py-2.5 font-mono text-xs uppercase tracking-wider whitespace-nowrap
                          border-b-2 transition-colors flex items-center justify-center gap-2 touch-manipulation
-                         {activeTab === tab.id 
-                           ? 'border-primary text-primary' 
-                           : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border/50'}"
-                  onclick={() => handleTabClick(tab.id)}
+                         {tab.disabled
+                           ? 'border-transparent text-muted-foreground/50 cursor-not-allowed'
+                           : activeTab === tab.id 
+                             ? 'border-primary text-primary' 
+                             : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border/50'}"
+                  onclick={() => !tab.disabled && handleTabClick(tab.id)}
                 >
-                  {#if tab.icon}
+                  {#if tab.disabled}
+                    <LockIcon class="h-3.5 w-3.5 text-muted-foreground/50" />
+                  {:else if tab.icon}
                     {#if typeof tab.icon === "string"}
                       <span class="text-sm">{tab.icon}</span>
                     {:else}
@@ -234,9 +243,9 @@
                   <span class="hidden sm:inline">{tab.label}</span>
                 </button>
               </Tooltip.Trigger>
-              <!-- Tooltip only shown on mobile where label is hidden -->
-              <Tooltip.Content class="sm:hidden">
-                <p>{tab.label}</p>
+              <!-- Tooltip: show disabledReason if disabled, otherwise show label on mobile -->
+              <Tooltip.Content class={tab.disabled ? "" : "sm:hidden"}>
+                <p>{tab.disabled && tab.disabledReason ? tab.disabledReason : tab.label}</p>
               </Tooltip.Content>
             </Tooltip.Root>
           {/each}

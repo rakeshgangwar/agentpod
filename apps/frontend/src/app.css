@@ -1213,6 +1213,29 @@ article,
   box-shadow: 0 0 8px var(--cyber-red);
 }
 
+.status-sleeping {
+  color: var(--cyber-magenta);
+  background: color-mix(in oklch, var(--cyber-magenta) 10%, transparent);
+  border: 1px solid color-mix(in oklch, var(--cyber-magenta) 30%, transparent);
+}
+
+.status-sleeping .status-dot {
+  background: var(--cyber-magenta);
+  box-shadow: 0 0 8px var(--cyber-magenta);
+  animation: pulse-slow 3s ease-in-out infinite;
+}
+
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.95);
+  }
+}
+
 .status-dot {
   width: 6px;
   height: 6px;

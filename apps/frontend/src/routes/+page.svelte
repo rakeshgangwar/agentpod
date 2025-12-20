@@ -345,6 +345,7 @@
       case "stopping": return "status-starting";
       case "created":
       case "stopped": return "status-stopped";
+      case "sleeping": return "status-sleeping";
       case "error":
       case "unknown": return "status-error";
       default: return "status-stopped";
