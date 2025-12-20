@@ -558,6 +558,79 @@ pub struct DockerContainerStats {
 }
 
 // =============================================================================
+// Preview Port Types
+// =============================================================================
+
+/// Preview port for web preview feature
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewPort {
+    pub id: String,
+    pub sandbox_id: String,
+    pub port: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    pub is_public: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub public_token: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub public_expires_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detected_framework: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detected_process: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_seen_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preview_url: Option<String>,
+}
+
+/// Response for listing preview ports
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewPortsResponse {
+    pub ports: Vec<PreviewPort>,
+    pub count: usize,
+}
+
+/// Response for detect and register ports operation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DetectPortsResponse {
+    pub ports: Vec<PreviewPort>,
+    pub detected: usize,
+}
+
+/// Input for registering a preview port
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RegisterPreviewPortInput {
+    pub port: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+}
+
+/// Input for creating a share link
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SharePreviewPortInput {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_in: Option<String>,
+}
+
+/// Response for creating a share link
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SharePreviewPortResponse {
+    pub url: String,
+    pub token: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<String>,
+}
+
+// =============================================================================
 // OpenCode Types
 // =============================================================================
 

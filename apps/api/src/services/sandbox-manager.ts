@@ -1291,8 +1291,9 @@ export class SandboxManager {
     const tierData = await getResourceTierById(tier);
     
     if (tierData) {
-      // Calculate PID limit based on memory (roughly 64 PIDs per GB of RAM)
-      const pidsLimit = Math.max(128, Math.floor(tierData.memoryGb * 64));
+      // Calculate PID limit based on memory (roughly 128 PIDs per GB of RAM, min 256)
+      // Node.js projects need higher PID limits due to npm/worker threads
+      const pidsLimit = Math.max(256, Math.floor(tierData.memoryGb * 128));
       
       return {
         cpus: String(tierData.cpuCores),

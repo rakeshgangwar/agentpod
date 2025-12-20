@@ -284,9 +284,58 @@ export function generateSandboxLabels(options: {
   return labels;
 }
 
-/**
- * Build URLs for a sandbox based on its labels
- */
+export interface PreviewPortConfig {
+  port: number;
+  label?: string;
+}
+
+export function generatePreviewLabels(options: {
+  slug: string;
+  baseDomain: string;
+  ports: PreviewPortConfig[];
+  tls?: boolean;
+  certResolver?: string;
+  network?: string;
+}): Record<string, string> {
+  const {
+    slug,
+    baseDomain,
+    ports,
+    tls = baseDomain !== "localhost",
+    certResolver,
+    network = "agentpod-net",
+  } = options;
+
+  const routes: TraefikRouteConfig[] = [];
+
+  for (const { port } of ports) {
+    routes.push({
+      name: `${slug}-preview-${port}`,
+      port,
+      subdomain: `preview-${slug}-${port}`,
+      baseDomain,
+      tls,
+      certResolver,
+    });
+  }
+
+  return generateTraefikLabels(routes, {
+    network,
+    defaultTls: tls,
+    defaultCertResolver: certResolver,
+  });
+}
+
+export function buildPreviewUrl(
+  slug: string,
+  port: number,
+  baseDomain: string,
+  tls?: boolean
+): string {
+  const protocol = tls ?? baseDomain !== "localhost" ? "https" : "http";
+  return `${protocol}://preview-${slug}-${port}.${baseDomain}`;
+}
+
 export function buildSandboxUrls(
   slug: string,
   baseDomain: string,

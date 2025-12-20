@@ -38,6 +38,9 @@ use commands::{
     disconnect,
     // Sandbox commands (v2, direct Docker orchestration)
     docker_health,
+    // Preview port commands (web preview)
+    detect_sandbox_preview_ports,
+    delete_sandbox_preview_port,
     exec_in_sandbox,
     export_settings,
     get_all_pending_permissions,
@@ -48,6 +51,7 @@ use commands::{
     get_docker_info,
     // Docker image management commands
     get_flavor_images,
+    get_sandbox_preview_ports,
     // Onboarding commands
     get_onboarding_session,
     get_onboarding_session_by_id,
@@ -85,6 +89,7 @@ use commands::{
     pull_image_sync,
     remove_provider_credentials,
     reset_onboarding,
+    register_sandbox_preview_port,
     restart_sandbox,
     sandbox_opencode_abort_session,
     sandbox_opencode_connect_stream,
@@ -111,6 +116,7 @@ use commands::{
     sandbox_opencode_unrevert_session,
     save_settings,
     set_default_provider,
+    share_sandbox_preview_port,
     skip_onboarding,
     start_onboarding,
     start_sandbox,
@@ -124,6 +130,7 @@ use commands::{
     terminal_send_input,
     test_connection,
     unpause_sandbox,
+    unshare_sandbox_preview_port,
     update_user_agents_md,
     update_user_opencode_settings,
     upsert_user_opencode_file,
@@ -263,6 +270,13 @@ pub fn run() {
             sandbox_opencode_find_files,
             sandbox_opencode_connect_stream,
             sandbox_opencode_disconnect_stream,
+            // Preview port commands (web preview)
+            get_sandbox_preview_ports,
+            detect_sandbox_preview_ports,
+            register_sandbox_preview_port,
+            delete_sandbox_preview_port,
+            share_sandbox_preview_port,
+            unshare_sandbox_preview_port,
             // Terminal commands (interactive shell)
             terminal_connect,
             terminal_send_input,

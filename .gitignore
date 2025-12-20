@@ -41,3 +41,6 @@ data/
 backups/
 *.sql.gz
 do-not-commit/
+
+# Runtime-generated Traefik preview configs
+config/traefik/dynamic/preview-*.yml

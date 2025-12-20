@@ -733,6 +733,76 @@ pub async fn sandbox_opencode_find_files(
 }
 
 // =============================================================================
+// Preview Ports (Web Preview)
+// =============================================================================
+
+use crate::models::{
+    DetectPortsResponse, PreviewPort, PreviewPortsResponse, RegisterPreviewPortInput,
+    SharePreviewPortInput, SharePreviewPortResponse,
+};
+
+#[tauri::command]
+pub async fn get_sandbox_preview_ports(sandbox_id: String) -> Result<Vec<PreviewPort>, AppError> {
+    let client = get_client()?;
+    let response: PreviewPortsResponse = client
+        .get(&format!("/api/v2/sandboxes/{}/preview", sandbox_id))
+        .await?;
+    Ok(response.ports)
+}
+
+#[tauri::command]
+pub async fn detect_sandbox_preview_ports(sandbox_id: String) -> Result<DetectPortsResponse, AppError> {
+    let client = get_client()?;
+    client
+        .post(&format!("/api/v2/sandboxes/{}/preview/detect", sandbox_id), &())
+        .await
+}
+
+#[tauri::command]
+pub async fn register_sandbox_preview_port(
+    sandbox_id: String,
+    port: i32,
+    label: Option<String>,
+) -> Result<PreviewPort, AppError> {
+    let client = get_client()?;
+    let input = RegisterPreviewPortInput { port, label };
+    client
+        .post(&format!("/api/v2/sandboxes/{}/preview", sandbox_id), &input)
+        .await
+}
+
+#[tauri::command]
+pub async fn delete_sandbox_preview_port(sandbox_id: String, port: i32) -> Result<(), AppError> {
+    let client = get_client()?;
+    let _: SuccessResponse = client
+        .delete(&format!("/api/v2/sandboxes/{}/preview/{}", sandbox_id, port))
+        .await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn share_sandbox_preview_port(
+    sandbox_id: String,
+    port: i32,
+    expires_in: Option<String>,
+) -> Result<SharePreviewPortResponse, AppError> {
+    let client = get_client()?;
+    let input = SharePreviewPortInput { expires_in };
+    client
+        .post(&format!("/api/v2/sandboxes/{}/preview/{}/share", sandbox_id, port), &input)
+        .await
+}
+
+#[tauri::command]
+pub async fn unshare_sandbox_preview_port(sandbox_id: String, port: i32) -> Result<(), AppError> {
+    let client = get_client()?;
+    let _: SuccessResponse = client
+        .delete(&format!("/api/v2/sandboxes/{}/preview/{}/share", sandbox_id, port))
+        .await?;
+    Ok(())
+}
+
+// =============================================================================
 // SSE Event Streaming
 // =============================================================================
 

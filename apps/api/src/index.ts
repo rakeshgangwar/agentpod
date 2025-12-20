@@ -33,6 +33,8 @@ import { mcpKnowledgeRoutes } from './routes/mcp-knowledge.ts';
 // Admin routes
 import { adminRouter } from './routes/admin.ts';
 import { banCheckMiddleware, signupCheckMiddleware } from './auth/admin-middleware.ts';
+// Preview routes
+import { previewRoutes, publicPreviewRoutes } from './routes/preview.ts';
 // Middleware
 import { activityLoggerMiddleware } from './middleware/activity-logger.ts';
 // Sync services
@@ -107,6 +109,8 @@ origin: (origin) => {
   .route('/api/v2/repos', repoRoutes) // Git repository management
   .route('/api/v2/health', sandboxHealthRoutes) // Health checks (includes /docker)
   .route('/api/v2/pending-actions', pendingActionsRoutes) // Global pending actions
+  .route('/api/v2/sandboxes/:id/preview', previewRoutes) // Preview port management
+  .route('/p', publicPreviewRoutes) // Public preview redirect
   // Onboarding system endpoints
   .route('/api/knowledge', knowledgeRoutes) // Knowledge documents
   .route('/api/onboarding', onboardingRoutes) // Onboarding sessions
