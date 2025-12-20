@@ -30,8 +30,8 @@ importers:
         specifier: ^2.2.5
         version: 2.2.5
       '@opencode-ai/sdk':
-        specifier: ^1.0.144
-        version: 1.0.144
+        specifier: ^1.0.174
+        version: 1.0.174
       '@types/dockerode':
         specifier: ^3.3.47
         version: 3.3.47
@@ -792,6 +792,9 @@ packages:
 
   '@opencode-ai/sdk@1.0.144':
     resolution: {integrity: sha512-ryu08BT86Eo5OPMDxy19b2A9AHI0GtNp50ftq5Cp/ulV1xvLhB0fKAGRgWpWfj1iYVfGcQTd1a8kFvH8mK177Q==}
+
+  '@opencode-ai/sdk@1.0.174':
+    resolution: {integrity: sha512-rSFs9WIhGIOgxQNGfoYp/lvlNEqxK2TYV0njYVZ4RogPgGMCMWmWjbHM/9ofj8fFLpYDP394otMVgnV4bKDugA==}
 
   '@polka/url@1.0.0-next.29':
     resolution: {integrity: sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==}
@@ -4162,6 +4165,8 @@ snapshots:
   '@noble/hashes@2.0.1': {}
 
   '@opencode-ai/sdk@1.0.144': {}
+
+  '@opencode-ai/sdk@1.0.174': {}
 
   '@polka/url@1.0.0-next.29': {}
 

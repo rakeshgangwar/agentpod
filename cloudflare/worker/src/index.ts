@@ -176,12 +176,61 @@ async function handleOpenCodeProxy(
   env: Env,
   sandboxId: string
 ): Promise<Response> {
-  const sandbox = getSandbox(env.Sandbox, sandboxId);
   const directory = "/home/user/workspace";
 
-  const server = await createOpencodeServer(sandbox, { directory });
+  const url = new URL(request.url);
+  const gatewayPrefix = `/sandbox/${sandboxId}/opencode`;
+  const opencodeApiPath = url.pathname.replace(gatewayPrefix, "") || "/";
 
-  return proxyToOpencode(request, sandbox, server);
+  try {
+    const sandbox = getSandbox(env.Sandbox, sandboxId);
+
+    // WORKAROUND: Raw containerFetch returns empty body for long-running AI prompt requests.
+    // Use SDK client which handles request lifecycle properly.
+    const messageMatch = opencodeApiPath.match(/^\/session\/([^/]+)\/message$/);
+    if (request.method === "POST" && messageMatch) {
+      const sessionId = messageMatch[1];
+      
+      const body = await request.json() as {
+        parts: Array<{ type: "text"; text: string }>;
+        model?: { providerID: string; modelID: string };
+        agent?: string;
+      };
+      
+      console.log(`[DEBUG] Using SDK for /session/${sessionId}/message`);
+      
+      const { client } = await createOpencode<OpencodeClient>(sandbox, { directory });
+      
+      const result = await client.session.prompt({
+        path: { id: sessionId },
+        body: {
+          parts: body.parts,
+          model: body.model,
+          agent: body.agent,
+        },
+      });
+      
+      console.log(`[DEBUG] SDK result type: ${typeof result}, keys: ${Object.keys(result ?? {}).join(',')}`);
+      console.log(`[DEBUG] SDK result.data type: ${typeof result.data}, keys: ${Object.keys(result.data ?? {}).join(',')}`);
+      console.log(`[DEBUG] SDK result.data stringified: ${JSON.stringify(result.data).slice(0, 500)}`);
+      
+      return Response.json(result.data ?? {});
+    }
+
+    console.log(`[DEBUG] Proxying to OpenCode: ${request.method} ${opencodeApiPath}`);
+    
+    const server = await createOpencodeServer(sandbox, { directory });
+    const rewrittenUrl = new URL(opencodeApiPath + url.search, url.origin);
+    const proxyRequest = new Request(rewrittenUrl.toString(), request);
+
+    return proxyToOpencode(proxyRequest, sandbox, server);
+  } catch (error) {
+    console.error(`[ERROR] OpenCode proxy failed for ${request.method} ${opencodeApiPath}:`, error);
+    return Response.json(
+      { error: error instanceof Error ? error.message : "Unknown error", path: opencodeApiPath },
+      { status: 500 }
+    );
+  }
 }
 
 async function handleSendMessage(
@@ -193,9 +242,12 @@ async function handleSendMessage(
   const sandbox = getSandbox(env.Sandbox, sandboxId);
   const directory = "/home/user/workspace";
 
+  const hasValidConfig = body.config?.provider && 
+    Object.keys(body.config.provider).length > 0;
+  
   const { client } = await createOpencode<OpencodeClient>(sandbox, {
     directory,
-    config: body.config,
+    ...(hasValidConfig ? { config: body.config } : {}),
   });
 
   let sessionId = body.sessionId;
@@ -209,6 +261,12 @@ async function handleSendMessage(
     sessionId = session.data.id;
   }
 
+  console.log(`[DEBUG] handleSendMessage: calling client.session.prompt`, {
+    sessionId,
+    message: body.message?.slice(0, 50),
+    hasModel: !!body.model,
+  });
+  
   const response = await client.session.prompt({
     path: { id: sessionId },
     body: {
@@ -217,10 +275,24 @@ async function handleSendMessage(
     },
   });
 
+  console.log(`[DEBUG] handleSendMessage: prompt response`, {
+    sessionId,
+    hasData: !!response.data,
+    dataKeys: Object.keys(response.data ?? {}),
+    dataStringified: JSON.stringify(response.data ?? {}).slice(0, 500),
+  });
+  
   const parts = response.data?.parts ?? [];
   const textPart = parts.find((p: { type: string }) => p.type === "text") as
     | { text?: string }
     | undefined;
+  
+  console.log(`[DEBUG] handleSendMessage: extracted parts`, {
+    sessionId,
+    partsCount: parts.length,
+    textPartFound: !!textPart,
+    textPreview: textPart?.text?.slice(0, 100),
+  });
 
   await notifyAgentPodAPI(env, "session.message", {
     sandboxId,

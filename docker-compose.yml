@@ -208,6 +208,8 @@ services:
       - ENABLE_CLOUDFLARE_SANDBOXES=${ENABLE_CLOUDFLARE_SANDBOXES:-false}
       - CLOUDFLARE_WORKER_URL=${CLOUDFLARE_WORKER_URL:-}
       - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:-}
+      - DEFAULT_SANDBOX_PROVIDER=${DEFAULT_SANDBOX_PROVIDER:-docker}
+      - AUTO_SELECT_PROVIDER=${AUTO_SELECT_PROVIDER:-false}
 
       # =======================================================================
       # Preview Configuration

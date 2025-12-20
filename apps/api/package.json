@@ -32,7 +32,7 @@
     "@agentpod/types": "workspace:*",
     "@hono/zod-validator": "^0.4.0",
     "@iarna/toml": "^2.2.5",
-    "@opencode-ai/sdk": "^1.0.144",
+    "@opencode-ai/sdk": "^1.0.174",
     "@types/dockerode": "^3.3.47",
     "better-auth": "^1.4.6",
     "dockerode": "^4.0.9",
