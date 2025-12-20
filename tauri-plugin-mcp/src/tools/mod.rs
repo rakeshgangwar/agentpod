@@ -15,8 +15,8 @@ pub mod text_input;
 pub mod webview;
 pub mod window_manager;
 pub mod console_logs;
+pub mod network_logs;
 
-// Re-export command handler functions
 pub use execute_js::handle_execute_js;
 pub use local_storage::handle_get_local_storage;
 pub use mouse_movement::handle_simulate_mouse_movement;
@@ -26,6 +26,7 @@ pub use text_input::handle_simulate_text_input;
 pub use webview::{handle_get_element_position, handle_send_text_to_element};
 pub use window_manager::handle_manage_window;
 pub use console_logs::handle_get_console_logs;
+pub use network_logs::handle_get_network_logs;
 
 /// Handle command routing for socket requests
 pub async fn handle_command<R: Runtime>(
@@ -52,6 +53,7 @@ pub async fn handle_command<R: Runtime>(
         commands::GET_ELEMENT_POSITION => handle_get_element_position(app, payload).await,
         commands::SEND_TEXT_TO_ELEMENT => handle_send_text_to_element(app, payload).await,
         commands::GET_CONSOLE_LOGS => handle_get_console_logs(app, payload).await,
+        commands::GET_NETWORK_LOGS => handle_get_network_logs(app, payload).await,
         _ => Ok(SocketResponse {
             success: false,
             data: None,

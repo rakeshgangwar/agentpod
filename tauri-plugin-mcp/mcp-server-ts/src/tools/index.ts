@@ -8,6 +8,7 @@ import { registerMouseMovementTool } from "./mouse_movement.js";
 import { registerGetElementPositionTool } from "./get_element_position.js";
 import { registerSendTextToElementTool } from "./send_text_to_element.js";
 import { registerGetConsoleLogsTool } from "./get_console_logs.js";
+import { registerGetNetworkLogsTool } from "./get_network_logs.js";
 import { socketClient } from "./client.js";
 
 // Re-export the socket client for direct use
@@ -24,6 +25,7 @@ export function registerAllTools(server: McpServer) {
   registerGetElementPositionTool(server);
   registerSendTextToElementTool(server);
   registerGetConsoleLogsTool(server);
+  registerGetNetworkLogsTool(server);
 }
 
 // Function to initialize socket connection (can be awaited before registering tools)

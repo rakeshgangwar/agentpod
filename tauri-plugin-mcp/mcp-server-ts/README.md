@@ -77,6 +77,87 @@ Manage localStorage in the Tauri webview.
 **Returns:**
 - Operation result
 
+### `get_console_logs`
+
+Retrieve captured console logs from the application window.
+
+**Parameters:**
+- `window_label` (optional): Target window (default: "main")
+- `level` (optional): Filter by log level ("log", "info", "warn", "error", "debug", or "all")
+- `limit` (optional): Maximum number of entries to return (default: 100, max: 500)
+- `clear` (optional): Clear the log buffer after retrieval (default: false)
+
+**Returns:**
+- Array of log entries with level, args, and timestamp
+
+### `get_network_logs`
+
+Retrieve captured network requests (fetch and XMLHttpRequest) from the application window.
+
+**Parameters:**
+- `window_label` (optional): Target window (default: "main")
+- `method` (optional): Filter by HTTP method (GET, POST, PUT, DELETE, etc.)
+- `url_pattern` (optional): Filter by URL pattern (regex)
+- `status` (optional): Filter by HTTP status code
+- `limit` (optional): Maximum number of entries to return (default: 100, max: 500)
+- `clear` (optional): Clear the log buffer after retrieval (default: false)
+
+**Returns:**
+- Array of network log entries with method, url, status, headers, body, timing, and error info
+
+### `get_element_position`
+
+Find an HTML element and get its position coordinates.
+
+**Parameters:**
+- `selector_type`: Type of selector ("id", "class", "tag", "text", or "selector")
+- `selector_value`: The selector value to search for
+- `should_click` (optional): Click the element after finding it (default: false)
+- `window_label` (optional): Target window (default: "main")
+
+**Returns:**
+- Element position (x, y) and metadata (tag, classes, id, text)
+
+### `send_text_to_element`
+
+Find an element and send text input to it.
+
+**Parameters:**
+- `selector_type`: Type of selector ("id", "class", "tag", "text", or "selector")
+- `selector_value`: The selector value to search for
+- `text`: Text to input into the element
+- `delay_ms` (optional): Delay between keystrokes in ms (default: 20)
+- `window_label` (optional): Target window (default: "main")
+
+**Returns:**
+- Success status and element metadata
+
+### `simulate_mouse_movement`
+
+Simulate mouse cursor movement and clicks.
+
+**Parameters:**
+- `x`: Target X coordinate
+- `y`: Target Y coordinate
+- `relative` (optional): Treat coordinates as relative to current position (default: false)
+- `click` (optional): Perform a click at the target position (default: false)
+- `button` (optional): Mouse button for click ("left", "right", "middle")
+
+**Returns:**
+- Success status and final cursor position
+
+### `simulate_text_input`
+
+Simulate keyboard text input at the current focus.
+
+**Parameters:**
+- `text`: Text to type
+- `delay_ms` (optional): Delay between keystrokes in ms
+- `initial_delay_ms` (optional): Initial delay before typing starts
+
+**Returns:**
+- Success status, characters typed, and duration
+
 ## Setup and Usage
 
 1. Ensure the Tauri application is running with the socket server active

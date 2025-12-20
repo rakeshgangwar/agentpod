@@ -136,4 +136,5 @@ pub mod commands {
     pub const GET_ELEMENT_POSITION: &str = "get_element_position";
     pub const SEND_TEXT_TO_ELEMENT: &str = "send_text_to_element";
     pub const GET_CONSOLE_LOGS: &str = "get_console_logs";
+    pub const GET_NETWORK_LOGS: &str = "get_network_logs";
 }

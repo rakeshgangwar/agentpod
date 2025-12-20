@@ -20,6 +20,10 @@ The Tauri MCP Plugin provides a comprehensive set of tools that allow AI models 
 - **Local Storage Management**: Get, set, remove, and clear localStorage entries
 - **Ping**: Simple connectivity testing to verify the plugin is responsive
 
+#### Debugging & Monitoring
+- **Console Logs**: Capture and retrieve console.log, console.info, console.warn, console.error, and console.debug output
+- **Network Logs**: Intercept and inspect all fetch and XMLHttpRequest calls with full request/response details
+
 ## How to build
 ```bash
 pnpm i 
