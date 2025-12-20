@@ -1,12 +1,29 @@
-import { getSandbox } from "@cloudflare/sandbox";
+import { getSandbox, type Sandbox as SandboxInstance } from "@cloudflare/sandbox";
 import {
   createOpencode,
   createOpencodeServer,
   proxyToOpencode,
 } from "@cloudflare/sandbox/opencode";
 import type { Config, OpencodeClient } from "@opencode-ai/sdk";
+import { WorkspaceStorage } from "./storage";
 
 export { Sandbox } from "@cloudflare/sandbox";
+
+const DEFAULT_WORKSPACE_DIR = "/home/user/workspace";
+
+const SYNC_EXCLUDED_PATHS = [
+  "node_modules",
+  ".git",
+  "__pycache__",
+  ".cache",
+  "dist",
+  "build",
+  ".next",
+  ".nuxt",
+  "target",
+  ".opencode",
+  ".DS_Store",
+];
 
 interface Env {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -150,17 +167,21 @@ async function handleWakeSandbox(
   sandboxId: string
 ): Promise<Response> {
   const body = (await request.json()) as { config?: Config };
-  const directory = "/home/user/workspace";
 
   const sandbox = getSandbox(env.Sandbox, sandboxId);
+  const storage = new WorkspaceStorage(env.WORKSPACE_BUCKET, sandboxId);
+
+  const restoreResult = await restoreR2ToSandbox(sandbox, storage, DEFAULT_WORKSPACE_DIR);
+  console.log(`[WAKE] Restored ${restoreResult.restoredFiles} files from R2 for sandbox ${sandboxId}`);
 
   const server = await createOpencodeServer(sandbox, {
-    directory,
+    directory: DEFAULT_WORKSPACE_DIR,
     config: body.config,
   });
 
   await notifyAgentPodAPI(env, "sandbox.woken", {
     sandboxId,
+    restoredFiles: restoreResult.restoredFiles,
     provider: "cloudflare",
   });
 
@@ -168,6 +189,7 @@ async function handleWakeSandbox(
     success: true,
     status: "running",
     serverPort: server.port,
+    restoredFiles: restoreResult.restoredFiles,
   });
 }
 
@@ -213,6 +235,13 @@ async function handleOpenCodeProxy(
       console.log(`[DEBUG] SDK result type: ${typeof result}, keys: ${Object.keys(result ?? {}).join(',')}`);
       console.log(`[DEBUG] SDK result.data type: ${typeof result.data}, keys: ${Object.keys(result.data ?? {}).join(',')}`);
       console.log(`[DEBUG] SDK result.data stringified: ${JSON.stringify(result.data).slice(0, 500)}`);
+      
+      const storage = new WorkspaceStorage(env.WORKSPACE_BUCKET, sandboxId);
+      syncSandboxToR2(sandbox, storage, directory).then(syncResult => {
+        console.log(`[AUTO-SYNC] Proxy message completed: ${syncResult.syncedFiles} files synced for ${sandboxId}`);
+      }).catch(err => {
+        console.error(`[AUTO-SYNC] Failed after proxy message for ${sandboxId}:`, err);
+      });
       
       return Response.json(result.data ?? {});
     }
@@ -300,20 +329,171 @@ async function handleSendMessage(
     provider: "cloudflare",
   });
 
+  const storage = new WorkspaceStorage(env.WORKSPACE_BUCKET, sandboxId);
+  const syncResult = await syncSandboxToR2(sandbox, storage, directory).catch(err => {
+    console.error(`[AUTO-SYNC] Failed after message for ${sandboxId}:`, err);
+    return { syncedFiles: 0, skippedFiles: 0, totalSize: 0, errors: [err.message] };
+  });
+  
+  console.log(`[AUTO-SYNC] After message: ${syncResult.syncedFiles} files synced for ${sandboxId}`);
+
   return Response.json({
     sessionId,
     response: textPart?.text ?? "",
     parts: response.data?.parts,
+    sync: {
+      syncedFiles: syncResult.syncedFiles,
+      totalSize: syncResult.totalSize,
+    },
   });
 }
 
 async function handleSyncWorkspace(env: Env, sandboxId: string): Promise<Response> {
-  return Response.json({
-    success: true,
+  const sandbox = getSandbox(env.Sandbox, sandboxId);
+  const storage = new WorkspaceStorage(env.WORKSPACE_BUCKET, sandboxId);
+  
+  try {
+    const result = await syncSandboxToR2(sandbox, storage, DEFAULT_WORKSPACE_DIR);
+    
+    await notifyAgentPodAPI(env, "workspace.synced", {
+      sandboxId,
+      syncedFiles: result.syncedFiles,
+      totalSize: result.totalSize,
+      provider: "cloudflare",
+    });
+    
+    return Response.json({
+      success: true,
+      sandboxId,
+      syncedFiles: result.syncedFiles,
+      skippedFiles: result.skippedFiles,
+      totalSize: result.totalSize,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error(`[ERROR] Sync failed for sandbox ${sandboxId}:`, error);
+    return Response.json(
+      { 
+        success: false, 
+        error: error instanceof Error ? error.message : "Sync failed",
+        sandboxId,
+      },
+      { status: 500 }
+    );
+  }
+}
+
+function shouldExcludeFromSync(relativePath: string): boolean {
+  const pathParts = relativePath.split("/");
+  return SYNC_EXCLUDED_PATHS.some(excluded => 
+    pathParts.some(part => part === excluded || part.startsWith(excluded))
+  );
+}
+
+interface SyncResult {
+  syncedFiles: number;
+  skippedFiles: number;
+  totalSize: number;
+  errors: string[];
+}
+
+async function syncSandboxToR2(
+  sandbox: ReturnType<typeof getSandbox>,
+  storage: WorkspaceStorage,
+  directory: string
+): Promise<SyncResult> {
+  const result: SyncResult = {
     syncedFiles: 0,
-    sandboxId,
-    message: "Workspace sync not yet implemented",
-  });
+    skippedFiles: 0,
+    totalSize: 0,
+    errors: [],
+  };
+
+  const listResult = await sandbox.listFiles(directory, { recursive: true });
+  
+  if (!listResult.success) {
+    throw new Error(`Failed to list files in ${directory}`);
+  }
+
+  for (const file of listResult.files) {
+    if (file.type !== "file") continue;
+    
+    const relativePath = file.relativePath || file.absolutePath.replace(directory + "/", "");
+    
+    if (shouldExcludeFromSync(relativePath)) {
+      result.skippedFiles++;
+      continue;
+    }
+
+    try {
+      const fileContent = await sandbox.readFile(file.absolutePath);
+      
+      if (!fileContent.success) {
+        result.errors.push(`Failed to read: ${relativePath}`);
+        continue;
+      }
+
+      const content = fileContent.isBinary 
+        ? Uint8Array.from(atob(fileContent.content), c => c.charCodeAt(0))
+        : new TextEncoder().encode(fileContent.content);
+      
+      await storage.saveFile(relativePath, content);
+      result.syncedFiles++;
+      result.totalSize += file.size;
+    } catch (error) {
+      result.errors.push(`Error syncing ${relativePath}: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+
+  console.log(`[SYNC] Completed: ${result.syncedFiles} files synced, ${result.skippedFiles} skipped, ${result.errors.length} errors`);
+  
+  return result;
+}
+
+async function restoreR2ToSandbox(
+  sandbox: ReturnType<typeof getSandbox>,
+  storage: WorkspaceStorage,
+  directory: string
+): Promise<{ restoredFiles: number; errors: string[] }> {
+  const result = { restoredFiles: 0, errors: [] as string[] };
+  
+  const files = await storage.listFiles();
+  
+  if (files.length === 0) {
+    console.log(`[RESTORE] No files found in R2 for workspace`);
+    return result;
+  }
+
+  const directories = new Set<string>();
+  for (const filePath of files) {
+    const dir = filePath.substring(0, filePath.lastIndexOf("/"));
+    if (dir) {
+      directories.add(dir);
+    }
+  }
+  
+  for (const dir of Array.from(directories).sort()) {
+    await sandbox.mkdir(`${directory}/${dir}`, { recursive: true }).catch(() => {});
+  }
+
+  for (const filePath of files) {
+    try {
+      const content = await storage.loadFile(filePath);
+      if (!content) continue;
+
+      const textContent = new TextDecoder().decode(content);
+      const fullPath = `${directory}/${filePath}`;
+      
+      await sandbox.writeFile(fullPath, textContent);
+      result.restoredFiles++;
+    } catch (error) {
+      result.errors.push(`Error restoring ${filePath}: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+
+  console.log(`[RESTORE] Completed: ${result.restoredFiles} files restored, ${result.errors.length} errors`);
+  
+  return result;
 }
 
 async function notifyAgentPodAPI(

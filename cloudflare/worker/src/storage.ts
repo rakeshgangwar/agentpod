@@ -14,7 +14,7 @@ export class WorkspaceStorage {
     return `workspaces/${this.sandboxId}/${path}`;
   }
 
-  async saveFile(path: string, content: ArrayBuffer | string): Promise<void> {
+  async saveFile(path: string, content: ArrayBuffer | Uint8Array | string): Promise<void> {
     const data = typeof content === "string" ? new TextEncoder().encode(content) : content;
     await this.bucket.put(this.getKey(path), data, {
       customMetadata: {

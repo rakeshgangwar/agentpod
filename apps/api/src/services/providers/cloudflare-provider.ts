@@ -278,6 +278,36 @@ export class CloudflareSandboxProvider implements SandboxProvider {
       response: result.response ?? "",
     };
   }
+
+  async syncWorkspace(sandboxId: string): Promise<{
+    success: boolean;
+    syncedFiles: number;
+    skippedFiles: number;
+    totalSize: number;
+  }> {
+    log.info("Syncing workspace to R2", { sandboxId });
+
+    const result = await this.workerFetch(`/sandbox/${sandboxId}/sync`, {
+      method: "POST",
+    }) as {
+      success?: boolean;
+      syncedFiles?: number;
+      skippedFiles?: number;
+      totalSize?: number;
+      error?: string;
+    };
+
+    if (!result.success) {
+      throw new Error(result.error ?? "Failed to sync workspace");
+    }
+
+    return {
+      success: true,
+      syncedFiles: result.syncedFiles ?? 0,
+      skippedFiles: result.skippedFiles ?? 0,
+      totalSize: result.totalSize ?? 0,
+    };
+  }
 }
 
 let cloudflareProviderInstance: CloudflareSandboxProvider | null = null;

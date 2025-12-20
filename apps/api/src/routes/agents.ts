@@ -740,4 +740,49 @@ export const agentRoutes = new Hono()
     };
 
     return c.json(providers);
-  });
+  })
+
+  .post(
+    "/sandbox/:id/sync",
+    async (c) => {
+      const sandboxId = c.req.param("id");
+      const userId = getAuthenticatedUserId(c);
+
+      if (!userId) {
+        return c.json({ error: "Authentication required" }, 401);
+      }
+
+      const sandbox = await SandboxModel.getSandboxById(sandboxId);
+      
+      if (!sandbox) {
+        return c.json({ error: "Sandbox not found" }, 404);
+      }
+
+      if (sandbox.userId !== userId) {
+        return c.json({ error: "Unauthorized" }, 403);
+      }
+
+      if (sandbox.provider !== "cloudflare") {
+        return c.json({ error: "Sync only available for Cloudflare sandboxes" }, 400);
+      }
+
+      if (!isCloudflareConfigured()) {
+        return c.json({ error: "Cloudflare not configured" }, 400);
+      }
+
+      try {
+        const provider = getCloudflareProvider();
+        const result = await provider.syncWorkspace(sandboxId);
+
+        log.info("Workspace synced", { sandboxId, syncedFiles: result.syncedFiles });
+
+        return c.json(result);
+      } catch (error) {
+        log.error("Sync failed", { sandboxId, error });
+        return c.json(
+          { error: error instanceof Error ? error.message : "Sync failed" },
+          500
+        );
+      }
+    }
+  );
