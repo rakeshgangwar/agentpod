@@ -11,10 +11,12 @@
   import * as Tooltip from "$lib/components/ui/tooltip";
   import AppShell from "$lib/components/app-shell.svelte";
   import QuickTaskModal from "$lib/components/quick-task-modal.svelte";
+  import { dev } from "$app/environment";
 
   let { children } = $props();
   let isInitializing = $state(true);
   let currentPath = $state("/");
+  let mcpCleanup: (() => Promise<void>) | null = null;
 
   // Public routes that don't require authentication (no AppShell/BottomNav)
   const publicRoutes = ["/login", "/setup"];
@@ -49,11 +51,37 @@
     isInitializing = false;
 
     window.addEventListener("keydown", handleGlobalKeydown);
+    
+    console.log("[LAYOUT] dev mode:", dev);
+    if (dev) {
+      initMcpDebugTools().catch(e => console.warn("[MCP-DEBUG] Failed to initialize:", e));
+    }
   });
+  
+  async function initMcpDebugTools() {
+    try {
+      console.log("[MCP-DEBUG] Starting import...");
+      const mcpModule = await import("tauri-plugin-mcp");
+      console.log("[MCP-DEBUG] Module imported:", Object.keys(mcpModule));
+      const html2canvasModule = await import("html2canvas");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).html2canvas = html2canvasModule.default;
+      console.log("[MCP-DEBUG] Calling initMcpDebug...");
+      await mcpModule.initMcpDebug();
+      console.log("[MCP-DEBUG] initMcpDebug completed");
+      mcpCleanup = mcpModule.cleanupMcpDebug;
+    } catch (e) {
+      console.error("[MCP-DEBUG] Error during initialization:", e);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__MCP_INIT_ERROR__ = String(e);
+      throw e;
+    }
+  }
 
   onDestroy(() => {
     if (typeof window !== "undefined") {
       window.removeEventListener("keydown", handleGlobalKeydown);
+      mcpCleanup?.();
     }
   });
 

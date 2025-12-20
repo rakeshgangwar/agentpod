@@ -5,6 +5,10 @@
   "small_model": "anthropic/claude-sonnet-4-5-20250929",
   
   "mcp": {
+    "tauri-mcp": {
+      "type": "local",
+      "command": ["node", "tauri-plugin-mcp/mcp-server-ts/build/index.js"]
+    },
     "context7": {
       "type": "remote",
       "url": "https://mcp.context7.com/mcp"

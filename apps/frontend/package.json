@@ -40,6 +40,8 @@
   },
   "devDependencies": {
     "@agentpod/tsconfig": "workspace:*",
+    "tauri-plugin-mcp": "file:../../tauri-plugin-mcp",
+    "html2canvas": "^1.4.1",
     "@internationalized/date": "^3.10.0",
     "@lucide/svelte": "^0.561.0",
     "@opencode-ai/sdk": "^1.0.144",
