@@ -56,16 +56,16 @@
       <TerminalIcon class="h-3.5 w-3.5" />
       <span>Console ({logs.length})</span>
       
-      {#if logs.some(l => l.type === 'error')}
+      {#if logs.some((l: ConsoleLog) => l.type === 'error')}
         <span class="flex items-center gap-1 text-red-500 ml-2">
           <XCircleIcon class="h-3 w-3" />
-          {logs.filter(l => l.type === 'error').length}
+          {logs.filter((l: ConsoleLog) => l.type === 'error').length}
         </span>
       {/if}
-      {#if logs.some(l => l.type === 'warn')}
+      {#if logs.some((l: ConsoleLog) => l.type === 'warn')}
         <span class="flex items-center gap-1 text-yellow-500 ml-1">
           <AlertTriangleIcon class="h-3 w-3" />
-          {logs.filter(l => l.type === 'warn').length}
+          {logs.filter((l: ConsoleLog) => l.type === 'warn').length}
         </span>
       {/if}
     </Collapsible.Trigger>
