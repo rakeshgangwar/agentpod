@@ -35,6 +35,9 @@ import { adminRouter } from './routes/admin.ts';
 import { banCheckMiddleware, signupCheckMiddleware } from './auth/admin-middleware.ts';
 // Preview routes
 import { previewRoutes, publicPreviewRoutes } from './routes/preview.ts';
+// Cloudflare sandbox integration
+import { agentRoutes } from './routes/agents.ts';
+import { cloudflareWebhookRoutes } from './routes/cloudflare-webhook.ts';
 // Middleware
 import { activityLoggerMiddleware } from './middleware/activity-logger.ts';
 // Sync services
@@ -116,7 +119,10 @@ origin: (origin) => {
   .route('/api/onboarding', onboardingRoutes) // Onboarding sessions
   .route('/api/mcp/knowledge', mcpKnowledgeRoutes)
   // Admin endpoints (require admin role)
-  .route('/api/admin', adminRouter);
+  .route('/api/admin', adminRouter)
+  // Cloudflare sandbox integration
+  .route('/api/v2/agents', agentRoutes)
+  .route('/api/v2/cloudflare', cloudflareWebhookRoutes);
 
 app.onError((err, c) => {
   const requestId = c.req.header('x-request-id') || crypto.randomUUID();

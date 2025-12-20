@@ -7,6 +7,7 @@
 
 import { pgTable, text, timestamp, index, unique, pgEnum } from "drizzle-orm/pg-core";
 import { user } from "./auth";
+import { sandboxProviderEnum } from "./cloudflare";
 
 // =============================================================================
 // Enums
@@ -43,7 +44,11 @@ export const sandboxes = pgTable(
     flavorId: text("flavor_id").default("js"),
     addonIds: text("addon_ids").default("[]"), // JSON array
 
-    // Container runtime info
+    // Provider type (docker or cloudflare)
+    provider: sandboxProviderEnum("provider").default("docker"),
+    cloudflareSandboxId: text("cloudflare_sandbox_id"),
+
+    // Container runtime info (Docker-specific)
     containerId: text("container_id"),
     containerName: text("container_name"),
     status: sandboxStatusEnum("status").default("created"),

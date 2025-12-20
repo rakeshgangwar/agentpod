@@ -1,0 +1,22 @@
+{
+  "name": "agentpod-sandbox-worker",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "types": "wrangler types",
+    "tail": "wrangler tail"
+  },
+  "dependencies": {
+    "@opencode-ai/sdk": "^1.0.137"
+  },
+  "devDependencies": {
+    "@cloudflare/sandbox": "^0.6.7",
+    "@cloudflare/workers-types": "^4.20241218.0",
+    "@types/node": "^22.10.1",
+    "typescript": "^5.7.2",
+    "wrangler": "^4.56.0"
+  }
+}
