@@ -205,7 +205,11 @@ export async function upsertPreviewPort(input: CreatePreviewPortInput): Promise<
       detectedProcess: input.detectedProcess,
       lastSeenAt: new Date(),
     });
-    return updated!;
+    // Handle race condition where port was deleted between check and update
+    if (!updated) {
+      return createPreviewPort(input);
+    }
+    return updated;
   }
   
   return createPreviewPort(input);
