@@ -18,6 +18,7 @@ export const sandboxStatusEnum = pgEnum("sandbox_status", [
   "running",
   "stopping",
   "stopped",
+  "sleeping",
   "error",
 ]);
 
