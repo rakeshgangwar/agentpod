@@ -476,18 +476,33 @@ async function restoreR2ToSandbox(
     await sandbox.mkdir(`${directory}/${dir}`, { recursive: true }).catch(() => {});
   }
 
+  console.log(`[RESTORE] Found ${files.length} files in R2:`, files);
+
   for (const filePath of files) {
     try {
       const content = await storage.loadFile(filePath);
-      if (!content) continue;
+      if (!content) {
+        console.log(`[RESTORE] No content for ${filePath}, skipping`);
+        continue;
+      }
 
       const textContent = new TextDecoder().decode(content);
       const fullPath = `${directory}/${filePath}`;
       
-      await sandbox.writeFile(fullPath, textContent);
+      console.log(`[RESTORE] Writing ${filePath} (${content.byteLength} bytes) to ${fullPath}`);
+      const writeResult = await sandbox.writeFile(fullPath, textContent);
+      
+      if (!writeResult.success) {
+        result.errors.push(`Failed to write ${filePath}: ${JSON.stringify(writeResult)}`);
+        console.error(`[RESTORE] Write failed for ${filePath}:`, writeResult);
+        continue;
+      }
+      
       result.restoredFiles++;
+      console.log(`[RESTORE] Successfully restored ${filePath}`);
     } catch (error) {
       result.errors.push(`Error restoring ${filePath}: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error(`[RESTORE] Exception for ${filePath}:`, error);
     }
   }
 

@@ -864,8 +864,10 @@ export class SandboxManager {
       }
     }
 
-    // Update last accessed
-    await SandboxModel.touchSandbox(sandboxId);
+    const isSleepingCloudflare = sandbox.provider === 'cloudflare' && sandbox.status === 'sleeping';
+    if (!isSleepingCloudflare) {
+      await SandboxModel.touchSandbox(sandboxId);
+    }
 
     return { sandbox, repository, config: sandboxConfig };
   }

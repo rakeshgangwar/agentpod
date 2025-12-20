@@ -22,7 +22,7 @@ use commands::{
     get_docker_info, check_docker_health,
     // Sandbox commands (v2, direct Docker orchestration)
     docker_health, list_sandboxes, get_sandbox, create_sandbox, delete_sandbox,
-    start_sandbox, stop_sandbox, restart_sandbox, pause_sandbox, unpause_sandbox,
+    start_sandbox, stop_sandbox, restart_sandbox, pause_sandbox, unpause_sandbox, wake_sandbox,
     get_sandbox_logs, get_sandbox_stats, get_sandbox_status,
     exec_in_sandbox,
     get_sandbox_git_status, get_sandbox_git_log, commit_sandbox_changes,
@@ -154,6 +154,7 @@ pub fn run() {
             restart_sandbox,
             pause_sandbox,
             unpause_sandbox,
+            wake_sandbox,
             get_sandbox_logs,
             get_sandbox_stats,
             get_sandbox_status,

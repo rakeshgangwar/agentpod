@@ -160,6 +160,20 @@ pub async fn unpause_sandbox(id: String) -> Result<Sandbox, AppError> {
     Ok(response.sandbox)
 }
 
+/// Wake a sleeping Cloudflare sandbox
+#[tauri::command]
+pub async fn wake_sandbox(id: String) -> Result<Sandbox, AppError> {
+    let client = get_client()?;
+    #[derive(serde::Deserialize)]
+    struct Response {
+        sandbox: Sandbox,
+    }
+    let response: Response = client
+        .post(&format!("/api/v2/sandboxes/{}/wake", id), &())
+        .await?;
+    Ok(response.sandbox)
+}
+
 // =============================================================================
 // Sandbox Monitoring
 // =============================================================================

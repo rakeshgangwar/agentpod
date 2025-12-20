@@ -31,7 +31,7 @@ import {
   checkAllLimitsForSandboxCreation, 
   checkAllLimitsForSandboxStart,
 } from "../models/user-resource-limits.ts";
-import { getSandboxById, createSandbox as createSandboxRecord, updateSandbox, generateUniqueSlug } from "../models/sandbox.ts";
+import { getSandboxById, createSandbox as createSandboxRecord, updateSandbox, generateUniqueSlug, touchSandbox } from "../models/sandbox.ts";
 import { isCloudflareConfigured, getCloudflareProvider } from "../services/providers/index.ts";
 import { nanoid } from "nanoid";
 
@@ -468,6 +468,41 @@ export const sandboxRoutes = new Hono()
       log.error("Failed to unpause sandbox", { id, error });
       return c.json(
         { error: "Failed to unpause sandbox", details: error instanceof Error ? error.message : "Unknown error" },
+        500
+      );
+    }
+  })
+
+  // ===========================================================================
+  // Wake Sandbox (Cloudflare)
+  // ===========================================================================
+  .post("/:id/wake", async (c) => {
+    const id = c.req.param("id");
+
+    log.info("Waking Cloudflare sandbox", { id });
+
+    try {
+      const sandboxInfo = await getSandboxById(id);
+      if (!sandboxInfo) {
+        return c.json({ error: "Sandbox not found" }, 404);
+      }
+
+      if (sandboxInfo.provider !== "cloudflare") {
+        return c.json({ error: "Wake endpoint only works for Cloudflare sandboxes" }, 400);
+      }
+
+      const cloudflareProvider = getCloudflareProvider();
+      await cloudflareProvider.startSandbox(id);
+      
+      await updateSandbox(id, { status: "running" });
+      await touchSandbox(id);
+      
+      const sandbox = await getSandboxById(id);
+      return c.json({ sandbox, message: "Sandbox woken up" });
+    } catch (error) {
+      log.error("Failed to wake sandbox", { id, error });
+      return c.json(
+        { error: "Failed to wake sandbox", details: error instanceof Error ? error.message : "Unknown error" },
         500
       );
     }

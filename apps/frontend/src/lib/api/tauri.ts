@@ -1139,6 +1139,13 @@ export async function unpauseSandbox(id: string): Promise<Sandbox> {
 }
 
 /**
+ * Wake a sleeping Cloudflare sandbox
+ */
+export async function wakeSandbox(id: string): Promise<Sandbox> {
+  return invoke<Sandbox>("wake_sandbox", { id });
+}
+
+/**
  * Get sandbox logs
  */
 export async function getSandboxLogs(id: string, tail?: number): Promise<string> {
