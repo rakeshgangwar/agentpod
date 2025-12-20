@@ -37,12 +37,45 @@ import type { Sandbox as DbSandbox, SandboxStatus as DbSandboxStatus } from "../
 import { getOpenCodeSyncService } from "./sync/opencode-sync.ts";
 import { onboardingService } from "./onboarding-service.ts";
 import { getResourceTierById } from "../models/resource-tier.ts";
+import { getProvider } from "./providers/index.ts";
+import type { SandboxProviderType } from "./providers/types.ts";
 
 const log = createLogger("sandbox-manager");
+
+// Cloudflare sandbox auto-hibernates after 10 minutes of inactivity (configurable via sleepAfter)
+// We use this as the threshold to determine if a Cloudflare sandbox is likely sleeping
+const CLOUDFLARE_SLEEP_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
 // =============================================================================
 // Type Mapping & Types
 // =============================================================================
+
+/**
+ * Calculate effective status for Cloudflare sandboxes based on last activity.
+ * Cloudflare sandboxes auto-hibernate after 10 minutes of inactivity,
+ * but there's no API to check their actual state without waking them.
+ */
+function calculateCloudflareEffectiveStatus(
+  dbStatus: DbSandboxStatus,
+  lastAccessedAt: Date | undefined,
+  createdAt: Date | undefined
+): DbSandboxStatus {
+  if (dbStatus !== 'running') {
+    return dbStatus;
+  }
+  
+  const referenceTime = lastAccessedAt ?? createdAt;
+  if (!referenceTime) {
+    return 'sleeping';
+  }
+  
+  const timeSinceAccess = Date.now() - referenceTime.getTime();
+  if (timeSinceAccess > CLOUDFLARE_SLEEP_TIMEOUT_MS) {
+    return 'sleeping';
+  }
+  
+  return 'running';
+}
 
 /**
  * Maps Docker container status to database sandbox status
@@ -282,6 +315,17 @@ export class SandboxManager {
       },
     };
 
+    // Handle Cloudflare sandboxes - calculate effective status based on activity
+    if (dbSandbox.provider === 'cloudflare') {
+      sandbox.status = calculateCloudflareEffectiveStatus(
+        dbSandbox.status,
+        dbSandbox.lastAccessedAt,
+        dbSandbox.createdAt
+      );
+      return sandbox;
+    }
+
+    // Handle Docker sandboxes - enrich with live container info
     if (dbSandbox.containerId) {
       try {
         const dockerSandbox = await this.orchestrator.getSandbox(dbSandbox.id);
@@ -608,16 +652,25 @@ export class SandboxManager {
     await SandboxModel.updateSandboxStatus(sandboxId, 'starting');
     
     try {
-      await this.orchestrator.startSandbox(sandboxId);
+      // Route to appropriate provider based on sandbox type
+      if (dbSandbox.provider === 'cloudflare') {
+        const provider = getProvider('cloudflare');
+        await provider.startSandbox(sandboxId);
+      } else {
+        await this.orchestrator.startSandbox(sandboxId);
+      }
+      
       await SandboxModel.updateSandboxStatus(sandboxId, 'running');
       await SandboxModel.touchSandbox(sandboxId);
       
-      // Start sync service for this sandbox
-      try {
-        await getOpenCodeSyncService().startSync(sandboxId);
-      } catch (syncError) {
-        log.warn("Failed to start sync for sandbox", { sandboxId, error: syncError });
-        // Don't fail the start if sync fails
+      // Start sync service for this sandbox (Docker only)
+      if (dbSandbox.provider !== 'cloudflare') {
+        try {
+          await getOpenCodeSyncService().startSync(sandboxId);
+        } catch (syncError) {
+          log.warn("Failed to start sync for sandbox", { sandboxId, error: syncError });
+          // Don't fail the start if sync fails
+        }
       }
     } catch (error) {
       await SandboxModel.updateSandboxStatus(sandboxId, 'error', error instanceof Error ? error.message : 'Start failed');
@@ -637,18 +690,24 @@ export class SandboxManager {
       throw new Error(`Sandbox not found: ${sandboxId}`);
     }
 
-    // Stop sync service before stopping container
-    try {
-      getOpenCodeSyncService().stopSync(sandboxId);
-    } catch (syncError) {
-      log.warn("Failed to stop sync for sandbox", { sandboxId, error: syncError });
-      // Don't fail the stop if sync stop fails
+    // Stop sync service before stopping container (Docker only)
+    if (dbSandbox.provider !== 'cloudflare') {
+      try {
+        getOpenCodeSyncService().stopSync(sandboxId);
+      } catch (syncError) {
+        log.warn("Failed to stop sync for sandbox", { sandboxId, error: syncError });
+      }
     }
 
     await SandboxModel.updateSandboxStatus(sandboxId, 'stopping');
     
     try {
-      await this.orchestrator.stopSandbox(sandboxId, timeout);
+      if (dbSandbox.provider === 'cloudflare') {
+        const provider = getProvider('cloudflare');
+        await provider.stopSandbox(sandboxId);
+      } else {
+        await this.orchestrator.stopSandbox(sandboxId, timeout);
+      }
       await SandboxModel.updateSandboxStatus(sandboxId, 'stopped');
     } catch (error) {
       await SandboxModel.updateSandboxStatus(sandboxId, 'error', error instanceof Error ? error.message : 'Stop failed');
@@ -671,7 +730,12 @@ export class SandboxManager {
     await SandboxModel.updateSandboxStatus(sandboxId, 'starting');
     
     try {
-      await this.orchestrator.restartSandbox(sandboxId, timeout);
+      if (dbSandbox.provider === 'cloudflare') {
+        const provider = getProvider('cloudflare');
+        await provider.startSandbox(sandboxId);
+      } else {
+        await this.orchestrator.restartSandbox(sandboxId, timeout);
+      }
       await SandboxModel.updateSandboxStatus(sandboxId, 'running');
       await SandboxModel.touchSandbox(sandboxId);
     } catch (error) {
