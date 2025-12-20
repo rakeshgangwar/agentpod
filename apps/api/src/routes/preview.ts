@@ -8,7 +8,6 @@ import {
   listPreviewPortsBySandbox,
   getPreviewPortByPort,
   getPreviewPortByPublicToken,
-  createPreviewPort,
   updatePreviewPort,
   deletePreviewPort,
   upsertPreviewPort,
@@ -30,7 +29,7 @@ const updatePortSchema = z.object({
 });
 
 const sharePortSchema = z.object({
-  expiresIn: z.string().regex(/^\d+[hdwm]$/).optional(),
+  expiresIn: z.string().regex(/^[1-9]\d{0,2}[hdwm]$/).optional(),
 });
 
 function buildPreviewUrl(slug: string, port: number): string {

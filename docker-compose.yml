@@ -177,7 +177,7 @@ services:
       # Host path prefix for bind mounts (required when API runs in Docker)
       # This translates container paths to host paths for sandbox bind mounts
       # Set to the absolute path of this project on the host machine
-      - HOST_PATH_PREFIX=${HOST_PATH_PREFIX:-${PWD}}
+      - HOST_PATH_PREFIX=${HOST_PATH_PREFIX:-}
 
       # =======================================================================
       # PostgreSQL Database
