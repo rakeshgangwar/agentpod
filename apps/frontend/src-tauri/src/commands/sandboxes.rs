@@ -57,6 +57,7 @@ pub async fn create_sandbox(
     resource_tier: Option<String>,
     addons: Option<Vec<String>>,
     auto_start: Option<bool>,
+    provider: Option<String>,
 ) -> Result<SandboxWithRepo, AppError> {
     let client = get_client()?;
     
@@ -69,6 +70,7 @@ pub async fn create_sandbox(
         resource_tier,
         addons,
         auto_start,
+        provider,
     };
     
     client.post("/api/v2/sandboxes", &input).await

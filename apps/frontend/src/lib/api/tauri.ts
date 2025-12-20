@@ -710,8 +710,8 @@ export async function authIsAuthenticated(): Promise<boolean> {
 // V2 Sandbox Types (Direct Docker Orchestration)
 // =============================================================================
 
-// Must match the API's SandboxStatus: 'created' | 'starting' | 'running' | 'stopping' | 'stopped' | 'error'
-export type SandboxStatus = "created" | "starting" | "running" | "stopping" | "stopped" | "error" | "unknown";
+// Must match the API's SandboxStatus: 'created' | 'starting' | 'running' | 'stopping' | 'stopped' | 'sleeping' | 'error'
+export type SandboxStatus = "created" | "starting" | "running" | "stopping" | "stopped" | "sleeping" | "error" | "unknown";
 
 export interface SandboxUrls {
   homepage?: string;
@@ -727,6 +727,8 @@ export interface SandboxHealth {
   lastCheck?: string;
 }
 
+export type SandboxProvider = "docker" | "cloudflare";
+
 export interface Sandbox {
   id: string;
   userId: string;
@@ -734,11 +736,14 @@ export interface Sandbox {
   slug: string;
   description?: string;
   
+  // Provider (docker or cloudflare)
+  provider?: SandboxProvider;
+  
   // Git/Repository info
   repoName: string;
   githubUrl?: string;
   
-  // Container configuration
+  // Container configuration (Docker-only)
   resourceTierId?: string;
   flavorId?: string;
   addonIds: string[];
@@ -789,11 +794,12 @@ export interface CreateSandboxInput {
   resourceTier?: string;
   addons?: string[];
   autoStart?: boolean;
+  provider?: SandboxProvider;
 }
 
 export interface SandboxWithRepo {
   sandbox: Sandbox;
-  repository: Repository;
+  repository?: Repository;
 }
 
 export interface SandboxInfo {
@@ -1086,6 +1092,7 @@ export async function createSandbox(input: CreateSandboxInput): Promise<SandboxW
     resourceTier: input.resourceTier ?? null,
     addons: input.addons ?? null,
     autoStart: input.autoStart ?? null,
+    provider: input.provider ?? null,
   });
 }
 
