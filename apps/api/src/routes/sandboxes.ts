@@ -31,7 +31,9 @@ import {
   checkAllLimitsForSandboxCreation, 
   checkAllLimitsForSandboxStart,
 } from "../models/user-resource-limits.ts";
-import { getSandboxById } from "../models/sandbox.ts";
+import { getSandboxById, createSandbox as createSandboxRecord, updateSandbox, generateUniqueSlug } from "../models/sandbox.ts";
+import { isCloudflareConfigured, getCloudflareProvider } from "../services/providers/index.ts";
+import { nanoid } from "nanoid";
 
 const log = createLogger("sandbox-routes");
 
@@ -59,7 +61,7 @@ const createSandboxSchema = z.object({
   description: z.string().max(500).optional(),
   githubUrl: z.string().url().optional(),
   userId: z.string().min(1),
-  // Dynamic validation: accept any string, validate against DB in handler
+  provider: z.enum(["docker", "cloudflare"]).optional().default("docker"),
   flavor: z.string().optional(),
   resourceTier: z.string().optional(),
   addons: z.array(z.string()).optional(),
@@ -121,10 +123,87 @@ export const sandboxRoutes = new Hono()
   .post("/", zValidator("json", createSandboxSchema), async (c) => {
     const body = c.req.valid("json");
 
-    log.info("Creating sandbox", { name: body.name, userId: body.userId });
+    log.info("Creating sandbox", { name: body.name, userId: body.userId, provider: body.provider });
 
     try {
-      // Validate flavor against database
+      if (body.provider === "cloudflare") {
+        if (!isCloudflareConfigured()) {
+          return c.json({ 
+            error: "Cloudflare provider not available",
+            message: "Cloudflare sandboxes are not enabled. Set ENABLE_CLOUDFLARE_SANDBOXES=true and configure CLOUDFLARE_WORKER_URL.",
+          }, 400);
+        }
+
+        const sandboxId = nanoid(12);
+        const slug = await generateUniqueSlug(body.userId, body.name);
+
+        log.info("Creating Cloudflare sandbox", { sandboxId, name: body.name, userId: body.userId });
+
+        const dbSandbox = await createSandboxRecord({
+          id: sandboxId,
+          userId: body.userId,
+          name: body.name,
+          slug,
+          description: body.description,
+          repoName: `${slug}-${sandboxId}`,
+          githubUrl: body.githubUrl,
+          provider: "cloudflare",
+          resourceTierId: "starter",
+          flavorId: "cloudflare",
+          addonIds: [],
+        });
+
+        await updateSandbox(sandboxId, { status: "starting" });
+
+        const cloudflareProvider = getCloudflareProvider();
+        const opencodeUrl = cloudflareProvider.getOpencodeUrl(sandboxId);
+
+        (async () => {
+          try {
+            log.info("Starting async Cloudflare sandbox provisioning", { sandboxId });
+            
+            await cloudflareProvider.createSandbox({
+              id: sandboxId,
+              userId: body.userId,
+              name: body.name,
+              gitUrl: body.githubUrl,
+            });
+
+            await updateSandbox(sandboxId, {
+              status: "running",
+              opencodeUrl,
+            });
+
+            log.info("Cloudflare sandbox provisioned successfully", { sandboxId });
+          } catch (cloudflareError) {
+            log.error("Cloudflare sandbox provisioning failed", { 
+              sandboxId, 
+              error: cloudflareError instanceof Error ? cloudflareError.message : "Unknown error",
+            });
+            await updateSandbox(sandboxId, { 
+              status: "error", 
+              errorMessage: cloudflareError instanceof Error ? cloudflareError.message : "Cloudflare sandbox creation failed",
+            });
+          }
+        })();
+
+        return c.json(
+          {
+            sandbox: {
+              ...dbSandbox,
+              status: "starting",
+              provider: "cloudflare",
+              opencodeUrl,
+              urls: {
+                opencode: opencodeUrl,
+              },
+            },
+            repository: null,
+          },
+          201
+        );
+      }
+
       let flavorId = body.flavor;
       if (flavorId) {
         const flavor = await getFlavorById(flavorId);
@@ -135,12 +214,10 @@ export const sandboxRoutes = new Hono()
           return c.json({ error: `Flavor '${flavorId}' is currently disabled.` }, 400);
         }
       } else {
-        // Use default flavor if not specified
         const defaultFlavor = await getDefaultFlavor();
         flavorId = defaultFlavor?.id;
       }
 
-      // Validate resourceTier against database
       let resourceTierId = body.resourceTier;
       if (resourceTierId) {
         const tier = await getResourceTierById(resourceTierId);
@@ -148,12 +225,10 @@ export const sandboxRoutes = new Hono()
           return c.json({ error: `Invalid resource tier: '${resourceTierId}'. Tier does not exist.` }, 400);
         }
       } else {
-        // Use default tier if not specified
         const defaultTier = await getDefaultResourceTier();
         resourceTierId = defaultTier?.id;
       }
 
-      // Check user resource limits before creating sandbox
       const limitCheck = await checkAllLimitsForSandboxCreation(
         body.userId,
         resourceTierId ?? "starter",

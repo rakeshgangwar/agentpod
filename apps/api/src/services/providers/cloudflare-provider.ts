@@ -38,6 +38,10 @@ export class CloudflareSandboxProvider implements SandboxProvider {
     }
   }
 
+  getOpencodeUrl(sandboxId: string): string {
+    return `${this.workerUrl}/sandbox/${sandboxId}/opencode`;
+  }
+
   private async workerFetch(
     path: string,
     options: RequestInit = {}
