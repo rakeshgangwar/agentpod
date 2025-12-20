@@ -113,6 +113,16 @@ pub struct MessagePath {
     pub root: String,
 }
 
+/// Model info for nested model object in some messages
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MessageModelInfo {
+    #[serde(rename = "providerID")]
+    pub provider_id: String,
+    #[serde(rename = "modelID")]
+    pub model_id: String,
+}
+
 /// Message info (metadata) - matches actual OpenCode API response
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -121,8 +131,9 @@ pub struct MessageInfo {
     #[serde(rename = "sessionID")]
     pub session_id: String,
     pub role: MessageRole,
+    // Time can be either an object {created, completed} or an ISO8601 string
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub time: Option<MessageTime>,
+    pub time: Option<serde_json::Value>,
     #[serde(rename = "parentID", skip_serializing_if = "Option::is_none")]
     pub parent_id: Option<String>,
     #[serde(rename = "modelID", skip_serializing_if = "Option::is_none")]
@@ -139,6 +150,14 @@ pub struct MessageInfo {
     pub tokens: Option<TokenUsage>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub finish: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<MessageModelInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub system: Option<String>,
 }
 
 /// Tool invocation state

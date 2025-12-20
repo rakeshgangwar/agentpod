@@ -155,14 +155,25 @@ function applyHandlerActions(actions: HandlerAction[], appliers: ActionAppliers)
   for (const action of actions) {
     switch (action.type) {
       case "add_message":
-        // Add message only if it doesn't already exist (upsert behavior)
-        // This prevents duplicate messages when message.updated and message.part.updated
-        // both arrive before state updates propagate
         appliers.setInternalMessages(prev => {
-          const exists = prev.some(m => m.id === action.message.id);
-          if (exists) {
-            console.log("[applyHandlerActions] Skipping duplicate add_message:", action.message.id);
-            return prev;
+          const existingIdx = prev.findIndex(m => m.id === action.message.id);
+          if (existingIdx !== -1) {
+            const existing = prev[existingIdx];
+            const incoming = action.message;
+            const merged: InternalMessage = {
+              ...existing,
+              text: incoming.text || existing.text,
+              reasoning: [...existing.reasoning, ...incoming.reasoning.filter(r => !existing.reasoning.some(e => e.id === r.id))],
+              files: [...existing.files, ...incoming.files.filter(f => !existing.files.some(e => e.id === f.id))],
+              steps: [...existing.steps, ...incoming.steps.filter(s => !existing.steps.some(e => e.id === s.id))],
+              patches: [...existing.patches, ...incoming.patches.filter(p => !existing.patches.some(e => e.id === p.id))],
+              subtasks: [...existing.subtasks, ...incoming.subtasks.filter(s => !existing.subtasks.some(e => e.id === s.id))],
+              retries: [...existing.retries, ...incoming.retries.filter(r => !existing.retries.some(e => e.id === r.id))],
+              toolCalls: new Map([...existing.toolCalls, ...incoming.toolCalls]),
+            };
+            const updated = [...prev];
+            updated[existingIdx] = merged;
+            return updated;
           }
           return [...prev, action.message];
         });
@@ -257,6 +268,12 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
   
   // Stream reference for SSE
   const streamRef = useRef<OpenCodeStream | null>(null);
+  
+  // Ref to always access latest internalMessages (avoids stale closure in SSE handler)
+  const internalMessagesRef = useRef<InternalMessage[]>(internalMessages);
+  useEffect(() => {
+    internalMessagesRef.current = internalMessages;
+  }, [internalMessages]);
   
   // Permission context - we only use addPermission and removePermission
   // clearPermissions is intentionally NOT used (see comment below)
@@ -390,20 +407,20 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
     };
   }, [projectId, sessionId]);
 
-  // Handle SSE event to update message state using modular handlers
   const handleSSEEvent = useCallback((event: OpenCodeEvent) => {
-    // Build handler context with current state - direct use of unified types
+    const eventType = (event.data as Record<string, unknown>)?.type || event.eventType;
+    console.log("[RuntimeProvider] handleSSEEvent:", eventType, "sessionId:", sessionId, "messagesCount:", internalMessagesRef.current.length);
+    
     const context: HandlerContext = {
       projectId,
       sessionId,
-      messages: internalMessages,
+      messages: internalMessagesRef.current,
     };
 
-    // Dispatch event to handlers
     const result = handleSSEEventFromHandlers(event, context);
 
-    // Apply returned actions to state
     if (result.actions.length > 0) {
+      console.log("[RuntimeProvider] Applying actions:", result.actions.map(a => a.type));
       applyHandlerActions(result.actions, {
         setInternalMessages,
         setIsRunning,
@@ -417,8 +434,10 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
         projectId,
         sessionId,
       });
+    } else if (!result.handled) {
+      console.log("[RuntimeProvider] Event not handled:", eventType);
     }
-  }, [projectId, sessionId, internalMessages]);
+  }, [projectId, sessionId]);
 
   // Connect to SSE stream when session is available
   // Use a ref for handleSSEEvent to avoid triggering reconnects when it changes

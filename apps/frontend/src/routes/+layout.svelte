@@ -1,14 +1,16 @@
 <script lang="ts">
   import "../app.css";
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import { goto } from "$app/navigation";
   import { initConnection } from "$lib/stores/connection.svelte";
   import { auth, initAuth } from "$lib/stores/auth.svelte";
   import { initSettings } from "$lib/stores/settings.svelte";
   import { themeStore } from "$lib/themes/store.svelte";
+  import { quickTask } from "$lib/stores/quick-task.svelte";
   import { Toaster } from "$lib/components/ui/sonner";
   import * as Tooltip from "$lib/components/ui/tooltip";
   import AppShell from "$lib/components/app-shell.svelte";
+  import QuickTaskModal from "$lib/components/quick-task-modal.svelte";
 
   let { children } = $props();
   let isInitializing = $state(true);
@@ -29,20 +31,30 @@
   // Hide on public routes (login/setup) and show on all authenticated routes
   let showAppShell = $derived(!isPublicRoute && !shouldShowLoading);
 
+  function handleGlobalKeydown(e: KeyboardEvent) {
+    if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      e.preventDefault();
+      quickTask.toggle();
+    }
+  }
+
   onMount(async () => {
-    // Get current path
     currentPath = window.location.pathname;
     
-    // Initialize theme store first (applies saved theme immediately)
     themeStore.initialize();
     
-    // Initialize settings
     await initSettings();
-    // Initialize auth
     await initAuth();
-    // Then connection
     await initConnection();
     isInitializing = false;
+
+    window.addEventListener("keydown", handleGlobalKeydown);
+  });
+
+  onDestroy(() => {
+    if (typeof window !== "undefined") {
+      window.removeEventListener("keydown", handleGlobalKeydown);
+    }
   });
 
   // Auth guard - redirect to login if not authenticated
@@ -96,4 +108,6 @@
       {@render children()}
     {/if}
   </div>
+
+  <QuickTaskModal />
 </Tooltip.Provider>
