@@ -158,7 +158,7 @@
     switch (status) {
       case "exited": return "stopped";
       case "created": return "ready";
-      case "sleeping": return "hibernating";
+      case "sleeping": return "sleeping";
       default: return status;
     }
   }

@@ -8,6 +8,9 @@
     fetchSandboxes,
     startSandbox,
     stopSandbox,
+    sleepSandbox,
+    wakeSandbox,
+    restartSandbox,
     deleteSandbox,
     checkDockerHealth
   } from "$lib/stores/sandboxes.svelte";
@@ -28,6 +31,9 @@
   import PlusIcon from "@lucide/svelte/icons/plus";
   import FolderIcon from "@lucide/svelte/icons/folder";
   import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
+  import SunriseIcon from "@lucide/svelte/icons/sunrise";
+  import RotateCcwIcon from "@lucide/svelte/icons/rotate-ccw";
+  import MoonIcon from "@lucide/svelte/icons/moon";
 
   // Back navigation helper
   function goBack() {
@@ -128,7 +134,7 @@
   function getStatusLabel(status: string): string {
     switch (status) {
       case "created": return "ready";
-      case "sleeping": return "hibernating";
+      case "sleeping": return "sleeping";
       default: return status;
     }
   }
@@ -201,6 +207,24 @@
   async function handleStop(e: MouseEvent, sandboxId: string) {
     e.stopPropagation();
     stopSandbox(sandboxId);
+  }
+
+  async function handleWake(e: MouseEvent, sandboxId: string) {
+    e.stopPropagation();
+    e.preventDefault();
+    wakeSandbox(sandboxId);
+  }
+
+  async function handleRetry(e: MouseEvent, sandboxId: string) {
+    e.stopPropagation();
+    e.preventDefault();
+    restartSandbox(sandboxId);
+  }
+
+  async function handleSleep(e: MouseEvent, sandboxId: string) {
+    e.stopPropagation();
+    e.preventDefault();
+    sleepSandbox(sandboxId);
   }
 
   async function handleDelete(e: MouseEvent, sandbox: { id: string; name: string }) {
@@ -446,7 +470,7 @@
                   >
                     Start
                   </Button>
-                {:else if sandbox.status === "running"}
+                {:else if sandbox.status === "running" && sandbox.provider !== "cloudflare"}
                   <Button
                     size="sm"
                     variant="secondary"
@@ -456,6 +480,16 @@
                   >
                     Stop
                   </Button>
+                {:else if sandbox.status === "running" && sandbox.provider === "cloudflare"}
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onclick={(e: MouseEvent) => handleSleep(e, sandbox.id)}
+                    disabled={sandboxes.isLoading}
+                    class="font-mono text-xs uppercase tracking-wider h-7 px-3"
+                  >
+                    Sleep
+                  </Button>
                 {:else if sandbox.status === "starting" || sandbox.status === "stopping"}
                   <Button
                     size="sm"
@@ -463,6 +497,26 @@
                     class="font-mono text-xs uppercase tracking-wider h-7 px-3"
                   >
                     {sandbox.status === "starting" ? "..." : "..."}
+                  </Button>
+                {:else if sandbox.status === "sleeping"}
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onclick={(e: MouseEvent) => handleWake(e, sandbox.id)}
+                    disabled={sandboxes.isLoading}
+                    class="font-mono text-xs uppercase tracking-wider h-7 px-3"
+                  >
+                    Wake
+                  </Button>
+                {:else if sandbox.status === "error"}
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onclick={(e: MouseEvent) => handleRetry(e, sandbox.id)}
+                    disabled={sandboxes.isLoading}
+                    class="font-mono text-xs uppercase tracking-wider h-7 px-3"
+                  >
+                    Retry
                   </Button>
                 {/if}
 
@@ -562,7 +616,7 @@
                     >
                       Start
                     </Button>
-                  {:else if sandbox.status === "running"}
+                  {:else if sandbox.status === "running" && sandbox.provider !== "cloudflare"}
                     <Button
                       size="sm"
                       variant="secondary"
@@ -572,6 +626,16 @@
                     >
                       Stop
                     </Button>
+                  {:else if sandbox.status === "running" && sandbox.provider === "cloudflare"}
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onclick={(e: MouseEvent) => handleSleep(e, sandbox.id)}
+                      disabled={sandboxes.isLoading}
+                      class="font-mono text-xs uppercase tracking-wider h-8 px-4"
+                    >
+                      Sleep
+                    </Button>
                   {:else if sandbox.status === "starting" || sandbox.status === "stopping"}
                     <Button
                       size="sm"
@@ -579,6 +643,26 @@
                       class="font-mono text-xs uppercase tracking-wider h-8 px-4"
                     >
                       {sandbox.status === "starting" ? "Starting..." : "Stopping..."}
+                    </Button>
+                  {:else if sandbox.status === "sleeping"}
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onclick={(e: MouseEvent) => handleWake(e, sandbox.id)}
+                      disabled={sandboxes.isLoading}
+                      class="font-mono text-xs uppercase tracking-wider h-8 px-4"
+                    >
+                      Wake
+                    </Button>
+                  {:else if sandbox.status === "error"}
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onclick={(e: MouseEvent) => handleRetry(e, sandbox.id)}
+                      disabled={sandboxes.isLoading}
+                      class="font-mono text-xs uppercase tracking-wider h-8 px-4"
+                    >
+                      Retry
                     </Button>
                   {/if}
 
@@ -666,7 +750,7 @@
                     >
                       Start
                     </Button>
-                  {:else if sandbox.status === "running"}
+                  {:else if sandbox.status === "running" && sandbox.provider !== "cloudflare"}
                     <Button
                       size="sm"
                       variant="secondary"
@@ -676,6 +760,16 @@
                     >
                       Stop
                     </Button>
+                  {:else if sandbox.status === "running" && sandbox.provider === "cloudflare"}
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onclick={(e: MouseEvent) => handleSleep(e, sandbox.id)}
+                      disabled={sandboxes.isLoading}
+                      class="font-mono text-xs uppercase tracking-wider h-7 px-3 flex-1"
+                    >
+                      Sleep
+                    </Button>
                   {:else if sandbox.status === "starting" || sandbox.status === "stopping"}
                     <Button
                       size="sm"
@@ -683,6 +777,26 @@
                       class="font-mono text-xs uppercase tracking-wider h-7 px-3 flex-1"
                     >
                       ...
+                    </Button>
+                  {:else if sandbox.status === "sleeping"}
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onclick={(e: MouseEvent) => handleWake(e, sandbox.id)}
+                      disabled={sandboxes.isLoading}
+                      class="font-mono text-xs uppercase tracking-wider h-7 px-3 flex-1"
+                    >
+                      Wake
+                    </Button>
+                  {:else if sandbox.status === "error"}
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onclick={(e: MouseEvent) => handleRetry(e, sandbox.id)}
+                      disabled={sandboxes.isLoading}
+                      class="font-mono text-xs uppercase tracking-wider h-7 px-3 flex-1"
+                    >
+                      Retry
                     </Button>
                   {/if}
 

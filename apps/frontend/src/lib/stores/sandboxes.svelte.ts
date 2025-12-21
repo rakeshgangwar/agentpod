@@ -268,6 +268,14 @@ export async function unpauseSandbox(id: string): Promise<boolean> {
 }
 
 /**
+ * Sleep a Cloudflare sandbox - UI-only, no API call (Cloudflare auto-hibernates)
+ */
+export async function sleepSandbox(id: string): Promise<boolean> {
+  setOptimisticStatus(id, "sleeping");
+  return true;
+}
+
+/**
  * Wake a sleeping Cloudflare sandbox
  */
 export async function wakeSandbox(id: string): Promise<boolean> {

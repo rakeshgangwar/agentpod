@@ -22,6 +22,7 @@ import { CommandPicker, type Command } from "./CommandPicker";
 import { FilePicker } from "./FilePicker";
 import { FileAttachmentButton, FileAttachmentPreview, type AttachedFile } from "./FileAttachment";
 import { useAttachments, useSessionStatus } from "./RuntimeProvider";
+import { PermissionBar } from "./PermissionBar";
 import { VoiceInputButton } from "../voice/VoiceInputButton";
 import { VoiceSetupDialog } from "../voice/VoiceSetupDialog";
 import { useVoiceInput } from "../voice/useVoiceInput";
@@ -436,8 +437,9 @@ function ToolCallPart({ toolName, args, result, isError }: ToolCallMessagePartPr
         </div>
       )}
       <details className="group">
-        <summary className="px-3 py-2 font-mono text-xs text-muted-foreground cursor-pointer hover:bg-muted/30 transition-colors">
-          {isComplete ? '> Show details' : '> Show arguments'}
+        <summary className="px-3 py-2 font-mono text-xs text-muted-foreground cursor-pointer hover:bg-muted/30 transition-colors list-none [&::-webkit-details-marker]:hidden">
+          <span className="group-open:rotate-90 inline-block transition-transform mr-1">&gt;</span>
+          {isComplete ? 'Show details' : 'Show arguments'}
         </summary>
         <div className="px-3 py-2 space-y-2 min-w-0">
           <div className="min-w-0">
@@ -470,7 +472,7 @@ const ToolGroup: FC<PropsWithChildren<{ startIndex: number; endIndex: number }>>
 
   return (
     <details className="my-2" open>
-      <summary className="cursor-pointer font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]/80 transition-colors">
+      <summary className="cursor-pointer font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]/80 transition-colors list-none [&::-webkit-details-marker]:hidden">
         [{toolCount}] tool {toolCount === 1 ? "call" : "calls"}
       </summary>
       <div className="mt-1 space-y-1">{children}</div>
@@ -1336,7 +1338,7 @@ function SessionStatusIndicator() {
           className={`${baseClasses} bg-gradient-to-r from-transparent via-[var(--cyber-cyan)] to-transparent`}
           style={{
             backgroundSize: "200% 100%",
-            animation: "glow-sweep 3s ease-in-out infinite",
+            animation: "glow-sweep 2s ease-in-out infinite alternate",
           }}
         />
         {/* Glow effect */}
@@ -1344,7 +1346,7 @@ function SessionStatusIndicator() {
           className="absolute inset-0 h-[2px] blur-sm bg-gradient-to-r from-transparent via-[var(--cyber-cyan)] to-transparent opacity-50"
           style={{
             backgroundSize: "200% 100%",
-            animation: "glow-sweep 3s ease-in-out infinite",
+            animation: "glow-sweep 2s ease-in-out infinite alternate",
           }}
         />
       </div>
@@ -1446,6 +1448,8 @@ export function ChatThread({
         
         {/* Session status indicator between messages and composer */}
         <SessionStatusIndicator />
+        
+        <PermissionBar />
         
         <Composer 
           projectId={projectId} 

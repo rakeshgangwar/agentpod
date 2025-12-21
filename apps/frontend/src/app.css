@@ -1073,7 +1073,7 @@ article,
 }
 
 .animate-glow-sweep {
-  animation: glow-sweep 3s ease-in-out infinite;
+  animation: glow-sweep 2s ease-in-out infinite alternate;
 }
 
 /* ============================================

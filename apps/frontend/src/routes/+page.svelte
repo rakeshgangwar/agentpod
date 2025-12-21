@@ -8,6 +8,9 @@
     fetchSandboxes,
     startSandbox,
     stopSandbox,
+    sleepSandbox,
+    wakeSandbox,
+    restartSandbox,
     checkDockerHealth
   } from "$lib/stores/sandboxes.svelte";
   import { subscribeToActivityChanges, getBusySandboxIds } from "$lib/stores/session-activity.svelte";
@@ -39,6 +42,9 @@
   import RocketIcon from "@lucide/svelte/icons/rocket";
   import ZapIcon from "@lucide/svelte/icons/zap";
   import CheckCircleIcon from "@lucide/svelte/icons/check-circle";
+  import SunriseIcon from "@lucide/svelte/icons/sunrise";
+  import RotateCcwIcon from "@lucide/svelte/icons/rotate-ccw";
+  import MoonIcon from "@lucide/svelte/icons/moon";
 
   // =============================================================================
   // Loading Screen State
@@ -327,6 +333,24 @@
     e.stopPropagation();
     e.preventDefault();
     stopSandbox(sandboxId);
+  }
+
+  async function handleWake(e: MouseEvent, sandboxId: string) {
+    e.stopPropagation();
+    e.preventDefault();
+    wakeSandbox(sandboxId);
+  }
+
+  async function handleRetry(e: MouseEvent, sandboxId: string) {
+    e.stopPropagation();
+    e.preventDefault();
+    restartSandbox(sandboxId);
+  }
+
+  async function handleSleep(e: MouseEvent, sandboxId: string) {
+    e.stopPropagation();
+    e.preventDefault();
+    sleepSandbox(sandboxId);
   }
 
   function handleRefresh() {
@@ -853,7 +877,7 @@
                       >
                         <PlayIcon class="h-4 w-4 text-[var(--cyber-emerald)]" />
                       </Button>
-                    {:else if isRunning}
+                    {:else if isRunning && sandbox.provider !== "cloudflare"}
                       <Button
                         size="sm"
                         variant="ghost"
@@ -863,6 +887,39 @@
                         title="Stop"
                       >
                         <SquareIcon class="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    {:else if isRunning && sandbox.provider === "cloudflare"}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onclick={(e: MouseEvent) => handleSleep(e, sandbox.id)}
+                        disabled={sandboxes.isLoading}
+                        class="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Sleep"
+                      >
+                        <MoonIcon class="h-4 w-4 text-[var(--cyber-purple)]" />
+                      </Button>
+                    {:else if sandbox.status === "sleeping"}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onclick={(e: MouseEvent) => handleWake(e, sandbox.id)}
+                        disabled={sandboxes.isLoading}
+                        class="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Wake"
+                      >
+                        <SunriseIcon class="h-4 w-4 text-[var(--cyber-amber)]" />
+                      </Button>
+                    {:else if sandbox.status === "error"}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onclick={(e: MouseEvent) => handleRetry(e, sandbox.id)}
+                        disabled={sandboxes.isLoading}
+                        class="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Retry"
+                      >
+                        <RotateCcwIcon class="h-4 w-4 text-[var(--cyber-red)]" />
                       </Button>
                     {/if}
                   </div>

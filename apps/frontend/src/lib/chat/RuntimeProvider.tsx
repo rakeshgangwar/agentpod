@@ -36,7 +36,7 @@ import {
 } from "../api/tauri";
 import type { AttachedFile } from "./FileAttachment";
 import { PermissionProvider, usePermissions } from "./PermissionContext";
-import { PermissionBar } from "./PermissionBar";
+
 import { setSessionActivity } from "../stores/session-activity.svelte";
 
 // Import from our modular chat system
@@ -940,7 +940,6 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
             <div className="flex-1 min-h-0">
               {children}
             </div>
-            <PermissionBar />
           </div>
         </AttachmentContext.Provider>
       </SessionStatusContext.Provider>
