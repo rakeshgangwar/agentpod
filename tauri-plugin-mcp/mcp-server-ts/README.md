@@ -39,16 +39,6 @@ Execute JavaScript code in a Tauri window.
 **Returns:**
 - The result of the JavaScript execution, serialized as a string
 
-### `get_dom`
-
-Get the HTML DOM content of a Tauri window.
-
-**Parameters:**
-- `window_label` (optional): The window to get the DOM from (default: "main")
-
-**Returns:**
-- HTML content as a string
-
 ### `manage_window`
 
 Control Tauri application windows.
