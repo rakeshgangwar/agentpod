@@ -10,10 +10,12 @@
   import * as Tabs from "$lib/components/ui/tabs";
   import * as Collapsible from "$lib/components/ui/collapsible";
   import { Check, ArrowLeft, ChevronDown, Settings2, Sparkles, Globe, Server, Smartphone, Bot, Wrench } from "@lucide/svelte";
+  import ThemeToggle from "$lib/components/theme-toggle.svelte";
   import ResourceTierSelector from "$lib/components/resource-tier-selector.svelte";
   import FlavorSelector from "$lib/components/flavor-selector.svelte";
   import AddonSelector from "$lib/components/addon-selector.svelte";
   import ProjectIconPicker from "$lib/components/project-icon-picker.svelte";
+  import ProviderSelector, { type SandboxProvider } from "$lib/components/provider-selector.svelte";
   import { getSuggestedIcon } from "$lib/utils/project-icons";
   import { projectIcons } from "$lib/stores/project-icons.svelte";
 
@@ -28,6 +30,9 @@
 
   // Form state
   let activeTab = $state("scratch");
+  
+  // Provider selection
+  let selectedProvider = $state<SandboxProvider>("docker");
   
   // From Scratch form
   let projectName = $state("");
@@ -44,6 +49,15 @@
   
   // Advanced options state (collapsed by default)
   let advancedOptionsOpen = $state(false);
+  
+  // Watch provider changes to clear Docker-specific state when switching to Cloudflare
+  $effect(() => {
+    if (selectedProvider === "cloudflare") {
+      selectedFlavorId = "";
+      selectedResourceTierId = "";
+      selectedAddonIds = [];
+    }
+  });
   
   // Flavor image availability tracking
   let flavorImageStatus = $state<Record<string, FlavorImageStatus>>({});
@@ -310,7 +324,10 @@
       
       if (activeTab === "scratch") {
         // From Scratch
-        creationProgress = [{ message: "Creating repository...", done: false }];
+        const firstStepMessage = selectedProvider === "docker" 
+          ? "Creating repository..." 
+          : "Provisioning sandbox...";
+        creationProgress = [{ message: firstStepMessage, done: false }];
         
         const result = await createSandbox({
           name: projectName.trim(),
@@ -320,6 +337,7 @@
           flavor: selectedFlavorId || undefined,
           addons: selectedAddonIds.length > 0 ? selectedAddonIds : undefined,
           autoStart: true,
+          provider: selectedProvider,
         });
         
         if (result) {
@@ -327,9 +345,15 @@
           // Save the selected icon for this project
           projectIcons.setIcon(sandboxId, selectedIconId);
           // Mark first step done, add second step
+          const firstStepMessage = selectedProvider === "docker" 
+            ? "Creating repository..." 
+            : "Provisioning sandbox...";
+          const secondStepMessage = selectedProvider === "docker"
+            ? "Starting container..."
+            : "Starting OpenCode...";
           creationProgress = [
-            { message: "Creating repository...", done: true },
-            { message: "Starting container...", done: false },
+            { message: firstStepMessage, done: true },
+            { message: secondStepMessage, done: false },
           ];
         } else {
           errorMessage = "Failed to create project. Please try again.";
@@ -337,7 +361,10 @@
         }
       } else {
         // GitHub Import
-        creationProgress = [{ message: "Cloning from GitHub...", done: false }];
+        const firstStepMessage = selectedProvider === "docker"
+          ? "Cloning from GitHub..."
+          : "Cloning repository...";
+        creationProgress = [{ message: firstStepMessage, done: false }];
         
         // Extract name from URL if not provided
         const repoName = extractRepoName(githubUrl);
@@ -350,6 +377,7 @@
           flavor: selectedFlavorId || undefined,
           addons: selectedAddonIds.length > 0 ? selectedAddonIds : undefined,
           autoStart: true,
+          provider: selectedProvider,
         });
         
         if (result) {
@@ -357,9 +385,15 @@
           // Save the selected icon for this project
           projectIcons.setIcon(sandboxId, selectedIconId);
           // Mark first step done, add second step
+          const firstStepMessage = selectedProvider === "docker"
+            ? "Cloning from GitHub..."
+            : "Cloning repository...";
+          const secondStepMessage = selectedProvider === "docker"
+            ? "Starting container..."
+            : "Starting OpenCode...";
           creationProgress = [
-            { message: "Cloning from GitHub...", done: true },
-            { message: "Starting container...", done: false },
+            { message: firstStepMessage, done: true },
+            { message: secondStepMessage, done: false },
           ];
         } else {
           errorMessage = "Failed to import project. Please check the URL and try again.";
@@ -440,6 +474,7 @@
       >
         <ArrowLeft class="h-4 w-4" />
       </Button>
+      <ThemeToggle />
       <div>
         <h1 class="text-2xl font-bold glitch-hover">
           New Project
@@ -449,6 +484,16 @@
         </p>
       </div>
     </div>
+
+    <!-- Provider Selector -->
+    {#if !isSubmitting}
+      <div class="cyber-card corner-accent overflow-hidden p-6 animate-fade-in-up">
+        <ProviderSelector 
+          bind:value={selectedProvider}
+          disabled={isSubmitting}
+        />
+      </div>
+    {/if}
 
     <!-- Creation Progress -->
     {#if isSubmitting && creationProgress.length > 0}
@@ -591,72 +636,75 @@
                   />
                 </div>
                 
-                <!-- Flavor selector -->
-                <div class="space-y-2 border-t border-border/30 pt-4">
-                  <FlavorSelector
-                    bind:selectedFlavorId
-                    disabled={isSubmitting}
-                  />
-                  
-                  <!-- Warning if selected flavor is not available -->
-                  {#if selectedFlavorId && flavorStatusLoaded && !isFlavorAvailable(selectedFlavorId)}
-                    <div class="p-3 rounded border border-[var(--cyber-amber)]/50 bg-[var(--cyber-amber)]/5">
-                      <p class="text-sm text-[var(--cyber-amber)] font-mono">
-                        <span class="font-bold">{selectedFlavorName()}</span> environment is not downloaded.
-                        Please download it from the list above before creating your project.
-                      </p>
-                    </div>
-                  {/if}
-                </div>
-                
-                <!-- Advanced Options (Collapsible) -->
-                <Collapsible.Root bind:open={advancedOptionsOpen} class="border-t border-border/30 pt-4">
-                  <Collapsible.Trigger 
-                    class="flex items-center justify-between w-full py-2 px-3 -mx-3 rounded 
-                           hover:bg-[var(--cyber-cyan)]/5 transition-colors group"
-                    disabled={isSubmitting}
-                  >
-                    <div class="flex items-center gap-2">
-                      <Settings2 class="w-4 h-4 text-muted-foreground group-hover:text-[var(--cyber-cyan)] transition-colors" />
-                      <span class="font-mono text-xs uppercase tracking-wider text-muted-foreground group-hover:text-foreground transition-colors">
-                        Advanced Options
-                      </span>
-                      {#if selectedAddonIds.length > 0 || selectedResourceTierId}
-                        <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--cyber-cyan)]/10 text-[var(--cyber-cyan)] border border-[var(--cyber-cyan)]/30">
-                          {#if selectedResourceTierId && selectedAddonIds.length > 0}
-                            Configured
-                          {:else if selectedAddonIds.length > 0}
-                            {selectedAddonIds.length} addon{selectedAddonIds.length > 1 ? 's' : ''}
-                          {:else}
-                            Custom tier
-                          {/if}
-                        </span>
-                      {/if}
-                    </div>
-                    <ChevronDown 
-                      class="w-4 h-4 text-muted-foreground transition-transform duration-200
-                             {advancedOptionsOpen ? 'rotate-180' : ''}" 
+                <!-- Docker-specific options -->
+                {#if selectedProvider === "docker"}
+                  <!-- Flavor selector -->
+                  <div class="space-y-2 border-t border-border/30 pt-4">
+                    <FlavorSelector
+                      bind:selectedFlavorId
+                      disabled={isSubmitting}
                     />
-                  </Collapsible.Trigger>
-                  
-                  <Collapsible.Content class="pt-4 space-y-4">
-                    <!-- Resource Tier selector -->
-                    <div class="space-y-2">
-                      <ResourceTierSelector
-                        bind:selectedTierId={selectedResourceTierId}
-                        disabled={isSubmitting}
-                      />
-                    </div>
                     
-                    <!-- Addon selector -->
-                    <div class="space-y-2 border-t border-border/30 pt-4">
-                      <AddonSelector
-                        bind:selectedAddonIds
-                        disabled={isSubmitting}
+                    <!-- Warning if selected flavor is not available -->
+                    {#if selectedFlavorId && flavorStatusLoaded && !isFlavorAvailable(selectedFlavorId)}
+                      <div class="p-3 rounded border border-[var(--cyber-amber)]/50 bg-[var(--cyber-amber)]/5">
+                        <p class="text-sm text-[var(--cyber-amber)] font-mono">
+                          <span class="font-bold">{selectedFlavorName()}</span> environment is not downloaded.
+                          Please download it from the list above before creating your project.
+                        </p>
+                      </div>
+                    {/if}
+                  </div>
+                  
+                  <!-- Advanced Options (Collapsible) -->
+                  <Collapsible.Root bind:open={advancedOptionsOpen} class="border-t border-border/30 pt-4">
+                    <Collapsible.Trigger 
+                      class="flex items-center justify-between w-full py-2 px-3 -mx-3 rounded 
+                             hover:bg-[var(--cyber-cyan)]/5 transition-colors group"
+                      disabled={isSubmitting}
+                    >
+                      <div class="flex items-center gap-2">
+                        <Settings2 class="w-4 h-4 text-muted-foreground group-hover:text-[var(--cyber-cyan)] transition-colors" />
+                        <span class="font-mono text-xs uppercase tracking-wider text-muted-foreground group-hover:text-foreground transition-colors">
+                          Advanced Options
+                        </span>
+                        {#if selectedAddonIds.length > 0 || selectedResourceTierId}
+                          <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--cyber-cyan)]/10 text-[var(--cyber-cyan)] border border-[var(--cyber-cyan)]/30">
+                            {#if selectedResourceTierId && selectedAddonIds.length > 0}
+                              Configured
+                            {:else if selectedAddonIds.length > 0}
+                              {selectedAddonIds.length} addon{selectedAddonIds.length > 1 ? 's' : ''}
+                            {:else}
+                              Custom tier
+                            {/if}
+                          </span>
+                        {/if}
+                      </div>
+                      <ChevronDown 
+                        class="w-4 h-4 text-muted-foreground transition-transform duration-200
+                               {advancedOptionsOpen ? 'rotate-180' : ''}" 
                       />
-                    </div>
-                  </Collapsible.Content>
-                </Collapsible.Root>
+                    </Collapsible.Trigger>
+                    
+                    <Collapsible.Content class="pt-4 space-y-4">
+                      <!-- Resource Tier selector -->
+                      <div class="space-y-2">
+                        <ResourceTierSelector
+                          bind:selectedTierId={selectedResourceTierId}
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                      
+                      <!-- Addon selector -->
+                      <div class="space-y-2 border-t border-border/30 pt-4">
+                        <AddonSelector
+                          bind:selectedAddonIds
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                    </Collapsible.Content>
+                  </Collapsible.Root>
+                {/if}
               </Tabs.Content>
               
               <!-- Templates Tab -->
@@ -764,72 +812,75 @@
                   </div>
                 {/if}
                 
-                <!-- Flavor selector -->
-                <div class="space-y-2 border-t border-border/30 pt-4">
-                  <FlavorSelector
-                    bind:selectedFlavorId
-                    disabled={isSubmitting}
-                  />
-                  
-                  <!-- Warning if selected flavor is not available -->
-                  {#if selectedFlavorId && flavorStatusLoaded && !isFlavorAvailable(selectedFlavorId)}
-                    <div class="p-3 rounded border border-[var(--cyber-amber)]/50 bg-[var(--cyber-amber)]/5">
-                      <p class="text-sm text-[var(--cyber-amber)] font-mono">
-                        <span class="font-bold">{selectedFlavorName()}</span> environment is not downloaded.
-                        Please download it from the list above before creating your project.
-                      </p>
-                    </div>
-                  {/if}
-                </div>
-                
-                <!-- Advanced Options (Collapsible) -->
-                <Collapsible.Root bind:open={advancedOptionsOpen} class="border-t border-border/30 pt-4">
-                  <Collapsible.Trigger 
-                    class="flex items-center justify-between w-full py-2 px-3 -mx-3 rounded 
-                           hover:bg-[var(--cyber-cyan)]/5 transition-colors group"
-                    disabled={isSubmitting}
-                  >
-                    <div class="flex items-center gap-2">
-                      <Settings2 class="w-4 h-4 text-muted-foreground group-hover:text-[var(--cyber-cyan)] transition-colors" />
-                      <span class="font-mono text-xs uppercase tracking-wider text-muted-foreground group-hover:text-foreground transition-colors">
-                        Advanced Options
-                      </span>
-                      {#if selectedAddonIds.length > 0 || selectedResourceTierId}
-                        <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--cyber-cyan)]/10 text-[var(--cyber-cyan)] border border-[var(--cyber-cyan)]/30">
-                          {#if selectedResourceTierId && selectedAddonIds.length > 0}
-                            Configured
-                          {:else if selectedAddonIds.length > 0}
-                            {selectedAddonIds.length} addon{selectedAddonIds.length > 1 ? 's' : ''}
-                          {:else}
-                            Custom tier
-                          {/if}
-                        </span>
-                      {/if}
-                    </div>
-                    <ChevronDown 
-                      class="w-4 h-4 text-muted-foreground transition-transform duration-200
-                             {advancedOptionsOpen ? 'rotate-180' : ''}" 
+                <!-- Docker-specific options -->
+                {#if selectedProvider === "docker"}
+                  <!-- Flavor selector -->
+                  <div class="space-y-2 border-t border-border/30 pt-4">
+                    <FlavorSelector
+                      bind:selectedFlavorId
+                      disabled={isSubmitting}
                     />
-                  </Collapsible.Trigger>
-                  
-                  <Collapsible.Content class="pt-4 space-y-4">
-                    <!-- Resource Tier selector -->
-                    <div class="space-y-2">
-                      <ResourceTierSelector
-                        bind:selectedTierId={selectedResourceTierId}
-                        disabled={isSubmitting}
-                      />
-                    </div>
                     
-                    <!-- Addon selector -->
-                    <div class="space-y-2 border-t border-border/30 pt-4">
-                      <AddonSelector
-                        bind:selectedAddonIds
-                        disabled={isSubmitting}
+                    <!-- Warning if selected flavor is not available -->
+                    {#if selectedFlavorId && flavorStatusLoaded && !isFlavorAvailable(selectedFlavorId)}
+                      <div class="p-3 rounded border border-[var(--cyber-amber)]/50 bg-[var(--cyber-amber)]/5">
+                        <p class="text-sm text-[var(--cyber-amber)] font-mono">
+                          <span class="font-bold">{selectedFlavorName()}</span> environment is not downloaded.
+                          Please download it from the list above before creating your project.
+                        </p>
+                      </div>
+                    {/if}
+                  </div>
+                  
+                  <!-- Advanced Options (Collapsible) -->
+                  <Collapsible.Root bind:open={advancedOptionsOpen} class="border-t border-border/30 pt-4">
+                    <Collapsible.Trigger 
+                      class="flex items-center justify-between w-full py-2 px-3 -mx-3 rounded 
+                             hover:bg-[var(--cyber-cyan)]/5 transition-colors group"
+                      disabled={isSubmitting}
+                    >
+                      <div class="flex items-center gap-2">
+                        <Settings2 class="w-4 h-4 text-muted-foreground group-hover:text-[var(--cyber-cyan)] transition-colors" />
+                        <span class="font-mono text-xs uppercase tracking-wider text-muted-foreground group-hover:text-foreground transition-colors">
+                          Advanced Options
+                        </span>
+                        {#if selectedAddonIds.length > 0 || selectedResourceTierId}
+                          <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--cyber-cyan)]/10 text-[var(--cyber-cyan)] border border-[var(--cyber-cyan)]/30">
+                            {#if selectedResourceTierId && selectedAddonIds.length > 0}
+                              Configured
+                            {:else if selectedAddonIds.length > 0}
+                              {selectedAddonIds.length} addon{selectedAddonIds.length > 1 ? 's' : ''}
+                            {:else}
+                              Custom tier
+                            {/if}
+                          </span>
+                        {/if}
+                      </div>
+                      <ChevronDown 
+                        class="w-4 h-4 text-muted-foreground transition-transform duration-200
+                               {advancedOptionsOpen ? 'rotate-180' : ''}" 
                       />
-                    </div>
-                  </Collapsible.Content>
-                </Collapsible.Root>
+                    </Collapsible.Trigger>
+                    
+                    <Collapsible.Content class="pt-4 space-y-4">
+                      <!-- Resource Tier selector -->
+                      <div class="space-y-2">
+                        <ResourceTierSelector
+                          bind:selectedTierId={selectedResourceTierId}
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                      
+                      <!-- Addon selector -->
+                      <div class="space-y-2 border-t border-border/30 pt-4">
+                        <AddonSelector
+                          bind:selectedAddonIds
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                    </Collapsible.Content>
+                  </Collapsible.Root>
+                {/if}
               </Tabs.Content>
               
               <!-- Submit Button -->
@@ -847,7 +898,7 @@
                   type="submit"
                   disabled={!isFormValid || isSubmitting}
                   class="flex-1 font-mono text-xs uppercase tracking-wider
-                         bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black
+                         bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)]
                          disabled:opacity-30"
                 >
                   {#if isSubmitting}

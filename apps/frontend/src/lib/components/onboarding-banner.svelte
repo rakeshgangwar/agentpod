@@ -130,7 +130,7 @@
         <div class="mt-4 flex items-center gap-3">
           <Button
             size="sm"
-            class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black"
+            class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)]"
             onclick={onStart}
             disabled={isLoading}
           >

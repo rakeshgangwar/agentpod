@@ -56,6 +56,7 @@ pub async fn create_sandbox(
     resource_tier: Option<String>,
     addons: Option<Vec<String>>,
     auto_start: Option<bool>,
+    provider: Option<String>,
 ) -> Result<SandboxWithRepo, AppError> {
     let client = get_client()?;
 
@@ -68,6 +69,7 @@ pub async fn create_sandbox(
         resource_tier,
         addons,
         auto_start,
+        provider,
     };
 
     client.post("/api/v2/sandboxes", &input).await
@@ -152,6 +154,20 @@ pub async fn unpause_sandbox(id: String) -> Result<Sandbox, AppError> {
     }
     let response: Response = client
         .post(&format!("/api/v2/sandboxes/{}/unpause", id), &())
+        .await?;
+    Ok(response.sandbox)
+}
+
+/// Wake a sleeping Cloudflare sandbox
+#[tauri::command]
+pub async fn wake_sandbox(id: String) -> Result<Sandbox, AppError> {
+    let client = get_client()?;
+    #[derive(serde::Deserialize)]
+    struct Response {
+        sandbox: Sandbox,
+    }
+    let response: Response = client
+        .post(&format!("/api/v2/sandboxes/{}/wake", id), &())
         .await?;
     Ok(response.sandbox)
 }

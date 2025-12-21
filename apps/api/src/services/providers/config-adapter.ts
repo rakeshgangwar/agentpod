@@ -38,13 +38,19 @@ export function agentPodToCloudflareConfig(
   const config: CloudflareConfig = {};
 
   if (auth) {
-    config.provider = {};
+    // Build provider config, only adding entries with valid API keys
+    const providerConfig: Record<string, { options?: { apiKey?: string } }> = {};
     for (const [providerId, credentials] of Object.entries(auth)) {
       if (credentials.type === "api" && credentials.key) {
-        config.provider[providerId] = {
+        providerConfig[providerId] = {
           options: { apiKey: credentials.key },
         };
       }
+    }
+    // Only set provider if we have at least one valid entry
+    // Empty provider object breaks OpenCode SDK's default provider discovery
+    if (Object.keys(providerConfig).length > 0) {
+      config.provider = providerConfig;
     }
   }
 

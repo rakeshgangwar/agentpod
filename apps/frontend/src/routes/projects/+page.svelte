@@ -8,6 +8,9 @@
     fetchSandboxes,
     startSandbox,
     stopSandbox,
+    sleepSandbox,
+    wakeSandbox,
+    restartSandbox,
     deleteSandbox,
     checkDockerHealth
   } from "$lib/stores/sandboxes.svelte";
@@ -18,6 +21,7 @@
   import LottieIcon from "$lib/components/lottie-icon.svelte";
   import PageHeader from "$lib/components/page-header.svelte";
   import { Button } from "$lib/components/ui/button";
+  import ThemeToggle from "$lib/components/theme-toggle.svelte";
 
   // Icons
   import ListIcon from "@lucide/svelte/icons/list";
@@ -28,6 +32,9 @@
   import PlusIcon from "@lucide/svelte/icons/plus";
   import FolderIcon from "@lucide/svelte/icons/folder";
   import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
+  import SunriseIcon from "@lucide/svelte/icons/sunrise";
+  import RotateCcwIcon from "@lucide/svelte/icons/rotate-ccw";
+  import MoonIcon from "@lucide/svelte/icons/moon";
 
   // Back navigation helper
   function goBack() {
@@ -118,6 +125,7 @@
       case "stopping": return "status-starting";
       case "created":
       case "stopped": return "status-stopped";
+      case "sleeping": return "status-sleeping";
       case "error":
       case "unknown": return "status-error";
       default: return "status-stopped";
@@ -127,6 +135,7 @@
   function getStatusLabel(status: string): string {
     switch (status) {
       case "created": return "ready";
+      case "sleeping": return "sleeping";
       default: return status;
     }
   }
@@ -201,6 +210,24 @@
     stopSandbox(sandboxId);
   }
 
+  async function handleWake(e: MouseEvent, sandboxId: string) {
+    e.stopPropagation();
+    e.preventDefault();
+    wakeSandbox(sandboxId);
+  }
+
+  async function handleRetry(e: MouseEvent, sandboxId: string) {
+    e.stopPropagation();
+    e.preventDefault();
+    restartSandbox(sandboxId);
+  }
+
+  async function handleSleep(e: MouseEvent, sandboxId: string) {
+    e.stopPropagation();
+    e.preventDefault();
+    sleepSandbox(sandboxId);
+  }
+
   async function handleDelete(e: MouseEvent, sandbox: { id: string; name: string }) {
     e.stopPropagation();
     const displayName = getSandboxDisplayName(sandbox);
@@ -236,35 +263,7 @@
     {/snippet}
     
     {#snippet actions()}
-      <!-- View Mode Toggle -->
-      {#if sandboxes.list.length > 0}
-        <div class="flex items-center border border-border/50 rounded-sm overflow-hidden">
-          <!-- List View -->
-          <button
-            onclick={() => setViewMode("list")}
-            class="p-2 h-9 w-9 flex items-center justify-center transition-colors {viewMode === 'list' ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
-            title="List view"
-          >
-            <ListIcon size={16} />
-          </button>
-          <!-- Card View -->
-          <button
-            onclick={() => setViewMode("cards")}
-            class="p-2 h-9 w-9 flex items-center justify-center border-l border-border/50 transition-colors {viewMode === 'cards' ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
-            title="Card view"
-          >
-            <LayoutGridIcon size={16} />
-          </button>
-          <!-- Compact View -->
-          <button
-            onclick={() => setViewMode("compact")}
-            class="p-2 h-9 w-9 flex items-center justify-center border-l border-border/50 transition-colors {viewMode === 'compact' ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
-            title="Compact view"
-          >
-            <Grid3x3Icon size={16} />
-          </button>
-        </div>
-      {/if}
+      <ThemeToggle />
 
       <Button
         onclick={() => goto("/projects/new")}
@@ -300,22 +299,49 @@
 
       <!-- Stats Bar -->
       {#if sandboxes.list.length > 0}
-        <div class="mb-6 flex flex-wrap gap-4 sm:gap-6 text-sm font-mono animate-fade-in-up">
-          <div class="flex items-center gap-2">
-            <span class="text-muted-foreground">total:</span>
-            <span class="text-foreground font-semibold">{sandboxes.list.length}</span>
+        <div class="mb-6 flex items-center justify-between animate-fade-in-up">
+          <div class="flex flex-wrap gap-4 sm:gap-6 text-sm font-mono">
+            <div class="flex items-center gap-2">
+              <span class="text-muted-foreground">total:</span>
+              <span class="text-foreground font-semibold">{sandboxes.list.length}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-muted-foreground">running:</span>
+              <span class="text-[var(--cyber-emerald)] font-semibold">
+                {sandboxes.list.filter(s => s.status === "running").length}
+              </span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-muted-foreground">stopped:</span>
+              <span class="text-muted-foreground font-semibold">
+                {sandboxes.list.filter(s => s.status === "stopped" || s.status === "created").length}
+              </span>
+            </div>
           </div>
-          <div class="flex items-center gap-2">
-            <span class="text-muted-foreground">running:</span>
-            <span class="text-[var(--cyber-emerald)] font-semibold">
-              {sandboxes.list.filter(s => s.status === "running").length}
-            </span>
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="text-muted-foreground">stopped:</span>
-            <span class="text-muted-foreground font-semibold">
-              {sandboxes.list.filter(s => s.status === "stopped" || s.status === "created").length}
-            </span>
+          
+          <!-- View Mode Toggle -->
+          <div class="flex items-center border border-border/50 rounded-sm overflow-hidden">
+            <button
+              onclick={() => setViewMode("list")}
+              class="p-2 h-8 w-8 flex items-center justify-center transition-colors {viewMode === 'list' ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
+              title="List view"
+            >
+              <ListIcon size={14} />
+            </button>
+            <button
+              onclick={() => setViewMode("cards")}
+              class="p-2 h-8 w-8 flex items-center justify-center border-l border-border/50 transition-colors {viewMode === 'cards' ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
+              title="Card view"
+            >
+              <LayoutGridIcon size={14} />
+            </button>
+            <button
+              onclick={() => setViewMode("compact")}
+              class="p-2 h-8 w-8 flex items-center justify-center border-l border-border/50 transition-colors {viewMode === 'compact' ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
+              title="Compact view"
+            >
+              <Grid3x3Icon size={14} />
+            </button>
           </div>
         </div>
       {/if}
@@ -440,11 +466,11 @@
                     size="sm"
                     onclick={(e: MouseEvent) => handleStart(e, sandbox.id)}
                     disabled={sandboxes.isLoading}
-                    class="font-mono text-xs uppercase tracking-wider h-7 px-3 bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-black"
+                    class="font-mono text-xs uppercase tracking-wider h-7 px-3 bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-[var(--cyber-emerald-foreground)]"
                   >
                     Start
                   </Button>
-                {:else if sandbox.status === "running"}
+                {:else if sandbox.status === "running" && sandbox.provider !== "cloudflare"}
                   <Button
                     size="sm"
                     variant="secondary"
@@ -454,6 +480,16 @@
                   >
                     Stop
                   </Button>
+                {:else if sandbox.status === "running" && sandbox.provider === "cloudflare"}
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onclick={(e: MouseEvent) => handleSleep(e, sandbox.id)}
+                    disabled={sandboxes.isLoading}
+                    class="font-mono text-xs uppercase tracking-wider h-7 px-3"
+                  >
+                    Sleep
+                  </Button>
                 {:else if sandbox.status === "starting" || sandbox.status === "stopping"}
                   <Button
                     size="sm"
@@ -461,6 +497,26 @@
                     class="font-mono text-xs uppercase tracking-wider h-7 px-3"
                   >
                     {sandbox.status === "starting" ? "..." : "..."}
+                  </Button>
+                {:else if sandbox.status === "sleeping"}
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onclick={(e: MouseEvent) => handleWake(e, sandbox.id)}
+                    disabled={sandboxes.isLoading}
+                    class="font-mono text-xs uppercase tracking-wider h-7 px-3"
+                  >
+                    Wake
+                  </Button>
+                {:else if sandbox.status === "error"}
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onclick={(e: MouseEvent) => handleRetry(e, sandbox.id)}
+                    disabled={sandboxes.isLoading}
+                    class="font-mono text-xs uppercase tracking-wider h-7 px-3"
+                  >
+                    Retry
                   </Button>
                 {/if}
 
@@ -556,11 +612,11 @@
                       size="sm"
                       onclick={(e: MouseEvent) => handleStart(e, sandbox.id)}
                       disabled={sandboxes.isLoading}
-                      class="font-mono text-xs uppercase tracking-wider h-8 px-4 bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-black"
+                      class="font-mono text-xs uppercase tracking-wider h-8 px-4 bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-[var(--cyber-emerald-foreground)]"
                     >
                       Start
                     </Button>
-                  {:else if sandbox.status === "running"}
+                  {:else if sandbox.status === "running" && sandbox.provider !== "cloudflare"}
                     <Button
                       size="sm"
                       variant="secondary"
@@ -570,6 +626,16 @@
                     >
                       Stop
                     </Button>
+                  {:else if sandbox.status === "running" && sandbox.provider === "cloudflare"}
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onclick={(e: MouseEvent) => handleSleep(e, sandbox.id)}
+                      disabled={sandboxes.isLoading}
+                      class="font-mono text-xs uppercase tracking-wider h-8 px-4"
+                    >
+                      Sleep
+                    </Button>
                   {:else if sandbox.status === "starting" || sandbox.status === "stopping"}
                     <Button
                       size="sm"
@@ -577,6 +643,26 @@
                       class="font-mono text-xs uppercase tracking-wider h-8 px-4"
                     >
                       {sandbox.status === "starting" ? "Starting..." : "Stopping..."}
+                    </Button>
+                  {:else if sandbox.status === "sleeping"}
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onclick={(e: MouseEvent) => handleWake(e, sandbox.id)}
+                      disabled={sandboxes.isLoading}
+                      class="font-mono text-xs uppercase tracking-wider h-8 px-4"
+                    >
+                      Wake
+                    </Button>
+                  {:else if sandbox.status === "error"}
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onclick={(e: MouseEvent) => handleRetry(e, sandbox.id)}
+                      disabled={sandboxes.isLoading}
+                      class="font-mono text-xs uppercase tracking-wider h-8 px-4"
+                    >
+                      Retry
                     </Button>
                   {/if}
 
@@ -660,11 +746,11 @@
                       size="sm"
                       onclick={(e: MouseEvent) => handleStart(e, sandbox.id)}
                       disabled={sandboxes.isLoading}
-                      class="font-mono text-xs uppercase tracking-wider h-7 px-3 flex-1 bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-black"
+                      class="font-mono text-xs uppercase tracking-wider h-7 px-3 flex-1 bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-[var(--cyber-emerald-foreground)]"
                     >
                       Start
                     </Button>
-                  {:else if sandbox.status === "running"}
+                  {:else if sandbox.status === "running" && sandbox.provider !== "cloudflare"}
                     <Button
                       size="sm"
                       variant="secondary"
@@ -674,6 +760,16 @@
                     >
                       Stop
                     </Button>
+                  {:else if sandbox.status === "running" && sandbox.provider === "cloudflare"}
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onclick={(e: MouseEvent) => handleSleep(e, sandbox.id)}
+                      disabled={sandboxes.isLoading}
+                      class="font-mono text-xs uppercase tracking-wider h-7 px-3 flex-1"
+                    >
+                      Sleep
+                    </Button>
                   {:else if sandbox.status === "starting" || sandbox.status === "stopping"}
                     <Button
                       size="sm"
@@ -681,6 +777,26 @@
                       class="font-mono text-xs uppercase tracking-wider h-7 px-3 flex-1"
                     >
                       ...
+                    </Button>
+                  {:else if sandbox.status === "sleeping"}
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onclick={(e: MouseEvent) => handleWake(e, sandbox.id)}
+                      disabled={sandboxes.isLoading}
+                      class="font-mono text-xs uppercase tracking-wider h-7 px-3 flex-1"
+                    >
+                      Wake
+                    </Button>
+                  {:else if sandbox.status === "error"}
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onclick={(e: MouseEvent) => handleRetry(e, sandbox.id)}
+                      disabled={sandboxes.isLoading}
+                      class="font-mono text-xs uppercase tracking-wider h-7 px-3 flex-1"
+                    >
+                      Retry
                     </Button>
                   {/if}
 

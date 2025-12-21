@@ -28,3 +28,6 @@ export * from "./preview-ports";
 
 // Cloudflare sandbox integration
 export * from "./cloudflare";
+
+// Quick task templates
+export * from "./quick-tasks";

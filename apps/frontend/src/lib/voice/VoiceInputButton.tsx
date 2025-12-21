@@ -218,7 +218,7 @@ export const VoiceInputButton: FC<VoiceInputButtonProps> = ({
   // Build class names
   const baseClasses = 'relative flex items-center justify-center w-10 h-10 rounded-full transition-all duration-150';
   const stateClasses = isActive
-    ? 'bg-[var(--cyber-red)] text-white shadow-[0_0_12px_var(--cyber-red)]'
+    ? 'bg-[var(--cyber-red)] text-[var(--cyber-red-foreground)] shadow-[0_0_12px_var(--cyber-red)]'
     : disabled || !isModelLoaded
       ? 'bg-muted text-muted-foreground cursor-not-allowed opacity-50'
       : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground';

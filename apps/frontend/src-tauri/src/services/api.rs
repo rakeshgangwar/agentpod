@@ -42,6 +42,9 @@ impl ApiClient {
 
         let sse_client = Client::builder()
             .http1_only()
+            .no_gzip()
+            .no_brotli()
+            .no_deflate()
             .build()
             .map_err(|e| AppError::NetworkError(format!("Failed to create SSE client: {}", e)))?;
 

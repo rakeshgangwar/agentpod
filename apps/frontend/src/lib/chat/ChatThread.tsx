@@ -22,6 +22,7 @@ import { CommandPicker, type Command } from "./CommandPicker";
 import { FilePicker } from "./FilePicker";
 import { FileAttachmentButton, FileAttachmentPreview, type AttachedFile } from "./FileAttachment";
 import { useAttachments, useSessionStatus } from "./RuntimeProvider";
+import { PermissionBar } from "./PermissionBar";
 import { VoiceInputButton } from "../voice/VoiceInputButton";
 import { VoiceSetupDialog } from "../voice/VoiceSetupDialog";
 import { useVoiceInput } from "../voice/useVoiceInput";
@@ -436,8 +437,9 @@ function ToolCallPart({ toolName, args, result, isError }: ToolCallMessagePartPr
         </div>
       )}
       <details className="group">
-        <summary className="px-3 py-2 font-mono text-xs text-muted-foreground cursor-pointer hover:bg-muted/30 transition-colors">
-          {isComplete ? '> Show details' : '> Show arguments'}
+        <summary className="px-3 py-2 font-mono text-xs text-muted-foreground cursor-pointer hover:bg-muted/30 transition-colors list-none [&::-webkit-details-marker]:hidden">
+          <span className="group-open:rotate-90 inline-block transition-transform mr-1">&gt;</span>
+          {isComplete ? 'Show details' : 'Show arguments'}
         </summary>
         <div className="px-3 py-2 space-y-2 min-w-0">
           <div className="min-w-0">
@@ -470,7 +472,7 @@ const ToolGroup: FC<PropsWithChildren<{ startIndex: number; endIndex: number }>>
 
   return (
     <details className="my-2" open>
-      <summary className="cursor-pointer font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]/80 transition-colors">
+      <summary className="cursor-pointer font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]/80 transition-colors list-none [&::-webkit-details-marker]:hidden">
         [{toolCount}] tool {toolCount === 1 ? "call" : "calls"}
       </summary>
       <div className="mt-1 space-y-1">{children}</div>
@@ -509,7 +511,7 @@ function UserMessage() {
 
   return (
     <MessagePrimitive.Root className="group flex justify-end mb-4 relative">
-      <div className="max-w-[80%] rounded px-4 py-2 bg-[var(--cyber-cyan)] text-black font-mono text-sm border border-[var(--cyber-cyan)] shadow-[0_0_12px_var(--cyber-cyan)/20]">
+      <div className="max-w-[80%] rounded px-4 py-2 bg-[var(--cyber-cyan)] text-[var(--cyber-cyan-foreground)] font-mono text-sm border border-[var(--cyber-cyan)] shadow-[0_0_12px_var(--cyber-cyan)/20]">
         {/* Render images */}
         {imageAttachments.map((img, index) => (
           <ImagePart key={`img-${index}`} image={img.image} />
@@ -580,7 +582,7 @@ function EditComposer() {
           <ComposerPrimitive.Send asChild>
             <button
               type="submit"
-              className="px-3 py-1.5 font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] text-black rounded hover:bg-[var(--cyber-cyan)]/90 transition-colors shadow-[0_0_8px_var(--cyber-cyan)/30]"
+              className="px-3 py-1.5 font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] text-[var(--cyber-cyan-foreground)] rounded hover:bg-[var(--cyber-cyan)]/90 transition-colors shadow-[0_0_8px_var(--cyber-cyan)/30]"
             >
               Update
             </button>
@@ -1186,7 +1188,7 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
           <button
             type="submit"
             disabled={!inputValue.trim() && attachments.length === 0}
-            className="px-4 py-2 font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] text-black rounded hover:bg-[var(--cyber-cyan)]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-[0_0_12px_var(--cyber-cyan)/20]"
+            className="px-4 py-2 font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] text-[var(--cyber-cyan-foreground)] rounded hover:bg-[var(--cyber-cyan)]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-[0_0_12px_var(--cyber-cyan)/20]"
           >
             Send
           </button>
@@ -1336,7 +1338,7 @@ function SessionStatusIndicator() {
           className={`${baseClasses} bg-gradient-to-r from-transparent via-[var(--cyber-cyan)] to-transparent`}
           style={{
             backgroundSize: "200% 100%",
-            animation: "glow-sweep 3s ease-in-out infinite",
+            animation: "glow-sweep 2s ease-in-out infinite alternate",
           }}
         />
         {/* Glow effect */}
@@ -1344,7 +1346,7 @@ function SessionStatusIndicator() {
           className="absolute inset-0 h-[2px] blur-sm bg-gradient-to-r from-transparent via-[var(--cyber-cyan)] to-transparent opacity-50"
           style={{
             backgroundSize: "200% 100%",
-            animation: "glow-sweep 3s ease-in-out infinite",
+            animation: "glow-sweep 2s ease-in-out infinite alternate",
           }}
         />
       </div>
@@ -1446,6 +1448,8 @@ export function ChatThread({
         
         {/* Session status indicator between messages and composer */}
         <SessionStatusIndicator />
+        
+        <PermissionBar />
         
         <Composer 
           projectId={projectId} 

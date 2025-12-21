@@ -147,7 +147,7 @@ export const FileAttachmentPreview: FC<{
             onClick={() => onRemove(file.id)}
             className="
               absolute -top-1 -right-1 w-4 h-4 
-              bg-[var(--cyber-red)] text-black 
+              bg-[var(--cyber-red)] text-[var(--cyber-red-foreground)] 
               rounded-full text-xs 
               opacity-0 group-hover:opacity-100 
               transition-opacity

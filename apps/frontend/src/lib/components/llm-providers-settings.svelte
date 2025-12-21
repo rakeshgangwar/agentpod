@@ -556,7 +556,7 @@
         Cancel
       </Button>
       <Button 
-        class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/90 text-white"
+        class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/90 text-[var(--cyber-red-foreground)]"
         onclick={handleConfirmRemove}
         disabled={removing}
       >

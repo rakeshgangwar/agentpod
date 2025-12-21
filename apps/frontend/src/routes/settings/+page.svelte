@@ -640,7 +640,7 @@ export default {
                   </div>
                   <Button 
                     onclick={() => goto("/admin")}
-                    class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-magenta)] hover:bg-[var(--cyber-magenta)]/90 text-white"
+                    class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-magenta)] hover:bg-[var(--cyber-magenta)]/90 text-[var(--cyber-magenta-foreground)]"
                   >
                     <ShieldIcon class="h-4 w-4 mr-2" />
                     Open Admin Panel
@@ -834,7 +834,7 @@ export default {
                   <Button 
                     onclick={handleSaveAgentsMd}
                     disabled={agentsMdSaving || agentsMd === agentsMdOriginal}
-                    class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black disabled:opacity-50"
+                    class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)] disabled:opacity-50"
                   >
                     {#if agentsMdSaving}
                       <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>
@@ -866,7 +866,7 @@ export default {
                 <Button 
                   onclick={handleOpenNewFileDialog} 
                   size="sm"
-                  class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black"
+                  class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)]"
                 >
                   + New File
                 </Button>
@@ -988,7 +988,7 @@ export default {
                             <Button 
                               onclick={handleSaveFile}
                               disabled={fileSaving || editingFileContent === selectedFile.content}
-                              class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black disabled:opacity-50"
+                              class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)] disabled:opacity-50"
                             >
                               {#if fileSaving}
                                 <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>
@@ -1158,7 +1158,7 @@ export default {
                     onchange={handleFileUpload}
                     class="block w-full text-sm font-mono file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 
                            file:text-xs file:font-mono file:uppercase file:tracking-wider
-                           file:bg-[var(--cyber-cyan)] file:text-black hover:file:bg-[var(--cyber-cyan)]/90"
+                           file:bg-[var(--cyber-cyan)] file:text-[var(--cyber-cyan-foreground)] hover:file:bg-[var(--cyber-cyan)]/90"
                   />
                   <p class="text-xs text-muted-foreground font-mono">Or paste JSON:</p>
                   <textarea 
@@ -1172,7 +1172,7 @@ export default {
                       size="sm" 
                       onclick={handleImport} 
                       disabled={!importInput.trim()}
-                      class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black"
+                      class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)]"
                     >
                       Import
                     </Button>
@@ -1350,7 +1350,7 @@ export default {
       <Button 
         onclick={handleCreateFile}
         disabled={newFileCreating || !newFileName.trim()}
-        class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black disabled:opacity-50"
+        class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)] disabled:opacity-50"
       >
         {#if newFileCreating}
           <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>
@@ -1382,7 +1382,7 @@ export default {
       <Button 
         onclick={handleConfirmDelete}
         disabled={fileDeleting}
-        class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/90 text-white disabled:opacity-50"
+        class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/90 text-[var(--cyber-red-foreground)] disabled:opacity-50"
       >
         {#if fileDeleting}
           <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>

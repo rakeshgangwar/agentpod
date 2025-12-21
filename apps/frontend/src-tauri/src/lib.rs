@@ -186,7 +186,9 @@ pub fn run() {
     // Initialize tracing subscriber for logging
     tracing_subscriber::registry()
         .with(fmt::layer())
-        .with(EnvFilter::from_default_env().add_directive("agentpod_lib=debug".parse().unwrap()))
+        .with(EnvFilter::from_default_env()
+            .add_directive("agentpod_lib=debug".parse().unwrap())
+            .add_directive("tauri_plugin_mcp=debug".parse().unwrap()))
         .init();
 
     tracing::info!("Starting AgentPod with tracing enabled");
@@ -200,6 +202,16 @@ pub fn run() {
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_oauth::init())
         .plugin(tauri_plugin_http::init());
+
+    #[cfg(all(debug_assertions, desktop))]
+    {
+        tracing::info!("Development build detected, enabling MCP plugin for AI agent debugging");
+        builder = builder.plugin(tauri_plugin_mcp::init_with_config(
+            tauri_plugin_mcp::PluginConfig::new("agentpod".to_string())
+                .socket_path(std::path::PathBuf::from("/tmp/tauri-mcp.sock"))
+                .start_socket_server(true)
+        ));
+    }
 
     // Voice input state (only when voice feature is enabled)
     #[cfg(feature = "voice")]
@@ -232,6 +244,7 @@ pub fn run() {
             restart_sandbox,
             pause_sandbox,
             unpause_sandbox,
+            wake_sandbox,
             get_sandbox_logs,
             get_sandbox_stats,
             get_sandbox_status,

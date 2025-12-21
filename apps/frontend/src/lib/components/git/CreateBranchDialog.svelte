@@ -151,7 +151,7 @@
           type="submit"
           onclick={handleCreate}
           disabled={isCreating || !isValidName}
-          class="bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black"
+          class="bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)]"
         >
           {#if isCreating}
             Creating...

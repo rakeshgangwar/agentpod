@@ -168,7 +168,7 @@
           Open a terminal to access the sandbox shell.
         </p>
         <Button
-          class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black px-4 py-2"
+          class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)] px-4 py-2"
           onclick={handleNewTerminal}
           disabled={isConnecting}
         >

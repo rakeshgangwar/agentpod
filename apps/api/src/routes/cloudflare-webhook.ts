@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createLogger } from "../utils/logger";
 import { db } from "../db/drizzle";
 import { cloudflareSandboxes } from "../db/schema/cloudflare";
+import { sandboxes } from "../db/schema/sandboxes";
 import { eq } from "drizzle-orm";
 
 const log = createLogger("cloudflare-webhook");
@@ -116,26 +117,47 @@ async function handleSandboxCreated(data: { sandboxId: string; userId?: string }
 }
 
 async function handleSandboxHibernated(data: { sandboxId: string }) {
+  const now = new Date();
+  
   await db
     .update(cloudflareSandboxes)
     .set({
       status: "sleeping",
-      updatedAt: new Date(),
+      updatedAt: now,
     })
     .where(eq(cloudflareSandboxes.id, data.sandboxId));
+
+  await db
+    .update(sandboxes)
+    .set({
+      status: "sleeping",
+      updatedAt: now,
+    })
+    .where(eq(sandboxes.id, data.sandboxId));
 
   log.info("Sandbox hibernated", { sandboxId: data.sandboxId });
 }
 
 async function handleSandboxWoken(data: { sandboxId: string }) {
+  const now = new Date();
+  
   await db
     .update(cloudflareSandboxes)
     .set({
       status: "running",
-      lastActiveAt: new Date(),
-      updatedAt: new Date(),
+      lastActiveAt: now,
+      updatedAt: now,
     })
     .where(eq(cloudflareSandboxes.id, data.sandboxId));
+
+  await db
+    .update(sandboxes)
+    .set({
+      status: "running",
+      lastAccessedAt: now,
+      updatedAt: now,
+    })
+    .where(eq(sandboxes.id, data.sandboxId));
 
   log.info("Sandbox woken", { sandboxId: data.sandboxId });
 }
@@ -160,13 +182,23 @@ async function handleSandboxError(data: { sandboxId: string; error?: string }) {
 }
 
 async function handleSessionMessage(data: { sandboxId: string; sessionId?: string }) {
+  const now = new Date();
+  
   await db
     .update(cloudflareSandboxes)
     .set({
-      lastActiveAt: new Date(),
-      updatedAt: new Date(),
+      lastActiveAt: now,
+      updatedAt: now,
     })
     .where(eq(cloudflareSandboxes.id, data.sandboxId));
+
+  await db
+    .update(sandboxes)
+    .set({
+      lastAccessedAt: now,
+      updatedAt: now,
+    })
+    .where(eq(sandboxes.id, data.sandboxId));
 
   log.debug("Session message received", { sandboxId: data.sandboxId, sessionId: data.sessionId });
 }

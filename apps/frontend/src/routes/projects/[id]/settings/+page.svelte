@@ -181,7 +181,7 @@
             onclick={handleStart}
             disabled={sandboxes.isLoading}
             class="flex-1 sm:flex-none h-10 px-6 font-mono text-xs uppercase tracking-wider
-                   bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-black"
+                   bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-[var(--cyber-emerald-foreground)]"
           >
             <PlayIcon class="h-4 w-4 mr-2" />
             Start Container
@@ -628,7 +628,7 @@
       <Button 
         onclick={handleRestart} 
         disabled={isRestarting}
-        class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-amber)] hover:bg-[var(--cyber-amber)]/90 text-black"
+        class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-amber)] hover:bg-[var(--cyber-amber)]/90 text-[var(--cyber-amber-foreground)]"
       >
         {isRestarting ? "Restarting..." : "Restart"}
       </Button>

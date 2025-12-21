@@ -138,7 +138,7 @@ pub struct ContainerAddonsResponse {
 // =============================================================================
 
 /// Sandbox status enum
-/// Must match the API's SandboxStatus: 'created' | 'starting' | 'running' | 'stopping' | 'stopped' | 'error'
+/// Must match the API's SandboxStatus: 'created' | 'starting' | 'running' | 'stopping' | 'stopped' | 'sleeping' | 'error'
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum SandboxStatus {
@@ -147,6 +147,7 @@ pub enum SandboxStatus {
     Running,
     Stopping,
     Stopped,
+    Sleeping,
     Error,
     #[serde(other)]
     Unknown,
@@ -189,6 +190,10 @@ pub struct Sandbox {
     pub slug: String,
     #[serde(default)]
     pub description: Option<String>,
+
+    // Provider (docker or cloudflare)
+    #[serde(default)]
+    pub provider: Option<String>,
 
     // Git/Repository info
     pub repo_name: String,
@@ -275,6 +280,8 @@ pub struct CreateSandboxInput {
     pub addons: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub auto_start: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
 }
 
 /// Sandbox with repository response
@@ -282,7 +289,7 @@ pub struct CreateSandboxInput {
 #[serde(rename_all = "camelCase")]
 pub struct SandboxWithRepo {
     pub sandbox: Sandbox,
-    pub repository: Repository,
+    pub repository: Option<Repository>,
 }
 
 /// Sandbox info response (includes config)

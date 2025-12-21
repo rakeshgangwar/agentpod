@@ -5,6 +5,10 @@
   "small_model": "anthropic/claude-sonnet-4-5-20250929",
   
   "mcp": {
+    "tauri-mcp": {
+      "type": "local",
+      "command": ["node", "tauri-plugin-mcp/mcp-server-ts/build/index.js"]
+    },
     "context7": {
       "type": "remote",
       "url": "https://mcp.context7.com/mcp"
@@ -67,7 +71,7 @@
     "plan": {
       "description": "Planning mode - read-only exploration and design",
       "mode": "primary",
-      "model": "anthropic/claude-haiku-4-5",
+      "model": "anthropic/claude-sonnet-4-5-20250929",
       "tools": {
         "write": false,
         "edit": false,
@@ -116,7 +120,7 @@
   
   "mode": {
     "plan": {
-      "model": "anthropic/claude-haiku-4-5"
+      "model": "anthropic/claude-sonnet-4-5-20250929"
     }
   },
   

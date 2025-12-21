@@ -128,7 +128,7 @@
         onclick={() => autoRefresh = !autoRefresh}
         class="h-8 px-4 font-mono text-xs uppercase tracking-wider flex items-center gap-2
                {autoRefresh
-                 ? 'bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-black'
+                 ? 'bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-[var(--cyber-emerald-foreground)]'
                  : 'bg-transparent border border-border/50 hover:border-[var(--cyber-emerald)]/50 hover:text-[var(--cyber-emerald)]'}"
       >
         <Circle class="h-2.5 w-2.5 {autoRefresh ? 'fill-current' : ''}" />

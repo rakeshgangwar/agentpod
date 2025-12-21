@@ -267,6 +267,38 @@ export async function unpauseSandbox(id: string): Promise<boolean> {
   }
 }
 
+/**
+ * Sleep a Cloudflare sandbox - UI-only, no API call (Cloudflare auto-hibernates)
+ */
+export async function sleepSandbox(id: string): Promise<boolean> {
+  setOptimisticStatus(id, "sleeping");
+  return true;
+}
+
+/**
+ * Wake a sleeping Cloudflare sandbox
+ */
+export async function wakeSandbox(id: string): Promise<boolean> {
+  isLoading = true;
+  error = null;
+  
+  // Optimistic UI update - show "starting" state immediately
+  setOptimisticStatus(id, "starting");
+  
+  try {
+    const sandbox = await api.wakeSandbox(id);
+    updateSandboxInList(sandbox);
+    return true;
+  } catch (e) {
+    // Revert to sleeping state on error
+    setOptimisticStatus(id, "sleeping");
+    error = e instanceof Error ? e.message : "Failed to wake sandbox";
+    return false;
+  } finally {
+    isLoading = false;
+  }
+}
+
 // =============================================================================
 // Sandbox Monitoring
 // =============================================================================

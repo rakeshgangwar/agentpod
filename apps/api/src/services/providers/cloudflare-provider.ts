@@ -38,6 +38,10 @@ export class CloudflareSandboxProvider implements SandboxProvider {
     }
   }
 
+  getOpencodeUrl(sandboxId: string): string {
+    return `${this.workerUrl}/sandbox/${sandboxId}/opencode`;
+  }
+
   private async workerFetch(
     path: string,
     options: RequestInit = {}
@@ -272,6 +276,36 @@ export class CloudflareSandboxProvider implements SandboxProvider {
     return {
       sessionId: result.sessionId ?? "",
       response: result.response ?? "",
+    };
+  }
+
+  async syncWorkspace(sandboxId: string): Promise<{
+    success: boolean;
+    syncedFiles: number;
+    skippedFiles: number;
+    totalSize: number;
+  }> {
+    log.info("Syncing workspace to R2", { sandboxId });
+
+    const result = await this.workerFetch(`/sandbox/${sandboxId}/sync`, {
+      method: "POST",
+    }) as {
+      success?: boolean;
+      syncedFiles?: number;
+      skippedFiles?: number;
+      totalSize?: number;
+      error?: string;
+    };
+
+    if (!result.success) {
+      throw new Error(result.error ?? "Failed to sync workspace");
+    }
+
+    return {
+      success: true,
+      syncedFiles: result.syncedFiles ?? 0,
+      skippedFiles: result.skippedFiles ?? 0,
+      totalSize: result.totalSize ?? 0,
     };
   }
 }

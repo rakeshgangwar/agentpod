@@ -136,12 +136,64 @@ export function getAllCachedPermissions(): Array<Permission & { sandboxId: strin
  * This is needed because containers use Traefik/Let's Encrypt certs that may have chain issues
  * when accessed from within the same infrastructure.
  */
-const insecureFetch = (request: Request): Promise<Response> => {
-  return fetch(request, {
+const insecureFetch = async (request: Request): Promise<Response> => {
+  const url = request.url;
+  const method = request.method;
+  
+  const isCloudflareRequest = url.includes('workers.dev');
+  const isPromptCall = method === "POST" && url.includes('/session/') && url.includes('/message');
+  
+  if (isPromptCall) {
+    const clonedReq = request.clone();
+    const bodyText = await clonedReq.text();
+    
+    const headers: Record<string, string> = {};
+    request.headers.forEach((v, k) => { headers[k] = v; });
+    
+    log.info("insecureFetch: POST to message endpoint", {
+      url,
+      method,
+      headers: JSON.stringify(headers),
+      requestBody: bodyText.slice(0, 500),
+    });
+  }
+  
+  // For Cloudflare requests, disable compression to avoid zstd decoding issues in Bun
+  let modifiedRequest = request;
+  if (isCloudflareRequest) {
+    const newHeaders = new Headers(request.headers);
+    newHeaders.set('Accept-Encoding', 'identity');
+    modifiedRequest = new Request(request.url, {
+      method: request.method,
+      headers: newHeaders,
+      body: request.body,
+      duplex: 'half',
+    });
+  }
+  
+  const response = await fetch(modifiedRequest, {
     tls: {
       rejectUnauthorized: false,
     },
   });
+  
+  if (isPromptCall) {
+    const cloned = response.clone();
+    const responseText = await cloned.text();
+    
+    const respHeaders: Record<string, string> = {};
+    response.headers.forEach((v, k) => { respHeaders[k] = v; });
+    
+    log.info("insecureFetch: Response from POST message", {
+      url,
+      status: response.status,
+      headers: JSON.stringify(respHeaders),
+      responseBodyLength: responseText.length,
+      responseBodyPreview: responseText.slice(0, 1000),
+    });
+  }
+  
+  return response;
 };
 
 const log = createLogger("opencode-v2");
@@ -167,6 +219,8 @@ export interface SendMessageInput {
   };
   /** Optional agent to use for this message (e.g., "onboarding", "plan", "build") */
   agent?: string;
+  /** OpenCode config for Cloudflare sandboxes (auth, providers, settings) */
+  opencodeConfig?: Record<string, unknown>;
 }
 
 // =============================================================================
@@ -199,14 +253,19 @@ const clientCache = new Map<string, ReturnType<typeof createOpencodeClient>>();
  * that don't resolve inside containers).
  */
 function getOpenCodeUrl(sandbox: Sandbox): string {
-  // Use internal Docker network URL: http://{containerName}:{opencodePort}
-  // Container name format: {prefix}-{sandboxId} (e.g., "agentpod-MN1N1-rsnw0v")
+  // For Cloudflare sandboxes, use the stored opencodeUrl directly
+  if (sandbox.provider === 'cloudflare' && sandbox.opencodeUrl) {
+    log.debug("Using Cloudflare URL for OpenCode", {
+      sandboxId: sandbox.id,
+      opencodeUrl: sandbox.opencodeUrl,
+    });
+    return sandbox.opencodeUrl;
+  }
+  
+  // For Docker sandboxes, use internal Docker network URL: http://{containerName}:{opencodePort}
   const containerPrefix = config.docker.containerPrefix;
   const opencodePort = config.opencode.serverPort;
-  
-  // The container name is stored or can be derived from sandbox.id
   const containerName = `${containerPrefix}-${sandbox.id}`;
-  
   const internalUrl = `http://${containerName}:${opencodePort}`;
   
   log.debug("Using internal Docker URL for OpenCode", {
@@ -449,9 +508,8 @@ export const opencodeV2 = {
     sessionId: string,
     input: SendMessageInput
   ): Promise<{ info: Message; parts: Part[] }> {
-    const { client } = await getClient(sandboxId);
+    const { client, sandbox } = await getClient(sandboxId);
 
-    // Convert our input format to SDK format
     const sdkParts = input.parts.map((part) => {
       if (part.type === "text") {
         return { type: "text" as const, text: part.text || "" };
@@ -465,7 +523,6 @@ export const opencodeV2 = {
       }
     });
 
-    // Build the body with optional model selection and agent
     const body: {
       parts: typeof sdkParts;
       model?: { providerID: string; modelID: string };
@@ -493,10 +550,150 @@ export const opencodeV2 = {
       });
     }
 
+    const baseUrl = getOpenCodeUrl(sandbox);
+    log.info("SDK sendMessage call", { 
+      sandboxId, 
+      sessionId, 
+      baseUrl,
+      provider: sandbox.provider,
+      bodyParts: body.parts.length,
+    });
+
+    // For Cloudflare sandboxes, use the direct /message endpoint instead of SDK proxy
+    // The SDK's client.session.prompt() goes through /opencode/session/{id}/message which
+    // has issues with containerFetch returning empty responses. The /message endpoint works.
+    if (sandbox.provider === 'cloudflare' && config.cloudflare.workerUrl) {
+      const messageUrl = `${config.cloudflare.workerUrl}/sandbox/${sandboxId}/message`;
+      const textPart = sdkParts.find(p => p.type === 'text') as { type: 'text'; text: string } | undefined;
+      
+      log.info("Using direct /message endpoint for Cloudflare", {
+        sandboxId,
+        sessionId,
+        messageUrl,
+        messagePreview: textPart?.text?.slice(0, 100),
+      });
+      
+      const requestBody: { 
+        sessionId?: string; 
+        message: string; 
+        model?: { providerID: string; modelID: string };
+        config?: Record<string, unknown>;
+      } = {
+        message: textPart?.text ?? '',
+      };
+      if (sessionId) {
+        requestBody.sessionId = sessionId;
+      }
+      if (input.model) {
+        requestBody.model = input.model;
+      }
+      const hasValidConfig = input.opencodeConfig && 
+        input.opencodeConfig.provider && 
+        Object.keys(input.opencodeConfig.provider as object).length > 0;
+      if (hasValidConfig) {
+        requestBody.config = input.opencodeConfig;
+      }
+      
+      log.info("Cloudflare /message request", {
+        sandboxId,
+        messageUrl,
+        requestBody: JSON.stringify(requestBody),
+        hasApiToken: !!config.cloudflare.apiToken,
+      });
+      
+      const fetchStart = Date.now();
+      log.info("Cloudflare fetch starting", { sandboxId, messageUrl });
+      
+      const response = await fetch(messageUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          ...(config.cloudflare.apiToken ? { 'Authorization': `Bearer ${config.cloudflare.apiToken}` } : {}),
+        },
+        body: JSON.stringify(requestBody),
+      });
+      
+      log.info("Cloudflare fetch completed", { 
+        sandboxId, 
+        elapsed: Date.now() - fetchStart,
+        status: response.status,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries()),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        log.error("Cloudflare /message endpoint failed", {
+          sandboxId,
+          sessionId,
+          status: response.status,
+          error: errorText,
+        });
+        throw new OpenCodeV2Error(`Cloudflare message failed: ${response.status} - ${errorText}`, response.status);
+      }
+      
+      const rawText = await response.text();
+      log.info("Cloudflare /message raw response", {
+        sandboxId,
+        rawLength: rawText.length,
+        rawPreview: rawText.slice(0, 500),
+      });
+      
+      const result = JSON.parse(rawText) as {
+        sessionId: string;
+        response: string;
+        parts?: Array<{ type: string; text?: string }>;
+      };
+      
+      const actualSessionId = result.sessionId || sessionId;
+      
+      log.info("Cloudflare /message parsed response", {
+        sandboxId,
+        sessionId: actualSessionId,
+        hasResponse: !!result.response,
+        responseLength: result.response?.length,
+        partsCount: result.parts?.length,
+        firstTextPart: result.parts?.find(p => p.type === 'text'),
+      });
+      
+      const timestamp = new Date().toISOString();
+      return {
+        info: {
+          id: `msg_${Date.now()}`,
+          sessionID: actualSessionId,
+          role: 'assistant',
+          time: timestamp,
+          parentID: '',
+          modelID: input.model?.modelID ?? '',
+          providerID: input.model?.providerID ?? '',
+          system: '',
+          tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+          error: undefined,
+        } as unknown as Message,
+        parts: (result.parts ?? [{ type: 'text', text: result.response }]) as unknown as Part[],
+      };
+    }
+
+    // For Docker sandboxes, use the SDK as usual
     const result = await client.session.prompt({
       path: { id: sessionId },
       body,
     });
+    
+    log.info("SDK sendMessage response FULL", {
+      sandboxId,
+      sessionId,
+      hasData: !!result.data,
+      responseKeys: result.data ? Object.keys(result.data) : [],
+      dataType: typeof result.data,
+      dataStringified: JSON.stringify(result.data)?.slice(0, 500),
+      resultKeys: Object.keys(result),
+      hasError: !!(result as Record<string, unknown>).error,
+      errorValue: (result as Record<string, unknown>).error,
+      hasResponse: !!(result as Record<string, unknown>).response,
+    });
+    
     return result.data!;
   },
 
@@ -680,14 +877,124 @@ export const opencodeV2 = {
   /**
    * Subscribe to SSE events for a sandbox
    * Returns an async iterator of events
+   * 
+   * For Cloudflare sandboxes, uses native SSE because the SDK's SSE implementation
+   * doesn't properly handle external HTTPS URLs.
    */
   async subscribeToEvents(
     sandboxId: string,
     signal?: AbortSignal
   ): Promise<AsyncIterable<{ type: string; properties: unknown }>> {
-    const { client } = await getClient(sandboxId);
+    const { client, sandbox } = await getClient(sandboxId);
+    
+    // Use native SSE for Cloudflare sandboxes
+    if (sandbox.provider === 'cloudflare' && sandbox.opencodeUrl) {
+      log.info("Using native SSE for Cloudflare sandbox", { sandboxId, opencodeUrl: sandbox.opencodeUrl });
+      return this.subscribeToEventsNative(sandbox.opencodeUrl, signal);
+    }
+    
+    // Use SDK for Docker sandboxes
     const result = await client.event.subscribe({ signal });
     return result.stream!;
+  },
+
+  /**
+   * Native SSE implementation for Cloudflare sandboxes.
+   * The SDK's SSE doesn't work with external Cloudflare worker URLs,
+   * so we implement SSE parsing manually using native fetch.
+   */
+  async *subscribeToEventsNative(
+    baseUrl: string,
+    signal?: AbortSignal
+  ): AsyncGenerator<{ type: string; properties: unknown }> {
+    log.info("subscribeToEventsNative: Generator entered", { baseUrl });
+    const eventUrl = `${baseUrl}/event`;
+    log.info("Connecting to native SSE", { eventUrl });
+
+    const response = await fetch(eventUrl, {
+      headers: {
+        'Accept': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+      },
+      signal,
+    });
+
+    if (!response.ok) {
+      throw new OpenCodeV2Error(
+        `SSE connection failed: ${response.status} ${response.statusText}`,
+        response.status
+      );
+    }
+
+    if (!response.body) {
+      throw new OpenCodeV2Error("SSE response has no body", 500);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let currentEventType = "message";
+    let currentData = "";
+
+    log.info("SSE reader created, starting read loop");
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          log.info("SSE stream ended (done=true)");
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        
+        // Keep incomplete line in buffer
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith('event:')) {
+            currentEventType = line.slice(6).trim();
+          } else if (line.startsWith('data:')) {
+            currentData += line.slice(5).trim();
+          } else if (line === '') {
+            if (currentData) {
+              try {
+                const parsed = JSON.parse(currentData);
+                log.info("SSE event received", { 
+                  type: parsed.type || currentEventType,
+                  eventType: currentEventType,
+                  parsedType: parsed.type,
+                  hasProperties: !!parsed.properties,
+                });
+                yield {
+                  type: parsed.type || currentEventType,
+                  properties: parsed.properties || parsed,
+                };
+              } catch (parseError) {
+                log.warn("Failed to parse SSE data", { 
+                  data: currentData.slice(0, 100),
+                  error: parseError instanceof Error ? parseError.message : parseError,
+                });
+              }
+              currentData = "";
+              currentEventType = "message";
+            }
+          }
+        }
+      }
+    } catch (error) {
+      if (signal?.aborted) {
+        log.info("SSE stream aborted by signal");
+        return;
+      }
+      log.error("SSE stream error", { error: error instanceof Error ? error.message : error });
+      throw error;
+    } finally {
+      log.info("SSE generator finally block reached");
+      reader.releaseLock();
+    }
   },
 
   /**

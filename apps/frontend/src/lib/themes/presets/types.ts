@@ -52,10 +52,15 @@ export interface ThemeStyleProps {
   // Cyber/accent colors for terminal aesthetic
   "cyber-cyan": string;
   "cyber-cyan-dim": string;
+  "cyber-cyan-foreground"?: string;
   "cyber-emerald": string;
+  "cyber-emerald-foreground"?: string;
   "cyber-magenta": string;
+  "cyber-magenta-foreground"?: string;
   "cyber-amber": string;
+  "cyber-amber-foreground"?: string;
   "cyber-red": string;
+  "cyber-red-foreground"?: string;
   "cyber-glow": string;
   "cyber-glow-emerald": string;
 }

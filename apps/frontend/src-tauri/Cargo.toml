@@ -44,6 +44,9 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tauri-plugin-http = "2"
 
+# MCP plugin for AI agent debugging (dev builds only)
+tauri-plugin-mcp = { path = "../../../tauri-plugin-mcp" }
+
 # Voice input dependencies (optional)
 # Note: On Linux, we use ALSA. The alsa-sys crate will link dynamically by default.
 # For static linking (no runtime deps), build with ALSA_STATIC=1 environment variable.

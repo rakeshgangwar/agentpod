@@ -21,7 +21,8 @@ const log = createLogger('sandbox-model');
 // Types
 // =============================================================================
 
-export type SandboxStatus = 'created' | 'starting' | 'running' | 'stopping' | 'stopped' | 'error';
+export type SandboxStatus = 'created' | 'starting' | 'running' | 'stopping' | 'stopped' | 'sleeping' | 'error';
+export type SandboxProvider = 'docker' | 'cloudflare';
 
 export interface Sandbox {
   id: string;
@@ -29,6 +30,9 @@ export interface Sandbox {
   name: string;
   slug: string;
   description?: string;
+  
+  // Provider type
+  provider: SandboxProvider;
   
   // Git/Repository info
   repoName: string;
@@ -39,7 +43,7 @@ export interface Sandbox {
   flavorId: string;
   addonIds: string[];
   
-  // Container runtime info
+  // Container runtime info (Docker-specific)
   containerId?: string;
   containerName?: string;
   status: SandboxStatus;
@@ -63,11 +67,14 @@ export interface CreateSandboxInput {
   name: string;
   slug: string;
   description?: string;
+  provider?: SandboxProvider;
   repoName: string;
   githubUrl?: string;
   resourceTierId?: string;
   flavorId?: string;
   addonIds?: string[];
+  opencodeUrl?: string;
+  status?: SandboxStatus;
 }
 
 export interface UpdateSandboxInput {
@@ -106,6 +113,7 @@ function rowToSandbox(row: typeof sandboxes.$inferSelect): Sandbox {
     name: row.name,
     slug: row.slug,
     description: row.description ?? undefined,
+    provider: (row.provider ?? 'docker') as SandboxProvider,
     repoName: row.repoName,
     githubUrl: row.githubUrl ?? undefined,
     resourceTierId: row.resourceTierId ?? 'starter',
@@ -143,14 +151,17 @@ export async function createSandbox(input: CreateSandboxInput): Promise<Sandbox>
       name: input.name,
       slug: input.slug,
       description: input.description ?? null,
+      provider: input.provider ?? 'docker',
       repoName: input.repoName,
       githubUrl: input.githubUrl ?? null,
       resourceTierId: input.resourceTierId ?? 'starter',
       flavorId: input.flavorId ?? 'js',
       addonIds: JSON.stringify(input.addonIds ?? ['code-server']),
-      status: 'created',
+      opencodeUrl: input.opencodeUrl ?? null,
+      status: input.status ?? 'created',
       createdAt: now,
       updatedAt: now,
+      lastAccessedAt: now,
     })
     .returning();
   
@@ -393,6 +404,7 @@ export async function getSandboxCountsByStatus(userId: string): Promise<Record<S
     running: 0,
     stopping: 0,
     stopped: 0,
+    sleeping: 0,
     error: 0,
   };
   

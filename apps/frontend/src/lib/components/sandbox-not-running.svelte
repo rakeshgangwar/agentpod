@@ -33,7 +33,7 @@
       onclick={() => startSandbox(sandbox.id)}
       disabled={sandboxes.isLoading}
       class="mt-6 font-mono text-xs uppercase tracking-wider
-             bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-black"
+             bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-[var(--cyber-emerald-foreground)]"
     >
       {sandboxes.isLoading ? "Starting..." : "Start Sandbox"}
     </Button>

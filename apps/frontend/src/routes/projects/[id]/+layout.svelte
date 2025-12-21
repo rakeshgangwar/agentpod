@@ -8,12 +8,13 @@
     fetchSandboxes, 
     fetchSandbox,
     restartSandbox,
+    wakeSandbox,
     getSandbox 
   } from "$lib/stores/sandboxes.svelte";
   import { markAsSeen } from "$lib/stores/unseen-completions.svelte";
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog";
-  import PageHeader, { type PageIcon } from "$lib/components/page-header.svelte";
+  import PageHeader, { type PageIcon, type Tab } from "$lib/components/page-header.svelte";
   import ThemeToggle from "$lib/components/theme-toggle.svelte";
   import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
   import MessageSquareIcon from "@lucide/svelte/icons/message-square";
@@ -23,6 +24,7 @@
   import GitBranchIcon from "@lucide/svelte/icons/git-branch";
   import GlobeIcon from "@lucide/svelte/icons/globe";
   import SettingsIcon from "@lucide/svelte/icons/settings";
+  import MoonStarIcon from "@lucide/svelte/icons/moon-star";
   import { getProjectIcon } from "$lib/utils/project-icons";
   import { getAnimatedIcon } from "$lib/utils/animated-icons";
   import { projectIcons, parseIconId } from "$lib/stores/project-icons.svelte";
@@ -66,6 +68,32 @@
   let isRestarting = $state(false);
   let restartError = $state<string | null>(null);
   let showRestartDialog = $state(false);
+  
+  // Wake state (for Cloudflare sandboxes)
+  let isWaking = $state(false);
+
+  async function handleWake() {
+    if (!sandbox) return;
+    
+    isWaking = true;
+    
+    try {
+      await wakeSandbox(sandbox.id);
+      
+      toast.success("Sandbox awakened", {
+        description: "The Cloudflare sandbox is now running and your files have been restored.",
+      });
+      
+      await fetchSandbox(sandbox.id);
+    } catch (e) {
+      const errorMsg = e instanceof Error ? e.message : "Wake failed";
+      toast.error("Wake failed", {
+        description: errorMsg,
+      });
+    } finally {
+      isWaking = false;
+    }
+  }
 
   async function handleRestart() {
     if (!sandbox) return;
@@ -111,11 +139,12 @@
     goto(`/projects/${sandboxId}/${tab}`, { replaceState: true });
   }
 
-  function getStatusVariant(status: string): "running" | "starting" | "stopped" | "error" {
+  function getStatusVariant(status: string): "running" | "starting" | "stopped" | "error" | "sleeping" {
     switch (status) {
       case "running": return "running";
       case "starting":
       case "stopping": return "starting";
+      case "sleeping": return "sleeping";
       case "created":
       case "stopped": return "stopped";
       case "error":
@@ -129,6 +158,7 @@
     switch (status) {
       case "exited": return "stopped";
       case "created": return "ready";
+      case "sleeping": return "sleeping";
       default: return status;
     }
   }
@@ -171,15 +201,43 @@
     return staticIcon?.component;
   }
 
-  const tabs = [
-    { id: "chat", label: "Chat", icon: MessageSquareIcon },
-    { id: "files", label: "Files", icon: FolderIcon },
-    { id: "logs", label: "Logs", icon: ScrollTextIcon },
-    { id: "terminal", label: "Terminal", icon: TerminalIcon },
-    { id: "preview", label: "Preview", icon: GlobeIcon },
-    { id: "sync", label: "Git", icon: GitBranchIcon },
-    { id: "settings", label: "Settings", icon: SettingsIcon },
-  ];
+  const tabs = $derived.by(() => {
+    const isCloudflare = sandbox?.provider === "cloudflare";
+    
+    return [
+      { id: "chat", label: "Chat", icon: MessageSquareIcon },
+      { id: "files", label: "Files", icon: FolderIcon },
+      { 
+        id: "logs", 
+        label: "Logs", 
+        icon: ScrollTextIcon,
+        disabled: isCloudflare,
+        disabledReason: isCloudflare ? "Logs are not available for Cloudflare Workers" : undefined
+      },
+      { 
+        id: "terminal", 
+        label: "Terminal", 
+        icon: TerminalIcon,
+        disabled: isCloudflare,
+        disabledReason: isCloudflare ? "Terminal access is not available for Cloudflare Workers" : undefined
+      },
+      { 
+        id: "preview", 
+        label: "Preview", 
+        icon: GlobeIcon,
+        disabled: isCloudflare,
+        disabledReason: isCloudflare ? "Preview is not available for Cloudflare Workers" : undefined
+      },
+      { 
+        id: "sync", 
+        label: "Git", 
+        icon: GitBranchIcon,
+        disabled: isCloudflare,
+        disabledReason: isCloudflare ? "Git sync is not available for Cloudflare Workers" : undefined
+      },
+      { id: "settings", label: "Settings", icon: SettingsIcon },
+    ];
+  });
 
   // Back navigation - uses browser history for proper back behavior
   // Tab changes use replaceState so they don't pollute history
@@ -262,7 +320,7 @@
           <Button 
             onclick={handleRestart} 
             disabled={isRestarting}
-            class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-amber)] hover:bg-[var(--cyber-amber)]/90 text-black"
+            class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-amber)] hover:bg-[var(--cyber-amber)]/90 text-[var(--cyber-amber-foreground)]"
           >
             {isRestarting ? "Restarting..." : "Restart"}
           </Button>
@@ -272,9 +330,81 @@
 
     <!-- Content area - fills remaining height, each page handles its own scrolling -->
     <div class="flex-1 min-h-0 flex flex-col pb-16 md:pb-0">
-      <div class="container mx-auto px-4 sm:px-6 py-4 md:py-6 max-w-7xl flex-1 min-h-0 flex flex-col">
-        {@render children()}
-      </div>
+      {#if sandbox.provider === "cloudflare" && sandbox.status !== "running"}
+        <div class="flex-1 flex items-center justify-center">
+          <div class="text-center animate-fade-in-up max-w-md mx-auto px-6">
+            <div class="relative mb-8 inline-block">
+              <div class="absolute inset-0 rounded-full bg-[var(--cyber-cyan)]/20 blur-3xl animate-pulse-slow"></div>
+              <div class="relative w-24 h-24 mx-auto">
+                <MoonStarIcon class="w-full h-full text-[var(--cyber-cyan)] animate-float" />
+              </div>
+            </div>
+            
+            <h2 class="text-2xl font-bold font-heading mb-4 cyber-text">
+              {sandbox.status === "sleeping" ? "Sandbox is Hibernating" : "Waking Up..."}
+            </h2>
+            
+            {#if sandbox.status === "sleeping"}
+              <p class="text-muted-foreground font-mono text-sm mb-8 leading-relaxed">
+                Cloudflare sandboxes hibernate after 10 minutes of inactivity. 
+                <span class="block mt-2 text-[var(--cyber-cyan)]">
+                  Your files are safely stored and will be restored when you wake the sandbox.
+                </span>
+              </p>
+              
+              <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <Button 
+                  onclick={handleWake} 
+                  disabled={isWaking}
+                  size="lg"
+                  class="font-mono text-sm uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)] border-0 shadow-lg hover:shadow-[var(--cyber-cyan)]/20 transition-all duration-300 min-w-[200px]"
+                >
+                  {#if isWaking}
+                    <div class="flex items-center gap-3">
+                      <div class="w-4 h-4 border-2 border-black/20 border-t-black rounded-full animate-spin"></div>
+                      <span>Waking Up...</span>
+                    </div>
+                  {:else}
+                    <span>Wake Up</span>
+                  {/if}
+                </Button>
+                
+                <Button 
+                  variant="ghost" 
+                  onclick={goBack}
+                  disabled={isWaking}
+                  size="lg"
+                  class="font-mono text-sm uppercase tracking-wider text-muted-foreground hover:text-foreground hover:bg-muted/50 min-w-[200px]"
+                >
+                  <ArrowLeftIcon class="h-4 w-4 mr-2" />
+                  <span>Go Back</span>
+                </Button>
+              </div>
+              
+              <p class="mt-6 text-xs text-muted-foreground/60 font-mono">
+                [ Wake to restore workspace, or go back to projects ]
+              </p>
+            {:else}
+              <p class="text-muted-foreground font-mono text-sm mb-8 leading-relaxed">
+                Restoring your workspace from storage...
+                <span class="block mt-2 text-[var(--cyber-cyan)]">
+                  This usually takes a few seconds.
+                </span>
+              </p>
+              
+              <div class="flex items-center justify-center gap-3">
+                <div class="w-5 h-5 border-2 border-[var(--cyber-cyan)]/30 border-t-[var(--cyber-cyan)] rounded-full animate-spin"></div>
+                <span class="font-mono text-sm text-muted-foreground">Please wait...</span>
+              </div>
+            {/if}
+          </div>
+        </div>
+      {:else}
+        <!-- Normal content -->
+        <div class="container mx-auto px-4 sm:px-6 py-4 md:py-6 max-w-7xl flex-1 min-h-0 flex flex-col">
+          {@render children()}
+        </div>
+      {/if}
     </div>
   {:else if sandboxes.isLoading}
     <!-- Loading State -->
