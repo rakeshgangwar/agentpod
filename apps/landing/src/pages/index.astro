@@ -1,570 +1,307 @@
 ---
-import { getCollection } from "astro:content";
-import BaseLayout from "../layouts/BaseLayout.astro";
-import Header from "../components/Header.astro";
-import Footer from "../components/Footer.astro";
-
-// Get latest 2 blog posts
-const allPosts = await getCollection("blog");
-const latestPosts = allPosts
-  .sort((a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime())
-  .slice(0, 2);
-
-function calculateReadTime(content: string): number {
-  const wordsPerMinute = 200;
-  const words = content.trim().split(/\s+/).length;
-  return Math.ceil(words / wordsPerMinute);
-}
-
-function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  return date.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
+import ModernLayout from "../layouts/ModernLayout.astro";
+import Header from "../components/modern/Header.astro";
+import Footer from "../components/modern/Footer.astro";
 ---
 
-<BaseLayout title="AgentPod — Your Portable Command Center">
+<ModernLayout title="AgentPod — Your AI Agents, Anywhere">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  
   <Header slot="header" />
   
-  <!-- HERO: Motivation-driven -->
-  <section class="pt-12 pb-20 px-4">
-    <div class="max-w-4xl mx-auto">
-      <!-- Tagline -->
-      <div class="text-center mb-10 animate-fade-in-up">
-        <h1 class="font-mono mb-6">
-          <span class="block text-2xl md:text-4xl text-muted-foreground tracking-tight">Your AI Agents,</span>
-          <span class="block text-4xl md:text-6xl font-bold text-cyber-cyan uppercase tracking-widest hero-glow mt-2">Anywhere</span>
+  <div id="main-content"></div>
+  
+  <!-- HERO -->
+  <section class="relative min-h-[90vh] flex items-center justify-center overflow-hidden pt-32 pb-20">
+    <div class="relative container-wide mx-auto px-6">
+      <div class="max-w-4xl">
+        <div class="badge badge-accent mb-8 animate-fade-in">
+          <span class="w-2 h-2 rounded-full bg-success animate-pulse"></span>
+          <span>Now in Early Access</span>
+        </div>
+        
+        <h1 class="display-xl mb-8 text-foreground animate-fade-in-up delay-100">
+          Your AI Agents,<br />
+          <span class="text-accent-sienna">Anywhere</span>
         </h1>
-        <p class="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-          TUI coding agents are powerful — but trapped on desktops. 
-          <span class="text-cyber-amber font-mono">AgentPod</span> sets them free.
+        
+        <p class="subheadline max-w-2xl mb-12 animate-fade-in-up delay-200">
+          Run powerful AI agents in secure, portable sandboxes. 
+          Access from any device. Keep your computer safe.
+        </p>
+        
+        <div class="flex flex-col sm:flex-row gap-4 mb-12 animate-fade-in-up delay-300">
+          <a href="#waitlist" class="btn btn-primary">
+            Join the Waitlist
+          </a>
+          <a href="/developers" class="btn btn-secondary">
+            Self-Host Now
+          </a>
+        </div>
+        
+        <p class="text-sm text-foreground-muted animate-fade-in delay-400">
+          Powered by <a href="https://opencode.ai" target="_blank" rel="noopener noreferrer" class="text-foreground hover:text-accent-sienna transition-colors font-medium border-b border-current">OpenCode</a> — 75+ AI models supported
+        </p>
+      </div>
+    </div>
+    
+    <div class="absolute right-0 top-1/4 w-1/3 h-1/2 bg-accent-gold opacity-5 blur-3xl pointer-events-none"></div>
+  </section>
+
+  <!-- FEATURES -->
+  <section id="features" class="py-32 relative" aria-labelledby="features-heading">
+    <div class="container-wide mx-auto px-6">
+      <div class="max-w-3xl mb-20">
+        <span class="eyebrow reveal">Why AgentPod</span>
+        <h2 class="headline mt-4 mb-6 reveal reveal-delay-1">
+          AI agents are powerful. But running them on your main computer is risky, and accessing them on-the-go is impossible.
+        </h2>
+        <div class="divider-short reveal reveal-delay-2"></div>
+      </div>
+      
+      <div class="grid md:grid-cols-3 gap-8">
+        <div class="card-feature reveal reveal-delay-1">
+          <div class="mb-6">
+            <svg class="w-8 h-8 text-accent-sienna" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <h3 class="text-xl font-semibold mb-3" style="font-family: var(--font-display);">Access Anywhere</h3>
+          <p class="text-foreground-muted leading-relaxed">
+            Your AI workspace travels with you. Desktop, tablet, or phone — your agents are always within reach.
+          </p>
+        </div>
+        
+        <div class="card-feature reveal reveal-delay-2">
+          <div class="mb-6">
+            <svg class="w-8 h-8 text-accent-sienna" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+          </div>
+          <h3 class="text-xl font-semibold mb-3" style="font-family: var(--font-display);">Sandboxed & Safe</h3>
+          <p class="text-foreground-muted leading-relaxed">
+            Agents run in isolated containers, not on your computer. Execute commands freely without risk.
+          </p>
+        </div>
+        
+        <div class="card-feature reveal reveal-delay-3">
+          <div class="mb-6">
+            <svg class="w-8 h-8 text-accent-sienna" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </div>
+          <h3 class="text-xl font-semibold mb-3" style="font-family: var(--font-display);">Full AI Power</h3>
+          <p class="text-foreground-muted leading-relaxed">
+            75+ AI models. Claude, GPT, Copilot, Ollama, and more. One interface, infinite possibilities.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section id="how-it-works" class="py-32 bg-background-subtle relative" aria-labelledby="how-it-works-heading">
+    <div class="container-wide mx-auto px-6">
+      <div class="text-center max-w-2xl mx-auto mb-20">
+        <span class="eyebrow reveal">The Process</span>
+        <h2 class="headline mt-4 reveal reveal-delay-1">
+          How It Works
+        </h2>
+      </div>
+      
+      <div class="grid md:grid-cols-3 gap-16">
+        <div class="relative reveal reveal-delay-1">
+          <div class="section-number">01</div>
+          <div class="relative pt-8">
+            <h3 class="text-2xl font-semibold mb-4" style="font-family: var(--font-display);">Create a Pod</h3>
+            <p class="text-foreground-muted leading-relaxed">
+              Spin up an isolated AI workspace in seconds. Choose your tools, languages, and AI models.
+            </p>
+          </div>
+        </div>
+        
+        <div class="relative reveal reveal-delay-2">
+          <div class="section-number">02</div>
+          <div class="relative pt-8">
+            <h3 class="text-2xl font-semibold mb-4" style="font-family: var(--font-display);">Connect from Anywhere</h3>
+            <p class="text-foreground-muted leading-relaxed">
+              Access your pod from any device. Desktop app, mobile app, or browser — your choice.
+            </p>
+          </div>
+        </div>
+        
+        <div class="relative reveal reveal-delay-3">
+          <div class="section-number">03</div>
+          <div class="relative pt-8">
+            <h3 class="text-2xl font-semibold mb-4" style="font-family: var(--font-display);">Let AI Work for You</h3>
+            <p class="text-foreground-muted leading-relaxed">
+              Chat with your AI agent, run tasks, and get things done — all in a safe, sandboxed environment.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- USE CASES -->
+  <section class="py-32 relative">
+    <div class="container-wide mx-auto px-6">
+      <div class="max-w-3xl mb-16">
+        <span class="eyebrow reveal">Possibilities</span>
+        <h2 class="headline mt-4 reveal reveal-delay-1">
+          What Can You Do?
+        </h2>
+        <p class="subheadline mt-6 reveal reveal-delay-2">
+          AgentPod adapts to how you work.
         </p>
       </div>
       
-      <!-- Key value props -->
-      <div class="grid md:grid-cols-3 gap-4 mb-10 text-center">
-        <div class="p-4 animate-fade-in-up stagger-1">
-          <div class="text-2xl mb-2">🔒</div>
-          <div class="text-sm font-mono text-cyber-emerald">SANDBOXED</div>
-          <div class="text-xs text-muted-foreground mt-1">Agents run isolated, not on your laptop</div>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="card reveal reveal-delay-1">
+          <h4 class="font-semibold mb-2 text-lg" style="font-family: var(--font-display);">Code from your phone</h4>
+          <p class="text-sm text-foreground-muted leading-relaxed">Review PRs, fix bugs, or build features — from anywhere.</p>
         </div>
-        <div class="p-4 animate-fade-in-up stagger-2">
-          <div class="text-2xl mb-2">📱</div>
-          <div class="text-sm font-mono text-cyber-cyan">PORTABLE</div>
-          <div class="text-xs text-muted-foreground mt-1">Code from any device, anywhere</div>
+        <div class="card reveal reveal-delay-2">
+          <h4 class="font-semibold mb-2 text-lg" style="font-family: var(--font-display);">Automate tasks</h4>
+          <p class="text-sm text-foreground-muted leading-relaxed">Let AI handle repetitive work while you focus on what matters.</p>
         </div>
-        <div class="p-4 animate-fade-in-up stagger-3">
-          <a href="https://opencode.ai" target="_blank" rel="noopener noreferrer" class="block hover:opacity-80 transition-opacity">
-            <div class="text-sm font-mono text-cyber-magenta mb-2">POWERED BY</div>
-            <img src="/opencode-wordmark-dark.svg" alt="OpenCode" class="h-6 mx-auto" />
-            <div class="text-xs text-muted-foreground mt-2">75+ LLM providers supported</div>
-          </a>
+        <div class="card reveal reveal-delay-3">
+          <h4 class="font-semibold mb-2 text-lg" style="font-family: var(--font-display);">Experiment safely</h4>
+          <p class="text-sm text-foreground-muted leading-relaxed">Test risky commands in sandboxes, not on your main machine.</p>
+        </div>
+        <div class="card reveal reveal-delay-4">
+          <h4 class="font-semibold mb-2 text-lg" style="font-family: var(--font-display);">Multiple projects</h4>
+          <p class="text-sm text-foreground-muted leading-relaxed">Each pod is isolated. Switch contexts without conflicts.</p>
         </div>
       </div>
-      
-      <!-- Boot Terminal -->
-      <div class="terminal-window max-w-2xl mx-auto crt-flicker animate-fade-in-up stagger-4">
-        <div class="terminal-header">
-          <div class="terminal-dot bg-red-500"></div>
-          <div class="terminal-dot bg-yellow-500"></div>
-          <div class="terminal-dot bg-green-500"></div>
-          <span class="ml-4 text-xs text-muted-foreground font-mono">agentpod — boot</span>
-        </div>
-        <div class="terminal-body text-sm space-y-2 font-mono">
-          <div class="text-cyber-cyan">&gt; INITIALIZING AGENTPOD v0.1.0...</div>
-          <div class="text-muted-foreground">&gt; Spinning up sandbox container... <span class="text-cyber-emerald">OK</span></div>
-          <div class="text-muted-foreground">&gt; OpenCode server connected... <span class="text-cyber-emerald">OK</span></div>
-          <div class="text-muted-foreground">&gt; Your laptop stays clean. Agents stay isolated.</div>
-          <div class="text-cyber-emerald mt-3">READY — Code from anywhere</div>
-          <div class="mt-4">
-            <span class="text-cyber-cyan">$</span> 
-            <span class="text-foreground">_</span>
-            <span class="cursor"></span>
+    </div>
+  </section>
+
+  <!-- WAITLIST -->
+  <section id="waitlist" class="py-32 bg-background-subtle relative" aria-labelledby="waitlist-heading">
+    <div class="container-narrow mx-auto px-6">
+      <div class="text-center">
+        <span class="eyebrow reveal">Get Access</span>
+        <h2 class="headline mt-4 mb-6 reveal reveal-delay-1">
+          Join the Waitlist
+        </h2>
+        <p class="subheadline mb-12 reveal reveal-delay-2">
+          We're building the hosted version. Be first in line.
+        </p>
+        
+        <form 
+          id="waitlist-form" 
+          class="flex flex-col sm:flex-row gap-4 max-w-md mx-auto reveal reveal-delay-3" 
+          action="#" 
+          method="POST"
+          aria-labelledby="waitlist-heading"
+        >
+          <div class="flex-1">
+            <label for="email" class="sr-only">Email address</label>
+            <input 
+              type="email" 
+              id="email"
+              name="email" 
+              placeholder="you@example.com" 
+              required
+              aria-required="true"
+              aria-describedby="email-error"
+              class="input w-full"
+            />
+            <span id="email-error" class="sr-only" role="alert"></span>
           </div>
-        </div>
+          <button type="submit" class="btn btn-primary whitespace-nowrap">
+            <span id="submit-text">Join Waitlist</span>
+            <span id="loading-text" class="hidden">Joining...</span>
+          </button>
+        </form>
+        
+        <div id="form-message" class="mt-6 text-sm" role="status" aria-live="polite"></div>
+        
+        <p class="text-sm text-foreground-muted mt-8 reveal reveal-delay-4">
+          Can't wait? <a href="/developers" class="text-foreground hover:text-accent-sienna transition-colors font-medium border-b border-current">Self-host now</a> — it's open source.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- OPEN SOURCE -->
+  <section class="py-32 relative">
+    <div class="container-narrow mx-auto px-6 text-center">
+      <div class="badge badge-accent mb-6 reveal">
+        Open Source
       </div>
       
-      <!-- CTAs -->
-      <div class="flex flex-col sm:flex-row gap-4 justify-center mt-10 animate-fade-in-up stagger-5">
-        <a href="/download" class="cyber-btn-primary cyber-btn">
-          $ DOWNLOAD
+      <h2 class="headline mb-6 reveal reveal-delay-1">
+        Built in the Open
+      </h2>
+      <p class="subheadline mb-12 reveal reveal-delay-2">
+        AgentPod is MIT licensed. Self-host on your own infrastructure, 
+        contribute to the project, or just peek under the hood.
+      </p>
+      
+      <div class="flex flex-col sm:flex-row gap-4 justify-center reveal reveal-delay-3">
+        <a 
+          href="https://github.com/rakeshgangwar/agentpod" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          class="btn btn-secondary"
+          aria-label="View AgentPod on GitHub (opens in new tab)"
+        >
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd" />
+          </svg>
+          <span>View on GitHub</span>
         </a>
-        <a href="https://github.com/rakeshgangwar/agentpod" target="_blank" rel="noopener noreferrer" class="cyber-btn">
-          $ VIEW SOURCE
+        <a href="/developers" class="btn btn-ghost">
+          Read the Docs
         </a>
-      </div>
-    </div>
-  </section>
-
-  <!-- DEMO: Live Terminal Windows -->
-  <section class="py-20 bg-background/50">
-    <div class="max-w-6xl mx-auto px-4">
-      <h2 class="text-xs font-mono text-cyber-cyan uppercase tracking-widest text-center mb-12 reveal-fade">
-        // LIVE DEMO
-      </h2>
-      
-      <div class="grid md:grid-cols-3 gap-6">
-        <!-- Terminal 1: AI Chat -->
-        <div class="terminal-window reveal-slide-up reveal-delay-1">
-          <div class="terminal-header">
-            <span class="text-xs">chat.session</span>
-          </div>
-          <div class="terminal-body text-xs space-y-2">
-            <div><span class="text-cyber-magenta">You:</span> Add OAuth login</div>
-            <div><span class="text-cyber-cyan">AI:</span> Creating auth module...</div>
-            <div class="mt-2 p-2 border border-cyber-amber/30 bg-cyber-amber/10 rounded">
-              <div class="text-cyber-amber text-[10px] uppercase">Permission Required</div>
-              <div class="mt-1">npm install passport</div>
-              <div class="mt-2 flex gap-2">
-                <button class="text-[10px] px-2 py-1 bg-cyber-emerald/20 text-cyber-emerald rounded hover:bg-cyber-emerald/30 transition-all">ALLOW</button>
-                <button class="text-[10px] px-2 py-1 bg-cyber-red/20 text-cyber-red rounded hover:bg-cyber-red/30 transition-all">DENY</button>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Terminal 2: File Tree -->
-        <div class="terminal-window reveal-slide-up reveal-delay-2">
-          <div class="terminal-header">
-            <span class="text-xs">files.browser</span>
-          </div>
-          <div class="terminal-body text-xs font-mono">
-            <div class="text-muted-foreground">src/</div>
-            <div class="pl-4 text-cyber-cyan">├── auth/</div>
-            <div class="pl-8 text-cyber-emerald">│   └── oauth.ts ✓</div>
-            <div class="pl-4">├── routes/</div>
-            <div class="pl-8 text-cyber-amber">│   └── login.svelte *</div>
-            <div class="pl-4">└── lib/</div>
-          </div>
-        </div>
-        
-        <!-- Terminal 3: Status -->
-        <div class="terminal-window reveal-slide-up reveal-delay-3">
-          <div class="terminal-header">
-            <span class="text-xs">container.status</span>
-          </div>
-          <div class="terminal-body text-xs space-y-3">
-            <div class="flex items-center justify-between">
-              <span>CONTAINER</span>
-              <span class="flex items-center gap-2">
-                <span class="status-dot status-running"></span>
-                <span class="text-cyber-emerald">RUNNING</span>
-              </span>
-            </div>
-            <div class="flex items-center justify-between">
-              <span>CPU</span>
-              <span class="text-cyber-cyan">23%</span>
-            </div>
-            <div class="flex items-center justify-between">
-              <span>MEM</span>
-              <span class="text-cyber-cyan">1.2GB</span>
-            </div>
-            <div class="flex items-center justify-between">
-              <span>FLAVOR</span>
-              <span class="text-muted-foreground">fullstack</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ARCHITECTURE: CSS Diagram -->
-  <section class="py-20 bg-card/50">
-    <div class="max-w-4xl mx-auto px-4 text-center">
-      <h2 class="text-xs font-mono text-cyber-cyan uppercase tracking-widest mb-12 reveal-fade">
-        // HYBRID ARCHITECTURE
-      </h2>
-      
-      <!-- Architecture Diagram using CSS -->
-      <div class="arch-diagram font-mono text-xs">
-        <!-- Desktop Layer -->
-        <div class="arch-box border-cyber-cyan">
-          <div class="arch-label text-foreground font-bold mb-4">YOUR DESKTOP</div>
-          <div class="flex justify-center gap-4 flex-wrap">
-            <div class="arch-node">
-              <div class="text-cyber-cyan">macOS</div>
-              <div class="text-muted-foreground">Tauri</div>
-            </div>
-            <div class="arch-node">
-              <div class="text-cyber-cyan">Windows</div>
-              <div class="text-muted-foreground">Tauri</div>
-            </div>
-            <div class="arch-node">
-              <div class="text-cyber-cyan">Linux</div>
-              <div class="text-muted-foreground">Tauri</div>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Connector -->
-        <div class="arch-connector">
-          <div class="arch-line"></div>
-          <div class="arch-arrow">▼</div>
-        </div>
-        
-        <!-- API Layer -->
-        <div class="arch-box border-cyber-emerald inline-block">
-          <div class="text-foreground font-bold">AGENTPOD API</div>
-          <div class="text-muted-foreground">(Bun + Hono)</div>
-        </div>
-        
-        <!-- Split Connector -->
-        <div class="arch-connector">
-          <div class="arch-line"></div>
-          <div class="flex justify-center gap-8 md:gap-24">
-            <div class="arch-arrow">▼</div>
-            <div class="arch-arrow">▼</div>
-          </div>
-        </div>
-        
-        <!-- Sandbox Layer -->
-        <div class="flex justify-center gap-4 flex-wrap">
-          <!-- Docker -->
-          <div class="arch-box border-cyber-magenta flex-1 max-w-xs">
-            <div class="text-foreground font-bold mb-2">DOCKER SANDBOXES</div>
-            <div class="text-muted-foreground text-[10px] mb-3">(Full Dev Environments)</div>
-            <div class="flex justify-center gap-2 mb-3">
-              <div class="arch-inner-node">OpenCode<br/>Server</div>
-              <div class="arch-inner-node">OpenCode<br/>Server</div>
-            </div>
-            <div class="text-muted-foreground text-[10px] space-y-0.5">
-              <div>+ Workspace + Terminal</div>
-              <div>+ code-server + Git</div>
-            </div>
-          </div>
-          
-          <!-- Cloudflare -->
-          <div class="arch-box border-cyber-amber flex-1 max-w-xs">
-            <div class="text-foreground font-bold mb-2">CLOUDFLARE SANDBOXES</div>
-            <div class="text-muted-foreground text-[10px] mb-3">(Quick Agent Tasks)</div>
-            <div class="flex justify-center gap-2 mb-3">
-              <div class="arch-inner-node">OpenCode<br/>Worker</div>
-              <div class="arch-inner-node">OpenCode<br/>Worker</div>
-            </div>
-            <div class="text-muted-foreground text-[10px] space-y-0.5">
-              <div>+ R2 Storage + Auto-wake</div>
-              <div>+ Pay-per-request</div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Mode Comparison Cards -->
-      <div class="mt-10 grid md:grid-cols-2 gap-4 text-left max-w-2xl mx-auto">
-        <div class="terminal-window p-4 reveal-slide-left reveal-delay-1">
-          <div class="text-cyber-magenta font-mono text-xs uppercase mb-2">$ docker mode</div>
-          <div class="text-muted-foreground text-xs space-y-1">
-            <div class="flex items-center gap-2"><span class="text-cyber-emerald">✓</span> Full development environment</div>
-            <div class="flex items-center gap-2"><span class="text-cyber-emerald">✓</span> Persistent workspace & terminal</div>
-            <div class="flex items-center gap-2"><span class="text-cyber-emerald">✓</span> Interactive code editing</div>
-          </div>
-        </div>
-        <div class="terminal-window p-4 reveal-slide-right reveal-delay-2">
-          <div class="text-cyber-amber font-mono text-xs uppercase mb-2">$ cloudflare mode</div>
-          <div class="text-muted-foreground text-xs space-y-1">
-            <div class="flex items-center gap-2"><span class="text-cyber-emerald">✓</span> Lightweight VM execution</div>
-            <div class="flex items-center gap-2"><span class="text-cyber-emerald">✓</span> Wake-on-demand (auto-hibernate)</div>
-            <div class="flex items-center gap-2"><span class="text-cyber-emerald">✓</span> Parallel multi-agent teams</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- CAPABILITIES: Command List -->
-  <section class="py-20">
-    <div class="max-w-4xl mx-auto px-4">
-      <h2 class="text-xs font-mono text-cyber-cyan uppercase tracking-widest text-center mb-12 reveal-fade">
-        // CAPABILITIES
-      </h2>
-      
-      <div class="terminal-window reveal-slide-up">
-        <div class="terminal-header">
-          <span class="text-xs">help.commands</span>
-        </div>
-        <div class="terminal-body font-mono text-sm space-y-4">
-          <div class="grid md:grid-cols-2 gap-4">
-            <div class="hover:translate-x-1 transition-transform">
-              <div class="text-cyber-cyan">$ sandbox create</div>
-              <div class="text-muted-foreground text-xs pl-4">Spin up isolated Docker containers</div>
-            </div>
-            <div class="hover:translate-x-1 transition-transform">
-              <div class="text-cyber-cyan">$ llm switch claude</div>
-              <div class="text-muted-foreground text-xs pl-4">75+ providers: Claude, GPT, Copilot, Ollama</div>
-            </div>
-            <div class="hover:translate-x-1 transition-transform">
-              <div class="text-cyber-cyan">$ agent chat</div>
-              <div class="text-muted-foreground text-xs pl-4">Real-time streaming AI conversations</div>
-            </div>
-            <div class="hover:translate-x-1 transition-transform">
-              <div class="text-cyber-cyan">$ files browse</div>
-              <div class="text-muted-foreground text-xs pl-4">Syntax-highlighted file explorer</div>
-            </div>
-            <div class="hover:translate-x-1 transition-transform">
-              <div class="text-cyber-cyan">$ terminal open</div>
-              <div class="text-muted-foreground text-xs pl-4">Full xterm.js shell access</div>
-            </div>
-            <div class="hover:translate-x-1 transition-transform">
-              <div class="text-cyber-cyan">$ git sync</div>
-              <div class="text-muted-foreground text-xs pl-4">Push/pull to GitHub, GitLab</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- CONTAINER FLAVORS: Interactive Selector -->
-  <section class="py-20 bg-card/50">
-    <div class="max-w-4xl mx-auto px-4">
-      <h2 class="text-xs font-mono text-cyber-cyan uppercase tracking-widest text-center mb-12 reveal-fade">
-        // SELECT CONTAINER FLAVOR
-      </h2>
-      
-      <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <div class="terminal-window p-4 hover:border-cyber-cyan cursor-pointer group card-glow reveal-slide-up reveal-delay-1">
-          <div class="text-cyber-cyan group-hover:glow-text transition-all">JavaScript</div>
-          <div class="text-xs text-muted-foreground mt-1">Node 22, Bun, Deno</div>
-          <div class="text-xs text-cyber-cyan/50 mt-2">~800MB</div>
-        </div>
-        <div class="terminal-window p-4 hover:border-cyber-emerald cursor-pointer group card-glow reveal-slide-up reveal-delay-2">
-          <div class="text-cyber-emerald group-hover:glow-text transition-all">Python</div>
-          <div class="text-xs text-muted-foreground mt-1">Python 3.12, Jupyter</div>
-          <div class="text-xs text-cyber-cyan/50 mt-2">~1.2GB</div>
-        </div>
-        <div class="terminal-window p-4 hover:border-cyber-magenta cursor-pointer group card-glow reveal-slide-up reveal-delay-3">
-          <div class="text-cyber-magenta group-hover:glow-text transition-all">Fullstack</div>
-          <div class="text-xs text-muted-foreground mt-1">Node + Python</div>
-          <div class="text-xs text-cyber-cyan/50 mt-2">~1.8GB</div>
-        </div>
-        <div class="terminal-window p-4 hover:border-cyber-cyan cursor-pointer group card-glow reveal-slide-up reveal-delay-4">
-          <div class="text-cyber-cyan group-hover:glow-text transition-all">Go</div>
-          <div class="text-xs text-muted-foreground mt-1">Go 1.22</div>
-          <div class="text-xs text-cyber-cyan/50 mt-2">~900MB</div>
-        </div>
-        <div class="terminal-window p-4 hover:border-cyber-amber cursor-pointer group card-glow reveal-slide-up reveal-delay-5">
-          <div class="text-cyber-amber group-hover:glow-text transition-all">Rust</div>
-          <div class="text-xs text-muted-foreground mt-1">Rust stable</div>
-          <div class="text-xs text-cyber-cyan/50 mt-2">~1.1GB</div>
-        </div>
-        <div class="terminal-window p-4 hover:border-cyber-magenta cursor-pointer group card-glow reveal-slide-up reveal-delay-6">
-          <div class="text-cyber-magenta group-hover:glow-text transition-all">Polyglot</div>
-          <div class="text-xs text-muted-foreground mt-1">All languages</div>
-          <div class="text-xs text-cyber-cyan/50 mt-2">~3GB</div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ABOUT: Origin Story & Roadmap -->
-  <section class="py-20">
-    <div class="max-w-4xl mx-auto px-4">
-      <h2 class="text-xs font-mono text-cyber-cyan uppercase tracking-widest text-center mb-12 reveal-fade">
-        // WHY WE BUILT THIS
-      </h2>
-      
-      <!-- Origin Story Terminal -->
-      <div class="terminal-window reveal-slide-up mb-12">
-        <div class="terminal-header">
-          <span class="text-xs">origin-story.log</span>
-        </div>
-        <div class="terminal-body font-mono text-sm space-y-4">
-          <div class="text-cyber-cyan">&gt; THE PROBLEM</div>
-          <div class="text-muted-foreground space-y-2 pl-4">
-            <div>$ TUI coding agents (Claude Code, Gemini CLI, OpenCode) are incredible...</div>
-            <div>$ But try using them on a tablet or phone — nearly impossible</div>
-            <div>$ Running AI agents that execute arbitrary commands on your main laptop?</div>
-            <div class="text-cyber-amber">! RISKY</div>
-          </div>
-          
-          <div class="text-cyber-cyan mt-6">&gt; WHAT WE NEEDED</div>
-          <div class="text-muted-foreground space-y-2 pl-4">
-            <div>$ True portability — code from any device, anywhere</div>
-            <div>$ Security through isolation — sandboxed containers, not your main system</div>
-            <div>$ The full power of OpenCode — because they built something amazing</div>
-          </div>
-          
-          <div class="text-cyber-emerald mt-6">&gt; THE SOLUTION</div>
-          <div class="text-muted-foreground space-y-2 pl-4">
-            <div>$ OpenCode server running in Docker containers</div>
-            <div>$ Your client (desktop, mobile) talks to isolated sandboxes</div>
-            <div>$ Work travels with you — your AI coding environment in your pocket</div>
-          </div>
-          
-          <div class="mt-6 p-3 border border-cyber-cyan/30 bg-cyber-cyan/5 rounded">
-            <div class="text-xs text-cyber-cyan mb-2">// THANKS</div>
-            <div class="text-xs text-muted-foreground">
-              Huge thanks to the <span class="text-cyber-cyan">OpenCode</span> team for building 
-              an incredible open-source agent platform. AgentPod wouldn't exist without their work.
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Roadmap -->
-      <h2 class="text-xs font-mono text-cyber-cyan uppercase tracking-widest text-center mb-12 reveal-fade">
-        // ROADMAP
-      </h2>
-      
-      <div class="terminal-window reveal-slide-up">
-        <div class="terminal-header">
-          <span class="text-xs">future.plans</span>
-        </div>
-        <div class="terminal-body font-mono text-sm space-y-3">
-          <div class="flex items-start gap-3 group hover:translate-x-1 transition-transform">
-            <div class="text-cyber-emerald text-lg">✓</div>
-            <div>
-              <div class="text-foreground">Desktop Support</div>
-              <div class="text-xs text-muted-foreground">macOS, Windows, Linux — all working beautifully</div>
-            </div>
-          </div>
-          
-          <div class="flex items-start gap-3 group hover:translate-x-1 transition-transform">
-            <div class="text-cyber-amber text-lg">◐</div>
-            <div>
-              <div class="text-foreground">Mobile Apps <span class="text-xs text-cyber-amber">(IN PROGRESS)</span></div>
-              <div class="text-xs text-muted-foreground">Tauri v2 enables native iOS & Android — code from your phone</div>
-            </div>
-          </div>
-          
-          <div class="flex items-start gap-3 group hover:translate-x-1 transition-transform">
-            <div class="text-muted-foreground text-lg">○</div>
-            <div>
-              <div class="text-foreground">ACP Gateway <span class="text-xs text-muted-foreground">(PLANNED)</span></div>
-              <div class="text-xs text-muted-foreground">Agent Communication Protocol — standardized multi-agent interactions</div>
-            </div>
-          </div>
-          
-          <div class="flex items-start gap-3 group hover:translate-x-1 transition-transform">
-            <div class="text-muted-foreground text-lg">○</div>
-            <div>
-              <div class="text-foreground">Code Server Integration <span class="text-xs text-muted-foreground">(PLANNED)</span></div>
-              <div class="text-xs text-muted-foreground">Full VS Code experience in your browser — complete IDE access</div>
-            </div>
-          </div>
-          
-          <div class="flex items-start gap-3 group hover:translate-x-1 transition-transform">
-            <div class="text-cyber-cyan text-lg">∞</div>
-            <div>
-              <div class="text-foreground">Continuous Evolution</div>
-              <div class="text-xs text-muted-foreground">Latest LLM providers, modern tooling, community-driven features</div>
-            </div>
-          </div>
-          
-          <div class="mt-6 pt-4 border-t border-cyber-cyan/20">
-            <div class="text-xs text-muted-foreground">
-              <span class="text-cyber-cyan">$</span> Open source. Community-driven. Built by developers, for developers.
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- BLOG: Latest Posts -->
-  <section class="py-20 bg-card/50">
-    <div class="max-w-4xl mx-auto px-4">
-      <h2 class="text-xs font-mono text-cyber-cyan uppercase tracking-widest text-center mb-12 reveal-fade">
-        // FROM THE BLOG
-      </h2>
-      
-      <div class="grid md:grid-cols-2 gap-6">
-        {latestPosts.map((post, index) => {
-          const readTime = calculateReadTime(post.body);
-          const formattedDate = formatDate(post.data.date);
-          
-          return (
-            <article 
-              class={`terminal-window blog-card reveal-slide-up reveal-delay-${index + 1}`}
-            >
-              <div class="terminal-header">
-                <span class="text-xs text-muted-foreground font-mono">
-                  {formattedDate}
-                </span>
-                <span class="ml-auto text-xs text-cyber-cyan">{readTime} min</span>
-              </div>
-              <div class="terminal-body">
-                <a href={`/blog/${post.id}`} class="group block">
-                  <h3 class="text-lg font-bold text-foreground mb-2 group-hover:text-cyber-cyan transition-colors">
-                    {post.data.title}
-                  </h3>
-                  <p class="text-muted-foreground text-sm mb-3 leading-relaxed line-clamp-2">
-                    {post.data.excerpt}
-                  </p>
-                  <div class="flex items-center gap-2">
-                    {post.data.tags.slice(0, 2).map((tag: string) => (
-                      <span class="text-xs px-2 py-0.5 bg-cyber-cyan/10 text-cyber-cyan rounded font-mono">
-                        #{tag}
-                      </span>
-                    ))}
-                  </div>
-                </a>
-              </div>
-            </article>
-          );
-        })}
-      </div>
-      
-      <div class="text-center mt-8">
-        <a href="/blog" class="cyber-btn">
-          $ cat /blog --all
-        </a>
-      </div>
-    </div>
-  </section>
-
-  <!-- PRICING: Simple Terminal -->
-  <section class="py-20">
-    <div class="max-w-2xl mx-auto px-4 text-center">
-      <div class="terminal-window reveal-slide-up">
-        <div class="terminal-header">
-          <span class="text-xs">pricing.info</span>
-        </div>
-        <div class="terminal-body font-mono">
-          <div class="text-4xl text-cyber-emerald mb-4 glow-text">$0</div>
-          <div class="text-muted-foreground text-sm space-y-1">
-            <div>&gt; Open source (MIT License)</div>
-            <div>&gt; Self-hosted on your infrastructure</div>
-            <div>&gt; No usage limits</div>
-            <div>&gt; No telemetry</div>
-          </div>
-          <div class="mt-6 text-xs text-muted-foreground">
-            You pay for: LLM API calls + server hosting
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- CTA: Command Prompt -->
-  <section class="py-20">
-    <div class="max-w-2xl mx-auto px-4 text-center">
-      <div class="font-mono text-lg text-cyber-cyan mb-6">
-        &gt; READY TO DEPLOY YOUR AI AGENT?
-      </div>
-      <div class="flex flex-col sm:flex-row gap-4 justify-center">
-        <a href="/download" class="cyber-btn-primary cyber-btn">
-          $ download --platform=auto
-        </a>
-        <a href="https://github.com/rakeshgangwar/agentpod" target="_blank" rel="noopener noreferrer" class="cyber-btn">
-          $ git clone agentpod
-        </a>
-      </div>
-      <div class="mt-8 font-mono text-xs text-muted-foreground">
-        <span class="text-cyber-emerald">●</span> 411 tests passing | 
-        <span class="text-cyber-cyan">●</span> 6 container flavors | 
-        <span class="text-cyber-magenta">●</span> 20+ themes
       </div>
     </div>
   </section>
 
   <Footer slot="footer" />
-</BaseLayout>
+</ModernLayout>
 
 <script>
-import '../scripts/main.ts';
+  const revealElements = document.querySelectorAll('.reveal');
+  
+  const revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('revealed');
+      }
+    });
+  }, {
+    threshold: 0.1,
+    rootMargin: '0px 0px -80px 0px'
+  });
+  
+  revealElements.forEach(el => revealObserver.observe(el));
+  
+  const waitlistForm = document.getElementById('waitlist-form') as HTMLFormElement;
+  const formMessage = document.getElementById('form-message');
+  const submitText = document.getElementById('submit-text');
+  const loadingText = document.getElementById('loading-text');
+  
+  if (waitlistForm && formMessage && submitText && loadingText) {
+    waitlistForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      submitText.classList.add('hidden');
+      loadingText.classList.remove('hidden');
+      const submitButton = waitlistForm.querySelector<HTMLButtonElement>('button[type="submit"]');
+      if (submitButton) submitButton.disabled = true;
+      
+      setTimeout(() => {
+        formMessage.textContent = '✓ Thanks! We\'ll be in touch soon.';
+        formMessage.className = 'mt-6 text-sm text-success font-medium';
+        waitlistForm.reset();
+        
+        submitText.classList.remove('hidden');
+        loadingText.classList.add('hidden');
+        if (submitButton) submitButton.disabled = false;
+      }, 1500);
+    });
+  }
 </script>

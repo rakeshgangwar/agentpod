@@ -1,9 +1,9 @@
 ---
 import { getCollection } from "astro:content";
 import type { CollectionEntry } from "astro:content";
-import BaseLayout from "../../layouts/BaseLayout.astro";
-import Header from "../../components/Header.astro";
-import Footer from "../../components/Footer.astro";
+import ModernLayout from "../../layouts/ModernLayout.astro";
+import Header from "../../components/modern/Header.astro";
+import Footer from "../../components/modern/Footer.astro";
 
 export async function getStaticPaths() {
   const blogPosts = await getCollection("blog");
@@ -39,72 +39,71 @@ const readTime = calculateReadTime(post.body);
 const formattedDate = formatDate(post.data.date);
 ---
 
-<BaseLayout title={`${post.data.title} — AgentPod Blog`} description={post.data.excerpt}>
-  <Header slot="header" />
+<ModernLayout title={`${post.data.title} — AgentPod Blog`} description={post.data.excerpt}>
+  <Header slot="header" variant="solid" />
   
   <!-- Article Header -->
-  <article class="pt-20 pb-12 px-4">
-    <div class="max-w-3xl mx-auto">
+  <article class="pt-32 pb-24 px-6">
+    <div class="container-narrow mx-auto">
       <!-- Breadcrumb -->
-      <nav class="mb-8 animate-fade-in-up">
-        <div class="font-mono text-xs text-muted-foreground">
-          <a href="/" class="hover:text-cyber-cyan transition-colors">$ cd ~</a>
-          <span class="mx-2">/</span>
-          <a href="/blog" class="hover:text-cyber-cyan transition-colors">blog</a>
-          <span class="mx-2">/</span>
-          <span class="text-cyber-cyan">{post.id}</span>
-        </div>
+      <nav class="mb-12 animate-fade-in-up" aria-label="Breadcrumb">
+        <ol class="flex items-center gap-2 text-sm text-foreground-muted">
+          <li><a href="/" class="hover:text-foreground transition-colors">Home</a></li>
+          <li aria-hidden="true">/</li>
+          <li><a href="/blog" class="hover:text-foreground transition-colors">Blog</a></li>
+          <li aria-hidden="true">/</li>
+          <li class="text-foreground" aria-current="page">{post.data.title}</li>
+        </ol>
       </nav>
 
-      <!-- Title Terminal -->
-      <div class="terminal-window mb-8 animate-fade-in-up stagger-2">
-        <div class="terminal-header">
-          <div class="terminal-dot bg-red-500"></div>
-          <div class="terminal-dot bg-yellow-500"></div>
-          <div class="terminal-dot bg-green-500"></div>
-          <span class="ml-4 text-xs text-muted-foreground font-mono">{post.id}.md</span>
+      <!-- Article Header -->
+      <header class="mb-12 animate-fade-in-up delay-100">
+        <div class="flex flex-wrap gap-2 mb-6">
+          {post.data.tags.map((tag: string) => (
+            <span class="badge badge-accent text-xs">
+              {tag}
+            </span>
+          ))}
         </div>
-        <div class="terminal-body">
-          <h1 class="text-3xl md:text-4xl font-bold text-foreground mb-4 leading-tight">
-            {post.data.title}
-          </h1>
-          <p class="text-muted-foreground text-lg mb-6 leading-relaxed">
-            {post.data.excerpt}
-          </p>
-          <div class="flex flex-wrap items-center gap-4 text-sm">
-            <div class="flex items-center gap-2">
-              <span class="text-cyber-emerald">▸</span>
-              <span class="text-foreground">{post.data.author}</span>
-            </div>
-            <div class="text-muted-foreground">{formattedDate}</div>
-            <div class="text-cyber-cyan">{readTime} min read</div>
-            <div class="flex gap-2 ml-auto">
-              {post.data.tags.map((tag: string) => (
-                <span class="text-xs px-2 py-1 bg-cyber-cyan/10 text-cyber-cyan rounded font-mono">
-                  #{tag}
-                </span>
-              ))}
-            </div>
+        
+        <h1 class="display-lg mb-6 text-balance">
+          {post.data.title}
+        </h1>
+        
+        <p class="subheadline mb-8 text-balance">
+          {post.data.excerpt}
+        </p>
+        
+        <div class="flex flex-wrap items-center gap-4 text-sm text-foreground-muted pb-8 border-b border-border">
+          <div class="flex items-center gap-2">
+            <span class="text-foreground font-medium">{post.data.author}</span>
           </div>
+          <span aria-hidden="true">·</span>
+          <time datetime={post.data.date}>{formattedDate}</time>
+          <span aria-hidden="true">·</span>
+          <span>{readTime} min read</span>
         </div>
-      </div>
+      </header>
 
       <!-- Article Content -->
-      <div class="prose-terminal animate-fade-in-up stagger-3">
+      <div class="prose-modern animate-fade-in-up delay-200">
         <Content />
       </div>
 
       <!-- Back to Blog -->
-      <div class="mt-12 pt-8 border-t border-border animate-fade-in-up stagger-4">
-        <a href="/blog" class="cyber-btn inline-block">
-          $ cd /blog
+      <div class="mt-16 pt-12 border-t border-border animate-fade-in-up delay-300">
+        <a href="/blog" class="btn btn-secondary inline-flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+          </svg>
+          Back to blog
         </a>
       </div>
     </div>
   </article>
 
   <Footer slot="footer" />
-</BaseLayout>
+</ModernLayout>
 
 <style is:global>
   /* Terminal-style prose styling for blog content */

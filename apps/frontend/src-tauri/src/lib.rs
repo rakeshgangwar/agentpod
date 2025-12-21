@@ -130,6 +130,7 @@ use commands::{
     terminal_send_input,
     test_connection,
     unpause_sandbox,
+    wake_sandbox,
     unshare_sandbox_preview_port,
     update_user_agents_md,
     update_user_opencode_settings,

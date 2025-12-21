@@ -1,8 +1,8 @@
 ---
 import { getCollection } from "astro:content";
-import BaseLayout from "../../layouts/BaseLayout.astro";
-import Header from "../../components/Header.astro";
-import Footer from "../../components/Footer.astro";
+import ModernLayout from "../../layouts/ModernLayout.astro";
+import Header from "../../components/modern/Header.astro";
+import Footer from "../../components/modern/Footer.astro";
 
 const allPosts = await getCollection("blog");
 const sortedPosts = allPosts.sort(
@@ -25,73 +25,70 @@ function formatDate(dateString: string): string {
 }
 ---
 
-<BaseLayout title="Blog — AgentPod" description="Thoughts on portable AI sandboxes, development tools, and building in public">
-  <Header slot="header" />
+<ModernLayout title="Blog — AgentPod" description="Thoughts on portable AI sandboxes, development tools, and building in public">
+  <Header slot="header" variant="solid" />
   
   <!-- Blog Header -->
-  <section class="pt-20 pb-12 px-4">
-    <div class="max-w-4xl mx-auto">
-      <div class="terminal-window animate-fade-in-up">
-        <div class="terminal-header">
-          <div class="terminal-dot bg-red-500"></div>
-          <div class="terminal-dot bg-yellow-500"></div>
-          <div class="terminal-dot bg-green-500"></div>
-          <span class="ml-4 text-xs text-muted-foreground font-mono">blog.archive</span>
-        </div>
-        <div class="terminal-body">
-          <div class="text-cyber-cyan font-mono text-sm mb-2">$ cat /blog</div>
-          <div class="text-muted-foreground text-sm">
-            Thoughts on portable AI sandboxes, development patterns, and building in public.
-          </div>
-        </div>
+  <section class="pt-32 pb-16 px-6">
+    <div class="container-wide mx-auto">
+      <div class="max-w-3xl animate-fade-in-up">
+        <p class="eyebrow mb-4">Insights & Stories</p>
+        <h1 class="display-lg mb-6">Blog</h1>
+        <p class="subheadline max-w-2xl">
+          Thoughts on portable AI sandboxes, development patterns, and building in public.
+        </p>
       </div>
     </div>
   </section>
 
   <!-- Blog Posts Grid -->
-  <section class="pb-20 px-4">
-    <div class="max-w-4xl mx-auto">
-      <div class="space-y-6">
+  <section class="pb-24 px-6">
+    <div class="container-wide mx-auto">
+      <div class="grid grid-cols-1 gap-8 max-w-5xl">
         {sortedPosts.map((post, index) => {
           const readTime = calculateReadTime(post.body);
           const formattedDate = formatDate(post.data.date);
           
           return (
             <article 
-              class={`terminal-window blog-card animate-fade-in-up stagger-${Math.min(index + 1, 6)}`}
+              class={`card group cursor-pointer animate-fade-in-up delay-${Math.min(index + 1, 6) * 100}`}
             >
-              <div class="terminal-header">
-                <span class="text-xs text-muted-foreground font-mono">
-                  {formattedDate}
-                </span>
-                <span class="ml-auto flex items-center gap-2">
-                  <span class="text-xs text-cyber-cyan">{readTime} min read</span>
-                  {post.data.tags.slice(0, 2).map((tag: string) => (
-                    <span class="text-xs px-2 py-0.5 bg-cyber-cyan/10 text-cyber-cyan rounded">
-                      #{tag}
-                    </span>
-                  ))}
-                </span>
-              </div>
-              <div class="terminal-body">
-                <a href={`/blog/${post.id}`} class="group block">
-                  <h2 class="text-xl font-bold text-foreground mb-3 group-hover:text-cyber-cyan transition-colors">
-                    {post.data.title}
-                  </h2>
-                  <p class="text-muted-foreground text-sm mb-4 leading-relaxed">
-                    {post.data.excerpt}
-                  </p>
-                  <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span class="text-cyber-emerald">▸</span>
-                      <span>by {post.data.author}</span>
-                    </div>
-                    <div class="cyber-btn text-xs group-hover:bg-cyber-cyan group-hover:text-background transition-all">
-                      $ read --post
-                    </div>
+              <a href={`/blog/${post.id}`} class="block">
+                <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
+                  <div class="flex items-center gap-4 text-sm text-foreground-muted">
+                    <time datetime={post.data.date}>{formattedDate}</time>
+                    <span>·</span>
+                    <span>{readTime} min read</span>
                   </div>
-                </a>
-              </div>
+                  <div class="flex flex-wrap gap-2">
+                    {post.data.tags.slice(0, 3).map((tag: string) => (
+                      <span class="badge text-xs">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                
+                <h2 class="headline text-2xl mb-3 group-hover:text-accent-sienna transition-colors">
+                  {post.data.title}
+                </h2>
+                
+                <p class="text-foreground-muted leading-relaxed mb-4">
+                  {post.data.excerpt}
+                </p>
+                
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-foreground-muted">
+                    by {post.data.author}
+                  </span>
+                  <span class="text-accent-sienna text-sm font-medium group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
+                    Read article
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </span>
+                </div>
+              </a>
             </article>
           );
         })}
@@ -99,21 +96,14 @@ function formatDate(dateString: string): string {
 
       <!-- Empty State (if no posts) -->
       {sortedPosts.length === 0 && (
-        <div class="terminal-window text-center py-12">
-          <div class="terminal-body">
-            <div class="text-muted-foreground text-sm font-mono">
-              <div class="text-cyber-amber mb-2">$ ls -la /blog</div>
-              <div>No posts found. Check back soon!</div>
-            </div>
-          </div>
+        <div class="card text-center py-16 max-w-2xl mx-auto">
+          <p class="text-foreground-muted text-lg">
+            No posts published yet. Check back soon for insights and updates.
+          </p>
         </div>
       )}
     </div>
   </section>
 
   <Footer slot="footer" />
-</BaseLayout>
-
-<script>
-  import '../../scripts/main.ts';
-</script>
+</ModernLayout>
