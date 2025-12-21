@@ -1,7 +1,29 @@
 ---
+import { getCollection } from "astro:content";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import Header from "../components/Header.astro";
 import Footer from "../components/Footer.astro";
+
+// Get latest 2 blog posts
+const allPosts = await getCollection("blog");
+const latestPosts = allPosts
+  .sort((a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime())
+  .slice(0, 2);
+
+function calculateReadTime(content: string): number {
+  const wordsPerMinute = 200;
+  const words = content.trim().split(/\s+/).length;
+  return Math.ceil(words / wordsPerMinute);
+}
+
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
 ---
 
 <BaseLayout title="AgentPod — Your Portable Command Center">
@@ -439,6 +461,58 @@ import Footer from "../components/Footer.astro";
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BLOG: Latest Posts -->
+  <section class="py-20 bg-card/50">
+    <div class="max-w-4xl mx-auto px-4">
+      <h2 class="text-xs font-mono text-cyber-cyan uppercase tracking-widest text-center mb-12 reveal-fade">
+        // FROM THE BLOG
+      </h2>
+      
+      <div class="grid md:grid-cols-2 gap-6">
+        {latestPosts.map((post, index) => {
+          const readTime = calculateReadTime(post.body);
+          const formattedDate = formatDate(post.data.date);
+          
+          return (
+            <article 
+              class={`terminal-window blog-card reveal-slide-up reveal-delay-${index + 1}`}
+            >
+              <div class="terminal-header">
+                <span class="text-xs text-muted-foreground font-mono">
+                  {formattedDate}
+                </span>
+                <span class="ml-auto text-xs text-cyber-cyan">{readTime} min</span>
+              </div>
+              <div class="terminal-body">
+                <a href={`/blog/${post.id}`} class="group block">
+                  <h3 class="text-lg font-bold text-foreground mb-2 group-hover:text-cyber-cyan transition-colors">
+                    {post.data.title}
+                  </h3>
+                  <p class="text-muted-foreground text-sm mb-3 leading-relaxed line-clamp-2">
+                    {post.data.excerpt}
+                  </p>
+                  <div class="flex items-center gap-2">
+                    {post.data.tags.slice(0, 2).map((tag: string) => (
+                      <span class="text-xs px-2 py-0.5 bg-cyber-cyan/10 text-cyber-cyan rounded font-mono">
+                        #{tag}
+                      </span>
+                    ))}
+                  </div>
+                </a>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+      
+      <div class="text-center mt-8">
+        <a href="/blog" class="cyber-btn">
+          $ cat /blog --all
+        </a>
       </div>
     </div>
   </section>

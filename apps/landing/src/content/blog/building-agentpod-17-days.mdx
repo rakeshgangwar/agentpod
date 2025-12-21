@@ -1,0 +1,148 @@
+---
+title: "Building AgentPod: 337 Commits in 17 Days"
+date: "2025-12-21"
+author: "Rakesh Gangwar"
+excerpt: "From first commit to production-ready desktop app in 17 days. Here's the complete journey of building AgentPod."
+tags: ["development", "journey", "tauri", "architecture"]
+---
+
+On December 5th, 2025, the first commit landed: "Initial commit: Portable Command Center project setup." 17 days and 337 commits later, AgentPod is a fully functional desktop application with production-ready infrastructure.
+
+Here's how it happened.
+
+## The Timeline
+
+### Day 1 (Dec 5): Foundation
+
+- Initial project scaffold with Tauri v2 + SvelteKit
+- Phased implementation guides for 6 development phases
+- OpenCode Docker image for container deployment
+- **Phase 1 Complete**: Infrastructure Setup
+
+Started with a clear vision: Tauri for cross-platform native app, SvelteKit for the frontend, connecting to a Hetzner VPS running Coolify for container orchestration.
+
+### Day 2 (Dec 6): API & Desktop App
+
+- Management API with Bun + Hono framework
+- SQLite database with full CRUD operations
+- **Phase 2 Complete**: API with 39 tests passing
+- Tauri desktop app with project management
+- **Phase 3 Complete**: Desktop foundation
+- OpenCode integration with SSE streaming
+- Chat UI with assistant-ui (React)
+- File browser with Shiki syntax highlighting
+- **Phase 4 at 95%**: Core features working
+
+This was the most intense day. Went from nothing to a working chat interface with real-time streaming in a single push.
+
+### Day 3 (Dec 7): Configuration & Permissions
+
+- Human-in-the-loop permission system
+- OpenCode configuration architecture
+- Container tier system (starter, builder, creator, power)
+- code-server (VS Code in browser) integration
+- AGENTS.md editor for AI agent rules
+
+### Days 4-5 (Dec 8-9): Architecture Deep Dive
+
+- Comprehensive UI/UX analysis and implementation plan
+- Generative UI architecture documentation
+- ACP (Agent Communication Protocol) Gateway implementation
+- Modular container architecture
+
+### Day 6 (Dec 10): Daytona POC
+
+- Self-hosted Daytona sandbox proof-of-concept
+- Comprehensive README documentation
+
+### Day 7 (Dec 11): Monorepo Migration
+
+- Restructured entire project to Turborepo monorepo
+- Migrated to OpenCode SDK
+- Added Keycloak OAuth authentication (later replaced)
+- Modular container system with resource tiers
+
+### Day 8 (Dec 12): The Great Simplification
+
+- **Removed Coolify** — Replaced with direct Docker API
+- **Removed Forgejo** — Filesystem-based Git
+- **Removed Keycloak** — Replaced with Better Auth
+- V2 API with direct Docker orchestration
+- Theme system with 20 presets
+
+This was a pivotal day. The original architecture was complex (Coolify + Forgejo + Keycloak). We simplified to direct Docker API + Better Auth.
+
+### Days 9-10 (Dec 13-14): Testing & Onboarding
+
+- **411 tests** added (unit + integration + e2e)
+- PostgreSQL migration with Drizzle ORM
+- Comprehensive onboarding system
+- Agent management system
+
+### Days 11-12 (Dec 15-16): UI Polish
+
+- Terminal/cyberpunk UI redesign
+- Modular theme system (color schemes + font pairings)
+- Interactive terminal with xterm.js
+- Session activity tracking
+- Command Center homepage
+- Keyboard shortcuts (Cmd+, for agents, Alt+, for models)
+
+### Day 13 (Dec 17): Production Readiness
+
+- Responsive mobile UI with bottom navigation
+- **Production infrastructure**: Loki + Fluent Bit + Grafana
+- HTTPS with Let's Encrypt + Traefik
+- iOS project files for Tauri iOS builds
+- **Phase 6 Complete**: Production ready
+
+### Days 14-15 (Dec 18-19): Features & Release
+
+- Rebranded CodeOpen → AgentPod
+- Voice input with Whisper + OpenWakeWord
+- Admin panel with signup control
+- Git branch management and diff viewing
+- Tauri release workflow for all platforms
+- Web preview feature with Traefik dynamic routing
+- Model doctor command for agent configuration
+
+### Days 16-17 (Dec 20-21): Cloudflare & Landing
+
+- **Cloudflare Sandbox SDK integration**
+- Hybrid architecture: Docker + Cloudflare workers
+- Hibernation wake UI for sleeping sandboxes
+- Automatic workspace sync to R2 storage
+- MCP plugin for AI agent debugging
+- **Landing page** with terminal/cyberpunk design
+
+## The Numbers
+
+| Metric | Value |
+|--------|-------|
+| Total Commits | 337 |
+| Development Days | 17 |
+| Commits/Day Average | ~20 |
+| Tests | 411 |
+| Container Flavors | 6 |
+| Themes | 20+ |
+| LLM Providers | 75+ |
+
+## Key Architectural Decisions
+
+1. **Tauri over Electron** — Native performance, smaller bundle
+2. **SvelteKit over React** — Simpler reactivity with Svelte 5 runes
+3. **Better Auth over Keycloak** — Embedded, simpler, less infrastructure
+4. **Direct Docker API over Coolify** — Full control, fewer moving parts
+5. **Hybrid Sandboxes** — Docker for dev, Cloudflare for quick tasks
+
+## What's Next
+
+- Mobile apps (iOS/Android) — Tauri v2 enables this
+- ACP Gateway — Standardized multi-agent interactions
+- Web client — Browser-based access
+
+The foundation is solid. Now we build on top of it.
+
+---
+
+*Built in public. Open source. MIT licensed.*

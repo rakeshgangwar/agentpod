@@ -1,0 +1,52 @@
+---
+title: "Why AgentPod: The Story Behind Portable AI Sandboxes"
+date: "2025-12-21"
+author: "Rakesh Gangwar"
+excerpt: "TUI coding agents are incredible, but they're trapped on desktops. Here's why we built AgentPod to set them free."
+tags: ["motivation", "opencode", "sandboxing", "portability"]
+---
+
+The motivation behind AgentPod came from a clear need: **portability with coding agents** and a platform for **experimenting with new UI paradigms**.
+
+## The TUI Revolution
+
+With the emergence of TUI-based coding agents like Claude Code, Gemini CLI, and more recently OpenCode (which powers this very project), we're witnessing a revolution in how developers interact with AI. These terminal-based tools are incredibly powerful.
+
+But here's the problem: **TUIs are difficult to work with on screens other than desktop.**
+
+Try using Claude Code on a tablet. Or running Gemini CLI from your phone. It's nearly impossible. These powerful tools are trapped in desktop environments.
+
+## The Security Problem
+
+There was another pressing issue: **sandboxing**.
+
+AI agents that can run arbitrary commands on your primary laptop? That's a security nightmare waiting to happen. We needed isolation. We needed containers. We needed a way to let agents do their work without risking our main system.
+
+## OpenCode Server: The Godsend
+
+This is where [OpenCode](https://opencode.ai) became a godsend.
+
+OpenCode's server mode allows running the agent in sandboxed containers while the client runs on your primary machine to interact with users. This separation of concerns is exactly what we needed:
+
+- **Server**: Runs in Docker containers, isolated and sandboxed
+- **Client**: Runs on any device — desktop, tablet, or phone
+- **Connection**: Secure communication between client and server
+
+## What AgentPod Does
+
+AgentPod takes this architecture and makes it accessible:
+
+1. **Spin up sandboxes** — Docker containers or Cloudflare workers
+2. **Connect from anywhere** — Desktop app now, mobile coming soon
+3. **Stay safe** — Your laptop stays clean, agents stay isolated
+4. **Use any LLM** — 75+ providers supported through OpenCode
+
+## The Vision
+
+We're building the "Portable Command Center" — your personal AI-powered development environment that travels with you.
+
+Desktop support is complete. Mobile is in progress. The future is portable.
+
+---
+
+*Thanks to the OpenCode team for building an incredible open-source agent platform. AgentPod wouldn't exist without their work.*

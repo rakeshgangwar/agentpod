@@ -1,0 +1,292 @@
+---
+import { getCollection } from "astro:content";
+import type { CollectionEntry } from "astro:content";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Header from "../../components/Header.astro";
+import Footer from "../../components/Footer.astro";
+
+export async function getStaticPaths() {
+  const blogPosts = await getCollection("blog");
+  return blogPosts.map((post) => ({
+    params: { slug: post.id },
+    props: { post },
+  }));
+}
+
+interface Props {
+  post: CollectionEntry<"blog">;
+}
+
+const { post } = Astro.props;
+const { Content } = await post.render();
+
+function calculateReadTime(content: string): number {
+  const wordsPerMinute = 200;
+  const words = content.trim().split(/\s+/).length;
+  return Math.ceil(words / wordsPerMinute);
+}
+
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+const readTime = calculateReadTime(post.body);
+const formattedDate = formatDate(post.data.date);
+---
+
+<BaseLayout title={`${post.data.title} — AgentPod Blog`} description={post.data.excerpt}>
+  <Header slot="header" />
+  
+  <!-- Article Header -->
+  <article class="pt-20 pb-12 px-4">
+    <div class="max-w-3xl mx-auto">
+      <!-- Breadcrumb -->
+      <nav class="mb-8 animate-fade-in-up">
+        <div class="font-mono text-xs text-muted-foreground">
+          <a href="/" class="hover:text-cyber-cyan transition-colors">$ cd ~</a>
+          <span class="mx-2">/</span>
+          <a href="/blog" class="hover:text-cyber-cyan transition-colors">blog</a>
+          <span class="mx-2">/</span>
+          <span class="text-cyber-cyan">{post.id}</span>
+        </div>
+      </nav>
+
+      <!-- Title Terminal -->
+      <div class="terminal-window mb-8 animate-fade-in-up stagger-2">
+        <div class="terminal-header">
+          <div class="terminal-dot bg-red-500"></div>
+          <div class="terminal-dot bg-yellow-500"></div>
+          <div class="terminal-dot bg-green-500"></div>
+          <span class="ml-4 text-xs text-muted-foreground font-mono">{post.id}.md</span>
+        </div>
+        <div class="terminal-body">
+          <h1 class="text-3xl md:text-4xl font-bold text-foreground mb-4 leading-tight">
+            {post.data.title}
+          </h1>
+          <p class="text-muted-foreground text-lg mb-6 leading-relaxed">
+            {post.data.excerpt}
+          </p>
+          <div class="flex flex-wrap items-center gap-4 text-sm">
+            <div class="flex items-center gap-2">
+              <span class="text-cyber-emerald">▸</span>
+              <span class="text-foreground">{post.data.author}</span>
+            </div>
+            <div class="text-muted-foreground">{formattedDate}</div>
+            <div class="text-cyber-cyan">{readTime} min read</div>
+            <div class="flex gap-2 ml-auto">
+              {post.data.tags.map((tag: string) => (
+                <span class="text-xs px-2 py-1 bg-cyber-cyan/10 text-cyber-cyan rounded font-mono">
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Article Content -->
+      <div class="prose-terminal animate-fade-in-up stagger-3">
+        <Content />
+      </div>
+
+      <!-- Back to Blog -->
+      <div class="mt-12 pt-8 border-t border-border animate-fade-in-up stagger-4">
+        <a href="/blog" class="cyber-btn inline-block">
+          $ cd /blog
+        </a>
+      </div>
+    </div>
+  </article>
+
+  <Footer slot="footer" />
+</BaseLayout>
+
+<style is:global>
+  /* Terminal-style prose styling for blog content */
+  .prose-terminal {
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    line-height: 1.7;
+  }
+
+  .prose-terminal h2 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--color-cyber-cyan);
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 1.25rem;
+  }
+
+  .prose-terminal h2::before {
+    content: "// ";
+    color: var(--color-cyber-cyan);
+    opacity: 0.6;
+  }
+
+  .prose-terminal h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--color-cyber-emerald);
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+    font-family: var(--font-mono);
+  }
+
+  .prose-terminal h3::before {
+    content: "$ ";
+    color: var(--color-cyber-emerald);
+  }
+
+  .prose-terminal p {
+    margin-bottom: 1.25rem;
+    color: var(--color-muted-foreground);
+  }
+
+  .prose-terminal strong {
+    color: var(--color-foreground);
+    font-weight: 600;
+  }
+
+  .prose-terminal a {
+    color: var(--color-cyber-cyan);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s;
+  }
+
+  .prose-terminal a:hover {
+    border-bottom-color: var(--color-cyber-cyan);
+  }
+
+  .prose-terminal ul,
+  .prose-terminal ol {
+    margin-bottom: 1.25rem;
+    padding-left: 1.5rem;
+    color: var(--color-muted-foreground);
+  }
+
+  .prose-terminal ul {
+    list-style: none;
+  }
+
+  .prose-terminal ul li::before {
+    content: "▸";
+    color: var(--color-cyber-cyan);
+    display: inline-block;
+    width: 1em;
+    margin-left: -1em;
+  }
+
+  .prose-terminal ol {
+    list-style: decimal;
+  }
+
+  .prose-terminal li {
+    margin-bottom: 0.5rem;
+  }
+
+  .prose-terminal code {
+    font-family: var(--font-mono);
+    font-size: 0.875em;
+    background: var(--color-card);
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    color: var(--color-cyber-amber);
+    border: 1px solid var(--color-border);
+  }
+
+  .prose-terminal pre {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: 0.25rem;
+    padding: 1rem;
+    margin-bottom: 1.25rem;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  .prose-terminal pre code {
+    background: transparent;
+    padding: 0;
+    border: none;
+    color: var(--color-foreground);
+  }
+
+  .prose-terminal blockquote {
+    border-left: 3px solid var(--color-cyber-magenta);
+    padding-left: 1rem;
+    margin: 1.5rem 0;
+    font-style: italic;
+    color: var(--color-muted-foreground);
+  }
+
+  .prose-terminal hr {
+    border: none;
+    border-top: 1px solid var(--color-border);
+    margin: 2rem 0;
+  }
+
+  .prose-terminal table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.5rem 0;
+    font-size: 0.875rem;
+  }
+
+  .prose-terminal th {
+    background: var(--color-card);
+    color: var(--color-cyber-cyan);
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.75rem;
+    padding: 0.75rem;
+    text-align: left;
+    border: 1px solid var(--color-border);
+  }
+
+  .prose-terminal td {
+    padding: 0.75rem;
+    border: 1px solid var(--color-border);
+    color: var(--color-muted-foreground);
+  }
+
+  .prose-terminal tbody tr:hover {
+    background: var(--color-card);
+  }
+
+  /* Images */
+  .prose-terminal img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.25rem;
+    border: 1px solid var(--color-border);
+    margin: 1.5rem 0;
+  }
+
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    .prose-terminal h2 {
+      font-size: 1.125rem;
+    }
+
+    .prose-terminal h3 {
+      font-size: 1rem;
+    }
+  }
+</style>
+
+<script>
+  import '../../scripts/main.ts';
+</script>

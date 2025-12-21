@@ -12,8 +12,9 @@
     "clean": "rm -rf dist .astro"
   },
   "dependencies": {
-    "astro": "^5.16.6",
-    "@astrojs/check": "^0.9.4"
+    "@astrojs/check": "^0.9.4",
+    "@astrojs/mdx": "^4.3.13",
+    "astro": "^5.16.6"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.17",

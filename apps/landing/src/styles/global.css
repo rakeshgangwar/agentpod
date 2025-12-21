@@ -485,6 +485,17 @@
   opacity: 0.3;
 }
 
+/* Blog card hover - clean border glow without pseudo-element */
+.blog-card {
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.blog-card:hover {
+  border-color: var(--cyber-cyan);
+  box-shadow: 0 0 20px oklch(0.8 0.15 192 / 0.15);
+  transform: translateY(-2px);
+}
+
 /* Link underline animation */
 .link-underline {
   position: relative;
@@ -685,28 +696,35 @@ footer a:hover::before {
   transition-property: all;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+    
+    .reveal,
+    .reveal-fade,
+    .reveal-slide-up,
+    .reveal-slide-left,
+    .reveal-slide-right {
+      opacity: 1 !important;
+      transform: none !important;
+    }
+    
+    .arch-connector {
+      animation: none !important;
+    }
   }
-  
-  .reveal,
-  .reveal-fade,
-  .reveal-slide-up,
-  .reveal-slide-left,
-  .reveal-slide-right {
-    opacity: 1 !important;
-    transform: none !important;
+
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
-  
-  .arch-connector {
-    animation: none !important;
-  }
-}
 
 /* ============================================
    ARCHITECTURE DIAGRAM
