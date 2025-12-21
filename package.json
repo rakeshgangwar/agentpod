@@ -8,6 +8,7 @@
     "dev": "turbo run dev",
     "dev:frontend": "turbo run dev --filter=@agentpod/frontend",
     "dev:api": "turbo run dev --filter=@agentpod/api",
+    "dev:landing": "turbo run dev --filter=@agentpod/landing",
     "build": "turbo run build",
     "check": "turbo run check",
     "typecheck": "turbo run typecheck",
