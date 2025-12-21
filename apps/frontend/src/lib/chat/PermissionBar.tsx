@@ -321,7 +321,7 @@ export function PermissionBar({ className }: PermissionBarProps) {
                 className="
                   inline-flex items-center justify-center rounded px-3 py-1.5
                   font-mono text-xs uppercase tracking-wider
-                  bg-[var(--cyber-emerald)] text-black
+                  bg-[var(--cyber-emerald)] text-[var(--cyber-emerald-foreground)]
                   hover:bg-[var(--cyber-emerald)]/90
                   transition-colors shadow-[0_0_12px_var(--cyber-emerald)/20]
                 "

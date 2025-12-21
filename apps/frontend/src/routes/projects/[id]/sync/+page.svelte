@@ -437,7 +437,7 @@
                     onclick={handleCommit}
                     disabled={isCommitting || !commitMessage.trim()}
                     class="h-10 px-4 font-mono text-xs uppercase
-                           bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-black"
+                           bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-[var(--cyber-emerald-foreground)]"
                   >
                     {#if isCommitting}
                       <RefreshCw class="h-4 w-4 animate-spin" />
@@ -691,7 +691,7 @@
                   disabled={isCommitting || !commitMessage.trim()}
                   size="sm"
                   class="h-8 px-3 font-mono text-[10px] uppercase tracking-wider
-                         bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-black
+                         bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-[var(--cyber-emerald-foreground)]
                          disabled:opacity-30"
                 >
                   {#if isCommitting}

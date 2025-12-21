@@ -511,7 +511,7 @@ function UserMessage() {
 
   return (
     <MessagePrimitive.Root className="group flex justify-end mb-4 relative">
-      <div className="max-w-[80%] rounded px-4 py-2 bg-[var(--cyber-cyan)] text-black font-mono text-sm border border-[var(--cyber-cyan)] shadow-[0_0_12px_var(--cyber-cyan)/20]">
+      <div className="max-w-[80%] rounded px-4 py-2 bg-[var(--cyber-cyan)] text-[var(--cyber-cyan-foreground)] font-mono text-sm border border-[var(--cyber-cyan)] shadow-[0_0_12px_var(--cyber-cyan)/20]">
         {/* Render images */}
         {imageAttachments.map((img, index) => (
           <ImagePart key={`img-${index}`} image={img.image} />
@@ -582,7 +582,7 @@ function EditComposer() {
           <ComposerPrimitive.Send asChild>
             <button
               type="submit"
-              className="px-3 py-1.5 font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] text-black rounded hover:bg-[var(--cyber-cyan)]/90 transition-colors shadow-[0_0_8px_var(--cyber-cyan)/30]"
+              className="px-3 py-1.5 font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] text-[var(--cyber-cyan-foreground)] rounded hover:bg-[var(--cyber-cyan)]/90 transition-colors shadow-[0_0_8px_var(--cyber-cyan)/30]"
             >
               Update
             </button>
@@ -1188,7 +1188,7 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
           <button
             type="submit"
             disabled={!inputValue.trim() && attachments.length === 0}
-            className="px-4 py-2 font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] text-black rounded hover:bg-[var(--cyber-cyan)]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-[0_0_12px_var(--cyber-cyan)/20]"
+            className="px-4 py-2 font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] text-[var(--cyber-cyan-foreground)] rounded hover:bg-[var(--cyber-cyan)]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-[0_0_12px_var(--cyber-cyan)/20]"
           >
             Send
           </button>

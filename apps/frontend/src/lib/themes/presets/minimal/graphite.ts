@@ -22,7 +22,7 @@ export const graphite: ThemePreset = {
       secondary: "#f5f5f5",
       "secondary-foreground": "#171717",
       muted: "#f5f5f5",
-      "muted-foreground": "#737373",
+      "muted-foreground": "#5a5a5a",
       accent: "#f5f5f5",
       "accent-foreground": "#171717",
       destructive: "#dc2626",

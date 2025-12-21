@@ -10,6 +10,7 @@
   import * as Tabs from "$lib/components/ui/tabs";
   import * as Collapsible from "$lib/components/ui/collapsible";
   import { Check, ArrowLeft, ChevronDown, Settings2, Sparkles, Globe, Server, Smartphone, Bot, Wrench } from "@lucide/svelte";
+  import ThemeToggle from "$lib/components/theme-toggle.svelte";
   import ResourceTierSelector from "$lib/components/resource-tier-selector.svelte";
   import FlavorSelector from "$lib/components/flavor-selector.svelte";
   import AddonSelector from "$lib/components/addon-selector.svelte";
@@ -473,6 +474,7 @@
       >
         <ArrowLeft class="h-4 w-4" />
       </Button>
+      <ThemeToggle />
       <div>
         <h1 class="text-2xl font-bold glitch-hover">
           New Project
@@ -896,7 +898,7 @@
                   type="submit"
                   disabled={!isFormValid || isSubmitting}
                   class="flex-1 font-mono text-xs uppercase tracking-wider
-                         bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black
+                         bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)]
                          disabled:opacity-30"
                 >
                   {#if isSubmitting}

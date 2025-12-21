@@ -21,6 +21,7 @@
   import LottieIcon from "$lib/components/lottie-icon.svelte";
   import PageHeader from "$lib/components/page-header.svelte";
   import { Button } from "$lib/components/ui/button";
+  import ThemeToggle from "$lib/components/theme-toggle.svelte";
 
   // Icons
   import ListIcon from "@lucide/svelte/icons/list";
@@ -262,35 +263,7 @@
     {/snippet}
     
     {#snippet actions()}
-      <!-- View Mode Toggle -->
-      {#if sandboxes.list.length > 0}
-        <div class="flex items-center border border-border/50 rounded-sm overflow-hidden">
-          <!-- List View -->
-          <button
-            onclick={() => setViewMode("list")}
-            class="p-2 h-9 w-9 flex items-center justify-center transition-colors {viewMode === 'list' ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
-            title="List view"
-          >
-            <ListIcon size={16} />
-          </button>
-          <!-- Card View -->
-          <button
-            onclick={() => setViewMode("cards")}
-            class="p-2 h-9 w-9 flex items-center justify-center border-l border-border/50 transition-colors {viewMode === 'cards' ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
-            title="Card view"
-          >
-            <LayoutGridIcon size={16} />
-          </button>
-          <!-- Compact View -->
-          <button
-            onclick={() => setViewMode("compact")}
-            class="p-2 h-9 w-9 flex items-center justify-center border-l border-border/50 transition-colors {viewMode === 'compact' ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
-            title="Compact view"
-          >
-            <Grid3x3Icon size={16} />
-          </button>
-        </div>
-      {/if}
+      <ThemeToggle />
 
       <Button
         onclick={() => goto("/projects/new")}
@@ -326,22 +299,49 @@
 
       <!-- Stats Bar -->
       {#if sandboxes.list.length > 0}
-        <div class="mb-6 flex flex-wrap gap-4 sm:gap-6 text-sm font-mono animate-fade-in-up">
-          <div class="flex items-center gap-2">
-            <span class="text-muted-foreground">total:</span>
-            <span class="text-foreground font-semibold">{sandboxes.list.length}</span>
+        <div class="mb-6 flex items-center justify-between animate-fade-in-up">
+          <div class="flex flex-wrap gap-4 sm:gap-6 text-sm font-mono">
+            <div class="flex items-center gap-2">
+              <span class="text-muted-foreground">total:</span>
+              <span class="text-foreground font-semibold">{sandboxes.list.length}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-muted-foreground">running:</span>
+              <span class="text-[var(--cyber-emerald)] font-semibold">
+                {sandboxes.list.filter(s => s.status === "running").length}
+              </span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-muted-foreground">stopped:</span>
+              <span class="text-muted-foreground font-semibold">
+                {sandboxes.list.filter(s => s.status === "stopped" || s.status === "created").length}
+              </span>
+            </div>
           </div>
-          <div class="flex items-center gap-2">
-            <span class="text-muted-foreground">running:</span>
-            <span class="text-[var(--cyber-emerald)] font-semibold">
-              {sandboxes.list.filter(s => s.status === "running").length}
-            </span>
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="text-muted-foreground">stopped:</span>
-            <span class="text-muted-foreground font-semibold">
-              {sandboxes.list.filter(s => s.status === "stopped" || s.status === "created").length}
-            </span>
+          
+          <!-- View Mode Toggle -->
+          <div class="flex items-center border border-border/50 rounded-sm overflow-hidden">
+            <button
+              onclick={() => setViewMode("list")}
+              class="p-2 h-8 w-8 flex items-center justify-center transition-colors {viewMode === 'list' ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
+              title="List view"
+            >
+              <ListIcon size={14} />
+            </button>
+            <button
+              onclick={() => setViewMode("cards")}
+              class="p-2 h-8 w-8 flex items-center justify-center border-l border-border/50 transition-colors {viewMode === 'cards' ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
+              title="Card view"
+            >
+              <LayoutGridIcon size={14} />
+            </button>
+            <button
+              onclick={() => setViewMode("compact")}
+              class="p-2 h-8 w-8 flex items-center justify-center border-l border-border/50 transition-colors {viewMode === 'compact' ? 'bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}"
+              title="Compact view"
+            >
+              <Grid3x3Icon size={14} />
+            </button>
           </div>
         </div>
       {/if}
@@ -466,7 +466,7 @@
                     size="sm"
                     onclick={(e: MouseEvent) => handleStart(e, sandbox.id)}
                     disabled={sandboxes.isLoading}
-                    class="font-mono text-xs uppercase tracking-wider h-7 px-3 bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-black"
+                    class="font-mono text-xs uppercase tracking-wider h-7 px-3 bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-[var(--cyber-emerald-foreground)]"
                   >
                     Start
                   </Button>
@@ -612,7 +612,7 @@
                       size="sm"
                       onclick={(e: MouseEvent) => handleStart(e, sandbox.id)}
                       disabled={sandboxes.isLoading}
-                      class="font-mono text-xs uppercase tracking-wider h-8 px-4 bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-black"
+                      class="font-mono text-xs uppercase tracking-wider h-8 px-4 bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-[var(--cyber-emerald-foreground)]"
                     >
                       Start
                     </Button>
@@ -746,7 +746,7 @@
                       size="sm"
                       onclick={(e: MouseEvent) => handleStart(e, sandbox.id)}
                       disabled={sandboxes.isLoading}
-                      class="font-mono text-xs uppercase tracking-wider h-7 px-3 flex-1 bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-black"
+                      class="font-mono text-xs uppercase tracking-wider h-7 px-3 flex-1 bg-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/90 text-[var(--cyber-emerald-foreground)]"
                     >
                       Start
                     </Button>

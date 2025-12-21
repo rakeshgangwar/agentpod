@@ -193,7 +193,7 @@
             <Button 
               type="submit" 
               class="w-full h-11 font-mono text-xs uppercase tracking-wider
-                     bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black
+                     bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)]
                      disabled:opacity-50 disabled:cursor-not-allowed" 
               disabled={isConnecting || !apiUrl}
             >
@@ -290,7 +290,7 @@
               <Button 
                 type="submit" 
                 class="w-full h-11 font-mono text-xs uppercase tracking-wider
-                       bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black
+                       bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)]
                        disabled:opacity-50" 
                 disabled={auth.isLoading}
               >

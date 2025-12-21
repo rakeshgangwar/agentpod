@@ -231,10 +231,15 @@ function applyColorScheme(colorScheme: ColorScheme) {
     radius: "--radius",
     "cyber-cyan": "--cyber-cyan",
     "cyber-cyan-dim": "--cyber-cyan-dim",
+    "cyber-cyan-foreground": "--cyber-cyan-foreground",
     "cyber-emerald": "--cyber-emerald",
+    "cyber-emerald-foreground": "--cyber-emerald-foreground",
     "cyber-magenta": "--cyber-magenta",
+    "cyber-magenta-foreground": "--cyber-magenta-foreground",
     "cyber-amber": "--cyber-amber",
+    "cyber-amber-foreground": "--cyber-amber-foreground",
     "cyber-red": "--cyber-red",
+    "cyber-red-foreground": "--cyber-red-foreground",
     "cyber-glow": "--cyber-glow",
     "cyber-glow-emerald": "--cyber-glow-emerald",
   };
@@ -245,6 +250,25 @@ function applyColorScheme(colorScheme: ColorScheme) {
     if (value) {
       root.style.setProperty(cssVar, value);
     }
+  }
+
+  // Ensure cyber foreground colors are always set for proper contrast
+  // Light mode (dark backgrounds) needs white text, dark mode (bright backgrounds) needs black text
+  const cyberForeground = resolvedMode === "dark" ? "#000000" : "#ffffff";
+  if (!styles["cyber-cyan-foreground"]) {
+    root.style.setProperty("--cyber-cyan-foreground", cyberForeground);
+  }
+  if (!styles["cyber-emerald-foreground"]) {
+    root.style.setProperty("--cyber-emerald-foreground", cyberForeground);
+  }
+  if (!styles["cyber-magenta-foreground"]) {
+    root.style.setProperty("--cyber-magenta-foreground", cyberForeground);
+  }
+  if (!styles["cyber-amber-foreground"]) {
+    root.style.setProperty("--cyber-amber-foreground", cyberForeground);
+  }
+  if (!styles["cyber-red-foreground"]) {
+    root.style.setProperty("--cyber-red-foreground", cyberForeground);
   }
 }
 

@@ -229,7 +229,7 @@ export const VoiceSetupDialog: FC<VoiceSetupDialogProps> = ({ open, onClose, onC
               type="button"
               onClick={handleLoadModel}
               disabled={isLoading}
-              className="px-4 py-2 font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] text-black rounded hover:bg-[var(--cyber-cyan)]/90 transition-colors disabled:opacity-50 shadow-[0_0_12px_var(--cyber-cyan)/20]"
+              className="px-4 py-2 font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] text-[var(--cyber-cyan-foreground)] rounded hover:bg-[var(--cyber-cyan)]/90 transition-colors disabled:opacity-50 shadow-[0_0_12px_var(--cyber-cyan)/20]"
             >
               {isLoading ? (
                 <span className="flex items-center gap-2">
@@ -245,7 +245,7 @@ export const VoiceSetupDialog: FC<VoiceSetupDialogProps> = ({ open, onClose, onC
               type="button"
               onClick={handleDownload}
               disabled={isDownloading || !selectedModelInfo}
-              className="px-4 py-2 font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] text-black rounded hover:bg-[var(--cyber-cyan)]/90 transition-colors disabled:opacity-50 shadow-[0_0_12px_var(--cyber-cyan)/20]"
+              className="px-4 py-2 font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] text-[var(--cyber-cyan-foreground)] rounded hover:bg-[var(--cyber-cyan)]/90 transition-colors disabled:opacity-50 shadow-[0_0_12px_var(--cyber-cyan)/20]"
             >
               {isDownloading ? (
                 <span className="flex items-center gap-2">

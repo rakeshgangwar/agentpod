@@ -386,7 +386,7 @@
         <Button
           onclick={handleSaveCustomTheme}
           disabled={!customThemeName.trim()}
-          class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black"
+          class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)]"
         >
           Save
         </Button>

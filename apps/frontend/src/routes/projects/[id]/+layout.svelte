@@ -320,7 +320,7 @@
           <Button 
             onclick={handleRestart} 
             disabled={isRestarting}
-            class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-amber)] hover:bg-[var(--cyber-amber)]/90 text-black"
+            class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-amber)] hover:bg-[var(--cyber-amber)]/90 text-[var(--cyber-amber-foreground)]"
           >
             {isRestarting ? "Restarting..." : "Restart"}
           </Button>
@@ -357,7 +357,7 @@
                   onclick={handleWake} 
                   disabled={isWaking}
                   size="lg"
-                  class="font-mono text-sm uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-black border-0 shadow-lg hover:shadow-[var(--cyber-cyan)]/20 transition-all duration-300 min-w-[200px]"
+                  class="font-mono text-sm uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)] border-0 shadow-lg hover:shadow-[var(--cyber-cyan)]/20 transition-all duration-300 min-w-[200px]"
                 >
                   {#if isWaking}
                     <div class="flex items-center gap-3">

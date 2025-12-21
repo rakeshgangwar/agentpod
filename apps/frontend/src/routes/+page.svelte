@@ -30,6 +30,7 @@
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
   import { Avatar, AvatarFallback } from "$lib/components/ui/avatar";
   import { getAllPendingPermissions, type PendingPermission } from "$lib/api/tauri";
+  import ThemeToggle from "$lib/components/theme-toggle.svelte";
 
   // Icons
   import PlusIcon from "@lucide/svelte/icons/plus";
@@ -505,6 +506,8 @@
           <RefreshCwIcon class="h-4 w-4 {sandboxes.isLoading ? 'animate-spin' : ''}" />
         </Button>
 
+        <ThemeToggle />
+
         <!-- User Menu (Mobile) -->
         <DropdownMenu.Root>
           <DropdownMenu.Trigger>
@@ -584,19 +587,13 @@
             <RefreshCwIcon class="h-4 w-4 {sandboxes.isLoading ? 'animate-spin' : ''}" />
           </Button>
 
+          <ThemeToggle />
+
           <Button
             onclick={() => goto("/projects/new")}
             class="cyber-btn-primary px-4 sm:px-6 h-10 font-mono text-xs uppercase tracking-wider"
           >
             <PlusIcon class="h-4 w-4 mr-2" /> New Project
-          </Button>
-
-          <Button
-            variant="ghost"
-            onclick={() => goto("/settings")}
-            class="font-mono text-xs uppercase tracking-wider h-10"
-          >
-            <SettingsIcon class="h-4 w-4 mr-2" /> Settings
           </Button>
 
           <!-- User Menu (Desktop) -->

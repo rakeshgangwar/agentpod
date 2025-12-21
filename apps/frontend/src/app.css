@@ -804,16 +804,23 @@ article,
 
 /* Custom color palette for cyberpunk theme
    These are fallback values - the theme store will override them
-   with theme-specific colors when a preset is applied */
+   with theme-specific colors when a preset is applied.
+   Light mode values are darkened for WCAG AA contrast (4.5:1) on white.
+   Foreground colors are set for proper contrast when used as backgrounds. */
 :root {
-  --cyber-cyan: oklch(0.55 0.2 192);
-  --cyber-cyan-dim: oklch(0.45 0.15 192);
-  --cyber-emerald: oklch(0.5 0.2 160);
-  --cyber-magenta: oklch(0.5 0.22 330);
-  --cyber-amber: oklch(0.55 0.2 85);
-  --cyber-red: oklch(0.5 0.25 25);
-  --cyber-glow: 0 0 12px oklch(0.55 0.2 192 / 0.2);
-  --cyber-glow-emerald: 0 0 12px oklch(0.5 0.2 160 / 0.2);
+  --cyber-cyan: oklch(0.45 0.18 192);
+  --cyber-cyan-dim: oklch(0.38 0.14 192);
+  --cyber-cyan-foreground: #ffffff;
+  --cyber-emerald: oklch(0.42 0.18 160);
+  --cyber-emerald-foreground: #ffffff;
+  --cyber-magenta: oklch(0.45 0.2 330);
+  --cyber-magenta-foreground: #ffffff;
+  --cyber-amber: oklch(0.48 0.18 85);
+  --cyber-amber-foreground: #ffffff;
+  --cyber-red: oklch(0.45 0.22 25);
+  --cyber-red-foreground: #ffffff;
+  --cyber-glow: 0 0 12px oklch(0.45 0.18 192 / 0.2);
+  --cyber-glow-emerald: 0 0 12px oklch(0.42 0.18 160 / 0.2);
   --noise-opacity: 0.03;
 }
 
@@ -821,10 +828,15 @@ article,
 .dark {
   --cyber-cyan: oklch(0.85 0.15 192);
   --cyber-cyan-dim: oklch(0.65 0.12 192);
+  --cyber-cyan-foreground: #000000;
   --cyber-emerald: oklch(0.75 0.18 160);
+  --cyber-emerald-foreground: #000000;
   --cyber-magenta: oklch(0.7 0.2 330);
+  --cyber-magenta-foreground: #000000;
   --cyber-amber: oklch(0.8 0.18 85);
+  --cyber-amber-foreground: #000000;
   --cyber-red: oklch(0.65 0.22 25);
+  --cyber-red-foreground: #000000;
   --cyber-glow: 0 0 20px oklch(0.85 0.15 192 / 0.3);
   --cyber-glow-emerald: 0 0 20px oklch(0.75 0.18 160 / 0.3);
   --noise-opacity: 0.05;
@@ -1371,7 +1383,7 @@ article,
 
 .cyber-btn-primary {
   background: var(--cyber-cyan);
-  color: #000000;
+  color: var(--cyber-cyan-foreground);
   font-weight: 600;
 }
 

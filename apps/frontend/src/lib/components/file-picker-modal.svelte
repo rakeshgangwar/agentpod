@@ -179,14 +179,14 @@
     <div class="flex gap-2 mb-4">
       <Button
         size="sm"
-        class="font-mono text-xs uppercase tracking-wider {viewMode === 'search' ? 'bg-[var(--cyber-cyan)] text-black hover:bg-[var(--cyber-cyan)]/90' : 'border border-border/50 bg-transparent hover:bg-[var(--cyber-cyan)]/10 hover:text-[var(--cyber-cyan)]'}"
+        class="font-mono text-xs uppercase tracking-wider {viewMode === 'search' ? 'bg-[var(--cyber-cyan)] text-[var(--cyber-cyan-foreground)] hover:bg-[var(--cyber-cyan)]/90' : 'border border-border/50 bg-transparent hover:bg-[var(--cyber-cyan)]/10 hover:text-[var(--cyber-cyan)]'}"
         onclick={() => (viewMode = "search")}
       >
         Search
       </Button>
       <Button
         size="sm"
-        class="font-mono text-xs uppercase tracking-wider {viewMode === 'browse' ? 'bg-[var(--cyber-cyan)] text-black hover:bg-[var(--cyber-cyan)]/90' : 'border border-border/50 bg-transparent hover:bg-[var(--cyber-cyan)]/10 hover:text-[var(--cyber-cyan)]'}"
+        class="font-mono text-xs uppercase tracking-wider {viewMode === 'browse' ? 'bg-[var(--cyber-cyan)] text-[var(--cyber-cyan-foreground)] hover:bg-[var(--cyber-cyan)]/90' : 'border border-border/50 bg-transparent hover:bg-[var(--cyber-cyan)]/10 hover:text-[var(--cyber-cyan)]'}"
         onclick={() => (viewMode = "browse")}
       >
         Browse
