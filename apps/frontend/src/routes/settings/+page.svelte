@@ -42,6 +42,7 @@
   import * as Select from "$lib/components/ui/select";
   import * as Tabs from "$lib/components/ui/tabs";
   import * as Dialog from "$lib/components/ui/dialog";
+  import { InlineTabs, type InlineTab } from "$lib/components/ui/inline-tabs";
   import LlmProvidersSettings from "$lib/components/llm-providers-settings.svelte";
   import ThemeSettings from "$lib/components/theme-settings.svelte";
   import VoiceSettings from "$lib/components/voice-settings.svelte";
@@ -358,12 +359,26 @@ export default {
   }
   
   // File type tabs config
-  const fileTypeTabs = [
+  const fileTypeTabsConfig = [
     { value: "agent", label: "Agents", description: "Custom AI agent definitions" },
     { value: "command", label: "Commands", description: "Custom slash commands" },
     { value: "tool", label: "Tools", description: "Custom tool implementations" },
     { value: "plugin", label: "Plugins", description: "Custom plugins" },
   ] as const;
+
+  // Convert to InlineTab format with dynamic counts
+  const fileTypeTabs = $derived<InlineTab[]>(
+    fileTypeTabsConfig.map((tab) => ({
+      value: tab.value,
+      label: tab.label,
+      count: getFilteredFiles(tab.value).length,
+    }))
+  );
+
+  // Get tab description helper
+  function getFileTypeDescription(value: string): string {
+    return fileTypeTabsConfig.find(t => t.value === value)?.description ?? "";
+  }
 
   async function handlePermissionChange(tool: keyof PermissionSettings, value: PermissionLevel) {
     if (!auth.user) return;
@@ -856,6 +871,7 @@ export default {
           {:else if opencodeSubTab === "custom"}
             <!-- Custom Agents/Commands/Tools/Plugins Content -->
             <div class="space-y-4">
+              <!-- Header -->
               <div class="flex items-center justify-between">
                 <div>
                   <h3 class="font-mono text-sm font-medium text-[var(--cyber-cyan)] mb-1">[custom_extensions]</h3>
@@ -881,136 +897,150 @@ export default {
                   <span class="ml-3 text-muted-foreground font-mono text-sm">Loading files...</span>
                 </div>
               {:else}
-                <Tabs.Root bind:value={selectedFileType}>
-                  <Tabs.List class="grid w-full grid-cols-4 bg-background/30 border border-border/30 rounded p-1">
-                    {#each fileTypeTabs as tab}
-                      <Tabs.Trigger 
-                        value={tab.value}
-                        class="font-mono text-xs uppercase tracking-wider py-2
-                               data-[state=active]:bg-[var(--cyber-cyan)]/10 data-[state=active]:text-[var(--cyber-cyan)]
-                               hover:bg-muted/50 transition-all rounded"
-                      >
-                        {tab.label}
-                        {#if getFilteredFiles(tab.value).length > 0}
-                          <span class="ml-1 text-xs bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)] px-1.5 py-0.5 rounded-full">
-                            {getFilteredFiles(tab.value).length}
-                          </span>
+                <!-- Split Panel Layout -->
+                <div class="flex flex-col md:flex-row gap-4" style="height: calc(100vh - 380px); min-height: 400px;">
+                  <!-- Left Panel: File List with Tabs -->
+                  <div class="w-full md:w-2/5 flex flex-col min-h-0 border border-border/30 rounded bg-background/30 overflow-hidden">
+                    <!-- Tabs inside left panel -->
+                    <div class="p-2 border-b border-border/30 bg-background/50 shrink-0">
+                      <InlineTabs 
+                        tabs={fileTypeTabs} 
+                        bind:value={selectedFileType}
+                      />
+                    </div>
+                    
+                    <!-- File list content -->
+                    {#each fileTypeTabsConfig as tab}
+                      {#if selectedFileType === tab.value}
+                        <div class="px-3 py-2 border-b border-border/30 shrink-0">
+                          <p class="text-xs text-muted-foreground font-mono">{tab.description}</p>
+                        </div>
+                        <div class="flex-1 overflow-y-auto p-3">
+                            {#if getFilteredFiles(tab.value).length === 0}
+                              <div class="text-center py-8 border-2 border-dashed border-border/30 rounded bg-background/30">
+                                <p class="text-muted-foreground font-mono text-sm">No {tab.label.toLowerCase()} yet</p>
+                                <Button 
+                                  variant="link" 
+                                  onclick={() => {
+                                    newFileType = tab.value;
+                                    handleOpenNewFileDialog();
+                                  }}
+                                  class="text-[var(--cyber-cyan)] font-mono text-sm"
+                                >
+                                  Create your first {tab.value}
+                                </Button>
+                              </div>
+                            {:else}
+                              <div class="space-y-2">
+                                {#each getFilteredFiles(tab.value) as file}
+                                  <div 
+                                    class="flex items-center justify-between p-3 border border-border/30 rounded bg-background/50 
+                                           hover:border-[var(--cyber-cyan)]/30 cursor-pointer transition-colors
+                                           {selectedFile?.name === file.name && selectedFile?.type === file.type ? 'border-[var(--cyber-cyan)] bg-[var(--cyber-cyan)]/5' : ''}"
+                                    onclick={() => handleSelectFile(file)}
+                                    onkeydown={(e) => e.key === 'Enter' && handleSelectFile(file)}
+                                    tabindex="0"
+                                    role="button"
+                                  >
+                                    <div class="flex items-center gap-3">
+                                      <span class="text-lg font-mono">
+                                        {#if file.type === "agent"}
+                                          <span class="text-[var(--cyber-cyan)]">λ</span>
+                                        {:else if file.type === "command"}
+                                          <span class="text-[var(--cyber-magenta)]">/</span>
+                                        {:else if file.type === "tool"}
+                                          <Settings class="h-4 w-4 text-[var(--cyber-amber)]" />
+                                        {:else}
+                                          <PlusCircle class="h-4 w-4 text-[var(--cyber-emerald)]" />
+                                        {/if}
+                                      </span>
+                                      <div>
+                                        <p class="font-mono text-sm">{file.name}</p>
+                                        <p class="text-xs text-muted-foreground font-mono">{file.name}.{file.extension}</p>
+                                      </div>
+                                    </div>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      onclick={(e: MouseEvent) => {
+                                        e.stopPropagation();
+                                        handleDeleteFile(file);
+                                      }}
+                                      class="font-mono text-xs text-[var(--cyber-red)] hover:text-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/10"
+                                    >
+                                      Delete
+                                    </Button>
+                                  </div>
+                                {/each}
+                              </div>
+                            {/if}
+                          </div>
                         {/if}
-                      </Tabs.Trigger>
-                    {/each}
-                  </Tabs.List>
-                  
-                  {#each fileTypeTabs as tab}
-                    <Tabs.Content value={tab.value} class="mt-4">
-                      <p class="text-xs text-muted-foreground font-mono mb-3">{tab.description}</p>
-                      
-                      {#if getFilteredFiles(tab.value).length === 0}
-                        <div class="text-center py-8 border-2 border-dashed border-border/30 rounded bg-background/30">
-                          <p class="text-muted-foreground font-mono text-sm">No {tab.label.toLowerCase()} yet</p>
+                      {/each}
+                    </div>
+                    
+                    <!-- Right Panel: Editor -->
+                    <div class="w-full md:w-3/5 flex flex-col min-h-0 border border-border/30 rounded overflow-hidden {selectedFile ? 'border-[var(--cyber-cyan)]/30 bg-[var(--cyber-cyan)]/5' : 'bg-background/30'}">
+                      {#if selectedFile}
+                        <div class="p-3 border-b border-[var(--cyber-cyan)]/30 bg-[var(--cyber-cyan)]/10 flex items-center justify-between shrink-0">
+                          <h4 class="font-mono text-sm text-[var(--cyber-cyan)]">
+                            {selectedFile.name}.{selectedFile.extension}
+                          </h4>
                           <Button 
-                            variant="link" 
-                            onclick={() => {
-                              newFileType = tab.value;
-                              handleOpenNewFileDialog();
-                            }}
-                            class="text-[var(--cyber-cyan)] font-mono text-sm"
+                            variant="ghost" 
+                            size="sm" 
+                            onclick={handleCloseFile}
+                            class="font-mono text-xs hover:text-[var(--cyber-cyan)] h-7"
                           >
-                            Create your first {tab.value}
+                            Close
+                          </Button>
+                        </div>
+                        <div class="flex-1 p-3 overflow-hidden flex flex-col min-h-0">
+                          <textarea 
+                            bind:value={editingFileContent}
+                            class="w-full flex-1 min-h-0 p-3 text-sm font-mono border border-border/50 rounded bg-background/50 resize-none
+                                   focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)] focus:outline-none"
+                          ></textarea>
+                        </div>
+                        <div class="p-3 border-t border-[var(--cyber-cyan)]/30 flex gap-2 shrink-0">
+                          <Button 
+                            onclick={handleSaveFile}
+                            disabled={fileSaving || editingFileContent === selectedFile.content}
+                            class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)] disabled:opacity-50"
+                          >
+                            {#if fileSaving}
+                              <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>
+                            {/if}
+                            {fileSaving ? "Saving..." : "Save"}
+                          </Button>
+                          <Button 
+                            variant="outline"
+                            onclick={() => editingFileContent = selectedFile?.content || ""}
+                            disabled={editingFileContent === selectedFile.content}
+                            class="font-mono text-xs uppercase tracking-wider border-border/50 hover:border-[var(--cyber-amber)] hover:text-[var(--cyber-amber)]"
+                          >
+                            Reset
                           </Button>
                         </div>
                       {:else}
-                        <div class="space-y-2">
-                          {#each getFilteredFiles(tab.value) as file}
-                            <div 
-                              class="flex items-center justify-between p-3 border border-border/30 rounded bg-background/50 
-                                     hover:border-[var(--cyber-cyan)]/30 cursor-pointer transition-colors
-                                     {selectedFile?.name === file.name && selectedFile?.type === file.type ? 'border-[var(--cyber-cyan)] bg-[var(--cyber-cyan)]/5' : ''}"
-                              onclick={() => handleSelectFile(file)}
-                              onkeydown={(e) => e.key === 'Enter' && handleSelectFile(file)}
-                              tabindex="0"
-                              role="button"
-                            >
-                              <div class="flex items-center gap-3">
-                                <span class="text-lg font-mono">
-                                  {#if file.type === "agent"}
-                                    <span class="text-[var(--cyber-cyan)]">λ</span>
-                                  {:else if file.type === "command"}
-                                    <span class="text-[var(--cyber-magenta)]">/</span>
-                                  {:else if file.type === "tool"}
-                                    <Settings class="h-4 w-4 text-[var(--cyber-amber)]" />
-                                  {:else}
-                                    <PlusCircle class="h-4 w-4 text-[var(--cyber-emerald)]" />
-                                  {/if}
-                                </span>
-                                <div>
-                                  <p class="font-mono text-sm">{file.name}</p>
-                                  <p class="text-xs text-muted-foreground font-mono">{file.name}.{file.extension}</p>
-                                </div>
-                              </div>
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                onclick={(e: MouseEvent) => {
-                                  e.stopPropagation();
-                                  handleDeleteFile(file);
-                                }}
-                                class="font-mono text-xs text-[var(--cyber-red)] hover:text-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/10"
-                              >
-                                Delete
-                              </Button>
+                        <div class="flex-1 flex items-center justify-center text-center p-6">
+                          <div class="space-y-3">
+                            <div class="mx-auto w-12 h-12 rounded-full bg-muted/50 border border-border/30 flex items-center justify-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
                             </div>
-                          {/each}
-                        </div>
-                      {/if}
-                      
-                      <!-- File Editor -->
-                      {#if selectedFile && selectedFile.type === tab.value}
-                        <div class="mt-4 p-4 border border-[var(--cyber-cyan)]/30 rounded bg-[var(--cyber-cyan)]/5">
-                          <div class="flex items-center justify-between mb-3">
-                            <h4 class="font-mono text-sm text-[var(--cyber-cyan)]">
-                              Editing: {selectedFile.name}.{selectedFile.extension}
-                            </h4>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              onclick={handleCloseFile}
-                              class="font-mono text-xs"
-                            >
-                              Close
-                            </Button>
-                          </div>
-                          <textarea 
-                            bind:value={editingFileContent}
-                            class="w-full h-48 p-3 text-sm font-mono border border-border/50 rounded bg-background/50 resize-y
-                                   focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)] focus:outline-none"
-                          ></textarea>
-                          <div class="flex gap-2 mt-3">
-                            <Button 
-                              onclick={handleSaveFile}
-                              disabled={fileSaving || editingFileContent === selectedFile.content}
-                              class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)] disabled:opacity-50"
-                            >
-                              {#if fileSaving}
-                                <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>
-                              {/if}
-                              {fileSaving ? "Saving..." : "Save"}
-                            </Button>
-                            <Button 
-                              variant="outline"
-                              onclick={() => editingFileContent = selectedFile?.content || ""}
-                              disabled={editingFileContent === selectedFile.content}
-                              class="font-mono text-xs uppercase tracking-wider border-border/50"
-                            >
-                              Reset
-                            </Button>
+                            <div>
+                              <p class="font-mono text-sm text-muted-foreground">Select a file to edit</p>
+                              <p class="text-xs text-muted-foreground/70 font-mono mt-1">Click on any item in the list</p>
+                            </div>
                           </div>
                         </div>
                       {/if}
-                    </Tabs.Content>
-                  {/each}
-                </Tabs.Root>
+                    </div>
+                  </div>
                 
-                <p class="text-xs text-muted-foreground font-mono pt-4 border-t border-border/30 mt-4">
+                <p class="text-xs text-muted-foreground font-mono pt-3 border-t border-border/30">
                   Changes require container restart to take effect.
                 </p>
               {/if}
@@ -1283,10 +1313,10 @@ export default {
           }}
         >
           <Select.Trigger class="w-full font-mono text-sm bg-background/50 border-border/50">
-            {fileTypeTabs.find(t => t.value === newFileType)?.label ?? "Agent"}
+            {fileTypeTabsConfig.find(t => t.value === newFileType)?.label ?? "Agent"}
           </Select.Trigger>
           <Select.Content>
-            {#each fileTypeTabs as tab}
+            {#each fileTypeTabsConfig as tab}
               <Select.Item value={tab.value} label={tab.label} />
             {/each}
           </Select.Content>

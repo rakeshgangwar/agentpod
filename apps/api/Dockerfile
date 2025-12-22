@@ -20,6 +20,7 @@ RUN bun -e "const pkg = JSON.parse(await Bun.file('package.json').text()); pkg.w
 
 # Copy workspace package.json files for dependency resolution
 COPY packages/types/package.json ./packages/types/
+COPY packages/agents/package.json ./packages/agents/
 COPY packages/tsconfig/ ./packages/tsconfig/
 COPY apps/api/package.json ./apps/api/
 
@@ -28,6 +29,7 @@ RUN bun install --filter @agentpod/api
 
 # Copy workspace packages source
 COPY packages/types/ ./packages/types/
+COPY packages/agents/ ./packages/agents/
 
 # Copy API source code
 COPY apps/api/src/ ./apps/api/src/

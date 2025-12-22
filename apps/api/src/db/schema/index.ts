@@ -18,6 +18,7 @@ export * from "./providers";
 export * from "./settings";
 export * from "./containers";
 export * from "./activity";
+export * from "./agents";
 
 // Onboarding system (new)
 export * from "./knowledge";

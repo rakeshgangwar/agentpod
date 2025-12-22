@@ -13,7 +13,8 @@ import { getUserOpencodeFullConfig } from "../models/user-opencode-config";
 import { createLogger } from "../utils/logger";
 import { db } from "../db/drizzle";
 import { agentTasks, taskTemplates } from "../db/schema";
-import { eq, desc, and, or, isNull } from "drizzle-orm";
+import { eq, desc, and, or } from "drizzle-orm";
+import { agentOrchestratorService } from "../services/agents/index";
 
 const log = createLogger("agents-routes");
 
@@ -785,4 +786,160 @@ export const agentRoutes = new Hono()
         );
       }
     }
-  );
+  )
+
+  // ===========================================================================
+  // Agent Orchestration Endpoints
+  // ===========================================================================
+  .get("/orchestrator/agents", async (c) => {
+    try {
+      const agents = agentOrchestratorService.getAgentsList();
+      return c.json({ agents });
+    } catch (error) {
+      log.error("Failed to list orchestrator agents", { error });
+      return c.json({ error: "Failed to list agents" }, 500);
+    }
+  })
+
+  .get("/orchestrator/squads", async (c) => {
+    try {
+      const squads = agentOrchestratorService.getSquads();
+      const squadDetails = squads.map(squad => ({
+        name: squad,
+        agents: agentOrchestratorService.getAgentsBySquad(squad).map(a => ({
+          name: a.name,
+          role: a.role,
+          emoji: a.emoji,
+        })),
+      }));
+      return c.json({ squads: squadDetails });
+    } catch (error) {
+      log.error("Failed to list squads", { error });
+      return c.json({ error: "Failed to list squads" }, 500);
+    }
+  })
+
+  .get("/orchestrator/workflows", async (c) => {
+    try {
+      const workflows = agentOrchestratorService.getWorkflowsList();
+      return c.json({ workflows });
+    } catch (error) {
+      log.error("Failed to list workflows", { error });
+      return c.json({ error: "Failed to list workflows" }, 500);
+    }
+  })
+
+  .get("/orchestrator/agents/:name", async (c) => {
+    try {
+      const name = c.req.param("name");
+      const agent = agentOrchestratorService.getAgent(name);
+      
+      if (!agent) {
+        return c.json({ error: "Agent not found" }, 404);
+      }
+
+      return c.json({ 
+        agent: {
+          name: agent.name,
+          role: agent.role,
+          emoji: agent.emoji,
+          squad: agent.squad,
+          tier: agent.tier,
+          personality: agent.personality,
+          intelligenceLevel: agent.intelligenceLevel,
+          relatedAgents: agent.relatedAgents,
+          workflows: agent.workflows,
+          delegationTriggers: agent.delegationTriggers,
+        }
+      });
+    } catch (error) {
+      log.error("Failed to get agent", { error });
+      return c.json({ error: "Failed to get agent" }, 500);
+    }
+  })
+
+  .post(
+    "/orchestrator/route",
+    zValidator(
+      "json",
+      z.object({
+        message: z.string().min(1).max(10000),
+        sandboxId: z.string().optional(),
+        context: z.object({
+          currentFile: z.string().optional(),
+          selectedCode: z.string().optional(),
+          recentErrors: z.array(z.string()).optional(),
+          sessionHistory: z.array(z.string()).optional(),
+        }).optional(),
+      })
+    ),
+    async (c) => {
+      try {
+        const body = c.req.valid("json");
+        const userId = getAuthenticatedUserId(c) || "anonymous";
+
+        const startTime = Date.now();
+        const result = await agentOrchestratorService.routeRequest({
+          userId,
+          sandboxId: body.sandboxId || "",
+          message: body.message,
+          context: body.context,
+        });
+        const processingTime = Date.now() - startTime;
+
+        log.info("Routed request via orchestrator", {
+          userId,
+          routingType: result.decision.type,
+          selectedAgent: result.selectedAgent.name,
+          processingTime,
+        });
+
+        return c.json({
+          routing: {
+            type: result.decision.type,
+            selectedAgent: {
+              name: result.selectedAgent.name,
+              role: result.selectedAgent.role,
+              emoji: result.selectedAgent.emoji,
+              squad: result.selectedAgent.squad,
+            },
+            allAgents: result.decision.agents.map(a => ({
+              name: a.name,
+              role: a.role,
+              emoji: a.emoji,
+            })),
+            workflow: result.decision.workflow ? {
+              id: result.decision.workflow.id,
+              name: result.decision.workflow.name,
+            } : undefined,
+          },
+          intent: result.decision.intent,
+          reasoning: result.reasoning,
+          suggestedFollowUp: result.suggestedFollowUp,
+          processingTimeMs: processingTime,
+        });
+      } catch (error) {
+        log.error("Failed to route request", { error });
+        return c.json(
+          { error: "Failed to route request", details: error instanceof Error ? error.message : "Unknown error" },
+          500
+        );
+      }
+    }
+  )
+
+  .get("/orchestrator/workflows/:id", async (c) => {
+    try {
+      const id = c.req.param("id");
+      const workflow = agentOrchestratorService.getWorkflow(id);
+      
+      if (!workflow) {
+        return c.json({ error: "Workflow not found" }, 404);
+      }
+
+      return c.json({ workflow });
+    } catch (error) {
+      log.error("Failed to get workflow", { error });
+      return c.json({ error: "Failed to get workflow" }, 500);
+    }
+  });

@@ -114,16 +114,22 @@
 
   <!-- Tabs for Color Scheme and Font Pairing -->
   <Tabs.Root value="colors" class="w-full">
-    <Tabs.List class="w-full inline-flex">
+    <Tabs.List class="grid w-full grid-cols-2 bg-background/30 border border-border/30 rounded p-1 h-auto">
       <Tabs.Trigger 
         value="colors"
-        class="flex-1 font-mono text-xs uppercase tracking-wider"
+        class="font-mono text-[10px] uppercase tracking-wider py-1.5 rounded transition-all
+               !border-transparent !shadow-none !h-auto
+               data-[state=active]:!bg-[var(--cyber-cyan)]/10 data-[state=active]:!text-[var(--cyber-cyan)]
+               data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50"
       >
         Color Schemes
       </Tabs.Trigger>
       <Tabs.Trigger 
         value="fonts"
-        class="flex-1 font-mono text-xs uppercase tracking-wider"
+        class="font-mono text-[10px] uppercase tracking-wider py-1.5 rounded transition-all
+               !border-transparent !shadow-none !h-auto
+               data-[state=active]:!bg-[var(--cyber-cyan)]/10 data-[state=active]:!text-[var(--cyber-cyan)]
+               data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50"
       >
         Font Pairings
       </Tabs.Trigger>

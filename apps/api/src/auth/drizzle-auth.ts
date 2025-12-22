@@ -21,6 +21,7 @@ import { config } from "../config";
 import { createLogger } from "../utils/logger";
 import { count, eq } from "drizzle-orm";
 import { disableSignup } from "../models/system-settings";
+import { ensureDefaultAgents } from "../services/default-agents-service";
 
 const log = createLogger("auth");
 
@@ -222,7 +223,18 @@ export const auth = betterAuth({
               userId: createdUser.id, 
               error 
             });
-            // Don't throw - user creation should still succeed
+          }
+          
+          try {
+            const { created } = await ensureDefaultAgents(createdUser.id);
+            if (created > 0) {
+              log.info("Created default agents for user", { userId: createdUser.id, count: created });
+            }
+          } catch (error) {
+            log.error("Failed to create default agents", { 
+              userId: createdUser.id, 
+              error 
+            });
           }
           
           // If this is the first user (now admin), disable public signup

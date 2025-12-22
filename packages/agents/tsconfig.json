@@ -1,0 +1,12 @@
+{
+  "extends": "@agentpod/tsconfig/node.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": ".",
+    "types": ["bun-types"],
+    "declaration": true,
+    "declarationMap": true
+  },
+  "include": ["src/**/*", "tests/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

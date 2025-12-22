@@ -270,22 +270,28 @@
   {:else}
     <!-- Tabs: Configured / All Providers -->
     <Tabs.Root bind:value={activeTab}>
-      <Tabs.List class="grid w-full grid-cols-2 max-w-md bg-background/30 border border-border/30 rounded p-1">
-        <Tabs.Trigger value="configured" class="gap-2 font-mono text-xs uppercase tracking-wider data-[state=active]:bg-[var(--cyber-cyan)]/10 data-[state=active]:text-[var(--cyber-cyan)] data-[state=active]:border-[var(--cyber-cyan)]/30 rounded transition-all">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <Tabs.List class="grid w-full grid-cols-2 max-w-md bg-background/30 border border-border/30 rounded p-1 h-auto">
+        <Tabs.Trigger value="configured" class="gap-1 font-mono text-[10px] uppercase tracking-wider py-1.5 rounded transition-all
+                       !border-transparent !shadow-none !h-auto
+                       data-[state=active]:!bg-[var(--cyber-cyan)]/10 data-[state=active]:!text-[var(--cyber-cyan)]
+                       data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           Your Providers
           {#if configuredProviders.length > 0}
-            <span class="ml-1 px-1.5 py-0 rounded text-[10px] bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]">{configuredProviders.length}</span>
+            <span class="px-1 py-0 rounded text-[9px] bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]">{configuredProviders.length}</span>
           {/if}
         </Tabs.Trigger>
-        <Tabs.Trigger value="all" class="gap-2 font-mono text-xs uppercase tracking-wider data-[state=active]:bg-[var(--cyber-cyan)]/10 data-[state=active]:text-[var(--cyber-cyan)] data-[state=active]:border-[var(--cyber-cyan)]/30 rounded transition-all">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <Tabs.Trigger value="all" class="gap-1 font-mono text-[10px] uppercase tracking-wider py-1.5 rounded transition-all
+                       !border-transparent !shadow-none !h-auto
+                       data-[state=active]:!bg-[var(--cyber-cyan)]/10 data-[state=active]:!text-[var(--cyber-cyan)]
+                       data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
           </svg>
           All Providers
-          <span class="ml-1 px-1.5 py-0 rounded text-[10px] border border-border/50">{allProviders.length}</span>
+          <span class="px-1 py-0 rounded text-[9px] border border-border/50">{allProviders.length}</span>
         </Tabs.Trigger>
       </Tabs.List>
       
