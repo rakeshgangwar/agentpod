@@ -614,13 +614,13 @@
   --secondary: oklch(0.968 0.007 247.896);
   --secondary-foreground: oklch(0.208 0.042 265.755);
   --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
+  --muted-foreground: oklch(0.45 0.046 257.417);
   --accent: oklch(0.968 0.007 247.896);
   --accent-foreground: oklch(0.208 0.042 265.755);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
+  --border: oklch(0.70 0.013 255.508);
+  --input: oklch(0.70 0.013 255.508);
+  --ring: oklch(0.50 0.04 256.788);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -632,8 +632,8 @@
   --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
   --sidebar-accent: oklch(0.968 0.007 247.896);
   --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
-  --sidebar-border: oklch(0.929 0.013 255.508);
-  --sidebar-ring: oklch(0.704 0.04 256.788);
+  --sidebar-border: oklch(0.70 0.013 255.508);
+  --sidebar-ring: oklch(0.50 0.04 256.788);
 }
 
 .dark {
@@ -808,19 +808,19 @@ article,
    Light mode values are darkened for WCAG AA contrast (4.5:1) on white.
    Foreground colors are set for proper contrast when used as backgrounds. */
 :root {
-  --cyber-cyan: oklch(0.45 0.18 192);
-  --cyber-cyan-dim: oklch(0.38 0.14 192);
+  --cyber-cyan: oklch(0.30 0.18 192);
+  --cyber-cyan-dim: oklch(0.25 0.14 192);
   --cyber-cyan-foreground: #ffffff;
-  --cyber-emerald: oklch(0.42 0.18 160);
+  --cyber-emerald: oklch(0.30 0.18 160);
   --cyber-emerald-foreground: #ffffff;
-  --cyber-magenta: oklch(0.45 0.2 330);
+  --cyber-magenta: oklch(0.30 0.2 330);
   --cyber-magenta-foreground: #ffffff;
-  --cyber-amber: oklch(0.48 0.18 85);
+  --cyber-amber: oklch(0.30 0.18 85);
   --cyber-amber-foreground: #ffffff;
-  --cyber-red: oklch(0.45 0.22 25);
+  --cyber-red: oklch(0.30 0.22 25);
   --cyber-red-foreground: #ffffff;
-  --cyber-glow: 0 0 12px oklch(0.45 0.18 192 / 0.2);
-  --cyber-glow-emerald: 0 0 12px oklch(0.42 0.18 160 / 0.2);
+  --cyber-glow: 0 0 12px oklch(0.30 0.18 192 / 0.2);
+  --cyber-glow-emerald: 0 0 12px oklch(0.30 0.18 160 / 0.2);
   --noise-opacity: 0.03;
 }
 
@@ -1001,6 +1001,25 @@ article,
   content: '_';
   animation: blink 1s step-end infinite;
   color: var(--cyber-cyan);
+}
+
+/* Streaming text cursor (ChatGPT/Claude-style) */
+.streaming-cursor {
+  display: inline-block;
+  width: 0.5em;
+  margin-left: 1px;
+  animation: cursor-blink 0.75s step-end infinite;
+  color: var(--foreground);
+  font-weight: normal;
+}
+
+@keyframes cursor-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.streaming-text-container {
+  display: inline;
 }
 
 /* Glitch effect for headers */

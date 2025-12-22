@@ -27,12 +27,12 @@ import { VoiceInputButton } from "../voice/VoiceInputButton";
 import { VoiceSetupDialog } from "../voice/VoiceSetupDialog";
 import { useVoiceInput } from "../voice/useVoiceInput";
 
-// Import new components for OpenCode-specific content
 import {
   ReasoningDisplay,
   PatchViewer,
   SubtaskList,
   RetryIndicator,
+  StreamingTextPart,
 } from "./components";
 
 // Import metadata extractors from thread-converter
@@ -715,11 +715,9 @@ function AssistantMessage() {
           <ReasoningDisplay reasoning={reasoning} />
         )}
         
-        {/* Main content (text + tool calls) */}
         <MessagePrimitive.Content
           components={{
-            Text: TextPart,
-            // Hide reasoning from default rendering since we render it above
+            Text: StreamingTextPart,
             Reasoning: () => null,
             tools: {
               Fallback: ToolCallPart,
