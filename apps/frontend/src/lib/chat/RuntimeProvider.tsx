@@ -27,13 +27,17 @@ import {
   sandboxOpencodeAbortSession,
   sandboxOpencodeRevertMessage,
   sandboxOpencodeGetPendingPermissions,
-  OpenCodeStream,
   type OpenCodeEvent,
   type ModelSelection,
   type PermissionRequest,
   type MessagePartInput,
   type Session,
 } from "../api/tauri";
+import {
+  BrowserSSEClient,
+  toLegacyFormat,
+  type SSEStatus,
+} from "../api/browser-sse";
 import type { AttachedFile } from "./FileAttachment";
 import { PermissionProvider, usePermissions } from "./PermissionContext";
 
@@ -266,8 +270,8 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
   // Track if pending message has been processed
   const pendingMessageProcessedRef = useRef(false);
   
-  // Stream reference for SSE
-  const streamRef = useRef<OpenCodeStream | null>(null);
+  // SSE client reference for Browser EventSource
+  const sseClientRef = useRef<BrowserSSEClient | null>(null);
   
   // Ref to always access latest internalMessages (avoids stale closure in SSE handler)
   const internalMessagesRef = useRef<InternalMessage[]>(internalMessages);
@@ -449,58 +453,45 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
   useEffect(() => {
     if (!sessionId || isLoading) return;
 
-    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
     let isCleaningUp = false;
     
-    const connectStream = async () => {
+    const connectSSE = () => {
       if (isCleaningUp) return;
       
-      // If there's already a connected stream, don't create another
-      if (streamRef.current?.isConnected) {
-        console.log("[RuntimeProvider] Stream already connected, skipping");
+      if (sseClientRef.current?.isConnected) {
+        console.log("[RuntimeProvider] SSE already connected, skipping");
         return;
       }
       
-      // Clean up existing stream before creating new one
-      if (streamRef.current) {
-        await streamRef.current.disconnect().catch(console.error);
+      if (sseClientRef.current) {
+        sseClientRef.current.disconnect();
       }
       
-      const stream = new OpenCodeStream(projectId);
-      streamRef.current = stream;
-
-      try {
-        await stream.connect(
-          (event) => handleSSEEventRef.current(event),
-          (status, err) => {
-            if (status === "error") {
-              console.warn("[RuntimeProvider] Stream error:", err);
-            }
-            // Try to reconnect after disconnection (unless we're cleaning up)
-            if (status === "disconnected" && !isCleaningUp) {
-              reconnectTimeout = setTimeout(connectStream, 2000);
-            }
+      const sseClient = new BrowserSSEClient(projectId, {
+        onEvent: (event) => {
+          handleSSEEventRef.current(toLegacyFormat(event));
+        },
+        onStatus: (status: SSEStatus, err?: string) => {
+          if (status === "error") {
+            console.warn("[RuntimeProvider] SSE error:", err);
           }
-        );
-      } catch (err) {
-        console.error("[RuntimeProvider] Failed to connect SSE:", err);
-        // Try to reconnect after failure (unless we're cleaning up)
-        if (!isCleaningUp) {
-          reconnectTimeout = setTimeout(connectStream, 2000);
-        }
-      }
+          if (status === "connected") {
+            console.log("[RuntimeProvider] SSE connected to", projectId);
+          }
+        },
+      });
+      
+      sseClientRef.current = sseClient;
+      sseClient.connect();
     };
 
-    connectStream();
+    connectSSE();
 
     return () => {
       isCleaningUp = true;
-      if (reconnectTimeout) {
-        clearTimeout(reconnectTimeout);
-      }
-      if (streamRef.current) {
-        streamRef.current.disconnect().catch(console.error);
-        streamRef.current = null;
+      if (sseClientRef.current) {
+        sseClientRef.current.disconnect();
+        sseClientRef.current = null;
       }
     };
   }, [projectId, sessionId, isLoading]);
@@ -824,7 +815,7 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
       !pendingMessageProcessedRef.current &&
       !isLoading &&
       sessionId &&
-      streamRef.current?.isConnected &&
+      sseClientRef.current?.isConnected &&
       (!pendingMessage.sessionId || pendingMessage.sessionId === sessionId)
     ) {
       pendingMessageProcessedRef.current = true;

@@ -14,6 +14,7 @@ import {
   useThread,
   useMessage,
   useComposerRuntime,
+  useThreadRuntime,
   type ToolCallMessagePartProps,
 } from "@assistant-ui/react";
 import { MarkdownTextPrimitive } from "@assistant-ui/react-markdown";
@@ -782,6 +783,14 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
   // Get the sendWithAttachments handler from context
   const { sendWithAttachments } = useAttachments();
   const composerRuntime = useComposerRuntime();
+  const threadRuntime = useThreadRuntime();
+  const isRunning = useThread((t) => t.isRunning);
+  const { status: sessionStatus } = useSessionStatus();
+  
+  // Show Stop button when EITHER runtime reports running OR SSE session status is "busy"
+  // This handles the case where SSE session.status:busy arrives before/after isRunning changes
+  const showStop = isRunning || sessionStatus === "busy";
+  
   const [inputValue, setInputValue] = useState("");
   const [showCommandPicker, setShowCommandPicker] = useState(false);
   const [showFilePicker, setShowFilePicker] = useState(false);
@@ -1207,13 +1216,23 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
             rows={1}
             style={{ height: "40px" }}
           />
-          <button
-            type="submit"
-            disabled={!inputValue.trim() && attachments.length === 0}
-            className="px-4 py-2 font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] text-[var(--cyber-cyan-foreground)] rounded hover:bg-[var(--cyber-cyan)]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-[0_0_12px_var(--cyber-cyan)/20]"
-          >
-            Send
-          </button>
+          {showStop ? (
+            <button
+              type="button"
+              onClick={() => threadRuntime.cancelRun()}
+              className="px-4 py-2 font-mono text-xs uppercase tracking-wider bg-red-500 text-white rounded hover:bg-red-600 transition-colors shadow-[0_0_12px_rgba(239,68,68,0.3)]"
+            >
+              Stop
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={!inputValue.trim() && attachments.length === 0}
+              className="px-4 py-2 font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] text-[var(--cyber-cyan-foreground)] rounded hover:bg-[var(--cyber-cyan)]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-[0_0_12px_var(--cyber-cyan)/20]"
+            >
+              Send
+            </button>
+          )}
         </div>
       </form>
       {/* Hints - simplified, shown only on larger screens */}

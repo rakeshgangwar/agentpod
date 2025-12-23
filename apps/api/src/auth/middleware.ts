@@ -136,13 +136,17 @@ export const authMiddleware = createMiddleware(async (c: Context, next: Next) =>
     log.debug("Better Auth session check failed", { error });
   }
 
-  // Fall back to API key authentication (backward compatibility)
+  // Fall back to Bearer token authentication (from header or query param)
   const authHeader = c.req.header("Authorization");
+  const queryToken = c.req.query("token");
+  
+  const bearerToken = authHeader?.startsWith("Bearer ") 
+    ? authHeader.slice(7) 
+    : queryToken;
 
-  if (authHeader?.startsWith("Bearer ")) {
-    const token = authHeader.slice(7);
-
-    if (safeCompare(token, config.auth.token)) {
+  if (bearerToken) {
+    // Check if it's the static API key (backward compatibility)
+    if (safeCompare(bearerToken, config.auth.token)) {
       log.debug("Authenticated via API key");
       c.set("user", {
         id: config.defaultUserId,
@@ -151,6 +155,29 @@ export const authMiddleware = createMiddleware(async (c: Context, next: Next) =>
       c.set("session", null);
       c.set("betterAuthUser", null);
       return next();
+    }
+    
+    // Try to validate as a Better Auth session token
+    try {
+      const session = await auth.api.getSession({
+        headers: new Headers({ Authorization: `Bearer ${bearerToken}` }),
+      });
+      
+      if (session) {
+        c.set("user", {
+          id: session.user.id,
+          email: session.user.email,
+          name: session.user.name,
+          image: session.user.image ?? undefined,
+          authType: "better_auth",
+        });
+        c.set("session", session.session);
+        c.set("betterAuthUser", session.user);
+        log.debug("Authenticated via Bearer token", { userId: session.user.id });
+        return next();
+      }
+    } catch (error) {
+      log.debug("Bearer token validation failed", { error });
     }
   }
 

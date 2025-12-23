@@ -347,59 +347,6 @@ pub struct OpenCodeHealth {
 }
 
 // =============================================================================
-// SSE Event Models
-// =============================================================================
-
-/// SSE event from OpenCode stream
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct OpenCodeEvent {
-    /// Event type (e.g., "session.updated", "message.part.updated", "tool.execute")
-    pub event_type: String,
-    /// Event data (varies by event type)
-    pub data: serde_json::Value,
-}
-
-/// SSE stream connection result
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct StreamConnection {
-    /// Unique stream ID for this connection
-    pub stream_id: String,
-    /// Project ID this stream is connected to
-    pub project_id: String,
-}
-
-/// SSE stream status
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum StreamStatus {
-    Connected,
-    Disconnected,
-    Error,
-}
-
-/// SSE stream event payload (emitted to frontend)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct StreamEventPayload {
-    pub stream_id: String,
-    pub project_id: String,
-    pub event: OpenCodeEvent,
-}
-
-/// SSE stream status payload (emitted to frontend)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct StreamStatusPayload {
-    pub stream_id: String,
-    pub project_id: String,
-    pub status: StreamStatus,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
-}
-
-// =============================================================================
 // Permission Models
 // =============================================================================
 

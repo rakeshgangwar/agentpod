@@ -501,32 +501,12 @@ export interface PendingPermission extends PermissionRequest {
 }
 
 // =============================================================================
-// OpenCode - SSE Streaming Types
+// OpenCode - Event Types (SSE handled by browser-sse.ts)
 // =============================================================================
-
-export type StreamStatus = "connected" | "disconnected" | "error";
-
-export interface StreamConnection {
-  streamId: string;
-  projectId: string;
-}
 
 export interface OpenCodeEvent {
   eventType: string;
   data: unknown;
-}
-
-export interface StreamEventPayload {
-  streamId: string;
-  projectId: string;
-  event: OpenCodeEvent;
-}
-
-export interface StreamStatusPayload {
-  streamId: string;
-  projectId: string;
-  status: StreamStatus;
-  error?: string;
 }
 
 // =============================================================================
@@ -1616,159 +1596,7 @@ export async function sandboxOpencodeFindFiles(sandboxId: string, query: string)
   return invoke<string[]>("sandbox_opencode_find_files", { sandboxId, query });
 }
 
-/**
- * Connect to OpenCode SSE event stream for a sandbox
- * This starts the Rust background task that processes SSE events
- */
-export async function sandboxOpencodeConnectStream(sandboxId: string): Promise<StreamConnection> {
-  return invoke<StreamConnection>("sandbox_opencode_connect_stream", { sandboxId });
-}
 
-/**
- * Disconnect from OpenCode SSE event stream
- */
-export async function sandboxOpencodeDisconnectStream(streamId: string): Promise<void> {
-  return invoke<void>("sandbox_opencode_disconnect_stream", { streamId });
-}
-
-// =============================================================================
-// SSE Event Listeners (for sandbox OpenCode streams)
-// =============================================================================
-
-/**
- * Listen for OpenCode stream events
- */
-export async function onStreamEvent(
-  callback: (payload: StreamEventPayload) => void
-): Promise<UnlistenFn> {
-  return listen<StreamEventPayload>("opencode:event", (event) => {
-    callback(event.payload);
-  });
-}
-
-/**
- * Listen for OpenCode stream status changes
- */
-export async function onStreamStatus(
-  callback: (payload: StreamStatusPayload) => void
-): Promise<UnlistenFn> {
-  return listen<StreamStatusPayload>("opencode:stream-status", (event) => {
-    callback(event.payload);
-  });
-}
-
-// =============================================================================
-// OpenCode Stream Helper Class
-// =============================================================================
-
-/**
- * Helper class for managing a v2 sandbox OpenCode stream connection
- */
-export class OpenCodeStream {
-  private sandboxId: string;
-  private streamId: string | null = null;
-  private eventUnlisten: UnlistenFn | null = null;
-  private statusUnlisten: UnlistenFn | null = null;
-  private onEvent: ((event: OpenCodeEvent) => void) | null = null;
-  private onStatus: ((status: StreamStatus, error?: string) => void) | null = null;
-
-  constructor(sandboxId: string) {
-    this.sandboxId = sandboxId;
-  }
-
-  /**
-   * Connect to the stream
-   */
-  async connect(
-    onEvent: (event: OpenCodeEvent) => void,
-    onStatus?: (status: StreamStatus, error?: string) => void
-  ): Promise<void> {
-    // Prevent duplicate connections
-    if (this.streamId) {
-      console.warn("[OpenCodeStream] Already connected, ignoring duplicate connect call");
-      return;
-    }
-
-    this.onEvent = onEvent;
-    this.onStatus = onStatus ?? null;
-
-    // IMPORTANT: Set up event listeners BEFORE starting the stream to avoid race condition
-    // The Rust backend starts emitting events immediately after connection, so we need
-    // the listeners ready first. We'll filter by streamId once we have it.
-    let pendingStreamId: string | null = null;
-    
-    this.eventUnlisten = await onStreamEvent((payload) => {
-      // Filter by streamId to only receive events for THIS stream connection
-      const targetStreamId = this.streamId || pendingStreamId;
-      if (payload.streamId === targetStreamId && this.onEvent) {
-        console.debug("[OpenCodeStream] Received event:", payload.event.eventType);
-        this.onEvent(payload.event);
-      }
-    });
-
-    this.statusUnlisten = await onStreamStatus((payload) => {
-      // Filter by streamId to only receive status for THIS stream connection
-      const targetStreamId = this.streamId || pendingStreamId;
-      if (payload.streamId === targetStreamId) {
-        console.debug("[OpenCodeStream] Received status:", payload.status);
-        
-        // If server disconnected, reset our internal state so reconnection can happen
-        if (payload.status === "disconnected" || payload.status === "error") {
-          console.log("[OpenCodeStream] Server disconnected, resetting state for streamId:", targetStreamId);
-          this.streamId = null;
-          // Note: We keep the listeners active so the RuntimeProvider can handle reconnection
-        }
-        
-        if (this.onStatus) {
-          this.onStatus(payload.status, payload.error);
-        }
-      }
-    });
-
-    // Now start the SSE stream via Rust backend
-    const connection = await sandboxOpencodeConnectStream(this.sandboxId);
-    pendingStreamId = connection.streamId;
-    this.streamId = connection.streamId;
-    console.log("[OpenCodeStream] Connected with streamId:", this.streamId);
-  }
-
-  /**
-   * Disconnect from the stream and clean up listeners
-   */
-  async disconnect(): Promise<void> {
-    // Disconnect the SSE stream via Rust backend
-    if (this.streamId) {
-      try {
-        await sandboxOpencodeDisconnectStream(this.streamId);
-        console.log("[OpenCodeStream] Disconnected streamId:", this.streamId);
-      } catch (err) {
-        console.warn("[OpenCodeStream] Error disconnecting stream:", err);
-      }
-      this.streamId = null;
-    }
-
-    // Clean up event listeners
-    if (this.eventUnlisten) {
-      this.eventUnlisten();
-      this.eventUnlisten = null;
-    }
-
-    if (this.statusUnlisten) {
-      this.statusUnlisten();
-      this.statusUnlisten = null;
-    }
-
-    this.onEvent = null;
-    this.onStatus = null;
-  }
-
-  /**
-   * Check if the stream is connected
-   */
-  get isConnected(): boolean {
-    return this.streamId !== null && this.eventUnlisten !== null;
-  }
-}
 
 // =============================================================================
 // User OpenCode Config Types

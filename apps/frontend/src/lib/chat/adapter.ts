@@ -1,8 +1,9 @@
 /**
  * OpenCode Chat Model Adapter for assistant-ui
  * 
- * This adapter connects assistant-ui to the OpenCode API via Tauri commands.
- * It handles session management, message sending, and real-time streaming.
+ * @deprecated This adapter is not currently used. The active SSE implementation
+ * is in RuntimeProvider.tsx which uses BrowserSSEClient directly.
+ * This file is kept for reference but may be removed in the future.
  * 
  * SSE Event Flow:
  * 1. message.updated (role: "user") - User message registered
@@ -20,11 +21,15 @@ import {
   sandboxOpencodeSendMessage,
   sandboxOpencodeAbortSession,
   sandboxOpencodeListMessages,
-  OpenCodeStream,
   type Session,
   type Message,
-  type OpenCodeEvent,
 } from "$lib/api/tauri";
+import {
+  BrowserSSEClient,
+  toLegacyFormat,
+  type SSEOpenCodeEvent,
+  type SSEStatus,
+} from "$lib/api/browser-sse";
 
 /**
  * State for tracking the current session
@@ -59,8 +64,7 @@ export function createOpenCodeAdapter(projectId: string, initialSessionId?: stri
     sessionId: initialSessionId || null,
   };
 
-  // Stream instance for SSE events
-  let stream: OpenCodeStream | null = null;
+  let sseClient: BrowserSSEClient | null = null;
 
   return {
     async *run({ messages, abortSignal }: ChatModelRunOptions): AsyncGenerator<ChatModelRunResult> {
@@ -103,142 +107,133 @@ export function createOpenCodeAdapter(projectId: string, initialSessionId?: stri
           lastUpdate: Date.now(),
         };
 
-        // Connect to SSE stream FIRST (before sending message)
-        console.log('[OpenCode Adapter] Connecting to SSE stream for project:', state.projectId);
-        stream = new OpenCodeStream(state.projectId);
+        console.log('[OpenCode Adapter] Connecting to SSE for project:', state.projectId);
         
         let receivedAnyEvent = false;
         
-        await stream.connect(
-          (event: OpenCodeEvent) => {
-            receivedAnyEvent = true;
-            streamState.lastUpdate = Date.now();
-            console.log('[OpenCode Adapter] SSE Event:', event.eventType, JSON.stringify(event.data).slice(0, 300));
+        const handleSSEEvent = (event: SSEOpenCodeEvent) => {
+          receivedAnyEvent = true;
+          streamState.lastUpdate = Date.now();
+          
+          const legacyEvent = toLegacyFormat(event);
+          console.log('[OpenCode Adapter] SSE Event:', legacyEvent.eventType, JSON.stringify(legacyEvent.data).slice(0, 300));
+          
+          const eventData = legacyEvent.data as Record<string, unknown>;
+          const properties = eventData?.properties as Record<string, unknown> | undefined;
+          
+          if (legacyEvent.eventType === "message.updated") {
+            const info = properties?.info as Record<string, unknown> | undefined;
+            if (info?.role === "assistant" && typeof info.id === "string") {
+              streamState.assistantMessageId = info.id;
+              console.log('[OpenCode Adapter] Assistant message ID:', streamState.assistantMessageId);
+            }
+          }
+          
+          if (legacyEvent.eventType === "message.part.updated") {
+            const part = properties?.part as Record<string, unknown> | undefined;
+            const delta = properties?.delta as string | undefined;
             
-            // The event.data contains the full SSE payload: {"type":"...", "properties":{...}}
-            // event.eventType is extracted from data.type by the Rust parser
-            const eventData = event.data as Record<string, unknown>;
-            const properties = eventData?.properties as Record<string, unknown> | undefined;
+            console.log('[OpenCode Adapter] Part update - type:', part?.type, 'has text:', !!part?.text, 'has delta:', !!delta);
             
-            // Track assistant message IDs from message.updated events
-            if (event.eventType === "message.updated") {
-              const info = properties?.info as Record<string, unknown> | undefined;
-              if (info?.role === "assistant" && typeof info.id === "string") {
-                streamState.assistantMessageId = info.id;
-                console.log('[OpenCode Adapter] Assistant message ID:', streamState.assistantMessageId);
+            if (part?.type === "text") {
+              if (typeof part.text === "string") {
+                streamState.accumulatedText = part.text;
+                console.log('[OpenCode Adapter] Text update (full), length:', streamState.accumulatedText.length);
+              } else if (delta) {
+                streamState.accumulatedText += delta;
+                console.log('[OpenCode Adapter] Text update (delta), total length:', streamState.accumulatedText.length);
               }
             }
             
-            // Handle text part updates
-            if (event.eventType === "message.part.updated") {
-              const part = properties?.part as Record<string, unknown> | undefined;
-              const delta = properties?.delta as string | undefined;
+            if (part?.type === "tool-invocation") {
+              const toolInvocation = part.toolInvocation as Record<string, unknown> | undefined;
+              if (toolInvocation?.toolCallId && typeof toolInvocation.toolCallId === "string") {
+                const toolCall: ToolCall = {
+                  id: toolInvocation.toolCallId,
+                  name: (toolInvocation.toolName as string) || "unknown",
+                  args: toolInvocation.args,
+                  state: (toolInvocation.state as "pending" | "running" | "complete" | "error") || "running",
+                  result: toolInvocation.result,
+                };
+                streamState.toolCalls.set(toolCall.id, toolCall);
+                console.log('[OpenCode Adapter] Tool call (legacy):', toolCall.name, toolCall.state);
+              }
+            }
+            
+            if (part?.type === "tool") {
+              const callID = part.callID as string | undefined;
+              const toolName = part.tool as string | undefined;
+              const partState = part.state as Record<string, unknown> | undefined;
               
-              console.log('[OpenCode Adapter] Part update - type:', part?.type, 'has text:', !!part?.text, 'has delta:', !!delta);
-              
-              if (part?.type === "text") {
-                // Use full text if available, otherwise use delta
-                if (typeof part.text === "string") {
-                  streamState.accumulatedText = part.text;
-                  console.log('[OpenCode Adapter] Text update (full), length:', streamState.accumulatedText.length);
-                } else if (delta) {
-                  streamState.accumulatedText += delta;
-                  console.log('[OpenCode Adapter] Text update (delta), total length:', streamState.accumulatedText.length);
-                }
-              }
-              
-              // Handle tool invocations (legacy format: tool-invocation)
-              if (part?.type === "tool-invocation") {
-                const toolInvocation = part.toolInvocation as Record<string, unknown> | undefined;
-                if (toolInvocation?.toolCallId && typeof toolInvocation.toolCallId === "string") {
-                  const toolCall: ToolCall = {
-                    id: toolInvocation.toolCallId,
-                    name: (toolInvocation.toolName as string) || "unknown",
-                    args: toolInvocation.args,
-                    state: (toolInvocation.state as "pending" | "running" | "complete" | "error") || "running",
-                    result: toolInvocation.result,
-                  };
-                  streamState.toolCalls.set(toolCall.id, toolCall);
-                  console.log('[OpenCode Adapter] Tool call (legacy):', toolCall.name, toolCall.state);
-                }
-              }
-              
-              // Handle tool parts (current OpenCode format: type: "tool")
-              if (part?.type === "tool") {
-                const callID = part.callID as string | undefined;
-                const toolName = part.tool as string | undefined;
-                const state = part.state as Record<string, unknown> | undefined;
-                
-                if (callID && toolName) {
-                  const status = state?.status as string | undefined;
-                  const toolCall: ToolCall = {
-                    id: callID,
-                    name: toolName,
-                    args: state?.input,
-                    state: status === "completed" ? "complete" : status === "error" ? "error" : "running",
-                    result: state?.output,
-                  };
-                  streamState.toolCalls.set(toolCall.id, toolCall);
-                  console.log('[OpenCode Adapter] Tool call:', toolCall.name, toolCall.state);
-                }
-              }
-            }
-            
-            // Session idle = processing complete
-            if (event.eventType === "session.idle") {
-              console.log('[OpenCode Adapter] Session idle - streaming complete');
-              streamState.isComplete = true;
-            }
-            
-            // Also check session.updated for status changes
-            if (event.eventType === "session.updated") {
-              const info = properties?.info as Record<string, unknown> | undefined;
-              const status = info?.status as Record<string, unknown> | undefined;
-              if (status?.type === "idle") {
-                console.log('[OpenCode Adapter] Session status idle via session.updated - streaming complete');
-                streamState.isComplete = true;
-              }
-            }
-            
-            // Handle errors (legacy event type)
-            if (event.eventType === "error") {
-              console.error('[OpenCode Adapter] Error event:', event.data);
-              streamState.error = new Error(String(event.data));
-              streamState.isComplete = true;
-            }
-            
-            // Handle session.error - OpenCode SDK error event
-            if (event.eventType === "session.error") {
-              const errorMessage = (properties?.error as string) || 
-                                  (properties?.message as string) || 
-                                  "Session error occurred";
-              console.error('[OpenCode Adapter] Session error:', errorMessage, properties);
-              streamState.error = new Error(errorMessage);
-              streamState.isComplete = true;
-            }
-          },
-          (status, error) => {
-            console.log('[OpenCode Adapter] Stream status:', status, error);
-            if (status === "error") {
-              streamState.error = new Error(error || "Stream error");
-              streamState.isComplete = true;
-            } else if (status === "disconnected") {
-              // Only mark complete if we've already started getting text
-              // Otherwise, disconnection might happen before we get any data
-              if (streamState.accumulatedText) {
-                streamState.isComplete = true;
+              if (callID && toolName) {
+                const status = partState?.status as string | undefined;
+                const toolCall: ToolCall = {
+                  id: callID,
+                  name: toolName,
+                  args: partState?.input,
+                  state: status === "completed" ? "complete" : status === "error" ? "error" : "running",
+                  result: partState?.output,
+                };
+                streamState.toolCalls.set(toolCall.id, toolCall);
+                console.log('[OpenCode Adapter] Tool call:', toolCall.name, toolCall.state);
               }
             }
           }
-        );
+          
+          if (legacyEvent.eventType === "session.idle") {
+            console.log('[OpenCode Adapter] Session idle - streaming complete');
+            streamState.isComplete = true;
+          }
+          
+          if (legacyEvent.eventType === "session.updated") {
+            const info = properties?.info as Record<string, unknown> | undefined;
+            const status = info?.status as Record<string, unknown> | undefined;
+            if (status?.type === "idle") {
+              console.log('[OpenCode Adapter] Session status idle via session.updated - streaming complete');
+              streamState.isComplete = true;
+            }
+          }
+          
+          if (legacyEvent.eventType === "error") {
+            console.error('[OpenCode Adapter] Error event:', legacyEvent.data);
+            streamState.error = new Error(String(legacyEvent.data));
+            streamState.isComplete = true;
+          }
+          
+          if (legacyEvent.eventType === "session.error") {
+            const errorMessage = (properties?.error as string) || 
+                                (properties?.message as string) || 
+                                "Session error occurred";
+            console.error('[OpenCode Adapter] Session error:', errorMessage, properties);
+            streamState.error = new Error(errorMessage);
+            streamState.isComplete = true;
+          }
+        };
+        
+        const handleSSEStatus = (status: SSEStatus, error?: string) => {
+          console.log('[OpenCode Adapter] SSE status:', status, error);
+          if (status === "error") {
+            streamState.error = new Error(error || "SSE error");
+            streamState.isComplete = true;
+          } else if (status === "disconnected") {
+            if (streamState.accumulatedText) {
+              streamState.isComplete = true;
+            }
+          }
+        };
+        
+        sseClient = new BrowserSSEClient(state.projectId, {
+          onEvent: handleSSEEvent,
+          onStatus: handleSSEStatus,
+        });
+        sseClient.connect();
 
-        // Handle abort signal
         const abortHandler = () => {
           console.log('[OpenCode Adapter] Abort signal received');
           if (state.sessionId) {
             sandboxOpencodeAbortSession(state.projectId, state.sessionId).catch(console.error);
           }
-          stream?.disconnect().catch(console.error);
+          sseClient?.disconnect();
           streamState.isComplete = true;
         };
         abortSignal?.addEventListener("abort", abortHandler);
@@ -337,10 +332,9 @@ export function createOpenCodeAdapter(projectId: string, initialSessionId?: stri
           }
         }
 
-        // Clean up
         abortSignal?.removeEventListener("abort", abortHandler);
-        await stream?.disconnect();
-        stream = null;
+        sseClient?.disconnect();
+        sseClient = null;
 
         if (streamState.error) {
           throw streamState.error;
@@ -391,9 +385,8 @@ export function createOpenCodeAdapter(projectId: string, initialSessionId?: stri
 
       } catch (error) {
         console.error('[OpenCode Adapter] Error in run:', error);
-        // Clean up on error
-        await stream?.disconnect();
-        stream = null;
+        sseClient?.disconnect();
+        sseClient = null;
         throw error;
       }
     },
