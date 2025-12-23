@@ -256,64 +256,33 @@ setup_user_config() {
 }
 
 # =============================================================================
-# Setup Onboarding Agents (Global)
+# Setup Global OpenCode Configuration
 # =============================================================================
-# Sets up AgentPod system agents in the GLOBAL config directory:
-#   - ~/.config/opencode/agent/manage.md (primary agent - Tab accessible)
-#   - ~/.config/opencode/agent/onboarding.md (subagent - invoked by manage)
-# These agents connect to the Management API's knowledge base MCP endpoint.
-#
-# The agents are GLOBAL (not project-level) so they persist across all
-# sandboxes and workspaces.
+# Configures global OpenCode settings:
+#   - MCP connection to knowledge base
+#   - Agent model overrides (if AGENT_MODEL is set)
 #
 # Environment Variables:
 #   ONBOARDING_MODE        - If "true", onboarding agent is active
 #   ONBOARDING_SESSION_ID  - Session ID for tracking onboarding progress
 #   AGENTPOD_API_TOKEN     - Auth token for MCP server
 #   MANAGEMENT_API_URL     - URL of Management API (for MCP endpoint)
+#   AGENT_MODEL            - Override model for agents (e.g., "copilot/gpt-4o")
 # =============================================================================
-setup_onboarding_agents() {
-    echo "Setting up global AgentPod agents..."
+setup_global_opencode_config() {
+    echo "Setting up global OpenCode configuration..."
     
-    # Create the GLOBAL agent directory (~/.config/opencode/agent/)
-    GLOBAL_AGENT_DIR="$OPENCODE_CONFIG_DIR/agent"
-    mkdir -p "$GLOBAL_AGENT_DIR"
-    
-    # Source files for agents
-    MANAGE_SRC="/opt/agentpod/scripts/agents/manage.md"
-    ONBOARDING_SRC="/opt/agentpod/scripts/agents/onboarding.md"
-    
-    # Copy manage agent (primary agent - Tab accessible)
-    if [ -f "$MANAGE_SRC" ]; then
-        echo "  Installing manage agent (primary) to $GLOBAL_AGENT_DIR/manage.md"
-        cp "$MANAGE_SRC" "$GLOBAL_AGENT_DIR/manage.md"
-    else
-        echo "  Warning: Manage agent not found at $MANAGE_SRC"
-    fi
-    
-    # Copy onboarding agent (subagent - invoked by manage)
-    if [ -f "$ONBOARDING_SRC" ]; then
-        echo "  Installing onboarding agent (subagent) to $GLOBAL_AGENT_DIR/onboarding.md"
-        cp "$ONBOARDING_SRC" "$GLOBAL_AGENT_DIR/onboarding.md"
-    else
-        echo "  Warning: Onboarding agent not found at $ONBOARDING_SRC"
-    fi
-    
-    # Update GLOBAL opencode.json to include MCP configuration for knowledge base
-    # This goes in ~/.config/opencode/opencode.json, not the project-level config
     if [ -n "$MANAGEMENT_API_URL" ]; then
-        echo "  Configuring MCP connection to knowledge base in global config..."
+        echo "  Configuring MCP connection to knowledge base..."
         
         GLOBAL_CONFIG_FILE="$OPENCODE_CONFIG_DIR/opencode.json"
         
-        # Read current config or create empty object
         if [ -f "$GLOBAL_CONFIG_FILE" ]; then
             CURRENT_CONFIG=$(cat "$GLOBAL_CONFIG_FILE")
         else
             CURRENT_CONFIG="{}"
         fi
         
-        # Add/update MCP configuration
         UPDATED_CONFIG=$(echo "$CURRENT_CONFIG" | jq --arg url "${MANAGEMENT_API_URL}/api/mcp/knowledge" '
             .mcp.agentpod_knowledge = {
                 "type": "remote",
@@ -324,52 +293,100 @@ setup_onboarding_agents() {
             }
         ')
         
-        # Write updated config
         echo "$UPDATED_CONFIG" > "$GLOBAL_CONFIG_FILE"
         echo "  MCP configuration added to global opencode.json"
     fi
     
-    # Configure agent models from environment variable
-    # AGENT_MODEL can be set to override the default model for all agents
-    # Format: provider/model (e.g., "copilot/gpt-4o", "anthropic/claude-sonnet-4-20250514")
     if [ -n "$AGENT_MODEL" ]; then
         echo "  Configuring agent models: $AGENT_MODEL"
         
         GLOBAL_CONFIG_FILE="$OPENCODE_CONFIG_DIR/opencode.json"
         
-        # Read current config or create empty object
         if [ -f "$GLOBAL_CONFIG_FILE" ]; then
             CURRENT_CONFIG=$(cat "$GLOBAL_CONFIG_FILE")
         else
             CURRENT_CONFIG="{}"
         fi
         
-        # Add agent model configuration for manage and onboarding agents
         UPDATED_CONFIG=$(echo "$CURRENT_CONFIG" | jq --arg model "$AGENT_MODEL" '
-            .agent.manage.model = $model |
+            .agent["commander-ada"].model = $model |
             .agent.onboarding.model = $model
         ')
         
-        # Write updated config
         echo "$UPDATED_CONFIG" > "$GLOBAL_CONFIG_FILE"
-        echo "  Agent model configuration added to global opencode.json"
+        echo "  Agent model configuration added"
     else
         echo "  No AGENT_MODEL set, agents will use default/global model"
     fi
     
-    # Set onboarding environment variables for OpenCode
     if [ "$ONBOARDING_MODE" = "true" ]; then
-        echo "  Onboarding mode is ACTIVE"
-        echo "  Session ID: ${ONBOARDING_SESSION_ID:-not set}"
-    else
-        echo "  Onboarding mode is inactive (normal operation)"
+        echo "  Onboarding mode is ACTIVE (Session: ${ONBOARDING_SESSION_ID:-not set})"
     fi
     
-    # Set ownership
-    chown -R developer:developer "$GLOBAL_AGENT_DIR" 2>/dev/null || true
     chown developer:developer "$OPENCODE_CONFIG_DIR/opencode.json" 2>/dev/null || true
     
-    echo "  Global AgentPod agents setup complete."
+    echo "  Global OpenCode configuration complete."
+}
+
+# =============================================================================
+# Fetch and Install Sandbox Agents
+# =============================================================================
+# Fetches agents assigned to this sandbox from the Management API
+# and writes them to /workspace/.opencode/agent/
+# =============================================================================
+fetch_sandbox_agents() {
+    if [ -z "$MANAGEMENT_API_URL" ] || [ -z "$SANDBOX_ID" ]; then
+        echo "No MANAGEMENT_API_URL or SANDBOX_ID provided. Skipping agent installation."
+        return 1
+    fi
+    
+    echo "Fetching sandbox agents from Management API..."
+    
+    AGENTS_URL="${MANAGEMENT_API_URL}/api/v2/sandboxes/${SANDBOX_ID}/agents"
+    echo "  URL: $AGENTS_URL"
+    
+    CURL_OPTS="-sf --connect-timeout 10 --max-time 30"
+    if [ -n "$AUTH_TOKEN" ]; then
+        CURL_OPTS="$CURL_OPTS -H 'Authorization: Bearer ${AUTH_TOKEN}'"
+    fi
+    
+    RESPONSE=$(eval curl $CURL_OPTS "'$AGENTS_URL'" 2>/dev/null) || {
+        echo "  Warning: Failed to fetch agents from Management API. Skipping agent installation."
+        return 1
+    }
+    
+    if ! echo "$RESPONSE" | jq empty 2>/dev/null; then
+        echo "  Warning: Invalid JSON response from Management API. Skipping agent installation."
+        return 1
+    fi
+    
+    AGENT_COUNT=$(echo "$RESPONSE" | jq '.agents | length')
+    if [ "$AGENT_COUNT" = "0" ] || [ "$AGENT_COUNT" = "null" ]; then
+        echo "  No agents assigned to this sandbox."
+        return 0
+    fi
+    
+    echo "  Found $AGENT_COUNT agents to install."
+    
+    WORKSPACE_AGENT_DIR="$WORKSPACE/.opencode/agent"
+    mkdir -p "$WORKSPACE_AGENT_DIR"
+    
+    echo "$RESPONSE" | jq -c '.agents[]' 2>/dev/null | while IFS= read -r agent_json; do
+        SLUG=$(echo "$agent_json" | jq -r '.slug // empty')
+        CONTENT=$(echo "$agent_json" | jq -r '.content // empty')
+        NAME=$(echo "$agent_json" | jq -r '.name // empty')
+        
+        if [ -n "$SLUG" ] && [ -n "$CONTENT" ]; then
+            AGENT_FILE="$WORKSPACE_AGENT_DIR/${SLUG}.md"
+            echo "  Installing agent: $NAME ($SLUG) -> $AGENT_FILE"
+            echo "$CONTENT" > "$AGENT_FILE"
+        fi
+    done
+    
+    chown -R developer:developer "$WORKSPACE_AGENT_DIR" 2>/dev/null || true
+    
+    echo "  Sandbox agents installation complete."
+    return 0
 }
 
 # =============================================================================
@@ -394,6 +411,7 @@ setup_project_config() {
         cat > "$WORKSPACE/opencode.json" << 'EOF'
 {
   "$schema": "https://opencode.ai/config.json",
+  "default_agent": "commander-ada",
   "permission": {
     "edit": "allow",
     "bash": "allow",
@@ -950,8 +968,10 @@ setup_user_config
 # Setup project-level config (opencode.json, flavor-specific AGENTS.md)
 setup_project_config
 
-# Setup onboarding agents (from /opt/agentpod/scripts/agents/)
-setup_onboarding_agents
+setup_global_opencode_config
+
+# Fetch and install sandbox-specific agents from Management API
+fetch_sandbox_agents
 
 # Install addons (based on ADDON_IDS env var)
 install_addons
