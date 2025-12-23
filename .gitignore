@@ -44,3 +44,6 @@ do-not-commit/
 
 # Runtime-generated Traefik preview configs
 config/traefik/dynamic/preview-*.yml
+
+# Reference documentation (large, imported from external source)
+docs/reference/agentic-space/

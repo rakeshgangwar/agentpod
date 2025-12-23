@@ -255,6 +255,7 @@ export interface OpenCodeJsonConfig {
   $schema?: string;
   model?: string;
   small_model?: string;
+  default_agent?: string;
   share?: "manual" | "auto" | "disabled";
   autoupdate?: boolean | "notify";
   mcp?: Record<string, McpServerDefinition>;

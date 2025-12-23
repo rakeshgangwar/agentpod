@@ -34,3 +34,6 @@ export * from "./onboarding";
 
 // Admin types
 export * from "./admin";
+
+// Agent catalog types
+export * from "./agents";
