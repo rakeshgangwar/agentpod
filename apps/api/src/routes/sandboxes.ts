@@ -66,6 +66,7 @@ const createSandboxSchema = z.object({
   resourceTier: z.string().optional(),
   addons: z.array(z.string()).optional(),
   autoStart: z.boolean().optional(),
+  agentSlugs: z.array(z.string()).optional(),
 });
 
 const listSandboxesSchema = z.object({
@@ -260,6 +261,7 @@ export const sandboxRoutes = new Hono()
         resourceTier: resourceTierId,
         addons: body.addons,
         autoStart: body.autoStart,
+        agentSlugs: body.agentSlugs,
       });
 
       log.info("Sandbox created", { sandboxId: result.sandbox.id });
@@ -599,6 +601,35 @@ export const sandboxRoutes = new Hono()
       log.error("Failed to get sandbox status", { id, error });
       return c.json(
         { error: "Failed to get status", details: error instanceof Error ? error.message : "Unknown error" },
+        500
+      );
+    }
+  })
+
+  // ===========================================================================
+  // Get Sandbox Agents
+  // ===========================================================================
+  .get("/:id/agents", async (c) => {
+    const id = c.req.param("id");
+
+    try {
+      const { getSandboxAgents } = await import("../services/agent-catalog-service.ts");
+      const agents = await getSandboxAgents(id);
+
+      return c.json({
+        agents: agents.map(agent => ({
+          slug: agent.slug,
+          name: agent.name,
+          role: agent.role,
+          emoji: agent.emoji,
+          squad: agent.squad,
+          content: agent.opencodeContent,
+        })),
+      });
+    } catch (error) {
+      log.error("Failed to get sandbox agents", { id, error });
+      return c.json(
+        { error: "Failed to get agents", details: error instanceof Error ? error.message : "Unknown error" },
         500
       );
     }
@@ -1135,14 +1166,28 @@ export const sandboxRoutes = new Hono()
   })
 
   // ===========================================================================
-  // OpenCode: Get Agents
+  // OpenCode: Get Agents (filtered by sandbox's assigned agents)
   // ===========================================================================
   .get("/:id/opencode/agents", async (c) => {
     const id = c.req.param("id");
 
     try {
-      const agents = await opencodeV2.getAgents(id);
-      return c.json({ agents });
+      const allAgents = await opencodeV2.getAgents(id);
+      
+      const { getSandboxAgents } = await import("../services/agent-catalog-service.ts");
+      const sandboxAgents = await getSandboxAgents(id);
+      
+      if (sandboxAgents.length > 0) {
+        const enabledAgentSlugs = new Set(
+          sandboxAgents.map(a => a.slug.toLowerCase())
+        );
+        const filteredAgents = allAgents.filter(
+          agent => enabledAgentSlugs.has(agent.name.toLowerCase())
+        );
+        return c.json({ agents: filteredAgents });
+      }
+      
+      return c.json({ agents: allAgents });
     } catch (error) {
       return handleOpenCodeError(c, error, "Failed to get OpenCode agents");
     }

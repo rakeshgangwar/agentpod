@@ -31,7 +31,7 @@ import type { Sandbox as DockerSandbox, SandboxConfig, SandboxStats, SandboxStat
 import type { Repository } from "./git/types.ts";
 import { createLogger } from "../utils/logger.ts";
 import { buildOpenCodeAuthJson } from "../models/provider.ts";
-import { getUserOpencodeFullConfig } from "../models/user-opencode-config.ts";
+import { getSandboxOpencodeConfig } from "../models/user-opencode-config.ts";
 import * as SandboxModel from "../models/sandbox.ts";
 import type { Sandbox as DbSandbox, SandboxStatus as DbSandboxStatus } from "../models/sandbox.ts";
 import { getOpenCodeSyncService } from "./sync/opencode-sync.ts";
@@ -123,22 +123,15 @@ export interface Sandbox extends DbSandbox {
 }
 
 export interface CreateSandboxOptions {
-  /** Project name */
   name: string;
-  /** Optional description */
   description?: string;
-  /** Clone from GitHub URL */
   githubUrl?: string;
-  /** User ID (owner) */
   userId: string;
-  /** Container flavor (js, python, go, rust, fullstack, polyglot) */
   flavor?: string;
-  /** Resource tier (starter, builder, creator, power) */
   resourceTier?: string;
-  /** Addon IDs to enable */
   addons?: string[];
-  /** Auto-start the container after creation */
   autoStart?: boolean;
+  agentSlugs?: string[];
 }
 
 export interface SandboxWithRepo {
@@ -384,6 +377,7 @@ export class SandboxManager {
       resourceTier = "starter",
       addons = ["code-server"],
       autoStart = false,
+      agentSlugs,
     } = options;
 
     // Generate unique sandbox ID and slug
@@ -460,7 +454,27 @@ export class SandboxManager {
       log.info("Created onboarding session", { sandboxId, sessionId: session.id });
     } catch (error) {
       log.warn("Failed to create onboarding session", { sandboxId, error });
-      // Don't fail sandbox creation if onboarding session fails
+    }
+
+    try {
+      const { getDefaultAgents, assignAgentsToSandbox } = await import("./agent-catalog-service.ts");
+      
+      let slugsToAssign: string[];
+      if (agentSlugs && agentSlugs.length > 0) {
+        slugsToAssign = agentSlugs;
+        log.info("Using provided agent slugs", { sandboxId, agents: slugsToAssign });
+      } else {
+        const defaultAgents = await getDefaultAgents();
+        slugsToAssign = defaultAgents.map(a => a.slug);
+        log.info("Using default agents", { sandboxId, agents: slugsToAssign });
+      }
+      
+      if (slugsToAssign.length > 0) {
+        await assignAgentsToSandbox(sandboxId, slugsToAssign, userId);
+        log.info("Assigned agents to sandbox", { sandboxId, agents: slugsToAssign });
+      }
+    } catch (error) {
+      log.warn("Failed to assign agents", { sandboxId, error });
     }
 
     // Step 3: Load or detect configuration
@@ -524,7 +538,7 @@ export class SandboxManager {
         log.debug("Injected OpenCode auth configuration");
       }
 
-      const userConfig = await getUserOpencodeFullConfig(userId);
+      const userConfig = await getSandboxOpencodeConfig(sandboxId, userId);
       if (userConfig) {
         containerSpec.env = {
           ...containerSpec.env,
@@ -540,17 +554,23 @@ export class SandboxManager {
       log.warn("Failed to build OpenCode config, continuing without it", { error: configError });
     }
 
-    // Step 5.5: Add onboarding environment variables
+    // Step 5.5: Add Management API environment variables for all sandboxes
+    // Use internal Docker network URL (agentpod-api:port) for container-to-API communication
+    const internalApiUrl = `http://${config.docker.network === 'host' ? 'localhost' : 'agentpod-api'}:${config.port}`;
+    containerSpec.env = {
+      ...containerSpec.env,
+      MANAGEMENT_API_URL: internalApiUrl,
+      AUTH_TOKEN: config.auth.token,
+    };
+    
     if (onboardingSessionId) {
       containerSpec.env = {
         ...containerSpec.env,
         ONBOARDING_MODE: "true",
         ONBOARDING_SESSION_ID: onboardingSessionId,
-        MANAGEMENT_API_URL: config.publicUrl,
       };
       log.debug("Added onboarding environment variables", {
         sessionId: onboardingSessionId,
-        apiUrl: config.publicUrl,
       });
     }
 

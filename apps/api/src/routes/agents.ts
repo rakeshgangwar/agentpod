@@ -15,6 +15,8 @@ import { db } from "../db/drizzle";
 import { agentTasks, taskTemplates } from "../db/schema";
 import { eq, desc, and, or } from "drizzle-orm";
 import { agentOrchestratorService } from "../services/agents/index";
+import * as agentCatalog from "../services/agent-catalog-service";
+import { isUserAdmin } from "../models/admin-users";
 
 const log = createLogger("agents-routes");
 
@@ -942,4 +944,216 @@ export const agentRoutes = new Hono()
       log.error("Failed to get workflow", { error });
       return c.json({ error: "Failed to get workflow" }, 500);
     }
-  });
+  })
+
+  .get("/catalog", async (c) => {
+    try {
+      const userId = getAuthenticatedUserId(c);
+      const isAdmin = userId ? await isUserAdmin(userId) : false;
+      const includeHidden = isAdmin && c.req.query("all") === "true";
+      
+      const agentList = await agentCatalog.getAllAgents(includeHidden);
+      
+      const summaries = agentList.map((agent) => ({
+        id: agent.id,
+        slug: agent.slug,
+        name: agent.name,
+        role: agent.role,
+        emoji: agent.emoji,
+        description: agent.description,
+        squad: agent.squad,
+        tier: agent.tier,
+        mode: agent.mode,
+        isBuiltin: agent.isBuiltin,
+        isPremium: agent.isPremium,
+        isMandatory: agent.isMandatory,
+        status: isAdmin ? agent.status : undefined,
+        installCount: agent.installCount,
+        ratingAvg: agent.ratingAvg,
+      }));
+
+      const bySquad = {
+        orchestration: summaries.filter((a) => a.squad === "orchestration"),
+        development: summaries.filter((a) => a.squad === "development"),
+        product: summaries.filter((a) => a.squad === "product"),
+        operations: summaries.filter((a) => a.squad === "operations"),
+        security: summaries.filter((a) => a.squad === "security"),
+        research: summaries.filter((a) => a.squad === "research"),
+        communication: summaries.filter((a) => a.squad === "communication"),
+        data: summaries.filter((a) => a.squad === "data"),
+      };
+
+      const mandatoryAgents = await agentCatalog.getMandatoryAgents();
+
+      return c.json({ 
+        agents: summaries, 
+        bySquad,
+        mandatoryAgentSlugs: mandatoryAgents.map(a => a.slug),
+      });
+    } catch (error) {
+      log.error("Failed to list agents from catalog", { error });
+      return c.json({ error: "Failed to list agents" }, 500);
+    }
+  })
+
+  .get("/catalog/:slug", async (c) => {
+    try {
+      const slug = c.req.param("slug");
+      const agent = await agentCatalog.getAgentBySlug(slug);
+      
+      if (!agent) {
+        return c.json({ error: "Agent not found" }, 404);
+      }
+
+      return c.json({ agent });
+    } catch (error) {
+      log.error("Failed to get agent from catalog", { error });
+      return c.json({ error: "Failed to get agent" }, 500);
+    }
+  })
+
+  .get("/catalog/id/:id", async (c) => {
+    const userId = getAuthenticatedUserId(c);
+    if (!userId) {
+      return c.json({ error: "Authentication required" }, 401);
+    }
+
+    const isAdmin = await isUserAdmin(userId);
+    if (!isAdmin) {
+      return c.json({ error: "Admin access required" }, 403);
+    }
+
+    try {
+      const id = c.req.param("id");
+      const agent = await agentCatalog.getAgentById(id);
+      
+      if (!agent) {
+        return c.json({ error: "Agent not found" }, 404);
+      }
+
+      return c.json({ agent });
+    } catch (error) {
+      log.error("Failed to get agent by ID", { error });
+      return c.json({ error: "Failed to get agent" }, 500);
+    }
+  })
+
+  .patch(
+    "/catalog/:id",
+    zValidator(
+      "json",
+      z.object({
+        name: z.string().min(1).optional(),
+        role: z.string().min(1).optional(),
+        emoji: z.string().optional(),
+        description: z.string().optional(),
+        squad: z.enum(["orchestration", "development", "product", "operations", "security", "research", "communication", "data"]).optional(),
+        tier: z.enum(["central", "foundation", "specialized", "premium"]).optional(),
+        tags: z.array(z.string()).optional(),
+        category: z.string().optional(),
+        isDefault: z.boolean().optional(),
+        isPremium: z.boolean().optional(),
+        status: z.enum(["active", "deprecated", "hidden", "pending_review"]).optional(),
+        config: z.record(z.unknown()).optional(),
+        opencodeContent: z.string().optional(),
+      })
+    ),
+    async (c) => {
+      const userId = getAuthenticatedUserId(c);
+      if (!userId) {
+        return c.json({ error: "Authentication required" }, 401);
+      }
+
+      const isAdmin = await isUserAdmin(userId);
+      if (!isAdmin) {
+        return c.json({ error: "Admin access required" }, 403);
+      }
+
+      const agentId = c.req.param("id");
+      const updates = c.req.valid("json");
+
+      try {
+        const agent = await agentCatalog.updateAgent(agentId, updates, userId);
+        
+        if (!agent) {
+          return c.json({ error: "Agent not found" }, 404);
+        }
+
+        log.info("Agent updated by admin", { agentId, updates, adminId: userId });
+
+        return c.json({ agent });
+      } catch (error) {
+        log.error("Failed to update agent", { agentId, error });
+        return c.json({ error: "Failed to update agent" }, 500);
+      }
+    }
+  )
+
+
+
+
+
+  .get("/sandbox/:sandboxId", async (c) => {
+    try {
+      const sandboxId = c.req.param("sandboxId");
+      const agents = await agentCatalog.getSandboxAgents(sandboxId);
+
+      return c.json({ 
+        agents: agents.map((agent) => ({
+          id: agent.id,
+          slug: agent.slug,
+          name: agent.name,
+          role: agent.role,
+          emoji: agent.emoji,
+          description: agent.description,
+          squad: agent.squad,
+        })),
+      });
+    } catch (error) {
+      log.error("Failed to get sandbox agents", { error });
+      return c.json({ error: "Failed to get sandbox agents" }, 500);
+    }
+  })
+
+  .put(
+    "/sandbox/:sandboxId",
+    zValidator(
+      "json",
+      z.object({
+        agentSlugs: z.array(z.string()).min(1, "At least one agent is required"),
+      })
+    ),
+    async (c) => {
+      try {
+        const sandboxId = c.req.param("sandboxId");
+        const { agentSlugs } = c.req.valid("json");
+        const userId = getAuthenticatedUserId(c);
+
+        const result = await agentCatalog.updateSandboxAgents(sandboxId, agentSlugs, userId ?? undefined);
+        
+        if (result.error) {
+          return c.json({ error: result.error }, 400);
+        }
+
+        const agents = await agentCatalog.getSandboxAgents(sandboxId);
+
+        return c.json({ 
+          success: true,
+          created: result.created,
+          agents: agents.map((agent) => ({
+            id: agent.id,
+            slug: agent.slug,
+            name: agent.name,
+            role: agent.role,
+            emoji: agent.emoji,
+            squad: agent.squad,
+          })),
+        });
+      } catch (error) {
+        log.error("Failed to update sandbox agents", { error });
+        return c.json({ error: "Failed to update sandbox agents" }, 500);
+      }
+    }
+  )
+
+;

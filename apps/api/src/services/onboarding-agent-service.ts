@@ -114,6 +114,7 @@ export class OnboardingAgentService {
     const config: OpenCodeJsonConfig = {
       $schema: OPENCODE_SCHEMA_URL,
       model,
+      default_agent: "commander-ada",
       share: "manual",
       autoupdate: true,
       mcp: {

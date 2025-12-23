@@ -11,6 +11,7 @@ import { db } from '../db/drizzle';
 import { userOpencodeConfig, userOpencodeFiles } from '../db/schema/settings';
 import { eq, and } from 'drizzle-orm';
 import { createLogger } from '../utils/logger.ts';
+import { getSandboxAgents } from '../services/agent-catalog-service';
 
 const log = createLogger('user-opencode-config');
 
@@ -392,6 +393,45 @@ export async function getUserOpencodeFullConfig(userId: string): Promise<UserOpe
       extension: f.extension,
       content: f.content,
     })),
+  };
+}
+
+export async function getSandboxOpencodeConfig(
+  sandboxId: string,
+  userId: string
+): Promise<UserOpencodeFullConfig> {
+  const config = await getUserOpencodeConfig(userId);
+  const allUserFiles = await listUserOpencodeFiles(userId);
+  const sandboxAgentRecords = await getSandboxAgents(sandboxId);
+  
+  const agentFiles = sandboxAgentRecords
+    .filter(agent => agent.opencodeContent)
+    .map(agent => ({
+      type: 'agent' as const,
+      name: agent.slug,
+      extension: 'md' as const,
+      content: agent.opencodeContent!,
+    }));
+  
+  const nonAgentFiles = allUserFiles
+    .filter(f => f.type !== 'agent')
+    .map(f => ({
+      type: f.type,
+      name: f.name,
+      extension: f.extension,
+      content: f.content,
+    }));
+  
+  log.debug('Built sandbox-specific config', {
+    sandboxId,
+    agentCount: agentFiles.length,
+    nonAgentFilesCount: nonAgentFiles.length,
+  });
+
+  return {
+    settings: config?.settings ?? {},
+    agents_md: config?.agentsMd,
+    files: [...agentFiles, ...nonAgentFiles],
   };
 }
 

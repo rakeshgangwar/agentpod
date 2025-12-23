@@ -20,6 +20,9 @@ export * from "./containers";
 export * from "./activity";
 export * from "./agents";
 
+// Agent catalog (agent selection, marketplace, presets)
+export * from "./agent-catalog";
+
 // Onboarding system (new)
 export * from "./knowledge";
 export * from "./onboarding";
