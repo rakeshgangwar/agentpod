@@ -12,7 +12,7 @@ export const featurePlanningWorkflow: Workflow = {
   
   participants: [
     {
-      agentName: "Pete",
+      agentName: "Product-Pete",
       role: "coordinator",
       responsibilities: [
         "Define feature scope and value",
@@ -21,7 +21,7 @@ export const featurePlanningWorkflow: Workflow = {
       ]
     },
     {
-      agentName: "Spencer",
+      agentName: "Specs-Spencer",
       role: "primary",
       responsibilities: [
         "Write detailed requirements",
@@ -30,7 +30,7 @@ export const featurePlanningWorkflow: Workflow = {
       ]
     },
     {
-      agentName: "Alex",
+      agentName: "Architect-Alex",
       role: "reviewer",
       responsibilities: [
         "Assess technical feasibility",
@@ -39,7 +39,7 @@ export const featurePlanningWorkflow: Workflow = {
       ]
     },
     {
-      agentName: "River",
+      agentName: "Roadmap-River",
       role: "support",
       responsibilities: [
         "Estimate timeline",
@@ -48,7 +48,7 @@ export const featurePlanningWorkflow: Workflow = {
       ]
     },
     {
-      agentName: "Tess",
+      agentName: "Tester-Tim",
       role: "reviewer",
       responsibilities: [
         "Review testability",
@@ -61,37 +61,37 @@ export const featurePlanningWorkflow: Workflow = {
   phases: [
     {
       name: "Problem Definition",
-      agents: ["Pete"],
+      agents: ["Product-Pete"],
       description: "Define the problem and value proposition",
       outputs: ["Problem statement", "Success metrics", "Priority assessment"]
     },
     {
       name: "Requirements Gathering",
-      agents: ["Spencer", "Pete"],
+      agents: ["Specs-Spencer", "Product-Pete"],
       description: "Document detailed requirements and acceptance criteria",
       outputs: ["User stories", "Acceptance criteria", "Edge cases"]
     },
     {
       name: "Technical Design",
-      agents: ["Alex"],
+      agents: ["Architect-Alex"],
       description: "Design the technical solution",
       outputs: ["Architecture decision", "Component design", "Technical risks"]
     },
     {
       name: "Test Planning",
-      agents: ["Tess"],
+      agents: ["Tester-Tim"],
       description: "Plan testing strategy",
       outputs: ["Test strategy", "Coverage plan", "Quality gates"]
     },
     {
       name: "Timeline & Dependencies",
-      agents: ["River"],
+      agents: ["Roadmap-River"],
       description: "Estimate effort and identify dependencies",
       outputs: ["Timeline estimate", "Dependency map", "Milestones"]
     },
     {
       name: "Final Review",
-      agents: ["Pete"],
+      agents: ["Product-Pete"],
       description: "Approve feature for implementation",
       outputs: ["Go/No-go decision", "Implementation tickets"]
     }

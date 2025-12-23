@@ -1,7 +1,7 @@
 import type { AgentConfig } from "../../core/types"
 
 export const noraNotifier: AgentConfig = {
-  name: "Nora",
+  name: "Notifier-Nora",
   role: "Communication Hub",
   emoji: "📢",
   

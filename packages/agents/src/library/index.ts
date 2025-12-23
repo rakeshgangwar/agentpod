@@ -1,9 +1,9 @@
-import { agentpodCentral } from "./central"
+import { commanderAda, builderBob, architectAria, guideGrace } from "./central"
 import { 
   kaiCoder, 
   danaDebugger, 
   alexArchitect, 
-  tessTester, 
+  testerTim, 
   samSecurity 
 } from "./development"
 import { 
@@ -22,11 +22,14 @@ export * from "./product"
 export * from "./operations"
 
 export const ALL_AGENTS = [
-  agentpodCentral,
+  commanderAda,
+  builderBob,
+  architectAria,
+  guideGrace,
   kaiCoder,
   danaDebugger,
   alexArchitect,
-  tessTester,
+  testerTim,
   samSecurity,
   peteProduct,
   spencerSpecs,
@@ -36,8 +39,8 @@ export const ALL_AGENTS = [
 ] as const
 
 export const AGENTS_BY_SQUAD = {
-  orchestration: [agentpodCentral],
-  development: [kaiCoder, danaDebugger, alexArchitect, tessTester, samSecurity],
+  orchestration: [commanderAda, builderBob, architectAria, guideGrace],
+  development: [kaiCoder, danaDebugger, alexArchitect, testerTim, samSecurity],
   product: [peteProduct, spencerSpecs, riverRoadmap],
   operations: [oliviaOperations, noraNotifier],
   security: [samSecurity],
@@ -45,15 +48,18 @@ export const AGENTS_BY_SQUAD = {
 } as const
 
 export const AGENTS_BY_NAME = {
-  Central: agentpodCentral,
-  Kai: kaiCoder,
-  Dana: danaDebugger,
-  Alex: alexArchitect,
-  Tess: tessTester,
-  Sam: samSecurity,
-  Pete: peteProduct,
-  Spencer: spencerSpecs,
-  River: riverRoadmap,
-  Olivia: oliviaOperations,
-  Nora: noraNotifier,
+  "Commander-Ada": commanderAda,
+  "Builder-Bob": builderBob,
+  "Architect-Aria": architectAria,
+  "Guide-Grace": guideGrace,
+  "Coder-Kai": kaiCoder,
+  "Debugger-Dana": danaDebugger,
+  "Architect-Alex": alexArchitect,
+  "Tester-Tim": testerTim,
+  "Security-Sam": samSecurity,
+  "Product-Pete": peteProduct,
+  "Specs-Spencer": spencerSpecs,
+  "Roadmap-River": riverRoadmap,
+  "Operations-Olivia": oliviaOperations,
+  "Notifier-Nora": noraNotifier,
 } as const

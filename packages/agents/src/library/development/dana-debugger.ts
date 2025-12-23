@@ -7,7 +7,7 @@ import type { AgentConfig } from "../../core/types"
  * Analyzes error logs, reproduces issues, and finds root causes.
  */
 export const danaDebugger: AgentConfig = {
-  name: "Dana",
+  name: "Debugger-Dana",
   role: "Bug Investigator",
   emoji: "🔍",
   
@@ -41,8 +41,10 @@ export const danaDebugger: AgentConfig = {
     network: true
   },
   
-  relatedAgents: ["Kai", "Alex", "Olivia", "Tess"],
+  relatedAgents: ["Kai", "Alex", "Olivia", "Tim"],
   workflows: ["incident-response", "bug-triage", "root-cause-analysis"],
+  
+  isDefault: true,
   
   delegationTriggers: [
     "bug", "error", "issue", "crash", "broken", "not working",
@@ -159,6 +161,6 @@ Observation: [what was found]
 - Delegate fix implementation to Kai
 - Escalate security-related bugs to Sam
 - Escalate infrastructure issues to Olivia
-- Delegate test case creation to Tess
+- Delegate test case creation to Tim
 - You can execute code to reproduce issues, but do NOT modify source files`
 }

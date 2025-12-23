@@ -1,7 +1,7 @@
 import type { AgentConfig } from "../../core/types"
 
 export const oliviaOperations: AgentConfig = {
-  name: "Olivia",
+  name: "Operations-Olivia",
   role: "Infrastructure Lead",
   emoji: "⚙️",
   

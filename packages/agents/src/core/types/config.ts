@@ -46,6 +46,8 @@ export interface AgentConfig {
   
   delegationTriggers?: string[]
   mandatoryFor?: string[]
+  
+  isDefault?: boolean
 }
 
 export interface AgentMetadata {

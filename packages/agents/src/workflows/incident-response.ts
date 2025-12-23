@@ -12,7 +12,7 @@ export const incidentResponseWorkflow: Workflow = {
   
   participants: [
     {
-      agentName: "Olivia",
+      agentName: "Operations-Olivia",
       role: "coordinator",
       responsibilities: [
         "Lead incident response",
@@ -21,7 +21,7 @@ export const incidentResponseWorkflow: Workflow = {
       ]
     },
     {
-      agentName: "Dana",
+      agentName: "Debugger-Dana",
       role: "primary",
       responsibilities: [
         "Investigate root cause",
@@ -30,7 +30,7 @@ export const incidentResponseWorkflow: Workflow = {
       ]
     },
     {
-      agentName: "Sam",
+      agentName: "Security-Sam",
       role: "reviewer",
       responsibilities: [
         "Assess security implications",
@@ -39,7 +39,7 @@ export const incidentResponseWorkflow: Workflow = {
       ]
     },
     {
-      agentName: "Nora",
+      agentName: "Notifier-Nora",
       role: "support",
       responsibilities: [
         "Communicate status updates",
@@ -52,37 +52,37 @@ export const incidentResponseWorkflow: Workflow = {
   phases: [
     {
       name: "Detection & Triage",
-      agents: ["Olivia"],
+      agents: ["Operations-Olivia"],
       description: "Assess severity and impact, assemble team",
       outputs: ["Severity assessment", "Impact scope", "Team assignment"]
     },
     {
       name: "Investigation",
-      agents: ["Dana", "Olivia"],
+      agents: ["Debugger-Dana", "Operations-Olivia"],
       description: "Find root cause through logs, metrics, and code analysis",
       outputs: ["Root cause hypothesis", "Evidence"]
     },
     {
       name: "Security Check",
-      agents: ["Sam"],
+      agents: ["Security-Sam"],
       description: "Verify no security breach or ongoing attack",
       outputs: ["Security assessment", "Data exposure check"]
     },
     {
       name: "Resolution",
-      agents: ["Olivia", "Dana"],
+      agents: ["Operations-Olivia", "Debugger-Dana"],
       description: "Fix or rollback to resolve the incident",
       outputs: ["Fix deployed", "Verification"]
     },
     {
       name: "Communication",
-      agents: ["Nora"],
+      agents: ["Notifier-Nora"],
       description: "Update stakeholders and users",
       outputs: ["Status updates", "Incident report"]
     },
     {
       name: "Post-mortem",
-      agents: ["Olivia", "Dana"],
+      agents: ["Operations-Olivia", "Debugger-Dana"],
       description: "Document learnings and prevention measures",
       outputs: ["Post-mortem document", "Action items"]
     }

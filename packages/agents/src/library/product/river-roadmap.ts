@@ -1,7 +1,7 @@
 import type { AgentConfig } from "../../core/types"
 
 export const riverRoadmap: AgentConfig = {
-  name: "River",
+  name: "Roadmap-River",
   role: "Roadmap Planner",
   emoji: "🗺️",
   

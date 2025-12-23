@@ -12,7 +12,7 @@ export const prReviewWorkflow: Workflow = {
   
   participants: [
     {
-      agentName: "Kai",
+      agentName: "Coder-Kai",
       role: "primary",
       responsibilities: [
         "Review code quality and best practices",
@@ -21,7 +21,7 @@ export const prReviewWorkflow: Workflow = {
       ]
     },
     {
-      agentName: "Sam",
+      agentName: "Security-Sam",
       role: "reviewer",
       responsibilities: [
         "Review for security vulnerabilities",
@@ -30,7 +30,7 @@ export const prReviewWorkflow: Workflow = {
       ]
     },
     {
-      agentName: "Tess",
+      agentName: "Tester-Tim",
       role: "reviewer",
       responsibilities: [
         "Assess test coverage",
@@ -43,25 +43,25 @@ export const prReviewWorkflow: Workflow = {
   phases: [
     {
       name: "Initial Review",
-      agents: ["Kai"],
+      agents: ["Coder-Kai"],
       description: "Code quality and structure review",
       outputs: ["Code review summary", "Improvement suggestions"]
     },
     {
       name: "Security Review",
-      agents: ["Sam"],
+      agents: ["Security-Sam"],
       description: "Security vulnerability assessment",
       outputs: ["Security findings", "Risk assessment"]
     },
     {
       name: "Test Review",
-      agents: ["Tess"],
+      agents: ["Tester-Tim"],
       description: "Test coverage and quality review",
       outputs: ["Coverage report", "Test recommendations"]
     },
     {
       name: "Synthesis",
-      agents: ["Kai"],
+      agents: ["Coder-Kai"],
       description: "Combine all reviews into final recommendation",
       outputs: ["Final review", "Approval decision"]
     }

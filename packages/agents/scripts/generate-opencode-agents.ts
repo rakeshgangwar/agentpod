@@ -99,6 +99,7 @@ interface OpenCodeAgentDefinition {
   role: string
   emoji: string
   squad: string
+  isDefault: boolean
   content: string
 }
 
@@ -114,6 +115,7 @@ function generateTypeScriptModule(agents: OpenCodeAgentDefinition[]): string {
     role: "${agent.role}",
     emoji: "${agent.emoji}",
     squad: "${agent.squad}",
+    isDefault: ${agent.isDefault},
     content: \`${escapedContent}\`,
   }`
   }).join(',\n')
@@ -130,6 +132,7 @@ export interface OpenCodeAgentDefinition {
   role: string
   emoji: string
   squad: string
+  isDefault: boolean
   content: string
 }
 
@@ -139,6 +142,8 @@ ${agentEntries}
 
 export const AGENT_NAMES = [${agents.map(a => `"${a.name.toLowerCase()}"`).join(', ')}] as const
 export type AgentName = typeof AGENT_NAMES[number]
+
+export const DEFAULT_AGENT_NAMES = [${agents.filter(a => a.isDefault).map(a => `"${a.name.toLowerCase()}"`).join(', ')}] as const
 `
 }
 
@@ -162,6 +167,7 @@ async function main() {
       role: agent.role,
       emoji: agent.emoji || "🤖",
       squad: agent.squad,
+      isDefault: agent.isDefault ?? false,
       content,
     })
     

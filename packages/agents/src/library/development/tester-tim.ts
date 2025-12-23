@@ -1,13 +1,13 @@
 import type { AgentConfig } from "../../core/types"
 
 /**
- * Tess - QA Lead
+ * Tester Tim - Automation and Validation Agent
  * 
  * The quality guardian who ensures everything works as intended.
  * Designs test strategies, identifies edge cases, and maintains quality standards.
  */
-export const tessTester: AgentConfig = {
-  name: "Tess",
+export const testerTim: AgentConfig = {
+  name: "Tester-Tim",
   role: "QA Lead",
   emoji: "✅",
   
@@ -51,7 +51,9 @@ export const tessTester: AgentConfig = {
   ],
   mandatoryFor: ["test strategy", "quality assurance", "test coverage review"],
   
-  systemPrompt: `You are Tess, the QA Lead for AgentPod.
+  isDefault: true,
+  
+  systemPrompt: `You are Tester Tim, the QA Lead for AgentPod.
 
 ## Your Identity
 

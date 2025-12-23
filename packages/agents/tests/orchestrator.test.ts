@@ -13,7 +13,7 @@ describe("Agent Orchestrator", () => {
   describe("initialization", () => {
     test("loads all agents", () => {
       const agents = orchestrator.getAllAgents();
-      expect(agents.length).toBe(11);
+      expect(agents.length).toBe(14);
     });
 
     test("loads all workflows", () => {
@@ -21,16 +21,16 @@ describe("Agent Orchestrator", () => {
       expect(workflows.length).toBe(3);
     });
 
-    test("sets Central as the central agent", () => {
-      const central = orchestrator.getAgent("Central");
-      expect(central).toBeDefined();
-      expect(central?.tier).toBe("central");
+    test("sets Commander-Ada as the central agent", () => {
+      const ada = orchestrator.getAgent("Commander-Ada");
+      expect(ada).toBeDefined();
+      expect(ada?.tier).toBe("central");
     });
   });
 
   describe("agent lookup", () => {
     test("finds agent by name", () => {
-      const kai = orchestrator.getAgent("Kai");
+      const kai = orchestrator.getAgent("Coder-Kai");
       expect(kai).toBeDefined();
       expect(kai?.role).toBe("Lead Code Reviewer");
     });
@@ -43,51 +43,51 @@ describe("Agent Orchestrator", () => {
     test("filters agents by squad", () => {
       const devAgents = orchestrator.getAgentsBySquad("development");
       expect(devAgents.length).toBe(4);
-      expect(devAgents.map(a => a.name)).toContain("Kai");
-      expect(devAgents.map(a => a.name)).toContain("Dana");
+      expect(devAgents.map(a => a.name)).toContain("Coder-Kai");
+      expect(devAgents.map(a => a.name)).toContain("Debugger-Dana");
       
       const securityAgents = orchestrator.getAgentsBySquad("security");
       expect(securityAgents.length).toBe(1);
-      expect(securityAgents[0]?.name).toBe("Sam");
+      expect(securityAgents[0]?.name).toBe("Security-Sam");
     });
   });
 
   describe("routing", () => {
-    test("routes code review request to Kai", async () => {
+    test("routes code review request to Coder-Kai", async () => {
       const decision = await orchestrator.route({
         message: "Please do a code review on this PR"
       });
       
       expect(decision.agents.length).toBeGreaterThan(0);
-      expect(decision.agents.some(a => a.name === "Kai")).toBe(true);
+      expect(decision.agents.some(a => a.name === "Coder-Kai")).toBe(true);
     });
 
-    test("routes bug investigation to Dana", async () => {
+    test("routes bug investigation to Debugger-Dana", async () => {
       const decision = await orchestrator.route({
         message: "I have a bug in my application, the error says null pointer"
       });
       
-      expect(decision.agents.some(a => a.name === "Dana")).toBe(true);
+      expect(decision.agents.some(a => a.name === "Debugger-Dana")).toBe(true);
       expect(decision.intent.keywords).toContain("bug");
     });
 
-    test("routes security concern to Sam", async () => {
+    test("routes security concern to Security-Sam", async () => {
       const decision = await orchestrator.route({
-        message: "Is this authentication implementation secure?"
+        message: "I need a security vulnerability assessment for this code"
       });
       
-      expect(decision.agents.some(a => a.name === "Sam")).toBe(true);
+      expect(decision.agents.some(a => a.name === "Security-Sam")).toBe(true);
     });
 
-    test("routes infrastructure question to Olivia", async () => {
+    test("routes infrastructure question to Operations-Olivia", async () => {
       const decision = await orchestrator.route({
         message: "How should I deploy this to production?"
       });
       
-      expect(decision.agents.some(a => a.name === "Olivia")).toBe(true);
+      expect(decision.agents.some(a => a.name === "Operations-Olivia")).toBe(true);
     });
 
-    test("falls back to Central for unknown requests", async () => {
+    test("falls back to Ada for unknown requests", async () => {
       const decision = await orchestrator.route({
         message: "Hello, what can you help me with?"
       });
@@ -115,8 +115,8 @@ describe("Agent Orchestrator", () => {
 });
 
 describe("Agent Library", () => {
-  test("ALL_AGENTS contains 11 agents", () => {
-    expect(ALL_AGENTS.length).toBe(11);
+  test("ALL_AGENTS contains 14 agents", () => {
+    expect(ALL_AGENTS.length).toBe(14);
   });
 
   test("ALL_WORKFLOWS contains 3 workflows", () => {
@@ -124,16 +124,16 @@ describe("Agent Library", () => {
   });
 
   test("AGENTS_BY_NAME provides quick lookup", () => {
-    expect(AGENTS_BY_NAME.Kai.role).toBe("Lead Code Reviewer");
-    expect(AGENTS_BY_NAME.Dana.role).toBe("Bug Investigator");
-    expect(AGENTS_BY_NAME.Central.tier).toBe("central");
+    expect(AGENTS_BY_NAME["Coder-Kai"].role).toBe("Lead Code Reviewer");
+    expect(AGENTS_BY_NAME["Debugger-Dana"].role).toBe("Bug Investigator");
+    expect(AGENTS_BY_NAME["Commander-Ada"].tier).toBe("central");
   });
 
   test("AGENTS_BY_SQUAD organizes agents correctly", () => {
     expect(AGENTS_BY_SQUAD.development.length).toBe(5);
     expect(AGENTS_BY_SQUAD.product.length).toBe(3);
     expect(AGENTS_BY_SQUAD.operations.length).toBe(2);
-    expect(AGENTS_BY_SQUAD.orchestration.length).toBe(1);
+    expect(AGENTS_BY_SQUAD.orchestration.length).toBe(4);
   });
 
   test("each agent has required fields", () => {
@@ -171,9 +171,9 @@ describe("Workflows", () => {
   test("PR Review workflow has correct participants", () => {
     const workflow = ALL_WORKFLOWS.find(w => w.id === "pr-review");
     expect(workflow).toBeDefined();
-    expect(workflow?.participants.map(p => p.agentName)).toContain("Kai");
-    expect(workflow?.participants.map(p => p.agentName)).toContain("Sam");
-    expect(workflow?.participants.map(p => p.agentName)).toContain("Tess");
+    expect(workflow?.participants.map(p => p.agentName)).toContain("Coder-Kai");
+    expect(workflow?.participants.map(p => p.agentName)).toContain("Security-Sam");
+    expect(workflow?.participants.map(p => p.agentName)).toContain("Tester-Tim");
   });
 
   test("Incident Response workflow has correct priority", () => {

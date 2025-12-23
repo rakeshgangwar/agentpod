@@ -1,7 +1,7 @@
 import type { AgentConfig } from "../../core/types"
 
 export const peteProduct: AgentConfig = {
-  name: "Pete",
+  name: "Product-Pete",
   role: "Product Owner",
   emoji: "📋",
   

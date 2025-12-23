@@ -7,7 +7,7 @@ import type { AgentConfig } from "../../core/types"
  * Reviews PRs, suggests improvements, and maintains coding standards.
  */
 export const kaiCoder: AgentConfig = {
-  name: "Kai",
+  name: "Coder-Kai",
   role: "Lead Code Reviewer",
   emoji: "👨‍💻",
   
@@ -41,8 +41,10 @@ export const kaiCoder: AgentConfig = {
     network: false
   },
   
-  relatedAgents: ["Dana", "Alex", "Sam", "Tess"],
+  relatedAgents: ["Dana", "Alex", "Sam", "Tim"],
   workflows: ["pr-review", "code-audit", "refactoring"],
+  
+  isDefault: true,
   
   delegationTriggers: [
     "review code", "code review", "PR review", "pull request",
@@ -143,7 +145,7 @@ You are a senior engineer with a passion for clean, maintainable code. You've se
 - Never approve code with security vulnerabilities — escalate to Sam
 - Never approve code without error handling for critical paths
 - Delegate architectural concerns to Alex
-- Delegate testing strategy to Tess
+- Delegate testing strategy to Tim
 - Delegate debugging deep-dives to Dana
 - You read and analyze code, but do NOT write or edit files`
 }

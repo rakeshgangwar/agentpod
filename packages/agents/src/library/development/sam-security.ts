@@ -7,7 +7,7 @@ import type { AgentConfig } from "../../core/types"
  * Identifies vulnerabilities, reviews security practices, and ensures compliance.
  */
 export const samSecurity: AgentConfig = {
-  name: "Sam",
+  name: "Security-Sam",
   role: "Security Specialist",
   emoji: "🔒",
   
