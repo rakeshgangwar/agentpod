@@ -282,6 +282,8 @@ pub struct CreateSandboxInput {
     pub auto_start: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_slugs: Option<Vec<String>>,
 }
 
 /// Sandbox with repository response
@@ -672,3 +674,70 @@ pub struct OpenCodeAgent {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hidden: Option<bool>,
 }
+
+// =============================================================================
+// Agent Catalog Types
+// =============================================================================
+
+/// Agent summary from the catalog
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentSummary {
+    pub id: String,
+    pub slug: String,
+    pub name: String,
+    pub role: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub emoji: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub squad: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tier: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_builtin: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_premium: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_mandatory: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub install_count: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rating_avg: Option<f64>,
+}
+
+/// Agents grouped by squad
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentsBySquad {
+    #[serde(default)]
+    pub orchestration: Vec<AgentSummary>,
+    #[serde(default)]
+    pub development: Vec<AgentSummary>,
+    #[serde(default)]
+    pub product: Vec<AgentSummary>,
+    #[serde(default)]
+    pub operations: Vec<AgentSummary>,
+    #[serde(default)]
+    pub security: Vec<AgentSummary>,
+    #[serde(default)]
+    pub research: Vec<AgentSummary>,
+    #[serde(default)]
+    pub communication: Vec<AgentSummary>,
+    #[serde(default)]
+    pub data: Vec<AgentSummary>,
+}
+
+/// Agent catalog response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentCatalogResponse {
+    pub agents: Vec<AgentSummary>,
+    pub by_squad: AgentsBySquad,
+    #[serde(default)]
+    pub mandatory_agent_slugs: Vec<String>,
+}
+
+

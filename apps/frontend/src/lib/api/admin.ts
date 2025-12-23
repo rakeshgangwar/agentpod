@@ -378,3 +378,84 @@ export async function createUser(input: CreateUserInput): Promise<AdminUserView>
   );
   return response.user;
 }
+
+// =============================================================================
+// Agent Catalog Management (Admin)
+// =============================================================================
+
+export type AgentStatus = "active" | "deprecated" | "hidden" | "pending_review";
+export type AgentSquad = "orchestration" | "development" | "product" | "operations" | "security" | "data";
+export type AgentTier = "central" | "foundation" | "specialized" | "premium";
+
+export interface AgentCatalogItem {
+  id: string;
+  slug: string;
+  name: string;
+  role: string;
+  emoji: string | null;
+  description: string | null;
+  squad: AgentSquad;
+  tier: AgentTier | null;
+  isBuiltin: boolean;
+  isPremium: boolean;
+  isDefault: boolean;
+  status: AgentStatus;
+  installCount: number;
+  ratingAvg: number | null;
+}
+
+export interface AgentFullDetails extends AgentCatalogItem {
+  tags: string[] | null;
+  category: string | null;
+  config: Record<string, unknown>;
+  opencodeContent: string;
+  publisherId: string | null;
+  publisherName: string | null;
+  priceMonthly: number | null;
+  priceYearly: number | null;
+  ratingCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AgentCatalogResponse {
+  agents: AgentCatalogItem[];
+  bySquad: Record<AgentSquad, AgentCatalogItem[]>;
+}
+
+export interface UpdateAgentInput {
+  name?: string;
+  role?: string;
+  emoji?: string;
+  description?: string;
+  squad?: AgentSquad;
+  tier?: AgentTier;
+  tags?: string[];
+  category?: string;
+  isDefault?: boolean;
+  isPremium?: boolean;
+  status?: AgentStatus;
+  config?: Record<string, unknown>;
+  opencodeContent?: string;
+}
+
+export async function getAgentCatalog(): Promise<AgentCatalogResponse> {
+  return apiRequest<AgentCatalogResponse>("/api/v2/agents/catalog");
+}
+
+export async function getAgentById(agentId: string): Promise<{ agent: AgentFullDetails }> {
+  return apiRequest<{ agent: AgentFullDetails }>(`/api/v2/agents/catalog/id/${agentId}`);
+}
+
+export async function updateAgentCatalogItem(
+  agentId: string,
+  updates: UpdateAgentInput
+): Promise<{ agent: AgentFullDetails }> {
+  return apiRequest<{ agent: AgentFullDetails }>(
+    `/api/v2/agents/catalog/${agentId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(updates),
+    }
+  );
+}

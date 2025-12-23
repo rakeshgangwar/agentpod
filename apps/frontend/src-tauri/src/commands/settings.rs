@@ -451,3 +451,15 @@ pub async fn list_non_gpu_addons() -> Result<Vec<ContainerAddon>, AppError> {
     let response: ContainerAddonsResponse = client.get("/api/addons/non-gpu").await?;
     Ok(response.addons)
 }
+
+// =============================================================================
+// Agent Catalog
+// =============================================================================
+
+#[tauri::command]
+pub async fn list_agent_catalog() -> Result<crate::models::AgentCatalogResponse, AppError> {
+    let client = ApiClient::new()?;
+    client.get("/api/v2/agents/catalog").await
+}
+
+

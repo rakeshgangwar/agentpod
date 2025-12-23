@@ -103,15 +103,20 @@
     selectedAgent = value;
   }
   
-  // Get display name for the current selection
+  function slugToDisplayName(slug: string): string {
+    return slug
+      .split("-")
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  }
+  
   function getDisplayName(): string {
     if (!selectedAgent) return "Select agent...";
     
     const agent = primaryAgents.find(a => a.name === selectedAgent);
     if (!agent) return selectedAgent;
     
-    // Capitalize first letter for display
-    return agent.name.charAt(0).toUpperCase() + agent.name.slice(1);
+    return slugToDisplayName(agent.name);
   }
   
 </script>
@@ -158,7 +163,7 @@
                   style="background-color: {agent.color}; color: {agent.color}"
                 ></span>
               {/if}
-              <span>{agent.name.charAt(0).toUpperCase() + agent.name.slice(1)}</span>
+              <span>{slugToDisplayName(agent.name)}</span>
               {#if agent.description}
                 <span class="text-xs text-muted-foreground ml-1">
                   - {agent.description.length > 30 ? agent.description.slice(0, 30) + '...' : agent.description}

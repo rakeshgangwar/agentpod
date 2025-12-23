@@ -52,12 +52,19 @@
     return selectedModel.modelId.split("/").pop() || "Unknown";
   }
 
+  function slugToDisplayName(slug: string): string {
+    return slug
+      .split("-")
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  }
+
   function getAgentDisplayName(): string {
     if (!selectedAgent) return "Select agent";
     
     const agent = agents.find(a => a.name === selectedAgent);
     if (agent) {
-      return agent.name.charAt(0).toUpperCase() + agent.name.slice(1);
+      return slugToDisplayName(agent.name);
     }
     
     return selectedAgent;
@@ -212,7 +219,7 @@
                 {/if}
                 <div class="min-w-0 flex-1">
                   <div class="font-medium text-sm {isSelected ? 'text-primary' : ''}">
-                    {agent.name.charAt(0).toUpperCase() + agent.name.slice(1)}
+                    {slugToDisplayName(agent.name)}
                   </div>
                   {#if agent.description}
                     <div class="text-xs text-muted-foreground mt-0.5 line-clamp-2">

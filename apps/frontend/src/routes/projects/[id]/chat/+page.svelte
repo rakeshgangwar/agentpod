@@ -151,10 +151,9 @@ import {
     if (!projectId) return;
     try {
       agents = await sandboxOpencodeGetAgents(projectId);
-      // Auto-select default agent if none selected
       if (!selectedAgent && primaryAgents.length > 0) {
-        const buildAgent = primaryAgents.find(a => a.name.toLowerCase() === "build");
-        selectedAgent = buildAgent?.name ?? primaryAgents[0].name;
+        const defaultAgent = primaryAgents.find(a => a.default);
+        selectedAgent = defaultAgent?.name ?? primaryAgents[0].name;
       }
     } catch (err) {
       console.error("Failed to load agents:", err);
@@ -252,7 +251,7 @@ import {
 
     // Set pending message to be sent by RuntimeProvider when it's ready
     if (selectedSessionId) {
-      const onboardingAgent = "manage";
+      const onboardingAgent = "commander-ada";
       pendingOnboardingMessage = {
         text: "Start the workspace setup and help me configure this project.",
         agent: onboardingAgent,
@@ -261,7 +260,7 @@ import {
       // Update the agent dropdown to reflect the agent being used
       selectedAgent = onboardingAgent;
       toast.info("Setup started", {
-        description: "The onboarding assistant is ready to help configure your workspace.",
+        description: "Commander Ada is ready to help configure your workspace.",
       });
 
       // Mark as skipped in backend (non-blocking)
@@ -1053,6 +1052,9 @@ import {
                   onPendingFilePathClear={clearPendingFilePath}
                   onSessionSelect={handleSessionSelect}
                   childSessions={currentSessionChildren}
+                  {agents}
+                  currentAgent={selectedAgent}
+                  onAgentSelect={(name: string | undefined) => { selectedAgent = name; }}
                 />
               </react.RuntimeProvider>
             {/key}

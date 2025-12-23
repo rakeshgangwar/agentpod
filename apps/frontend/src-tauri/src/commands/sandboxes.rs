@@ -57,6 +57,7 @@ pub async fn create_sandbox(
     addons: Option<Vec<String>>,
     auto_start: Option<bool>,
     provider: Option<String>,
+    agent_slugs: Option<Vec<String>>,
 ) -> Result<SandboxWithRepo, AppError> {
     let client = get_client()?;
 
@@ -70,6 +71,7 @@ pub async fn create_sandbox(
         addons,
         auto_start,
         provider,
+        agent_slugs,
     };
 
     client.post("/api/v2/sandboxes", &input).await

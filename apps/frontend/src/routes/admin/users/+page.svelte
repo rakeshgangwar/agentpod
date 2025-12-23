@@ -25,8 +25,8 @@
   import type { Tab } from "$lib/components/page-header.svelte";
   import ThemeToggle from "$lib/components/theme-toggle.svelte";
 
-  // Icons
   import UsersIcon from "@lucide/svelte/icons/users";
+  import BotIcon from "@lucide/svelte/icons/bot";
   import HomeIcon from "@lucide/svelte/icons/home";
   import SearchIcon from "@lucide/svelte/icons/search";
   import RefreshIcon from "@lucide/svelte/icons/refresh-cw";
@@ -76,11 +76,18 @@
   let newUserRole = $state<UserRole>("user");
   let createUserLoading = $state(false);
 
-  // Tabs
   const tabs: Tab[] = [
     { id: "users", label: "Users", icon: UsersIcon },
+    { id: "agents", label: "Agents", icon: BotIcon },
   ];
   let activeTab = $state("users");
+
+  function handleTabChange(tab: string) {
+    if (tab === "agents") {
+      goto("/admin/agents");
+    }
+    activeTab = tab;
+  }
 
   // Load data
   async function loadData() {
@@ -281,7 +288,7 @@
     subtitle="Manage users, resource limits, and system settings"
     tabs={tabs}
     activeTab={activeTab}
-    onTabChange={(tab) => activeTab = tab}
+    onTabChange={handleTabChange}
     sticky={false}
     collapsible={true}
   >

@@ -129,7 +129,14 @@ export async function createSandbox(input: CreateSandboxInput): Promise<SandboxW
     };
     return result;
   } catch (e) {
-    error = e instanceof Error ? e.message : "Failed to create sandbox";
+    // Tauri errors come as strings, not Error objects
+    if (typeof e === "string") {
+      error = e;
+    } else if (e instanceof Error) {
+      error = e.message;
+    } else {
+      error = "Failed to create sandbox";
+    }
     return null;
   } finally {
     isLoading = false;

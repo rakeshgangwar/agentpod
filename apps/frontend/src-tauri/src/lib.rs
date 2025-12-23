@@ -69,6 +69,8 @@ use commands::{
     get_user_opencode_config,
     import_settings,
     init_oauth_flow,
+    // Agent catalog commands
+    list_agent_catalog,
     list_configured_providers,
     // Container addon commands
     list_container_addons,
@@ -313,6 +315,8 @@ pub fn run() {
             // Container addon commands
             list_container_addons,
             list_non_gpu_addons,
+            // Agent catalog commands
+            list_agent_catalog,
             // Settings commands
             get_settings,
             save_settings,

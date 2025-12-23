@@ -19,7 +19,7 @@ import {
 import { MarkdownTextPrimitive } from "@assistant-ui/react-markdown";
 import remarkGfm from "remark-gfm";
 import { CommandPicker, type Command } from "./CommandPicker";
-import { FilePicker } from "./FilePicker";
+import { MentionPicker, type MentionAgent } from "./MentionPicker";
 import { FileAttachmentButton, FileAttachmentPreview, type AttachedFile } from "./FileAttachment";
 import { useAttachments, useSessionStatus } from "./RuntimeProvider";
 import { PermissionBar } from "./PermissionBar";
@@ -767,20 +767,18 @@ function AssistantMessage() {
   );
 }
 
-/**
- * Composer component for message input with slash commands, file picker, and file attachments
- */
 interface ComposerProps {
   projectId?: string;
   findFiles?: (projectId: string, pattern: string) => Promise<string[]>;
   onFilePickerRequest?: () => void;
   pendingFilePath?: string | null;
   onPendingFilePathClear?: () => void;
-  /** Callback when voice transcription is ready */
-  onVoiceTranscript?: (text: string) => void;
+  agents?: MentionAgent[];
+  currentAgent?: string;
+  onAgentSelect?: (agentName: string | undefined) => void;
 }
 
-function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, onPendingFilePathClear }: ComposerProps) {
+function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, onPendingFilePathClear, agents = [], currentAgent, onAgentSelect }: ComposerProps) {
   // Get the sendWithAttachments handler from context
   const { sendWithAttachments } = useAttachments();
   const composerRuntime = useComposerRuntime();
@@ -792,6 +790,8 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
   const [pickerPosition, setPickerPosition] = useState({ top: 60, left: 0 });
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pickerSelectedAgentRef = useRef<string | null>(null);
+  const agentBeforePickerRef = useRef<string | undefined>(undefined);
   
   // File attachments state
   const [attachments, setAttachments] = useState<AttachedFile[]>([]);
@@ -887,16 +887,23 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
     adjustTextareaHeight();
   }, [inputValue, adjustTextareaHeight]);
   
-  // Handle input changes
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     const cursor = e.target.selectionStart || 0;
     setInputValue(value);
     setCursorPosition(cursor);
     
-    // Check for slash command (only at start of input)
+    const agentFromPicker = pickerSelectedAgentRef.current;
+    const agentStillMentioned = agentFromPicker && new RegExp(`@${agentFromPicker}\\b`).test(value);
+    if (agentFromPicker && !agentStillMentioned) {
+      const revertTo = agentBeforePickerRef.current;
+      pickerSelectedAgentRef.current = null;
+      agentBeforePickerRef.current = undefined;
+      onAgentSelect?.(revertTo);
+    }
+    
     if (value.startsWith("/")) {
-      const query = value.slice(1).split(/\s/)[0]; // Get text after "/" until space
+      const query = value.slice(1).split(/\s/)[0];
       setCommandQuery(query);
       setShowCommandPicker(true);
       setShowFilePicker(false);
@@ -904,7 +911,6 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
       setShowCommandPicker(false);
     }
     
-    // Check for @ mention
     const textBeforeCursor = value.slice(0, cursor);
     const atMatch = textBeforeCursor.match(/@([^\s@]*)$/);
     if (atMatch) {
@@ -912,7 +918,6 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
       setShowFilePicker(true);
       setShowCommandPicker(false);
       
-      // Position the picker near the @ symbol
       if (inputRef.current) {
         const rect = inputRef.current.getBoundingClientRect();
         setPickerPosition({ top: 60, left: Math.min(atMatch.index || 0, rect.width - 320) });
@@ -920,7 +925,7 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
     } else if (!value.startsWith("/")) {
       setShowFilePicker(false);
     }
-  }, []);
+  }, [onAgentSelect]);
   
   // Handle command selection
   const handleCommandSelect = useCallback((command: Command) => {
@@ -938,12 +943,10 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
     inputRef.current?.focus();
   }, [onFilePickerRequest]);
   
-  // Handle file selection
   const handleFileSelect = useCallback((filePath: string) => {
     const textBeforeCursor = inputValue.slice(0, cursorPosition);
     const textAfterCursor = inputValue.slice(cursorPosition);
     
-    // Replace @query with @filepath
     const atMatch = textBeforeCursor.match(/@([^\s@]*)$/);
     if (atMatch) {
       const beforeAt = textBeforeCursor.slice(0, atMatch.index);
@@ -954,6 +957,26 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
     setShowFilePicker(false);
     inputRef.current?.focus();
   }, [inputValue, cursorPosition]);
+  
+  const handleAgentSelect = useCallback((agentName: string) => {
+    const textBeforeCursor = inputValue.slice(0, cursorPosition);
+    const textAfterCursor = inputValue.slice(cursorPosition);
+    
+    const atMatch = textBeforeCursor.match(/@([^\s@]*)$/);
+    if (atMatch) {
+      const beforeAt = textBeforeCursor.slice(0, atMatch.index);
+      const newValue = `${beforeAt}@${agentName} ${textAfterCursor}`;
+      setInputValue(newValue);
+    }
+    
+    if (!pickerSelectedAgentRef.current) {
+      agentBeforePickerRef.current = currentAgent;
+    }
+    pickerSelectedAgentRef.current = agentName;
+    onAgentSelect?.(agentName);
+    setShowFilePicker(false);
+    inputRef.current?.focus();
+  }, [inputValue, cursorPosition, currentAgent, onAgentSelect]);
   
   // Handle file attachment from file input
   const handleAttachmentSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1090,16 +1113,17 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
         visible={showCommandPicker}
       />
       
-      {/* File Picker */}
       {projectId && findFiles && (
-        <FilePicker
+        <MentionPicker
           projectId={projectId}
           query={fileQuery}
           position={pickerPosition}
-          onSelect={handleFileSelect}
+          onSelectFile={handleFileSelect}
+          onSelectAgent={handleAgentSelect}
           onClose={() => setShowFilePicker(false)}
           visible={showFilePicker}
           findFiles={findFiles}
+          agents={agents}
         />
       )}
       
@@ -1194,7 +1218,7 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
       </form>
       {/* Hints - simplified, shown only on larger screens */}
       <p className="hidden md:block font-mono text-xs text-muted-foreground/50 mt-1.5">
-        <span className="text-muted-foreground/70">/</span> commands · <span className="text-muted-foreground/70">@</span> files
+        <span className="text-muted-foreground/70">/</span> commands · <span className="text-muted-foreground/70">@</span> agents/files
         {voiceState.isAvailable && (
           <span> · <span className="text-muted-foreground/70">{voiceState.config?.pushToTalkKey || "Ctrl+Shift+M"}</span> voice</span>
         )}
@@ -1384,30 +1408,19 @@ function SessionStatusIndicator() {
   );
 }
 
-/**
- * ChatThread props
- */
 export interface ChatThreadProps {
-  /** Project ID for file search */
   projectId?: string;
-  /** Function to find files in the project */
   findFiles?: (projectId: string, pattern: string) => Promise<string[]>;
-  /** Callback when /file command is selected to open file picker modal */
   onFilePickerRequest?: () => void;
-  /** File path selected from external file picker modal */
   pendingFilePath?: string | null;
-  /** Callback to clear pending file path after it's been processed */
   onPendingFilePathClear?: () => void;
-  /** Callback when user clicks to navigate to a child session (from task tool call) */
   onSessionSelect?: (sessionId: string) => void;
-  /** Child sessions of the current session, used to match task tool calls to their spawned sessions */
   childSessions?: ChildSessionInfo[];
+  agents?: MentionAgent[];
+  currentAgent?: string;
+  onAgentSelect?: (agentName: string | undefined) => void;
 }
 
-/**
- * ChatThread component renders the full chat interface
- * Note: File attachment sending is handled via useAttachments context from RuntimeProvider
- */
 export function ChatThread({ 
   projectId, 
   findFiles, 
@@ -1416,6 +1429,9 @@ export function ChatThread({
   onPendingFilePathClear,
   onSessionSelect,
   childSessions,
+  agents = [],
+  currentAgent,
+  onAgentSelect,
 }: ChatThreadProps) {
   // Memoize the context value to prevent unnecessary re-renders
   const sessionNavigationValue = useMemo(() => ({ onSessionSelect, childSessions }), [onSessionSelect, childSessions]);
@@ -1455,6 +1471,9 @@ export function ChatThread({
           onFilePickerRequest={onFilePickerRequest}
           pendingFilePath={pendingFilePath}
           onPendingFilePathClear={onPendingFilePathClear}
+          agents={agents}
+          currentAgent={currentAgent}
+          onAgentSelect={onAgentSelect}
         />
       </ThreadPrimitive.Root>
     </SessionNavigationContext.Provider>

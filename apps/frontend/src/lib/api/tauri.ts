@@ -14,15 +14,39 @@ import { goto } from "$app/navigation";
 // =============================================================================
 
 /**
- * Check if an error is an unauthorized error (401/403)
+ * Check if an error is an unauthorized error (401/403 auth-related)
+ * 
+ * Note: We need to be careful to distinguish between:
+ * - Auth errors (session expired, invalid token) -> should trigger logout
+ * - Business logic 403s (sandbox limit reached, quota exceeded) -> should NOT trigger logout
  */
 function isUnauthorizedError(error: unknown): boolean {
   if (typeof error === "string") {
     const message = error.toLowerCase();
+    
+    // Skip if it's a known business logic error (403 but not auth-related)
+    const businessLogicErrors = [
+      "limit reached",
+      "quota exceeded",
+      "resource limit",
+      "sandbox limit",
+      "maximum",
+      "too many",
+    ];
+    
+    if (businessLogicErrors.some(pattern => message.includes(pattern))) {
+      return false;
+    }
+    
+    // Only treat as auth error if it's clearly authentication/session related
     return (
       message.includes("unauthorized") ||
       message.includes("session expired") ||
-      message.includes("access forbidden")
+      message.includes("invalid session") ||
+      message.includes("not authenticated") ||
+      message.includes("authentication failed") ||
+      message.includes("token expired") ||
+      message.includes("invalid token")
     );
   }
   return false;
@@ -191,6 +215,61 @@ export async function getDefaultContainerFlavor(): Promise<ContainerFlavor | nul
 export async function listContainerAddons(): Promise<ContainerAddon[]> {
   return invoke<ContainerAddon[]>("list_container_addons");
 }
+
+// =============================================================================
+// Agent Catalog Types
+// =============================================================================
+
+export type AgentSquad = "orchestration" | "development" | "product" | "operations" | "security" | "data";
+
+export interface AgentSummary {
+  id: string;
+  slug: string;
+  name: string;
+  role: string;
+  emoji?: string;
+  description?: string;
+  squad: AgentSquad;
+  tier?: string;
+  mode?: "primary" | "subagent";
+  isBuiltin?: boolean;
+  isPremium?: boolean;
+  isMandatory?: boolean;
+  installCount?: number;
+  ratingAvg?: number;
+}
+
+export interface AgentsBySquad {
+  orchestration: AgentSummary[];
+  development: AgentSummary[];
+  product: AgentSummary[];
+  operations: AgentSummary[];
+  security: AgentSummary[];
+  research: AgentSummary[];
+  communication: AgentSummary[];
+  data: AgentSummary[];
+}
+
+export interface AgentCatalogResponse {
+  agents: AgentSummary[];
+  bySquad: AgentsBySquad;
+  mandatoryAgentSlugs: string[];
+}
+
+
+
+// =============================================================================
+// Agent Catalog Commands
+// =============================================================================
+
+/**
+ * List all agents from the catalog, grouped by squad
+ */
+export async function listAgentCatalog(): Promise<AgentCatalogResponse> {
+  return invoke<AgentCatalogResponse>("list_agent_catalog");
+}
+
+
 
 // =============================================================================
 // OpenCode Types
@@ -373,6 +452,7 @@ export interface OpenCodeAgent {
   builtIn: boolean;
   color?: string;
   hidden?: boolean;
+  default?: boolean;
 }
 
 // =============================================================================
@@ -793,6 +873,7 @@ export interface CreateSandboxInput {
   flavor?: string;
   resourceTier?: string;
   addons?: string[];
+  agentSlugs?: string[];
   autoStart?: boolean;
   provider?: SandboxProvider;
 }
@@ -1093,6 +1174,7 @@ export async function createSandbox(input: CreateSandboxInput): Promise<SandboxW
     addons: input.addons ?? null,
     autoStart: input.autoStart ?? null,
     provider: input.provider ?? null,
+    agentSlugs: input.agentSlugs ?? null,
   });
 }
 

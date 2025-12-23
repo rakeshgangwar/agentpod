@@ -2,7 +2,7 @@
   import { goto } from "$app/navigation";
   import { connection } from "$lib/stores/connection.svelte";
   import { auth } from "$lib/stores/auth.svelte";
-  import { createSandbox } from "$lib/stores/sandboxes.svelte";
+  import { createSandbox, sandboxes } from "$lib/stores/sandboxes.svelte";
   import { sandboxOpencodeHealthCheck, sandboxOpencodeCreateSession, getFlavorImages, type FlavorImageStatus } from "$lib/api/tauri";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
@@ -14,6 +14,7 @@
   import ResourceTierSelector from "$lib/components/resource-tier-selector.svelte";
   import FlavorSelector from "$lib/components/flavor-selector.svelte";
   import AddonSelector from "$lib/components/addon-selector.svelte";
+  import AgentTeamSelector from "$lib/components/agent-team-selector.svelte";
   import ProjectIconPicker from "$lib/components/project-icon-picker.svelte";
   import ProviderSelector, { type SandboxProvider } from "$lib/components/provider-selector.svelte";
   import { getSuggestedIcon } from "$lib/utils/project-icons";
@@ -47,6 +48,9 @@
   let selectedFlavorId = $state("");
   let selectedAddonIds = $state<string[]>([]);
   
+  // Agent team selection
+  let selectedAgentSlugs = $state<string[]>([]);
+  
   // Advanced options state (collapsed by default)
   let advancedOptionsOpen = $state(false);
   
@@ -56,6 +60,7 @@
       selectedFlavorId = "";
       selectedResourceTierId = "";
       selectedAddonIds = [];
+      selectedAgentSlugs = [];
     }
   });
   
@@ -310,6 +315,19 @@
     return "";
   }
 
+  function formatErrorMessage(rawError: string | null, fallback: string): string {
+    const message = rawError || fallback;
+    const lowerMessage = message.toLowerCase();
+    
+    if (lowerMessage.includes("limit reached") || lowerMessage.includes("limit exceeded") || lowerMessage.includes("sandbox limit") || lowerMessage.includes("resource limit")) {
+      return "You've reached your sandbox limit. Please delete an existing project before creating a new one.";
+    }
+    if (lowerMessage.includes("quota exceeded")) {
+      return "Resource quota exceeded. Please contact support or upgrade your plan.";
+    }
+    return message;
+  }
+
   async function handleSubmit(e: Event) {
     e.preventDefault();
     if (!isFormValid || isSubmitting) return;
@@ -336,6 +354,7 @@
           resourceTier: selectedResourceTierId || undefined,
           flavor: selectedFlavorId || undefined,
           addons: selectedAddonIds.length > 0 ? selectedAddonIds : undefined,
+          agentSlugs: selectedAgentSlugs.length > 0 ? selectedAgentSlugs : undefined,
           autoStart: true,
           provider: selectedProvider,
         });
@@ -356,7 +375,7 @@
             { message: secondStepMessage, done: false },
           ];
         } else {
-          errorMessage = "Failed to create project. Please try again.";
+          errorMessage = formatErrorMessage(sandboxes.error, "Failed to create project. Please try again.");
           return;
         }
       } else {
@@ -376,6 +395,7 @@
           resourceTier: selectedResourceTierId || undefined,
           flavor: selectedFlavorId || undefined,
           addons: selectedAddonIds.length > 0 ? selectedAddonIds : undefined,
+          agentSlugs: selectedAgentSlugs.length > 0 ? selectedAgentSlugs : undefined,
           autoStart: true,
           provider: selectedProvider,
         });
@@ -396,7 +416,7 @@
             { message: secondStepMessage, done: false },
           ];
         } else {
-          errorMessage = "Failed to import project. Please check the URL and try again.";
+          errorMessage = formatErrorMessage(sandboxes.error, "Failed to import project. Please check the URL and try again.");
           return;
         }
       }
@@ -439,7 +459,8 @@
         }
       }
     } catch (err) {
-      errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
+      const message = err instanceof Error ? err.message : String(err);
+      errorMessage = formatErrorMessage(message, "An unexpected error occurred");
     } finally {
       isSubmitting = false;
       if (progressMessageInterval) {
@@ -636,6 +657,16 @@
                   />
                 </div>
                 
+                <!-- Docker-specific: Agent team selector -->
+                {#if selectedProvider === "docker"}
+                  <div class="space-y-2 border-t border-border/30 pt-4">
+                    <AgentTeamSelector
+                      bind:selectedAgentSlugs
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                {/if}
+                
                 <!-- Docker-specific options -->
                 {#if selectedProvider === "docker"}
                   <!-- Flavor selector -->
@@ -809,6 +840,16 @@
                   <div class="p-3 rounded bg-[var(--cyber-cyan)]/5 border border-[var(--cyber-cyan)]/20">
                     <span class="font-mono text-xs text-muted-foreground">Project name: </span>
                     <span class="font-mono text-sm text-[var(--cyber-cyan)]">{extractRepoName(githubUrl)}</span>
+                  </div>
+                {/if}
+                
+                <!-- Docker-specific: Agent team selector -->
+                {#if selectedProvider === "docker"}
+                  <div class="space-y-2 border-t border-border/30 pt-4">
+                    <AgentTeamSelector
+                      bind:selectedAgentSlugs
+                      disabled={isSubmitting}
+                    />
                   </div>
                 {/if}
                 

@@ -2,7 +2,8 @@
   import { page } from "$app/stores";
   import { toast } from "svelte-sonner";
   import { sandboxes, fetchSandbox, getSandboxStats, startSandbox, stopSandbox, restartSandbox } from "$lib/stores/sandboxes.svelte";
-  import type { SandboxStats, SandboxInfo } from "$lib/api/tauri";
+  import type { SandboxStats, SandboxInfo, OpenCodeAgent } from "$lib/api/tauri";
+  import { sandboxOpencodeGetAgents } from "$lib/api/tauri";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
@@ -16,6 +17,7 @@
   import PlayIcon from "@lucide/svelte/icons/play";
   import SquareIcon from "@lucide/svelte/icons/square";
   import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
+  import BotIcon from "@lucide/svelte/icons/bot";
 
   // Get current sandbox ID from route params
   let sandboxId = $derived($page.params.id ?? "");
@@ -29,6 +31,10 @@
   let isRestarting = $state(false);
   let restartError = $state<string | null>(null);
   let showRestartDialog = $state(false);
+  
+  // Agents state
+  let agents = $state<OpenCodeAgent[]>([]);
+  let isLoadingAgents = $state(false);
 
   async function handleStart() {
     if (!sandboxId) return;
@@ -109,10 +115,25 @@
   $effect(() => {
     if (sandbox?.status === "running") {
       refreshStats();
+      loadAgents();
     } else {
       stats = null;
+      agents = [];
     }
   });
+
+  async function loadAgents() {
+    if (!sandboxId || sandbox?.status !== "running") return;
+    isLoadingAgents = true;
+    try {
+      agents = await sandboxOpencodeGetAgents(sandboxId);
+    } catch (e) {
+      console.error("Failed to load agents:", e);
+      agents = [];
+    } finally {
+      isLoadingAgents = false;
+    }
+  }
 
   function getStatusColor(status: string | undefined): string {
     switch (status) {
@@ -543,6 +564,97 @@
       </div>
     </div>
   {/if}
+
+  <!-- Available Agents Section -->
+  <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-3">
+    <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+      <div class="flex items-center justify-between">
+        <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+          [available_agents]
+        </h3>
+        <span class="text-xs font-mono text-muted-foreground">
+          {agents.length} agent{agents.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+    </div>
+    
+    <div class="p-4">
+      {#if sandbox?.status !== "running"}
+        <div class="text-center py-8">
+          <BotIcon class="h-8 w-8 mx-auto text-muted-foreground/30 mb-3" />
+          <p class="text-sm font-mono text-muted-foreground">
+            Start the sandbox to view available agents
+          </p>
+        </div>
+      {:else if isLoadingAgents}
+        <div class="text-center py-6">
+          <div class="relative mx-auto w-8 h-8">
+            <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
+            <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
+          </div>
+          <p class="mt-3 text-xs font-mono text-muted-foreground">Loading agents...</p>
+        </div>
+      {:else if agents.length === 0}
+        <div class="text-center py-8">
+          <BotIcon class="h-8 w-8 mx-auto text-muted-foreground/30 mb-3" />
+          <p class="text-sm font-mono text-muted-foreground">
+            No agents available
+          </p>
+        </div>
+      {:else}
+        <div class="space-y-2">
+          {#each agents.filter(a => !a.hidden) as agent}
+            <div class="flex items-center gap-3 p-3 rounded bg-background/30 border border-border/30
+                        {agent.default ? 'border-[var(--cyber-cyan)]/30' : ''}">
+              <div class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-lg"
+                   style="background: {agent.color ? `${agent.color}20` : 'var(--muted)'}">
+                <BotIcon class="h-4 w-4" style="color: {agent.color || 'var(--muted-foreground)'}" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                  <span class="font-mono text-sm font-medium truncate">{agent.name}</span>
+                  {#if agent.default}
+                    <span class="px-1.5 py-0.5 text-[10px] font-mono uppercase rounded
+                                 bg-[var(--cyber-cyan)]/10 text-[var(--cyber-cyan)] border border-[var(--cyber-cyan)]/30">
+                      Default
+                    </span>
+                  {/if}
+                  {#if agent.builtIn}
+                    <span class="px-1.5 py-0.5 text-[10px] font-mono uppercase rounded
+                                 bg-muted text-muted-foreground border border-border/50">
+                      Built-in
+                    </span>
+                  {/if}
+                </div>
+                {#if agent.description}
+                  <p class="text-xs text-muted-foreground truncate mt-0.5">{agent.description}</p>
+                {/if}
+              </div>
+              <div class="flex-shrink-0">
+                <span class="px-2 py-0.5 text-[10px] font-mono uppercase rounded
+                             {agent.mode === 'primary' ? 'bg-[var(--cyber-emerald)]/10 text-[var(--cyber-emerald)] border border-[var(--cyber-emerald)]/30' : 
+                              agent.mode === 'subagent' ? 'bg-[var(--cyber-magenta)]/10 text-[var(--cyber-magenta)] border border-[var(--cyber-magenta)]/30' : 
+                              'bg-muted text-muted-foreground border border-border/50'}">
+                  {agent.mode}
+                </span>
+              </div>
+            </div>
+          {/each}
+        </div>
+        
+        <Button 
+          size="sm" 
+          variant="outline" 
+          onclick={loadAgents} 
+          disabled={isLoadingAgents}
+          class="w-full h-8 font-mono text-xs uppercase tracking-wider border-border/50
+                 hover:border-[var(--cyber-cyan)]/50 hover:text-[var(--cyber-cyan)] mt-3"
+        >
+          {isLoadingAgents ? "Refreshing..." : "↻ Refresh Agents"}
+        </Button>
+      {/if}
+    </div>
+  </div>
 
   <!-- Quick Actions -->
   {#if sandbox?.status === "running"}
