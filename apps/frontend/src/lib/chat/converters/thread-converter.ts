@@ -38,6 +38,11 @@ import type {
   InternalStep,
   InternalPatch,
   InternalSubtask,
+  OrderedPart,
+  OrderedTextPart,
+  OrderedReasoningPart,
+  OrderedToolCallPart,
+  OrderedFilePart,
 } from "../types/messages";
 
 // =============================================================================
@@ -173,20 +178,17 @@ function mergeAssistantMessages(messages: InternalMessage[]): ThreadMessageLike 
     return convertAssistantMessage(messages[0]);
   }
   
-  // Sort messages by creation time to ensure chronological order
   const sortedMessages = [...messages].sort((a, b) => {
     const timeA = a.createdAt?.getTime() ?? 0;
     const timeB = b.createdAt?.getTime() ?? 0;
     return timeA - timeB;
   });
   
-  // Use the first message as the base for ID and timestamps
   const firstMessage = sortedMessages[0];
   const lastMessage = sortedMessages[sortedMessages.length - 1];
   
   const content: ThreadAssistantMessagePart[] = [];
   
-  // Accumulate metadata across all messages
   let totalCost = 0;
   let totalTokens = { input: 0, output: 0, reasoning: 0, cached: 0 };
   const allSteps: InternalStep[] = [];
@@ -196,40 +198,54 @@ function mergeAssistantMessages(messages: InternalMessage[]): ThreadMessageLike 
   let agent: string | undefined;
   let isCompacted = false;
   
-  // Process each message in chronological order
-  // Each message's content stays together to preserve the natural conversation flow
+  const allOrderedParts: OrderedPart[] = [];
+  const hasOrderedParts = sortedMessages.some(m => m.contentParts && m.contentParts.length > 0);
+  
   for (const msg of sortedMessages) {
-    // 1. Add reasoning parts (typically come first in a response)
-    for (const reasoning of msg.reasoning) {
-      const reasoningPart: ReasoningMessagePart = {
-        type: "reasoning",
-        text: reasoning.text,
-      };
-      content.push(reasoningPart);
+    if (hasOrderedParts && msg.contentParts && msg.contentParts.length > 0) {
+      allOrderedParts.push(...msg.contentParts);
+    } else {
+      let order = msg.createdAt?.getTime() || 0;
+      
+      for (const reasoning of msg.reasoning) {
+        allOrderedParts.push({
+          type: "reasoning",
+          id: reasoning.id,
+          order: reasoning.startTime || order++,
+          text: reasoning.text,
+          startTime: reasoning.startTime,
+          endTime: reasoning.endTime,
+        });
+      }
+      
+      if (msg.text && msg.text.trim()) {
+        allOrderedParts.push({
+          type: "text",
+          id: `text-${msg.id}`,
+          order: order++,
+          text: msg.text,
+        });
+      }
+      
+      for (const [id, toolCall] of msg.toolCalls) {
+        allOrderedParts.push({
+          type: "tool-call",
+          id,
+          order: toolCall.startTime || order++,
+          toolCall,
+        });
+      }
+      
+      for (const file of msg.files) {
+        allOrderedParts.push({
+          type: "file",
+          id: file.id,
+          order: order++,
+          file,
+        });
+      }
     }
     
-    // 2. Add text content (the main response text)
-    // Add text BEFORE tool calls since that's the natural flow:
-    // "Let me check..." -> [tool call] -> "Based on results..."
-    if (msg.text && msg.text.trim()) {
-      const textPart: TextMessagePart = {
-        type: "text",
-        text: msg.text,
-      };
-      content.push(textPart);
-    }
-    
-    // 3. Add tool calls (after the text that introduces them)
-    for (const [, toolCall] of msg.toolCalls) {
-      content.push(convertToolCallToPart(toolCall));
-    }
-    
-    // 4. Add file attachments
-    for (const file of msg.files) {
-      content.push(convertFileToAssistantPart(file));
-    }
-    
-    // 5. Accumulate metadata
     if (msg.cost !== undefined) {
       totalCost += msg.cost;
     }
@@ -260,6 +276,29 @@ function mergeAssistantMessages(messages: InternalMessage[]): ThreadMessageLike 
     }
     if (msg.isCompacted) {
       isCompacted = true;
+    }
+  }
+
+  allOrderedParts.sort((a, b) => a.id.localeCompare(b.id));
+  
+  const seenIds = new Set<string>();
+  for (const part of allOrderedParts) {
+    if (seenIds.has(part.id)) continue;
+    seenIds.add(part.id);
+    
+    switch (part.type) {
+      case "reasoning":
+        content.push({ type: "reasoning", text: part.text });
+        break;
+      case "text":
+        content.push({ type: "text", text: part.text });
+        break;
+      case "tool-call":
+        content.push(convertToolCallToPart(part.toolCall));
+        break;
+      case "file":
+        content.push(convertFileToAssistantPart(part.file));
+        break;
     }
   }
   
@@ -388,63 +427,71 @@ function convertUserMessage(message: InternalMessage): ThreadMessageLike {
 function convertAssistantMessage(message: InternalMessage): ThreadMessageLike {
   const content: ThreadAssistantMessagePart[] = [];
   
-  // 1. Add reasoning parts first (they typically come before the main response)
-  for (const reasoning of message.reasoning) {
-    const reasoningPart: ReasoningMessagePart = {
-      type: "reasoning",
-      text: reasoning.text,
-    };
-    content.push(reasoningPart);
+  if (message.contentParts && message.contentParts.length > 0) {
+    const sortedParts = [...message.contentParts].sort((a, b) => a.id.localeCompare(b.id));
+    const seenIds = new Set<string>();
+    
+    for (const part of sortedParts) {
+      if (seenIds.has(part.id)) continue;
+      seenIds.add(part.id);
+      
+      switch (part.type) {
+        case "reasoning":
+          content.push({ type: "reasoning", text: part.text });
+          break;
+        case "text":
+          content.push({ type: "text", text: part.text });
+          break;
+        case "tool-call":
+          content.push(convertToolCallToPart(part.toolCall));
+          break;
+        case "file":
+          content.push(convertFileToAssistantPart(part.file));
+          break;
+      }
+    }
+  } else {
+    for (const reasoning of message.reasoning) {
+      content.push({ type: "reasoning", text: reasoning.text });
+    }
+    
+    if (message.text) {
+      content.push({ type: "text", text: message.text });
+    }
+    
+    const sortedToolCalls = [...message.toolCalls.values()]
+      .sort((a, b) => (a.startTime || 0) - (b.startTime || 0));
+    for (const toolCall of sortedToolCalls) {
+      content.push(convertToolCallToPart(toolCall));
+    }
+    
+    for (const file of message.files) {
+      content.push(convertFileToAssistantPart(file));
+    }
   }
   
-  // 2. Add main text content
-  if (message.text) {
-    const textPart: TextMessagePart = {
-      type: "text",
-      text: message.text,
-    };
-    content.push(textPart);
-  }
-  
-  // 3. Add tool calls
-  for (const [, toolCall] of message.toolCalls) {
-    content.push(convertToolCallToPart(toolCall));
-  }
-  
-  // 4. Add file attachments (e.g., from tool outputs)
-  for (const file of message.files) {
-    content.push(convertFileToAssistantPart(file));
-  }
-  
-  // 5. Add custom data parts for OpenCode-specific content
   if (message.patches.length > 0) {
-    const patchesPart: DataMessagePart = {
+    content.push({
       type: "data",
       name: "opencode-patches",
       data: serializePatches(message.patches),
-    };
-    content.push(patchesPart);
+    });
   }
   
   if (message.subtasks.length > 0) {
-    const subtasksPart: DataMessagePart = {
+    content.push({
       type: "data",
       name: "opencode-subtasks",
       data: serializeSubtasks(message.subtasks),
-    };
-    content.push(subtasksPart);
+    });
   }
   
-  // Ensure at least one content part
   if (content.length === 0) {
     content.push({ type: "text", text: "" });
   }
   
-  // Build metadata
   const steps = buildStepsMetadata(message);
   const custom = buildCustomMetadata(message);
-  
-  // Determine message status
   const status = determineMessageStatus(message);
   
   return {

@@ -1,17 +1,12 @@
 /**
  * Browser-native SSE client for OpenCode events using EventSource API.
- * Replaces Tauri Rust SSE proxy. Other APIs continue through Tauri.
+ * Uses async iterator pattern for clean event consumption.
  */
 
 import { getAuthApiUrl } from "../stores/auth.svelte";
 import { authGetToken } from "./tauri";
 
 export type SSEStatus = "connecting" | "connected" | "disconnected" | "error";
-
-export interface BrowserSSEClientOptions {
-  onEvent: (event: SSEOpenCodeEvent) => void;
-  onStatus?: (status: SSEStatus, error?: string) => void;
-}
 
 export interface SSEOpenCodeEvent {
   type: string;
@@ -24,6 +19,11 @@ export interface LegacyOpenCodeEvent {
     type: string;
     properties: Record<string, unknown>;
   };
+}
+
+export interface SSESubscription {
+  stream: AsyncIterable<SSEOpenCodeEvent>;
+  close: () => void;
 }
 
 const OPENCODE_EVENT_TYPES = [
@@ -56,121 +56,133 @@ const OPENCODE_EVENT_TYPES = [
   "lsp.updated",
 ] as const;
 
-export class BrowserSSEClient {
-  private eventSource: EventSource | null = null;
+export class SSEClient {
   private sandboxId: string;
-  private options: BrowserSSEClientOptions;
-  private reconnectAttempts = 0;
-  private maxReconnectAttempts = 50;
-  private isManuallyDisconnected = false;
 
-  constructor(sandboxId: string, options: BrowserSSEClientOptions) {
+  constructor(sandboxId: string) {
     this.sandboxId = sandboxId;
-    this.options = options;
   }
 
-  async connect(): Promise<void> {
-    if (this.eventSource) {
-      console.warn("[BrowserSSE] Already connected, ignoring");
-      return;
-    }
-
-    this.isManuallyDisconnected = false;
+  async subscribe(options?: {
+    onStatus?: (status: SSEStatus, error?: string) => void;
+  }): Promise<SSESubscription> {
     const apiUrl = getAuthApiUrl();
     
     if (!apiUrl) {
-      console.error("[BrowserSSE] No API URL configured");
-      this.options.onStatus?.("error", "No API URL configured");
-      return;
+      throw new Error("No API URL configured");
     }
 
     const token = await authGetToken();
     if (!token) {
-      console.error("[BrowserSSE] No auth token available");
-      this.options.onStatus?.("error", "No auth token available");
-      return;
+      throw new Error("No auth token available");
     }
 
     const sseUrl = `${apiUrl}/api/v2/sandboxes/${this.sandboxId}/opencode/event?token=${encodeURIComponent(token)}`;
     
-    console.log("[BrowserSSE] Connecting to:", apiUrl + "/api/v2/sandboxes/" + this.sandboxId + "/opencode/event");
-    this.options.onStatus?.("connecting");
+    console.log("[SSE] Connecting to:", this.sandboxId);
+    options?.onStatus?.("connecting");
 
-    try {
-      this.eventSource = new EventSource(sseUrl, { withCredentials: true });
-
-      this.eventSource.onopen = () => {
-        console.log("[BrowserSSE] Connected to", this.sandboxId);
-        this.reconnectAttempts = 0;
-        this.options.onStatus?.("connected");
-      };
-
-      this.eventSource.onmessage = (e) => {
-        this.handleEventData(e.data, "message");
-      };
-
-      OPENCODE_EVENT_TYPES.forEach((eventType) => {
-        this.eventSource!.addEventListener(eventType, (e: Event) => {
-          const messageEvent = e as MessageEvent;
-          this.handleEventData(messageEvent.data, eventType);
-        });
-      });
-
-      this.eventSource.onerror = (e) => {
-        if (!this.isManuallyDisconnected) {
-          console.warn("[BrowserSSE] Connection error, browser will auto-reconnect", e);
-          this.options.onStatus?.("disconnected");
-          
-          this.reconnectAttempts++;
-          
-          if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            console.error("[BrowserSSE] Max reconnect attempts reached, giving up");
-            this.disconnect();
-            this.options.onStatus?.("error", "Max reconnect attempts reached");
-          }
-        }
-      };
-
-    } catch (err) {
-      console.error("[BrowserSSE] Failed to create EventSource:", err);
-      this.options.onStatus?.("error", err instanceof Error ? err.message : "Unknown error");
-    }
-  }
-
-  private handleEventData(data: string, eventType: string): void {
-    try {
-      const parsed = JSON.parse(data);
-      
-      const event: SSEOpenCodeEvent = {
-        type: parsed.type || eventType,
-        properties: parsed.properties || parsed,
-      };
-
-      console.debug("[BrowserSSE] Event:", event.type);
-      this.options.onEvent(event);
-      
-    } catch (err) {
-      console.warn("[BrowserSSE] Failed to parse event data:", data.slice(0, 100), err);
-    }
-  }
-
-  disconnect(): void {
-    this.isManuallyDisconnected = true;
+    const eventSource = new EventSource(sseUrl, { withCredentials: true });
     
-    if (this.eventSource) {
-      console.log("[BrowserSSE] Disconnecting from", this.sandboxId);
-      this.eventSource.close();
-      this.eventSource = null;
-      this.options.onStatus?.("disconnected");
-    }
-  }
+    // Queue for buffering events until consumed
+    const eventQueue: SSEOpenCodeEvent[] = [];
+    let resolveNext: ((value: IteratorResult<SSEOpenCodeEvent>) => void) | null = null;
+    let closed = false;
+    let connected = false;
 
-  get isConnected(): boolean {
-    return this.eventSource?.readyState === EventSource.OPEN;
-  }
+    const pushEvent = (event: SSEOpenCodeEvent) => {
+      if (closed) return;
+      
+      if (resolveNext) {
+        resolveNext({ value: event, done: false });
+        resolveNext = null;
+      } else {
+        eventQueue.push(event);
+      }
+    };
 
-  get readyState(): number {
-    return this.eventSource?.readyState ?? EventSource.CLOSED;
+    const handleEventData = (data: string, eventType: string): void => {
+      try {
+        const parsed = JSON.parse(data);
+        
+        const event: SSEOpenCodeEvent = {
+          type: parsed.type || eventType,
+          properties: parsed.properties || parsed,
+        };
+
+        console.debug("[SSE] Event:", event.type);
+        pushEvent(event);
+        
+      } catch (err) {
+        console.warn("[SSE] Failed to parse event:", data.slice(0, 100), err);
+      }
+    };
+
+    eventSource.onopen = () => {
+      console.log("[SSE] Connected to", this.sandboxId);
+      connected = true;
+      options?.onStatus?.("connected");
+    };
+
+    eventSource.onmessage = (e) => {
+      handleEventData(e.data, "message");
+    };
+
+    OPENCODE_EVENT_TYPES.forEach((eventType) => {
+      eventSource.addEventListener(eventType, (e: Event) => {
+        const messageEvent = e as MessageEvent;
+        handleEventData(messageEvent.data, eventType);
+      });
+    });
+
+    eventSource.onerror = () => {
+      if (!closed) {
+        console.warn("[SSE] Connection error, browser will auto-reconnect");
+        if (connected) {
+          options?.onStatus?.("disconnected");
+          connected = false;
+        }
+      }
+    };
+
+    const close = () => {
+      if (closed) return;
+      closed = true;
+      
+      console.log("[SSE] Closing connection to", this.sandboxId);
+      eventSource.close();
+      options?.onStatus?.("disconnected");
+      
+      // Resolve any pending iterator with done
+      if (resolveNext) {
+        resolveNext({ value: undefined as unknown as SSEOpenCodeEvent, done: true });
+        resolveNext = null;
+      }
+    };
+
+    const stream: AsyncIterable<SSEOpenCodeEvent> = {
+      [Symbol.asyncIterator](): AsyncIterator<SSEOpenCodeEvent> {
+        return {
+          async next(): Promise<IteratorResult<SSEOpenCodeEvent>> {
+            if (closed && eventQueue.length === 0) {
+              return { value: undefined as unknown as SSEOpenCodeEvent, done: true };
+            }
+
+            // Return buffered event if available
+            if (eventQueue.length > 0) {
+              return { value: eventQueue.shift()!, done: false };
+            }
+
+            // Wait for next event
+            return new Promise((resolve) => {
+              resolveNext = resolve;
+            });
+          },
+        };
+      },
+    };
+
+    return { stream, close };
   }
 }
 
@@ -184,12 +196,39 @@ export function toLegacyFormat(event: SSEOpenCodeEvent): LegacyOpenCodeEvent {
   };
 }
 
-export async function createBrowserSSEClient(
-  sandboxId: string,
-  onEvent: (event: SSEOpenCodeEvent) => void,
-  onStatus?: (status: SSEStatus, error?: string) => void
-): Promise<BrowserSSEClient> {
-  const client = new BrowserSSEClient(sandboxId, { onEvent, onStatus });
-  await client.connect();
-  return client;
+export function createSSEClient(sandboxId: string): SSEClient {
+  return new SSEClient(sandboxId);
+}
+
+/** @deprecated Use SSEClient with async iterator pattern instead */
+export class BrowserSSEClient {
+  private sandboxId: string;
+  private options: { onEvent: (event: SSEOpenCodeEvent) => void; onStatus?: (status: SSEStatus, error?: string) => void };
+  private closeRef: (() => void) | null = null;
+
+  constructor(sandboxId: string, options: { onEvent: (event: SSEOpenCodeEvent) => void; onStatus?: (status: SSEStatus, error?: string) => void }) {
+    this.sandboxId = sandboxId;
+    this.options = options;
+  }
+
+  async connect(): Promise<void> {
+    const client = new SSEClient(this.sandboxId);
+    const subscription = await client.subscribe({ onStatus: this.options.onStatus });
+    this.closeRef = subscription.close;
+
+    (async () => {
+      for await (const event of subscription.stream) {
+        this.options.onEvent(event);
+      }
+    })();
+  }
+
+  disconnect(): void {
+    this.closeRef?.();
+    this.closeRef = null;
+  }
+
+  get isConnected(): boolean {
+    return this.closeRef !== null;
+  }
 }

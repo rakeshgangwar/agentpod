@@ -247,6 +247,73 @@ export interface AccumulatedTokens {
   cached?: number;
 }
 
+// =============================================================================
+// Ordered Content Parts (for temporal sequencing)
+// =============================================================================
+
+/**
+ * Content part types that support ordering.
+ */
+export type OrderedPartType = "text" | "reasoning" | "tool-call" | "file";
+
+/**
+ * Base interface for all ordered content parts.
+ * The `order` field enables temporal sequencing of parts.
+ */
+export interface OrderedPartBase {
+  type: OrderedPartType;
+  /** Unique identifier for deduplication */
+  id: string;
+  /** 
+   * Ordering value - typically timestamp * 1000 + counter.
+   * Parts are sorted by this value for display.
+   */
+  order: number;
+}
+
+/**
+ * Ordered text content part.
+ */
+export interface OrderedTextPart extends OrderedPartBase {
+  type: "text";
+  text: string;
+}
+
+/**
+ * Ordered reasoning/thinking content part.
+ */
+export interface OrderedReasoningPart extends OrderedPartBase {
+  type: "reasoning";
+  text: string;
+  startTime?: number;
+  endTime?: number;
+}
+
+/**
+ * Ordered tool call content part.
+ */
+export interface OrderedToolCallPart extends OrderedPartBase {
+  type: "tool-call";
+  toolCall: InternalToolCall;
+}
+
+/**
+ * Ordered file content part.
+ */
+export interface OrderedFilePart extends OrderedPartBase {
+  type: "file";
+  file: InternalFilePart;
+}
+
+/**
+ * Union type of all ordered content parts.
+ */
+export type OrderedPart = 
+  | OrderedTextPart 
+  | OrderedReasoningPart 
+  | OrderedToolCallPart 
+  | OrderedFilePart;
+
 /**
  * Internal representation of a message for RuntimeProvider state.
  * This is our React state format, not the API format.
@@ -268,12 +335,14 @@ export interface InternalMessage {
   completedAt?: Date;
   cost?: number;
   tokens?: AccumulatedTokens;
-  /**
-   * Parent message ID - used to group assistant messages that are part of the same turn.
-   * When a user sends a message, all assistant responses to that message share the same parentID.
-   * This enables multi-step tool call chains to be displayed as a single cohesive response.
-   */
+  /** Parent message ID for grouping multi-step assistant responses */
   parentID?: string;
+  /** Session ID for filtering messages by session */
+  sessionId?: string;
+  /** Ordered content parts for temporal sequencing in UI */
+  contentParts: OrderedPart[];
+  /** Counter for sub-millisecond ordering of parts */
+  partOrderCounter: number;
 }
 
 // =============================================================================
@@ -299,6 +368,8 @@ export function createEmptyInternalMessage(
     subtasks: [],
     retries: [],
     createdAt: new Date(),
+    contentParts: [],
+    partOrderCounter: 0,
   };
 }
 

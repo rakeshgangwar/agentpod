@@ -697,21 +697,24 @@ function AssistantMessage() {
   
   if (!hasContent) return null;
   
-  // Extract extended data from metadata (using ThreadMessageLike cast for helper functions)
   const patches = getMessagePatches(message as Parameters<typeof getMessagePatches>[0]);
   const subtasks = getMessageSubtasks(message as Parameters<typeof getMessageSubtasks>[0]);
   const retries = getMessageRetries(messageState);
   const reasoning = getMessageReasoning(messageState);
   
+  const hasTaskToolCalls = message.content.some(part => {
+    if (part.type !== "tool-call") return false;
+    const toolPart = part as { toolName?: string };
+    return toolPart.toolName === "task";
+  });
+  
   return (
     <MessagePrimitive.Root className="group flex justify-start mb-4 min-w-0 w-full relative">
       <div className="max-w-[80%] min-w-0 rounded px-4 py-2 bg-muted/50 border border-border/30 overflow-hidden backdrop-blur-sm">
-        {/* Retry indicator at top if there were retries */}
         {retries.length > 0 && (
           <RetryIndicator retries={retries} />
         )}
         
-        {/* Reasoning section (collapsible) */}
         {reasoning.length > 0 && (
           <ReasoningDisplay reasoning={reasoning} />
         )}
@@ -727,13 +730,11 @@ function AssistantMessage() {
           }}
         />
         
-        {/* Patches (files changed) */}
         {patches.length > 0 && (
           <PatchViewer patches={patches} />
         )}
         
-        {/* Subtasks spawned */}
-        {subtasks.length > 0 && (
+        {subtasks.length > 0 && !hasTaskToolCalls && (
           <SubtaskList 
             subtasks={subtasks}
             onNavigateToSession={onSessionSelect}

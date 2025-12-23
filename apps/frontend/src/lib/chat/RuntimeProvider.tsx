@@ -34,9 +34,9 @@ import {
   type Session,
 } from "../api/tauri";
 import {
-  BrowserSSEClient,
+  SSEClient,
   toLegacyFormat,
-  type SSEStatus,
+  type SSESubscription,
 } from "../api/browser-sse";
 import type { AttachedFile } from "./FileAttachment";
 import { PermissionProvider, usePermissions } from "./PermissionContext";
@@ -164,9 +164,13 @@ function applyHandlerActions(actions: HandlerAction[], appliers: ActionAppliers)
           if (existingIdx !== -1) {
             const existing = prev[existingIdx];
             const incoming = action.message;
+            
+            const existingPartIds = new Set(existing.contentParts.map(p => p.id));
+            const newParts = incoming.contentParts.filter(p => !existingPartIds.has(p.id));
+            
             const merged: InternalMessage = {
               ...existing,
-              text: incoming.text || existing.text,
+              text: incoming.text.length > existing.text.length ? incoming.text : existing.text,
               reasoning: [...existing.reasoning, ...incoming.reasoning.filter(r => !existing.reasoning.some(e => e.id === r.id))],
               files: [...existing.files, ...incoming.files.filter(f => !existing.files.some(e => e.id === f.id))],
               steps: [...existing.steps, ...incoming.steps.filter(s => !existing.steps.some(e => e.id === s.id))],
@@ -174,6 +178,8 @@ function applyHandlerActions(actions: HandlerAction[], appliers: ActionAppliers)
               subtasks: [...existing.subtasks, ...incoming.subtasks.filter(s => !existing.subtasks.some(e => e.id === s.id))],
               retries: [...existing.retries, ...incoming.retries.filter(r => !existing.retries.some(e => e.id === r.id))],
               toolCalls: new Map([...existing.toolCalls, ...incoming.toolCalls]),
+              contentParts: [...existing.contentParts, ...newParts],
+              partOrderCounter: Math.max(existing.partOrderCounter, incoming.partOrderCounter),
             };
             const updated = [...prev];
             updated[existingIdx] = merged;
@@ -270,8 +276,8 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
   // Track if pending message has been processed
   const pendingMessageProcessedRef = useRef(false);
   
-  // SSE client reference for Browser EventSource
-  const sseClientRef = useRef<BrowserSSEClient | null>(null);
+  // SSE subscription close function
+  const sseCloseRef = useRef<(() => void) | null>(null);
   
   // Ref to always access latest internalMessages (avoids stale closure in SSE handler)
   const internalMessagesRef = useRef<InternalMessage[]>(internalMessages);
@@ -453,45 +459,54 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
   useEffect(() => {
     if (!sessionId || isLoading) return;
 
-    let isCleaningUp = false;
+    let cancelled = false;
     
-    const connectSSE = () => {
-      if (isCleaningUp) return;
+    const startEventStream = async () => {
+      if (cancelled) return;
       
-      if (sseClientRef.current?.isConnected) {
-        console.log("[RuntimeProvider] SSE already connected, skipping");
-        return;
+      if (sseCloseRef.current) {
+        sseCloseRef.current();
+        sseCloseRef.current = null;
       }
       
-      if (sseClientRef.current) {
-        sseClientRef.current.disconnect();
-      }
-      
-      const sseClient = new BrowserSSEClient(projectId, {
-        onEvent: (event) => {
+      try {
+        const client = new SSEClient(projectId);
+        const subscription = await client.subscribe({
+          onStatus: (status, err) => {
+            if (status === "error") {
+              console.warn("[RuntimeProvider] SSE error:", err);
+            }
+            if (status === "connected") {
+              console.log("[RuntimeProvider] SSE connected to", projectId);
+            }
+          },
+        });
+        
+        if (cancelled) {
+          subscription.close();
+          return;
+        }
+        
+        sseCloseRef.current = subscription.close;
+        
+        for await (const event of subscription.stream) {
+          if (cancelled) break;
           handleSSEEventRef.current(toLegacyFormat(event));
-        },
-        onStatus: (status: SSEStatus, err?: string) => {
-          if (status === "error") {
-            console.warn("[RuntimeProvider] SSE error:", err);
-          }
-          if (status === "connected") {
-            console.log("[RuntimeProvider] SSE connected to", projectId);
-          }
-        },
-      });
-      
-      sseClientRef.current = sseClient;
-      sseClient.connect();
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("[RuntimeProvider] SSE subscription failed:", err);
+        }
+      }
     };
 
-    connectSSE();
+    startEventStream();
 
     return () => {
-      isCleaningUp = true;
-      if (sseClientRef.current) {
-        sseClientRef.current.disconnect();
-        sseClientRef.current = null;
+      cancelled = true;
+      if (sseCloseRef.current) {
+        sseCloseRef.current();
+        sseCloseRef.current = null;
       }
     };
   }, [projectId, sessionId, isLoading]);
@@ -815,7 +830,7 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
       !pendingMessageProcessedRef.current &&
       !isLoading &&
       sessionId &&
-      sseClientRef.current?.isConnected &&
+      sseCloseRef.current &&
       (!pendingMessage.sessionId || pendingMessage.sessionId === sessionId)
     ) {
       pendingMessageProcessedRef.current = true;
@@ -856,9 +871,12 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
     }
   }, [pendingMessage, isLoading, sessionId, selectedModel, selectedAgent, onPendingMessageSent, projectId]);
 
-  // Convert internal messages to ThreadMessageLike for the runtime
-  // Using convertMessagesGrouped to merge assistant messages with same parentID
-  const threadMessages = convertMessagesGrouped(internalMessages);
+  const filteredMessages = internalMessages.filter(msg => {
+    if (!msg.sessionId) return true;
+    return msg.sessionId === sessionId;
+  });
+  
+  const threadMessages = convertMessagesGrouped(filteredMessages);
 
   // Identity converter since we already convert to ThreadMessageLike
   const convertMessageForRuntime = useCallback((msg: ThreadMessageLike): ThreadMessageLike => msg, []);

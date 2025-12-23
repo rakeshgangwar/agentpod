@@ -299,6 +299,7 @@ export function convertCompactionPart(part: CompactionPart): boolean {
  * Result of converting a part - can update multiple fields of InternalMessage
  */
 export interface PartConversionResult {
+  partId?: string;
   text?: string;
   reasoning?: InternalReasoning;
   toolCall?: InternalToolCall;
@@ -317,53 +318,54 @@ export interface PartConversionResult {
  * Accepts ExtendedPart to handle legacy tool-invocation and tool-result types.
  */
 export function convertPart(part: ExtendedPart): PartConversionResult {
+  const partId = (part as { id?: string }).id;
+  
   switch (part.type) {
     case "text":
-      return { text: convertTextPart(part) };
+      return { partId, text: convertTextPart(part) };
       
     case "reasoning":
-      return { reasoning: convertReasoningPart(part) };
+      return { partId, reasoning: convertReasoningPart(part) };
       
     case "file":
-      return { file: convertFilePart(part) };
+      return { partId, file: convertFilePart(part) };
       
     case "tool":
-      return { toolCall: convertToolPart(part) };
+      return { partId, toolCall: convertToolPart(part) };
       
     case "tool-invocation":
-      return { toolCall: convertToolInvocationPart(part) };
+      return { partId, toolCall: convertToolInvocationPart(part) };
       
     case "tool-result":
       const toolResult = convertToolResultPart(part);
       if (toolResult.callID && toolResult.result) {
-        return { toolResult: { callID: toolResult.callID, result: toolResult.result } };
+        return { partId, toolResult: { callID: toolResult.callID, result: toolResult.result } };
       }
-      return {};
+      return { partId };
       
     case "step-start":
-      return { step: convertStepStartPart(part) };
+      return { partId, step: convertStepStartPart(part) };
       
     case "step-finish":
-      return { step: convertStepFinishPart(part) };
+      return { partId, step: convertStepFinishPart(part) };
       
     case "patch":
-      return { patch: convertPatchPart(part) };
+      return { partId, patch: convertPatchPart(part) };
       
     case "subtask":
-      return { subtask: convertSubtaskPart(part) };
+      return { partId, subtask: convertSubtaskPart(part) };
       
     case "agent":
-      return { agent: convertAgentPart(part) };
+      return { partId, agent: convertAgentPart(part) };
       
     case "retry":
-      return { retry: convertRetryPart(part) };
+      return { partId, retry: convertRetryPart(part) };
       
     case "compaction":
-      return { isCompacted: convertCompactionPart(part) };
+      return { partId, isCompacted: convertCompactionPart(part) };
       
     default:
-      // Handle unknown part types gracefully
       console.warn("[PartConverter] Unknown part type:", (part as { type: string }).type);
-      return {};
+      return { partId };
   }
 }

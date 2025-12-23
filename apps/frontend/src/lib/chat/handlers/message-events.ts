@@ -115,22 +115,20 @@ export function handleMessageUpdated(
     }
   }
   
-  // Create new message
   const newMessage = createEmptyInternalMessage(messageId, role);
   
-  // Set agent from user message or mode from assistant message
+  newMessage.sessionId = messageSessionId || context.sessionId || undefined;
+  
   if (role === "user" && info.agent) {
     newMessage.agent = info.agent;
   } else if (role === "assistant" && info.mode) {
     newMessage.agent = info.mode;
   }
   
-  // Set timestamp if available
   if (info.time?.created) {
     newMessage.createdAt = new Date(info.time.created);
   }
   
-  // Set parentID for message grouping (links assistant messages to user message)
   if (info.parentID) {
     newMessage.parentID = info.parentID;
   }
@@ -174,34 +172,36 @@ export function handleMessagePartUpdated(
   const messageExists = context.messages.some((m) => m.id === messageId);
   
   if (!messageExists) {
-    // Message doesn't exist yet (race condition: part.updated arrived before message.updated)
-    // Create the message now. This typically happens with assistant messages during streaming.
-    const newMessage = createEmptyInternalMessage(messageId, "assistant");
+    if (partSessionId && partSessionId !== context.sessionId) {
+      return notHandled();
+    }
     
-    // Apply the part update to the new message
+    const newMessage = createEmptyInternalMessage(messageId, "assistant");
+    newMessage.sessionId = partSessionId || context.sessionId || undefined;
+    
+    if (part.time?.start) {
+      newMessage.createdAt = new Date(part.time.start);
+    }
+    
     applySSEPartToMessage(newMessage, part, delta);
     
     return handled(addMessage(newMessage));
   }
   
-  // Message exists, update it
   return handled(
     updateMessage(messageId, (msg) => {
-      // Clone the message to update
       const updated: InternalMessage = {
         ...msg,
-        // Clone arrays to avoid mutation
         reasoning: [...msg.reasoning],
         files: [...msg.files],
         steps: [...msg.steps],
         patches: [...msg.patches],
         subtasks: [...msg.subtasks],
         retries: [...msg.retries],
-        // Clone Map
         toolCalls: new Map(msg.toolCalls),
+        contentParts: [...msg.contentParts],
       };
       
-      // Apply the SSE part update
       applySSEPartToMessage(updated, part, delta);
       
       return updated;
@@ -273,12 +273,11 @@ export function handleMessagePartRemoved(
         subtasks: [...msg.subtasks],
         retries: [...msg.retries],
         toolCalls: new Map(msg.toolCalls),
+        contentParts: msg.contentParts.filter(p => p.id !== partId),
       };
       
-      // Remove the part based on type
       switch (partType) {
         case "text":
-          // Can't really remove text, but could clear it
           updated.text = "";
           break;
           

@@ -19,6 +19,10 @@ import type {
   InternalSubtask,
   InternalRetry,
   AccumulatedTokens,
+  OrderedTextPart,
+  OrderedReasoningPart,
+  OrderedToolCallPart,
+  OrderedFilePart,
 } from "../types/messages";
 
 import {
@@ -119,7 +123,6 @@ export function convertOpenCodeMessage(msg: OpenCodeMessage): InternalMessage {
     internal.parentID = msg.info.parentID;
   }
   
-  // Process all parts
   for (const part of msg.parts) {
     applyPartToMessage(internal, convertPart(part as ExtendedPart));
   }
@@ -127,43 +130,81 @@ export function convertOpenCodeMessage(msg: OpenCodeMessage): InternalMessage {
   return internal;
 }
 
-/**
- * Apply a part conversion result to an internal message
- */
 export function applyPartToMessage(
   message: InternalMessage,
   result: PartConversionResult
 ): void {
+  const getNextId = (): string => {
+    message.partOrderCounter++;
+    return result.partId || `generated-${message.id}-${message.partOrderCounter}`;
+  };
+
   if (result.text !== undefined) {
+    const id = getNextId();
     message.text += result.text;
+    message.contentParts.push({
+      type: "text",
+      id,
+      order: message.partOrderCounter,
+      text: result.text,
+    });
   }
   
   if (result.reasoning) {
+    const id = result.partId || result.reasoning.id;
+    message.partOrderCounter++;
     message.reasoning.push(result.reasoning);
+    message.contentParts.push({
+      type: "reasoning",
+      id,
+      order: message.partOrderCounter,
+      text: result.reasoning.text,
+      startTime: result.reasoning.startTime,
+      endTime: result.reasoning.endTime,
+    });
   }
   
   if (result.toolCall) {
+    const id = result.partId || result.toolCall.toolCallId;
+    message.partOrderCounter++;
     message.toolCalls.set(result.toolCall.toolCallId, result.toolCall);
+    message.contentParts.push({
+      type: "tool-call",
+      id,
+      order: message.partOrderCounter,
+      toolCall: result.toolCall,
+    });
   }
   
   if (result.toolResult) {
-    // Update existing tool call with result
     const existingCall = message.toolCalls.get(result.toolResult.callID);
     if (existingCall) {
       existingCall.result = result.toolResult.result;
       existingCall.status = "completed";
+      const existingPartIdx = message.contentParts.findIndex(
+        p => p.type === "tool-call" && p.id === result.toolResult!.callID
+      );
+      if (existingPartIdx >= 0) {
+        (message.contentParts[existingPartIdx] as OrderedToolCallPart).toolCall = existingCall;
+      }
     }
   }
   
   if (result.file) {
+    const id = result.partId || result.file.id;
+    message.partOrderCounter++;
     message.files.push(result.file);
+    message.contentParts.push({
+      type: "file",
+      id,
+      order: message.partOrderCounter,
+      file: result.file,
+    });
   }
   
   if (result.step) {
-    // Check if we already have a step with this ID
     const existingStepIndex = message.steps.findIndex(s => s.id === result.step!.id);
     if (existingStepIndex >= 0) {
-      // Merge step-start with step-finish
       const existing = message.steps[existingStepIndex];
       message.steps[existingStepIndex] = {
         ...existing,
@@ -303,17 +344,43 @@ export function applySSEPartToMessage(
   part: RawSSEPart,
   delta?: string
 ): void {
+  const getNextOrder = (): number => {
+    message.partOrderCounter++;
+    return Date.now() * 1000 + message.partOrderCounter;
+  };
+
   switch (part.type) {
-    case "text":
-      // Handle streaming text with delta
+    case "text": {
+      const partId = `text-${part.id || message.partOrderCounter}`;
+      
       if (delta) {
         message.text += delta;
+        const existingTextPart = message.contentParts.find(
+          (p): p is OrderedTextPart => p.type === "text" && p.id === partId
+        );
+        if (existingTextPart) {
+          existingTextPart.text += delta;
+        } else {
+          message.contentParts.push({
+            type: "text",
+            id: partId,
+            order: getNextOrder(),
+            text: delta,
+          });
+        }
       } else if (typeof part.text === "string") {
         message.text = part.text;
+        message.contentParts.push({
+          type: "text",
+          id: partId,
+          order: getNextOrder(),
+          text: part.text,
+        });
       }
       break;
+    }
       
-    case "reasoning":
+    case "reasoning": {
       if (part.id && part.text !== undefined) {
         const existingIndex = message.reasoning.findIndex(r => r.id === part.id);
         const reasoning: InternalReasoning = {
@@ -327,10 +394,28 @@ export function applySSEPartToMessage(
         } else {
           message.reasoning.push(reasoning);
         }
+
+        const existingPartIdx = message.contentParts.findIndex(
+          p => p.type === "reasoning" && p.id === part.id
+        );
+        const orderedReasoning: OrderedReasoningPart = {
+          type: "reasoning",
+          id: part.id,
+          order: part.time?.start || getNextOrder(),
+          text: part.text,
+          startTime: part.time?.start,
+          endTime: part.time?.end,
+        };
+        if (existingPartIdx >= 0) {
+          message.contentParts[existingPartIdx] = orderedReasoning;
+        } else {
+          message.contentParts.push(orderedReasoning);
+        }
       }
       break;
+    }
       
-    case "file":
+    case "file": {
       if (part.id && part.url && part.mime) {
         const file: InternalFilePart = {
           id: part.id,
@@ -344,32 +429,88 @@ export function applySSEPartToMessage(
         } else {
           message.files.push(file);
         }
+
+        const existingPartIdx = message.contentParts.findIndex(
+          p => p.type === "file" && p.id === part.id
+        );
+        const orderedFile: OrderedFilePart = {
+          type: "file",
+          id: part.id,
+          order: getNextOrder(),
+          file,
+        };
+        if (existingPartIdx >= 0) {
+          message.contentParts[existingPartIdx] = orderedFile;
+        } else {
+          message.contentParts.push(orderedFile);
+        }
       }
       break;
+    }
       
-    case "tool":
+    case "tool": {
       if (part.callID && part.state) {
         const toolCall = convertSSEToolPart(part);
         message.toolCalls.set(part.callID, toolCall);
+
+        const existingPartIdx = message.contentParts.findIndex(
+          p => p.type === "tool-call" && p.id === part.callID
+        );
+        const orderedTool: OrderedToolCallPart = {
+          type: "tool-call",
+          id: part.callID,
+          order: toolCall.startTime || getNextOrder(),
+          toolCall,
+        };
+        if (existingPartIdx >= 0) {
+          message.contentParts[existingPartIdx] = orderedTool;
+        } else {
+          message.contentParts.push(orderedTool);
+        }
       }
       break;
+    }
       
-    case "tool-invocation":
+    case "tool-invocation": {
       if (part.toolInvocation?.toolCallId) {
         const toolCall = convertSSEToolInvocationPart(part);
         message.toolCalls.set(part.toolInvocation.toolCallId, toolCall);
+
+        const existingPartIdx = message.contentParts.findIndex(
+          p => p.type === "tool-call" && p.id === part.toolInvocation!.toolCallId
+        );
+        const orderedTool: OrderedToolCallPart = {
+          type: "tool-call",
+          id: part.toolInvocation.toolCallId,
+          order: toolCall.startTime || getNextOrder(),
+          toolCall,
+        };
+        if (existingPartIdx >= 0) {
+          message.contentParts[existingPartIdx] = orderedTool;
+        } else {
+          message.contentParts.push(orderedTool);
+        }
       }
       break;
+    }
       
-    case "tool-result":
+    case "tool-result": {
       if (part.callID) {
         const existingCall = message.toolCalls.get(part.callID);
         if (existingCall) {
           existingCall.result = part.text || part.state?.output;
           existingCall.status = "completed";
+
+          const existingPartIdx = message.contentParts.findIndex(
+            p => p.type === "tool-call" && p.id === part.callID
+          );
+          if (existingPartIdx >= 0) {
+            (message.contentParts[existingPartIdx] as OrderedToolCallPart).toolCall = existingCall;
+          }
         }
       }
       break;
+    }
       
     case "step-start":
       if (part.id) {
