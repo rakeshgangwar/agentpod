@@ -13,7 +13,8 @@ import {
 } from "./product"
 import { 
   oliviaOperations, 
-  noraNotifier 
+  noraNotifier,
+  modelDoctorMike
 } from "./operations"
 
 export * from "./central"
@@ -36,13 +37,14 @@ export const ALL_AGENTS = [
   riverRoadmap,
   oliviaOperations,
   noraNotifier,
+  modelDoctorMike,
 ] as const
 
 export const AGENTS_BY_SQUAD = {
   orchestration: [commanderAda, builderBob, architectAria, guideGrace],
   development: [kaiCoder, danaDebugger, alexArchitect, testerTim, samSecurity],
   product: [peteProduct, spencerSpecs, riverRoadmap],
-  operations: [oliviaOperations, noraNotifier],
+  operations: [oliviaOperations, noraNotifier, modelDoctorMike],
   security: [samSecurity],
   data: [],
 } as const
@@ -62,4 +64,5 @@ export const AGENTS_BY_NAME = {
   "Roadmap-River": riverRoadmap,
   "Operations-Olivia": oliviaOperations,
   "Notifier-Nora": noraNotifier,
+  "Model-Doctor-Mike": modelDoctorMike,
 } as const

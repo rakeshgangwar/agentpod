@@ -36,6 +36,12 @@ import {
     skipOnboarding,
     clearError,
   } from "$lib/stores/onboarding.svelte";
+  import {
+    markSessionViewed,
+    isSessionBusy,
+    hasUnreadMessages,
+    sessionStatusMap,
+  } from "$lib/stores/session-status.svelte";
 
   // File finder wrapper for ChatThread (uses sandboxId, same as projectId in URL)
   async function findFiles(sandboxId: string, pattern: string): Promise<string[]> {
@@ -217,8 +223,7 @@ import {
   // Callback when RuntimeProvider detects agent from existing session messages
   function handleSessionAgentDetected(agent: string) {
     // Only update if we haven't already loaded agent for this session
-    // and it's not a child session (child sessions get agent from title)
-    if (selectedSessionId && agentLoadedForSession !== selectedSessionId && !isChildSession) {
+    if (selectedSessionId && agentLoadedForSession !== selectedSessionId) {
       selectedAgent = agent;
       agentLoadedForSession = selectedSessionId;
     }
@@ -227,17 +232,20 @@ import {
   // Load sessions, onboarding status, agents, and providers when project changes
   $effect(() => {
     if (projectId) {
-      // Reset banner dismissed state when project changes
       onboardingBannerDismissed = false;
 
-      // Use untrack to prevent state updates inside these async functions
-      // from causing the effect to re-run
       untrack(() => {
         loadSessions();
         loadAgents();
         loadProviders();
         fetchOnboardingSession(projectId);
       });
+    }
+  });
+
+  $effect(() => {
+    if (selectedSessionId) {
+      markSessionViewed(selectedSessionId);
     }
   });
 
@@ -253,7 +261,7 @@ import {
     if (selectedSessionId) {
       const onboardingAgent = "commander-ada";
       pendingOnboardingMessage = {
-        text: "Start the workspace setup and help me configure this project.",
+        text: "First run Model Doctor to fix all the models and then start the workspace setup and help me configure this project.",
         agent: onboardingAgent,
         sessionId: selectedSessionId, // Track which session this message is for
       };
@@ -299,7 +307,7 @@ import {
     try {
       // projectId is actually sandboxId in v2 API
       sessions = await sandboxOpencodeListSessions(projectId);
-      
+
       // Priority for session selection:
       // 1. URL session parameter (from pending actions or direct link)
       // 2. Already selected session (preserve current selection)
@@ -746,10 +754,18 @@ import {
                           </button>
                         {/if}
                         <div class="min-w-0 flex-1">
-                          <div class="font-medium text-sm truncate {selectedSessionId === session.id ? 'text-primary' : ''}">
+                          <div class="font-medium text-sm truncate flex items-center gap-1.5
+                                      {selectedSessionId === session.id ? 'text-primary' : ''}
+                                      {hasUnreadMessages(session.id, session.time?.updated) && selectedSessionId !== session.id ? 'font-semibold' : ''}">
+                            {#if isSessionBusy(session.id)}
+                              <span class="w-1.5 h-1.5 rounded-full bg-[var(--cyber-cyan)] animate-pulse-dot flex-shrink-0" title="Agent is processing"></span>
+                            {/if}
                             {getSessionTitle(session)}
                             {#if hasChildren(session.id)}
                               <span class="text-xs opacity-60 font-mono">({getChildCount(session.id)})</span>
+                            {/if}
+                            {#if hasUnreadMessages(session.id, session.time?.updated) && selectedSessionId !== session.id}
+                              <span class="w-1.5 h-1.5 rounded-full bg-[var(--cyber-cyan)] flex-shrink-0" title="Unread messages"></span>
                             {/if}
                           </div>
                           <div class="text-xs font-mono text-muted-foreground mt-0.5">
@@ -769,9 +785,17 @@ import {
                                 : 'hover:bg-muted/50 border border-transparent'}"
                             onclick={() => selectSessionAndCloseMobile(childSession.id)}
                           >
-                            <div class="flex items-center gap-1 font-medium truncate {selectedSessionId === childSession.id ? 'text-primary' : ''}">
-                              <CornerDownRight class="h-3 w-3 text-primary/50" />
+                            <div class="flex items-center gap-1.5 font-medium truncate
+                                        {selectedSessionId === childSession.id ? 'text-primary' : ''}
+                                        {hasUnreadMessages(childSession.id, childSession.time?.updated) && selectedSessionId !== childSession.id ? 'font-semibold' : ''}">
+                              <CornerDownRight class="h-3 w-3 text-primary/50 flex-shrink-0" />
+                              {#if isSessionBusy(childSession.id)}
+                                <span class="w-1.5 h-1.5 rounded-full bg-[var(--cyber-cyan)] animate-pulse-dot flex-shrink-0" title="Agent is processing"></span>
+                              {/if}
                               {getSessionTitle(childSession)}
+                              {#if hasUnreadMessages(childSession.id, childSession.time?.updated) && selectedSessionId !== childSession.id}
+                                <span class="w-1.5 h-1.5 rounded-full bg-[var(--cyber-cyan)] flex-shrink-0" title="Unread messages"></span>
+                              {/if}
                             </div>
                             <div class="text-xs font-mono text-muted-foreground">
                               {formatDate(childSession.time?.updated || childSession.time?.created)}
@@ -873,11 +897,18 @@ import {
                         </button>
                       {/if}
                       <div class="min-w-0 flex-1">
-                        <div class="font-medium text-sm truncate flex items-center gap-1
-                                    {selectedSessionId === session.id ? 'text-primary' : 'text-foreground'}">
+                        <div class="font-medium text-sm truncate flex items-center gap-1.5
+                                    {selectedSessionId === session.id ? 'text-primary' : 'text-foreground'}
+                                    {hasUnreadMessages(session.id, session.time?.updated) && selectedSessionId !== session.id ? 'font-semibold' : ''}">
+                          {#if isSessionBusy(session.id)}
+                            <span class="w-1.5 h-1.5 rounded-full bg-[var(--cyber-cyan)] animate-pulse-dot flex-shrink-0" title="Agent is processing"></span>
+                          {/if}
                           {getSessionTitle(session)}
                           {#if hasChildren(session.id)}
                             <span class="text-xs opacity-60 font-mono">({getChildCount(session.id)})</span>
+                          {/if}
+                          {#if hasUnreadMessages(session.id, session.time?.updated) && selectedSessionId !== session.id}
+                            <span class="w-1.5 h-1.5 rounded-full bg-[var(--cyber-cyan)] flex-shrink-0" title="Unread messages"></span>
                           {/if}
                         </div>
                         <div class="text-xs font-mono truncate text-muted-foreground mt-0.5">
@@ -915,10 +946,17 @@ import {
                         >
                           <div class="flex items-start justify-between gap-2">
                             <div class="min-w-0 flex-1">
-                              <div class="font-medium truncate flex items-center gap-1
-                                          {selectedSessionId === childSession.id ? 'text-primary' : 'text-foreground'}">
-                                <CornerDownRight class="h-3 w-3 text-primary/50" />
+                              <div class="font-medium truncate flex items-center gap-1.5
+                                          {selectedSessionId === childSession.id ? 'text-primary' : 'text-foreground'}
+                                          {hasUnreadMessages(childSession.id, childSession.time?.updated) && selectedSessionId !== childSession.id ? 'font-semibold' : ''}">
+                                <CornerDownRight class="h-3 w-3 text-primary/50 flex-shrink-0" />
+                                {#if isSessionBusy(childSession.id)}
+                                  <span class="w-1.5 h-1.5 rounded-full bg-[var(--cyber-cyan)] animate-pulse-dot flex-shrink-0" title="Agent is processing"></span>
+                                {/if}
                                 {getSessionTitle(childSession)}
+                                {#if hasUnreadMessages(childSession.id, childSession.time?.updated) && selectedSessionId !== childSession.id}
+                                  <span class="w-1.5 h-1.5 rounded-full bg-[var(--cyber-cyan)] flex-shrink-0" title="Unread messages"></span>
+                                {/if}
                               </div>
                               <div class="text-xs font-mono truncate text-muted-foreground">
                                 {formatDate(childSession.time?.updated || childSession.time?.created)}
@@ -992,10 +1030,8 @@ import {
                   disabled={isChildSession}
                   agents={primaryAgents}
                   animateTrigger={agentAnimationTrigger}
+                  activeSubagent={childSessionAgent}
                 />
-                {#if isChildSession}
-                  <span class="text-xs font-mono text-amber-500 italic">(subagent)</span>
-                {/if}
               </div>
             </div>
 

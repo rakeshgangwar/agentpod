@@ -7,6 +7,7 @@ export const guideGrace: AgentConfig = {
   
   squad: "orchestration",
   tier: "specialized",
+  mode: "subagent",
   
   personality: {
     expertise: "generalist",

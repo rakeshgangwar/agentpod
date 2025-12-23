@@ -13,7 +13,7 @@ describe("Agent Orchestrator", () => {
   describe("initialization", () => {
     test("loads all agents", () => {
       const agents = orchestrator.getAllAgents();
-      expect(agents.length).toBe(14);
+      expect(agents.length).toBe(15);
     });
 
     test("loads all workflows", () => {
@@ -115,8 +115,8 @@ describe("Agent Orchestrator", () => {
 });
 
 describe("Agent Library", () => {
-  test("ALL_AGENTS contains 14 agents", () => {
-    expect(ALL_AGENTS.length).toBe(14);
+  test("ALL_AGENTS contains 15 agents", () => {
+    expect(ALL_AGENTS.length).toBe(15);
   });
 
   test("ALL_WORKFLOWS contains 3 workflows", () => {
@@ -132,7 +132,7 @@ describe("Agent Library", () => {
   test("AGENTS_BY_SQUAD organizes agents correctly", () => {
     expect(AGENTS_BY_SQUAD.development.length).toBe(5);
     expect(AGENTS_BY_SQUAD.product.length).toBe(3);
-    expect(AGENTS_BY_SQUAD.operations.length).toBe(2);
+    expect(AGENTS_BY_SQUAD.operations.length).toBe(3);
     expect(AGENTS_BY_SQUAD.orchestration.length).toBe(4);
   });
 

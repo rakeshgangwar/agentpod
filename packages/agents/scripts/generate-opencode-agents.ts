@@ -36,9 +36,11 @@ function generateFrontmatter(agent: AgentConfig): string {
     : agent.role
   lines.push(`description: "${shortDesc}"`)
   
-  lines.push("mode: primary")
-  lines.push(`model: ${agent.model}`)
-  lines.push(`temperature: ${agent.temperature}`)
+  lines.push(`mode: ${agent.mode ?? "primary"}`)
+  if (agent.model) {
+    lines.push(`model: ${agent.model}`)
+  }
+  lines.push(`temperature: ${agent.temperature ?? 0.7}`)
   
   const color = SQUAD_COLORS[agent.squad] || "#00D9FF"
   lines.push(`color: "${color}"`)
@@ -99,6 +101,7 @@ interface OpenCodeAgentDefinition {
   role: string
   emoji: string
   squad: string
+  mode: string
   isDefault: boolean
   content: string
 }
@@ -115,6 +118,7 @@ function generateTypeScriptModule(agents: OpenCodeAgentDefinition[]): string {
     role: "${agent.role}",
     emoji: "${agent.emoji}",
     squad: "${agent.squad}",
+    mode: "${agent.mode}",
     isDefault: ${agent.isDefault},
     content: \`${escapedContent}\`,
   }`
@@ -132,6 +136,7 @@ export interface OpenCodeAgentDefinition {
   role: string
   emoji: string
   squad: string
+  mode: string
   isDefault: boolean
   content: string
 }
@@ -167,6 +172,7 @@ async function main() {
       role: agent.role,
       emoji: agent.emoji || "🤖",
       squad: agent.squad,
+      mode: agent.mode ?? "primary",
       isDefault: agent.isDefault ?? false,
       content,
     })

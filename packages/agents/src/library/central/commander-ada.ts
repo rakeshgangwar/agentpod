@@ -35,7 +35,7 @@ export const commanderAda: AgentConfig = {
     network: true
   },
   
-  relatedAgents: ["guide-grace", "coder-kai", "debugger-dana", "architect-alex", "tester-tim", "security-sam"],
+  relatedAgents: ["guide-grace", "model-doctor-mike", "coder-kai", "debugger-dana", "architect-alex", "tester-tim", "security-sam"],
   workflows: ["workspace-setup", "pr-review", "incident-response", "feature-planning"],
   
   delegationTriggers: [
@@ -104,6 +104,24 @@ For development requests, route to specialists:
 | Testing | @tester-tim |
 | Security | @security-sam |
 | Workspace setup | @guide-grace (use task tool) |
+| Model configuration issues | @model-doctor-mike |
+
+## Model Configuration Issues
+
+When you detect model-related problems, delegate to Model Doctor Mike:
+
+**Signs of model configuration issues:**
+- Errors like "model not found" or "model unavailable"
+- User mentions providers not working
+- Agents failing due to hardcoded models
+- New sandbox with potential model mismatches
+
+**Your response:**
+\`\`\`
+I notice there might be model configuration issues. Let me have Model Doctor Mike diagnose and fix any agent configurations.
+
+@model-doctor-mike Please run diagnostics on this workspace.
+\`\`\`
 
 ## Workspace Management
 

@@ -23,6 +23,7 @@
     compact = false,
     agents: externalAgents,
     animateTrigger = 0,
+    activeSubagent,
   }: {
     projectId: string;
     selectedAgent?: string;
@@ -32,6 +33,8 @@
     agents?: OpenCodeAgent[];
     /** Increment to trigger animation (e.g., when agent changed via keyboard shortcut) */
     animateTrigger?: number;
+    /** Active subagent name (when a subagent session is active) */
+    activeSubagent?: string;
   } = $props();
   
   // Internal state for when agents aren't provided externally
@@ -46,6 +49,9 @@
   let primaryAgents = $derived(
     agents.filter(agent => (agent.mode === "primary" || agent.mode === "all") && !agent.hidden)
   );
+  
+  // Determine if selector should be disabled (either explicitly disabled or subagent is active)
+  let isDisabled = $derived(disabled || !!activeSubagent);
   
   // Animation state
   let isAnimating = $state(false);
@@ -140,39 +146,51 @@
     No agents configured
   </div>
 {:else}
-  <Select.Root 
-    type="single"
-    value={selectedAgent ?? ""}
-    onValueChange={handleValueChange}
-    {disabled}
-  >
-    <Select.Trigger 
-      class="font-mono {compact ? 'h-7 text-xs min-w-[100px] max-w-[150px]' : 'h-9 text-sm min-w-[120px]'} border-border/50 bg-background/50 focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)] {isAnimating ? 'animate-agent-switch' : ''}"
+  <div class="flex flex-col gap-1">
+    <Select.Root 
+      type="single"
+      value={selectedAgent ?? ""}
+      onValueChange={handleValueChange}
+      disabled={isDisabled}
     >
-      <span class="truncate">{getDisplayName()}</span>
-    </Select.Trigger>
+      <Select.Trigger 
+        class="font-mono {compact ? 'h-7 text-xs min-w-[100px] max-w-[150px]' : 'h-9 text-sm min-w-[120px]'} border-border/50 bg-background/50 focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)] {isAnimating ? 'animate-agent-switch' : ''} {isDisabled ? 'opacity-60 cursor-not-allowed' : ''}"
+      >
+        <span class="truncate">{getDisplayName()}</span>
+      </Select.Trigger>
+      
+      <Select.Portal>
+        <Select.Content class="font-mono border-border/50 bg-background/95 backdrop-blur-sm">
+          {#each primaryAgents as agent (agent.name)}
+            <Select.Item value={agent.name} class="text-sm font-mono">
+              <div class="flex items-center gap-2">
+                {#if agent.color}
+                  <span 
+                    class="w-2 h-2 rounded-full shadow-[0_0_4px_currentColor]" 
+                    style="background-color: {agent.color}; color: {agent.color}"
+                  ></span>
+                {/if}
+                <span>{slugToDisplayName(agent.name)}</span>
+                {#if agent.description}
+                  <span class="text-xs text-muted-foreground ml-1">
+                    - {agent.description.length > 30 ? agent.description.slice(0, 30) + '...' : agent.description}
+                  </span>
+                {/if}
+              </div>
+            </Select.Item>
+          {/each}
+        </Select.Content>
+      </Select.Portal>
+    </Select.Root>
     
-    <Select.Portal>
-      <Select.Content class="font-mono border-border/50 bg-background/95 backdrop-blur-sm">
-        {#each primaryAgents as agent (agent.name)}
-          <Select.Item value={agent.name} class="text-sm font-mono">
-            <div class="flex items-center gap-2">
-              {#if agent.color}
-                <span 
-                  class="w-2 h-2 rounded-full shadow-[0_0_4px_currentColor]" 
-                  style="background-color: {agent.color}; color: {agent.color}"
-                ></span>
-              {/if}
-              <span>{slugToDisplayName(agent.name)}</span>
-              {#if agent.description}
-                <span class="text-xs text-muted-foreground ml-1">
-                  - {agent.description.length > 30 ? agent.description.slice(0, 30) + '...' : agent.description}
-                </span>
-              {/if}
-            </div>
-          </Select.Item>
-        {/each}
-      </Select.Content>
-    </Select.Portal>
-  </Select.Root>
+    {#if activeSubagent}
+      <div 
+        class="flex items-center gap-1 text-xs font-mono text-[var(--cyber-cyan)] px-2 animate-in fade-in slide-in-from-top-1 duration-200"
+        title="Subagent is currently handling this task"
+      >
+        <span class="opacity-60">→</span>
+        <span>@{activeSubagent}</span>
+      </div>
+    {/if}
+  </div>
 {/if}

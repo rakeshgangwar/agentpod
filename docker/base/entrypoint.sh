@@ -378,8 +378,12 @@ fetch_sandbox_agents() {
         
         if [ -n "$SLUG" ] && [ -n "$CONTENT" ]; then
             AGENT_FILE="$WORKSPACE_AGENT_DIR/${SLUG}.md"
-            echo "  Installing agent: $NAME ($SLUG) -> $AGENT_FILE"
-            echo "$CONTENT" > "$AGENT_FILE"
+            if [ -f "$AGENT_FILE" ]; then
+                echo "  Skipping agent: $NAME ($SLUG) - already exists (preserving local changes)"
+            else
+                echo "  Installing agent: $NAME ($SLUG) -> $AGENT_FILE"
+                echo "$CONTENT" > "$AGENT_FILE"
+            fi
         fi
     done
     
@@ -388,6 +392,8 @@ fetch_sandbox_agents() {
     echo "  Sandbox agents installation complete."
     return 0
 }
+
+
 
 # =============================================================================
 # Setup Project Config

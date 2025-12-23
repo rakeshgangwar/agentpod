@@ -21,6 +21,7 @@ export const MANDATORY_AGENT_SLUGS = [
   "commander-ada",
   "builder-bob", 
   "architect-aria",
+  "model-doctor-mike",
 ] as const;
 
 export const SQUAD_PRIMARY_AGENTS: Record<AgentSquad, string> = {
@@ -147,6 +148,14 @@ const MANDATORY_AGENTS: MandatoryAgentDef[] = [
     role: "Workspace Setup Specialist",
     emoji: "🚀",
     squad: "orchestration",
+    mode: "subagent",
+  },
+  {
+    slug: "model-doctor-mike",
+    name: "Model Doctor Mike",
+    role: "AI Model Configuration Specialist",
+    emoji: "🩺",
+    squad: "operations",
     mode: "subagent",
   },
 ];

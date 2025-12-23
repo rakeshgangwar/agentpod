@@ -22,6 +22,8 @@ export interface ToolRestrictions {
   network?: boolean
 }
 
+export type AgentMode = "primary" | "subagent"
+
 export interface AgentConfig {
   name: string
   role: string
@@ -30,12 +32,13 @@ export interface AgentConfig {
   
   squad: Squad
   tier: AgentTier
+  mode?: AgentMode
   
   personality: AgentPersonality
   intelligenceLevel: IntelligenceLevel
   
-  model: string
-  temperature: number
+  model?: string
+  temperature?: number
   maxTokens?: number
   tools?: ToolRestrictions
   

@@ -24,6 +24,10 @@ import {
   notifySessionUpdated,
   updateSessionActivity,
 } from "./types";
+import {
+  setSessionStatus as setGlobalSessionStatus,
+  type SessionStatusType,
+} from "../../stores/session-status.svelte";
 
 // =============================================================================
 // Event Property Types
@@ -170,18 +174,27 @@ export function handleSessionStatus(
   const eventSessionId = properties?.sessionID;
   const status = properties?.status;
   
-  // Only process status updates for the current session
-  if (eventSessionId && eventSessionId !== context.sessionId) {
-    return notHandled();
-  }
-  
   if (!status) {
     console.warn("[SessionEvents] session.status missing status object");
     return notHandled();
   }
   
-  const statusType = status.type;
-  console.log("[SessionEvents] Session status:", statusType, status);
+  const statusType = status.type as SessionStatusType | undefined;
+  console.log("[SessionEvents] Session status:", statusType, status, "for session:", eventSessionId);
+  
+  if (eventSessionId && statusType) {
+    const retryInfo = statusType === "retry" ? {
+      attempt: status.attempt ?? 1,
+      message: status.message ?? "Retrying...",
+      next: status.next ?? Date.now() + 5000,
+    } : null;
+    
+    setGlobalSessionStatus(eventSessionId, statusType, retryInfo);
+  }
+  
+  if (eventSessionId && eventSessionId !== context.sessionId) {
+    return notHandled();
+  }
   
   const actions = [];
   
@@ -200,7 +213,6 @@ export function handleSessionStatus(
       next: status.next ?? Date.now() + 5000,
     };
     actions.push(setSessionStatus("retry", retryInfo));
-    // Keep isRunning true during retry
     actions.push(setRunning(true));
   }
   
