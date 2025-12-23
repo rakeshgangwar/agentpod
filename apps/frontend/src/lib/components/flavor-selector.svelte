@@ -104,21 +104,51 @@
       // Load flavors first
       flavors = await listContainerFlavors();
       
-      // Auto-select default flavor if none selected
-      if (!selectedFlavorId) {
-        const defaultFlavor = flavors.find(f => f.isDefault);
-        if (defaultFlavor) {
-          selectedFlavorId = defaultFlavor.id;
-        }
-      }
-      
-      // Then load image availability (don't fail if this fails)
+      // Load image availability BEFORE selecting default
       await loadImageStatus();
+      
+      // Auto-select best available flavor if none selected
+      if (!selectedFlavorId) {
+        selectBestAvailableFlavor();
+      }
     } catch (err) {
       error = err instanceof Error ? err.message : "Failed to load container flavors";
     } finally {
       loading = false;
     }
+  }
+  
+  /**
+   * Select the best available flavor based on:
+   * 1. If default flavor is downloaded, use it
+   * 2. Otherwise, use the smallest downloaded image
+   * 3. If nothing is downloaded, don't auto-select (user must pull first)
+   */
+  function selectBestAvailableFlavor() {
+    // First, try the default flavor
+    const defaultFlavor = flavors.find(f => f.isDefault);
+    if (defaultFlavor && isImageAvailable(defaultFlavor.id)) {
+      selectedFlavorId = defaultFlavor.id;
+      return;
+    }
+    
+    // Find all available (downloaded) flavors
+    const availableFlavors = flavors.filter(f => isImageAvailable(f.id));
+    
+    if (availableFlavors.length > 0) {
+      // Sort by size (smallest first) and pick the first one
+      const smallestAvailable = availableFlavors.sort((a, b) => {
+        const aSize = imageStatus[a.id]?.size ?? Infinity;
+        const bSize = imageStatus[b.id]?.size ?? Infinity;
+        return aSize - bSize;
+      })[0];
+      
+      selectedFlavorId = smallestAvailable.id;
+      return;
+    }
+    
+    // No available images - don't auto-select
+    // User will see all flavors as "Not downloaded" and can pull one
   }
   
   async function loadImageStatus() {
