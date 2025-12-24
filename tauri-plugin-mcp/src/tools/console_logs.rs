@@ -27,18 +27,25 @@ pub async fn handle_get_console_logs<R: Runtime>(
     app: &AppHandle<R>,
     payload: Value,
 ) -> Result<crate::socket_server::SocketResponse, crate::error::Error> {
-    info!("[TAURI_MCP] handle_get_console_logs called with payload: {:?}", payload);
-    
+    info!(
+        "[TAURI_MCP] handle_get_console_logs called with payload: {:?}",
+        payload
+    );
+
     let parsed: GetConsoleLogsPayload = serde_json::from_value(payload.clone()).map_err(|e| {
         crate::error::Error::Anyhow(format!("Invalid payload for get_console_logs: {}", e))
     })?;
 
-    info!("[TAURI_MCP] Parsed payload: window_label={}, level={:?}, limit={}", 
-          parsed.window_label, parsed.level, parsed.limit);
+    info!(
+        "[TAURI_MCP] Parsed payload: window_label={}, level={:?}, limit={}",
+        parsed.window_label, parsed.level, parsed.limit
+    );
 
-    let _window = app.get_webview_window(&parsed.window_label).ok_or_else(|| {
-        crate::error::Error::Anyhow(format!("Window not found: {}", parsed.window_label))
-    })?;
+    let _window = app
+        .get_webview_window(&parsed.window_label)
+        .ok_or_else(|| {
+            crate::error::Error::Anyhow(format!("Window not found: {}", parsed.window_label))
+        })?;
 
     // Register response listener BEFORE emitting (to avoid race condition)
     let (tx, rx) = mpsc::channel();
@@ -54,7 +61,10 @@ pub async fn handle_get_console_logs<R: Runtime>(
         "clear": parsed.clear
     });
 
-    info!("[TAURI_MCP] Emitting get-console-logs to window: {}", parsed.window_label);
+    info!(
+        "[TAURI_MCP] Emitting get-console-logs to window: {}",
+        parsed.window_label
+    );
     app.emit_to(&parsed.window_label, "get-console-logs", &js_payload)
         .map_err(|e| {
             crate::error::Error::Anyhow(format!("Failed to emit get-console-logs event: {}", e))
@@ -63,12 +73,18 @@ pub async fn handle_get_console_logs<R: Runtime>(
     info!("[TAURI_MCP] Waiting for response...");
     match rx.recv_timeout(std::time::Duration::from_secs(5)) {
         Ok(response_str) => {
-            info!("[TAURI_MCP] Got response: {}", &response_str[..100.min(response_str.len())]);
+            info!(
+                "[TAURI_MCP] Got response: {}",
+                &response_str[..100.min(response_str.len())]
+            );
             let result: Value = serde_json::from_str(&response_str).map_err(|e| {
                 crate::error::Error::Anyhow(format!("Failed to parse response: {}", e))
             })?;
 
-            let success = result.get("success").and_then(|v| v.as_bool()).unwrap_or(false);
+            let success = result
+                .get("success")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
 
             if success {
                 Ok(crate::socket_server::SocketResponse {
@@ -80,7 +96,10 @@ pub async fn handle_get_console_logs<R: Runtime>(
                 Ok(crate::socket_server::SocketResponse {
                     success: false,
                     data: None,
-                    error: result.get("error").and_then(|v| v.as_str()).map(String::from),
+                    error: result
+                        .get("error")
+                        .and_then(|v| v.as_str())
+                        .map(String::from),
                 })
             }
         }

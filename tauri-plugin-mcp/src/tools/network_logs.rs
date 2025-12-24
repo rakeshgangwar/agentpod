@@ -32,9 +32,11 @@ pub async fn handle_get_network_logs<R: Runtime>(
         crate::error::Error::Anyhow(format!("Invalid payload for get_network_logs: {}", e))
     })?;
 
-    let _window = app.get_webview_window(&parsed.window_label).ok_or_else(|| {
-        crate::error::Error::Anyhow(format!("Window not found: {}", parsed.window_label))
-    })?;
+    let _window = app
+        .get_webview_window(&parsed.window_label)
+        .ok_or_else(|| {
+            crate::error::Error::Anyhow(format!("Window not found: {}", parsed.window_label))
+        })?;
 
     let (tx, rx) = mpsc::channel();
     app.once("get-network-logs-response", move |event| {
@@ -61,7 +63,10 @@ pub async fn handle_get_network_logs<R: Runtime>(
                 crate::error::Error::Anyhow(format!("Failed to parse response: {}", e))
             })?;
 
-            let success = result.get("success").and_then(|v| v.as_bool()).unwrap_or(false);
+            let success = result
+                .get("success")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
 
             if success {
                 Ok(crate::socket_server::SocketResponse {
@@ -73,16 +78,17 @@ pub async fn handle_get_network_logs<R: Runtime>(
                 Ok(crate::socket_server::SocketResponse {
                     success: false,
                     data: None,
-                    error: result.get("error").and_then(|v| v.as_str()).map(String::from),
+                    error: result
+                        .get("error")
+                        .and_then(|v| v.as_str())
+                        .map(String::from),
                 })
             }
         }
-        Err(e) => {
-            Ok(crate::socket_server::SocketResponse {
-                success: false,
-                data: None,
-                error: Some(format!("Timeout waiting for network logs: {}", e)),
-            })
-        }
+        Err(e) => Ok(crate::socket_server::SocketResponse {
+            success: false,
+            data: None,
+            error: Some(format!("Timeout waiting for network logs: {}", e)),
+        }),
     }
 }

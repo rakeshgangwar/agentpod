@@ -1,13 +1,13 @@
 use crate::error::{Error, Result};
+use crate::models::ScreenshotRequest;
 use crate::shared::ScreenshotParams;
+use crate::socket_server::SocketResponse;
+use crate::TauriMcpExt;
 use base64;
 use image::DynamicImage;
+use log::info;
 use serde_json::Value;
 use tauri::{AppHandle, Runtime};
-use log::info;
-use crate::TauriMcpExt;
-use crate::models::ScreenshotRequest;
-use crate::socket_server::SocketResponse;
 
 /// Common function to process and compress an image - used by platform implementations
 #[allow(dead_code)]

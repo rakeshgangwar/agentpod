@@ -6,7 +6,7 @@ use tauri::Runtime;
 use win_screenshot::prelude::*;
 
 // Import shared functionality
-use crate::desktop::{ScreenshotContext, create_success_response};
+use crate::desktop::{create_success_response, ScreenshotContext};
 use crate::platform::shared::{get_window_title, handle_screenshot_task};
 use crate::shared::ScreenshotParams;
 use crate::tools::take_screenshot::process_image;

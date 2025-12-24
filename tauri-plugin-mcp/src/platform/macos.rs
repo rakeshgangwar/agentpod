@@ -1,11 +1,11 @@
 use crate::models::ScreenshotResponse;
 use crate::{Error, Result};
 use image;
-use log::{info, error};
+use log::{error, info};
 use tauri::Runtime;
 
 // Import shared functionality
-use crate::desktop::{ScreenshotContext, create_success_response};
+use crate::desktop::{create_success_response, ScreenshotContext};
 use crate::platform::shared::{get_window_title, handle_screenshot_task};
 use crate::shared::ScreenshotParams;
 use crate::tools::take_screenshot::process_image;
@@ -22,7 +22,7 @@ pub async fn take_screenshot<R: Runtime>(
         .window_label
         .clone()
         .unwrap_or_else(|| "main".to_string());
-    
+
     // Get application name from params or use a default
     let application_name = params.application_name.clone().unwrap_or_default();
 
@@ -66,7 +66,11 @@ pub async fn take_screenshot<R: Runtime>(
     }).await
 }
 
-fn find_window(xcap_windows: &[xcap::Window], window_title: &str, application_name: &str) -> Option<xcap::Window> {
+fn find_window(
+    xcap_windows: &[xcap::Window],
+    window_title: &str,
+    application_name: &str,
+) -> Option<xcap::Window> {
     let application_name_lower = application_name.to_lowercase();
     let window_title_lower = window_title.to_lowercase();
 
@@ -75,7 +79,10 @@ fn find_window(xcap_windows: &[xcap::Window], window_title: &str, application_na
         window_title, application_name
     );
 
-    error!("[TAURI-MCP] ============= ALL WINDOWS ({}) =============", xcap_windows.len());
+    error!(
+        "[TAURI-MCP] ============= ALL WINDOWS ({}) =============",
+        xcap_windows.len()
+    );
     for window in xcap_windows {
         error!(
             "[TAURI-MCP] Window: title='{}', app_name='{}', minimized={}",
@@ -95,7 +102,10 @@ fn find_window(xcap_windows: &[xcap::Window], window_title: &str, application_na
         let title = window.title().to_lowercase();
 
         if !application_name_lower.is_empty() && app_name.contains(&application_name_lower) {
-            info!("[TAURI-MCP] Found window by app name: '{}'", window.app_name());
+            info!(
+                "[TAURI-MCP] Found window by app name: '{}'",
+                window.app_name()
+            );
             return Some(window.clone());
         }
 

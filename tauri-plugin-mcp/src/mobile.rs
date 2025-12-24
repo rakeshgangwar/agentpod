@@ -1,8 +1,8 @@
 use serde::de::DeserializeOwned;
 use std::sync::{Arc, Mutex};
 use tauri::{
-    AppHandle, Manager, Runtime,
     plugin::{PluginApi, PluginHandle},
+    AppHandle, Manager, Runtime,
 };
 
 use crate::commands::SocketInfoResponse;

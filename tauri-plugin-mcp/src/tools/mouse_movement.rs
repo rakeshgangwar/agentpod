@@ -6,8 +6,8 @@ use crate::models::MouseMovementRequest;
 use crate::shared::{MouseMovementParams, MouseMovementResult};
 use crate::socket_server::SocketResponse;
 use enigo::{Button, Coordinate, Direction, Enigo, Mouse, Settings};
-use std::time::Instant;
 use log::info;
+use std::time::Instant;
 
 pub async fn simulate_mouse_movement_async<R: Runtime>(
     app: &AppHandle<R>,

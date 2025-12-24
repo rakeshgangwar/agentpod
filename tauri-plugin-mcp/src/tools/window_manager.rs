@@ -1,10 +1,10 @@
 use serde_json::Value;
 use tauri::{AppHandle, Runtime};
 
-use crate::TauriMcpExt;
 use crate::error::Error;
 use crate::models::WindowManagerRequest;
 use crate::socket_server::SocketResponse;
+use crate::TauriMcpExt;
 
 pub async fn handle_manage_window<R: Runtime>(
     app: &AppHandle<R>,

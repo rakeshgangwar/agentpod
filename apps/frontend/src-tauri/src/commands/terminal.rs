@@ -143,18 +143,10 @@ pub async fn terminal_connect(
     let base_url = client.base_url();
 
     // Convert HTTP URL to WebSocket URL
-    let ws_url = if let Some(stripped) = base_url.strip_prefix("https://") {
-        format!(
-            "wss://{}/api/v2/sandboxes/{}/terminal",
-            stripped,
-            sandbox_id
-        )
-    } else if let Some(stripped) = base_url.strip_prefix("http://") {
-        format!(
-            "ws://{}/api/v2/sandboxes/{}/terminal",
-            stripped,
-            sandbox_id
-        )
+    let ws_url = if let Some(host) = base_url.strip_prefix("https://") {
+        format!("wss://{}/api/v2/sandboxes/{}/terminal", host, sandbox_id)
+    } else if let Some(host) = base_url.strip_prefix("http://") {
+        format!("ws://{}/api/v2/sandboxes/{}/terminal", host, sandbox_id)
     } else {
         return Err(AppError::InvalidConfig(
             "Invalid API URL format".to_string(),

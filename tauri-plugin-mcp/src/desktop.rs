@@ -9,12 +9,12 @@ use crate::socket_server::SocketServer;
 use crate::tools::mouse_movement;
 use crate::{PluginConfig, Result};
 use enigo::{Enigo, Keyboard, Settings};
+use log::info;
 use serde::de::DeserializeOwned;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Manager, Runtime, plugin::PluginApi};
-use log::info;
+use tauri::{plugin::PluginApi, AppHandle, Manager, Runtime};
 
 // ----- Screenshot Utilities -----
 
