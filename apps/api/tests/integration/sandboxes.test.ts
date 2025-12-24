@@ -362,7 +362,8 @@ async function cleanupTestSandboxes(): Promise<void> {
 // =============================================================================
 
 beforeAll(async () => {
-  // Create test users
+  // Create test users (including default-user used by API key auth)
+  await createTestUser('default-user');
   await createTestUser(TEST_USER_ID);
   await createTestUser(TEST_USER_ID_2);
 });
@@ -372,6 +373,7 @@ afterAll(async () => {
   await cleanupTestSandboxes();
   await deleteTestUser(TEST_USER_ID);
   await deleteTestUser(TEST_USER_ID_2);
+  // Don't delete default-user as it may be shared across tests
 });
 
 beforeEach(async () => {
