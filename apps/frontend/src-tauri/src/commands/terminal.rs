@@ -143,16 +143,16 @@ pub async fn terminal_connect(
     let base_url = client.base_url();
 
     // Convert HTTP URL to WebSocket URL
-    let ws_url = if base_url.starts_with("https://") {
+    let ws_url = if let Some(stripped) = base_url.strip_prefix("https://") {
         format!(
             "wss://{}/api/v2/sandboxes/{}/terminal",
-            &base_url[8..],
+            stripped,
             sandbox_id
         )
-    } else if base_url.starts_with("http://") {
+    } else if let Some(stripped) = base_url.strip_prefix("http://") {
         format!(
             "ws://{}/api/v2/sandboxes/{}/terminal",
-            &base_url[7..],
+            stripped,
             sandbox_id
         )
     } else {

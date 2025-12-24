@@ -47,6 +47,7 @@ pub async fn get_sandbox(id: String) -> Result<SandboxInfo, AppError> {
 
 /// Create a new sandbox
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn create_sandbox(
     name: String,
     description: Option<String>,
