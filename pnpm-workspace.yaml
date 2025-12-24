@@ -1,6 +1,7 @@
 packages:
   - "apps/*"
   - "packages/*"
+  - "tauri-plugin-mcp"
 
 onlyBuiltDependencies:
   - esbuild

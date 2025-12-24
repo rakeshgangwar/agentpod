@@ -149,6 +149,9 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build tauri-plugin-mcp
+        run: pnpm --filter tauri-plugin-mcp build
+
       - name: Build Tauri App
         uses: tauri-apps/tauri-action@v0
         env:
