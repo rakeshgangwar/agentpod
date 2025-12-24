@@ -8,13 +8,25 @@
  */
 
 // IMPORTANT: Import setup first to set environment variables
-import '../setup.ts';
+import '../setup';
 
 import { describe, test, expect, beforeAll, afterAll, beforeEach } from 'bun:test';
-import { db } from '../../src/db/index.ts';
+import { db } from '../../src/db/drizzle';
+import { 
+  user, 
+  session, 
+  account,
+  userPreferences, 
+  userOpencodeConfig, 
+  userOpencodeFiles,
+  activityLog,
+  sandboxes,
+  chatSessions,
+  chatMessages,
+} from '../../src/db/schema';
+import { eq, and, isNull } from 'drizzle-orm';
 
-// Import the full app after environment is set up
-import { app } from '../../src/index.ts';
+import { app } from '../../src/index';
 
 // =============================================================================
 // Constants
@@ -28,99 +40,124 @@ const DEFAULT_USER_ID = 'default-user';
 // Test Helpers
 // =============================================================================
 
-function createTestUser(userId: string = DEFAULT_USER_ID, email: string = 'default@test.com'): void {
-  const now = new Date().toISOString();
-  db.run(`
-    INSERT OR IGNORE INTO user (id, name, email, emailVerified, createdAt, updatedAt)
-    VALUES (?, ?, ?, 0, ?, ?)
-  `, [userId, 'Default Test User', email, now, now]);
+async function createTestUser(userId: string = DEFAULT_USER_ID, email: string = 'default@test.com'): Promise<void> {
+  const now = new Date();
+  await db.insert(user).values({
+    id: userId,
+    name: 'Default Test User',
+    email,
+    emailVerified: false,
+    createdAt: now,
+    updatedAt: now,
+  }).onConflictDoNothing();
 }
 
-function deleteTestUser(userId: string = DEFAULT_USER_ID): void {
+async function deleteTestUser(userId: string = DEFAULT_USER_ID): Promise<void> {
   // Clean up in reverse order of foreign key dependencies
-  db.run('DELETE FROM user_preferences WHERE user_id = ?', [userId]);
-  db.run('DELETE FROM user_opencode_files WHERE user_id = ?', [userId]);
-  db.run('DELETE FROM user_opencode_config WHERE user_id = ?', [userId]);
-  // provider_credentials is global (no user_id column) - don't clean here
-  db.run('DELETE FROM activity_log WHERE user_id = ?', [userId]);
-  // Delete sandboxes (which will cascade to chat_sessions and chat_messages)
-  db.run('DELETE FROM sandboxes WHERE user_id = ?', [userId]);
-  db.run('DELETE FROM session WHERE userId = ?', [userId]);
-  db.run('DELETE FROM account WHERE userId = ?', [userId]);
-  db.run('DELETE FROM user WHERE id = ?', [userId]);
-}
-
-function createTestSandbox(userId: string, sandboxId: string, name: string): void {
-  const now = new Date().toISOString();
-  const slug = name.toLowerCase().replace(/\s+/g, '-');
-  db.run(`
-    INSERT INTO sandboxes (
-      id, user_id, name, slug, repo_name, status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, 'stopped', ?, ?)
-  `, [sandboxId, userId, name, slug, `test-repo-${sandboxId}`, now, now]);
-}
-
-function createTestChatSession(sandboxId: string, sessionId: string, title: string, userId: string = DEFAULT_USER_ID): void {
-  const now = new Date().toISOString();
-  db.run(`
-    INSERT INTO chat_sessions (
-      id, sandbox_id, user_id, source, title, message_count, status, created_at, updated_at
-    ) VALUES (?, ?, ?, 'opencode', ?, 0, 'active', ?, ?)
-  `, [sessionId, sandboxId, userId, title, now, now]);
-}
-
-function createTestActivityLog(userId: string, action: string): void {
-  const id = crypto.randomUUID();
-  const now = new Date().toISOString();
-  db.run(`
-    INSERT INTO activity_log (
-      id, user_id, action, ip_address, user_agent, created_at
-    ) VALUES (?, ?, ?, '127.0.0.1', 'Test Agent', ?)
-  `, [id, userId, action, now]);
-}
-
-function createTestPreferences(userId: string): void {
-  const now = new Date().toISOString();
-  db.run(`
-    INSERT OR IGNORE INTO user_preferences (
-      user_id, theme_mode, theme_preset, settings_version, created_at, updated_at
-    ) VALUES (?, 'dark', 'ocean-blue', 1, ?, ?)
-  `, [userId, now, now]);
-}
-
-function createTestOpenCodeConfig(userId: string): void {
-  const now = new Date().toISOString();
-  db.run(`
-    INSERT OR IGNORE INTO user_opencode_config (
-      user_id, settings, agents_md, created_at, updated_at
-    ) VALUES (?, '{"theme":"dark"}', '# Agents Config', ?, ?)
-  `, [userId, now, now]);
-}
-
-function cleanupAllTestData(): void {
-  // Clean up all test data
-  db.run('DELETE FROM activity_log WHERE user_id = ?', [DEFAULT_USER_ID]);
-  db.run('DELETE FROM user_preferences WHERE user_id = ?', [DEFAULT_USER_ID]);
-  db.run('DELETE FROM user_opencode_files WHERE user_id = ?', [DEFAULT_USER_ID]);
-  db.run('DELETE FROM user_opencode_config WHERE user_id = ?', [DEFAULT_USER_ID]);
-  // provider_credentials is global (no user_id column) - clean test providers
-  db.run("DELETE FROM provider_credentials WHERE provider_id LIKE 'test-provider-%'");
-  // Delete chat_messages first (foreign key to chat_sessions)
-  const sessions = db.query<{ id: string }, [string]>(
-    'SELECT cs.id FROM chat_sessions cs JOIN sandboxes s ON cs.sandbox_id = s.id WHERE s.user_id = ?'
-  ).all(DEFAULT_USER_ID);
-  for (const session of sessions) {
-    db.run('DELETE FROM chat_messages WHERE session_id = ?', [session.id]);
+  // Note: Most tables have ON DELETE CASCADE, but we clean explicitly for safety
+  await db.delete(userPreferences).where(eq(userPreferences.userId, userId));
+  await db.delete(userOpencodeFiles).where(eq(userOpencodeFiles.userId, userId));
+  await db.delete(userOpencodeConfig).where(eq(userOpencodeConfig.userId, userId));
+  await db.delete(activityLog).where(eq(activityLog.userId, userId));
+  
+  // Delete chat sessions (cascade will delete messages)
+  const userSandboxes = await db.select({ id: sandboxes.id }).from(sandboxes).where(eq(sandboxes.userId, userId));
+  for (const sandbox of userSandboxes) {
+    await db.delete(chatSessions).where(eq(chatSessions.sandboxId, sandbox.id));
   }
-  // Delete chat_sessions
-  const sandboxes = db.query<{ id: string }, [string]>(
-    'SELECT id FROM sandboxes WHERE user_id = ?'
-  ).all(DEFAULT_USER_ID);
-  for (const sandbox of sandboxes) {
-    db.run('DELETE FROM chat_sessions WHERE sandbox_id = ?', [sandbox.id]);
-  }
+  
   // Delete sandboxes
-  db.run('DELETE FROM sandboxes WHERE user_id = ?', [DEFAULT_USER_ID]);
+  await db.delete(sandboxes).where(eq(sandboxes.userId, userId));
+  await db.delete(session).where(eq(session.userId, userId));
+  await db.delete(account).where(eq(account.userId, userId));
+  await db.delete(user).where(eq(user.id, userId));
+}
+
+async function createTestSandbox(userId: string, sandboxId: string, name: string): Promise<void> {
+  const now = new Date();
+  const slug = name.toLowerCase().replace(/\s+/g, '-');
+  await db.insert(sandboxes).values({
+    id: sandboxId,
+    userId,
+    name,
+    slug,
+    repoName: `test-repo-${sandboxId}`,
+    status: 'stopped',
+    createdAt: now,
+    updatedAt: now,
+  }).onConflictDoNothing();
+}
+
+async function createTestChatSession(sandboxId: string, sessionId: string, title: string, userId: string = DEFAULT_USER_ID): Promise<void> {
+  const now = new Date();
+  await db.insert(chatSessions).values({
+    id: sessionId,
+    sandboxId,
+    userId,
+    source: 'opencode',
+    title,
+    messageCount: 0,
+    status: 'active',
+    createdAt: now,
+    updatedAt: now,
+  }).onConflictDoNothing();
+}
+
+async function createTestActivityLog(userId: string, action: string): Promise<void> {
+  const id = crypto.randomUUID();
+  const now = new Date();
+  await db.insert(activityLog).values({
+    id,
+    userId,
+    action,
+    ipAddress: '127.0.0.1',
+    userAgent: 'Test Agent',
+    createdAt: now,
+  });
+}
+
+async function createTestPreferences(userId: string): Promise<void> {
+  const now = new Date();
+  await db.insert(userPreferences).values({
+    id: crypto.randomUUID(),
+    userId,
+    themeMode: 'dark',
+    themePreset: 'ocean-blue',
+    settingsVersion: 1,
+    createdAt: now,
+    updatedAt: now,
+  }).onConflictDoNothing();
+}
+
+async function createTestOpenCodeConfig(userId: string): Promise<void> {
+  const now = new Date();
+  await db.insert(userOpencodeConfig).values({
+    id: crypto.randomUUID(),
+    userId,
+    settings: '{"theme":"dark"}',
+    agentsMd: '# Agents Config',
+    createdAt: now,
+    updatedAt: now,
+  }).onConflictDoNothing();
+}
+
+async function cleanupAllTestData(): Promise<void> {
+  // Clean up all test data for default user
+  await db.delete(activityLog).where(eq(activityLog.userId, DEFAULT_USER_ID));
+  await db.delete(userPreferences).where(eq(userPreferences.userId, DEFAULT_USER_ID));
+  await db.delete(userOpencodeFiles).where(eq(userOpencodeFiles.userId, DEFAULT_USER_ID));
+  await db.delete(userOpencodeConfig).where(eq(userOpencodeConfig.userId, DEFAULT_USER_ID));
+  
+  // Get user's sandboxes
+  const userSandboxes = await db.select({ id: sandboxes.id }).from(sandboxes).where(eq(sandboxes.userId, DEFAULT_USER_ID));
+  
+  // Delete chat sessions (cascade will delete messages)
+  for (const sandbox of userSandboxes) {
+    await db.delete(chatSessions).where(eq(chatSessions.sandboxId, sandbox.id));
+  }
+  
+  // Delete sandboxes
+  await db.delete(sandboxes).where(eq(sandboxes.userId, DEFAULT_USER_ID));
 }
 
 // =============================================================================
@@ -128,20 +165,20 @@ function cleanupAllTestData(): void {
 // =============================================================================
 
 describe('Account Routes Integration Tests', () => {
-  beforeAll(() => {
+  beforeAll(async () => {
     // Create the test user (foreign key constraint)
-    createTestUser();
+    await createTestUser();
   });
 
-  afterAll(() => {
-    cleanupAllTestData();
-    deleteTestUser();
+  afterAll(async () => {
+    await cleanupAllTestData();
+    await deleteTestUser();
   });
 
-  beforeEach(() => {
-    cleanupAllTestData();
+  beforeEach(async () => {
+    await cleanupAllTestData();
     // Recreate user if it was deleted
-    createTestUser();
+    await createTestUser();
   });
 
   // ===========================================================================
@@ -205,9 +242,9 @@ describe('Account Routes Integration Tests', () => {
 
     test('should return correct sandbox count', async () => {
       // Create test sandboxes
-      createTestSandbox(DEFAULT_USER_ID, 'sandbox-1', 'Test Sandbox 1');
-      createTestSandbox(DEFAULT_USER_ID, 'sandbox-2', 'Test Sandbox 2');
-      createTestSandbox(DEFAULT_USER_ID, 'sandbox-3', 'Test Sandbox 3');
+      await createTestSandbox(DEFAULT_USER_ID, 'sandbox-1', 'Test Sandbox 1');
+      await createTestSandbox(DEFAULT_USER_ID, 'sandbox-2', 'Test Sandbox 2');
+      await createTestSandbox(DEFAULT_USER_ID, 'sandbox-3', 'Test Sandbox 3');
       
       const res = await app.request('/api/account', {
         headers: AUTH_HEADER,
@@ -221,9 +258,9 @@ describe('Account Routes Integration Tests', () => {
 
     test('should return correct chat session count', async () => {
       // Create sandbox and chat sessions
-      createTestSandbox(DEFAULT_USER_ID, 'sandbox-chat', 'Chat Test Sandbox');
-      createTestChatSession('sandbox-chat', 'session-1', 'Session 1');
-      createTestChatSession('sandbox-chat', 'session-2', 'Session 2');
+      await createTestSandbox(DEFAULT_USER_ID, 'sandbox-chat', 'Chat Test Sandbox');
+      await createTestChatSession('sandbox-chat', 'session-1', 'Session 1');
+      await createTestChatSession('sandbox-chat', 'session-2', 'Session 2');
       
       const res = await app.request('/api/account', {
         headers: AUTH_HEADER,
@@ -238,11 +275,11 @@ describe('Account Routes Integration Tests', () => {
 
     test('should aggregate chat sessions across multiple sandboxes', async () => {
       // Create multiple sandboxes with chat sessions
-      createTestSandbox(DEFAULT_USER_ID, 'sandbox-a', 'Sandbox A');
-      createTestSandbox(DEFAULT_USER_ID, 'sandbox-b', 'Sandbox B');
-      createTestChatSession('sandbox-a', 'session-a1', 'Session A1');
-      createTestChatSession('sandbox-a', 'session-a2', 'Session A2');
-      createTestChatSession('sandbox-b', 'session-b1', 'Session B1');
+      await createTestSandbox(DEFAULT_USER_ID, 'sandbox-a', 'Sandbox A');
+      await createTestSandbox(DEFAULT_USER_ID, 'sandbox-b', 'Sandbox B');
+      await createTestChatSession('sandbox-a', 'session-a1', 'Session A1');
+      await createTestChatSession('sandbox-a', 'session-a2', 'Session A2');
+      await createTestChatSession('sandbox-b', 'session-b1', 'Session B1');
       
       const res = await app.request('/api/account', {
         headers: AUTH_HEADER,
@@ -307,12 +344,12 @@ describe('Account Routes Integration Tests', () => {
 
     test('should delete preferences when deleting account', async () => {
       // Create preferences
-      createTestPreferences(DEFAULT_USER_ID);
+      await createTestPreferences(DEFAULT_USER_ID);
       
       // Verify preferences exist
-      const prefsBefore = db.query<{ user_id: string }, [string]>(
-        'SELECT user_id FROM user_preferences WHERE user_id = ?'
-      ).get(DEFAULT_USER_ID);
+      const [prefsBefore] = await db.select({ userId: userPreferences.userId })
+        .from(userPreferences)
+        .where(eq(userPreferences.userId, DEFAULT_USER_ID));
       expect(prefsBefore).toBeDefined();
       
       // Delete account
@@ -331,23 +368,23 @@ describe('Account Routes Integration Tests', () => {
       expect(data.results.preferencesDeleted).toBe(true);
       
       // Verify preferences are deleted
-      const prefsAfter = db.query<{ user_id: string }, [string]>(
-        'SELECT user_id FROM user_preferences WHERE user_id = ?'
-      ).get(DEFAULT_USER_ID);
-      expect(prefsAfter).toBeNull();
+      const [prefsAfter] = await db.select({ userId: userPreferences.userId })
+        .from(userPreferences)
+        .where(eq(userPreferences.userId, DEFAULT_USER_ID));
+      expect(prefsAfter).toBeUndefined();
     });
 
     test('should anonymize activity logs when deleting account', async () => {
       // Create activity logs
-      createTestActivityLog(DEFAULT_USER_ID, 'sandbox.create');
-      createTestActivityLog(DEFAULT_USER_ID, 'chat.message_send');
+      await createTestActivityLog(DEFAULT_USER_ID, 'sandbox.create');
+      await createTestActivityLog(DEFAULT_USER_ID, 'chat.message_send');
       
       // Verify logs exist with user_id
-      const logsBefore = db.query<{ user_id: string | null, anonymized: number }, [string]>(
-        'SELECT user_id, anonymized FROM activity_log WHERE user_id = ?'
-      ).all(DEFAULT_USER_ID);
+      const logsBefore = await db.select({ userId: activityLog.userId, anonymized: activityLog.anonymized })
+        .from(activityLog)
+        .where(eq(activityLog.userId, DEFAULT_USER_ID));
       expect(logsBefore.length).toBe(2);
-      expect(logsBefore[0].anonymized).toBe(0);
+      expect(logsBefore[0].anonymized).toBe(false);
       
       // Delete account
       const res = await app.request('/api/account', {
@@ -365,11 +402,11 @@ describe('Account Routes Integration Tests', () => {
       expect(data.results.activityLogsAnonymized).toBe(2);
       
       // Verify logs are anonymized (user_id set to NULL)
-      const logsAfter = db.query<{ user_id: string | null, anonymized: number }, []>(
-        'SELECT user_id, anonymized FROM activity_log WHERE anonymized = 1'
-      ).all();
+      const logsAfter = await db.select({ userId: activityLog.userId, anonymized: activityLog.anonymized })
+        .from(activityLog)
+        .where(eq(activityLog.anonymized, true));
       expect(logsAfter.length).toBeGreaterThanOrEqual(2);
-      expect(logsAfter.every(log => log.user_id === null)).toBe(true);
+      expect(logsAfter.every(log => log.userId === null)).toBe(true);
     });
 
     // Note: provider_credentials is global (not per-user) in this schema
@@ -377,12 +414,12 @@ describe('Account Routes Integration Tests', () => {
 
     test('should delete OpenCode config when deleting account', async () => {
       // Create OpenCode config
-      createTestOpenCodeConfig(DEFAULT_USER_ID);
+      await createTestOpenCodeConfig(DEFAULT_USER_ID);
       
       // Verify config exists
-      const configBefore = db.query<{ user_id: string }, [string]>(
-        'SELECT user_id FROM user_opencode_config WHERE user_id = ?'
-      ).get(DEFAULT_USER_ID);
+      const [configBefore] = await db.select({ userId: userOpencodeConfig.userId })
+        .from(userOpencodeConfig)
+        .where(eq(userOpencodeConfig.userId, DEFAULT_USER_ID));
       expect(configBefore).toBeDefined();
       
       // Delete account
@@ -398,17 +435,17 @@ describe('Account Routes Integration Tests', () => {
       expect(res.status).toBe(200);
       
       // Verify config is deleted
-      const configAfter = db.query<{ user_id: string }, [string]>(
-        'SELECT user_id FROM user_opencode_config WHERE user_id = ?'
-      ).get(DEFAULT_USER_ID);
-      expect(configAfter).toBeNull();
+      const [configAfter] = await db.select({ userId: userOpencodeConfig.userId })
+        .from(userOpencodeConfig)
+        .where(eq(userOpencodeConfig.userId, DEFAULT_USER_ID));
+      expect(configAfter).toBeUndefined();
     });
 
     test('should return results summary', async () => {
       // Set up data to delete
-      createTestPreferences(DEFAULT_USER_ID);
-      createTestActivityLog(DEFAULT_USER_ID, 'test.action');
-      createTestOpenCodeConfig(DEFAULT_USER_ID);
+      await createTestPreferences(DEFAULT_USER_ID);
+      await createTestActivityLog(DEFAULT_USER_ID, 'test.action');
+      await createTestOpenCodeConfig(DEFAULT_USER_ID);
       
       const res = await app.request('/api/account', {
         method: 'DELETE',
@@ -501,8 +538,8 @@ describe('Account Routes Integration Tests', () => {
     });
 
     test('should include sandboxes in export', async () => {
-      createTestSandbox(DEFAULT_USER_ID, 'export-sandbox-1', 'Export Test 1');
-      createTestSandbox(DEFAULT_USER_ID, 'export-sandbox-2', 'Export Test 2');
+      await createTestSandbox(DEFAULT_USER_ID, 'export-sandbox-1', 'Export Test 1');
+      await createTestSandbox(DEFAULT_USER_ID, 'export-sandbox-2', 'Export Test 2');
       
       const res = await app.request('/api/account/data-export', {
         headers: AUTH_HEADER,
@@ -518,9 +555,9 @@ describe('Account Routes Integration Tests', () => {
     });
 
     test('should include chat history in export', async () => {
-      createTestSandbox(DEFAULT_USER_ID, 'chat-export-sandbox', 'Chat Export');
-      createTestChatSession('chat-export-sandbox', 'export-session-1', 'Export Session 1');
-      createTestChatSession('chat-export-sandbox', 'export-session-2', 'Export Session 2');
+      await createTestSandbox(DEFAULT_USER_ID, 'chat-export-sandbox', 'Chat Export');
+      await createTestChatSession('chat-export-sandbox', 'export-session-1', 'Export Session 1');
+      await createTestChatSession('chat-export-sandbox', 'export-session-2', 'Export Session 2');
       
       const res = await app.request('/api/account/data-export', {
         headers: AUTH_HEADER,
@@ -535,7 +572,7 @@ describe('Account Routes Integration Tests', () => {
     });
 
     test('should include preferences in export', async () => {
-      createTestPreferences(DEFAULT_USER_ID);
+      await createTestPreferences(DEFAULT_USER_ID);
       
       const res = await app.request('/api/account/data-export', {
         headers: AUTH_HEADER,
@@ -545,12 +582,12 @@ describe('Account Routes Integration Tests', () => {
       const data = await res.json();
       
       expect(data.preferences).toBeDefined();
-      expect(data.preferences.theme_mode).toBe('dark');
-      expect(data.preferences.theme_preset).toBe('ocean-blue');
+      expect(data.preferences.themeMode).toBe('dark');
+      expect(data.preferences.themePreset).toBe('ocean-blue');
     });
 
     test('should include OpenCode config in export', async () => {
-      createTestOpenCodeConfig(DEFAULT_USER_ID);
+      await createTestOpenCodeConfig(DEFAULT_USER_ID);
       
       const res = await app.request('/api/account/data-export', {
         headers: AUTH_HEADER,
@@ -576,10 +613,10 @@ describe('Account Routes Integration Tests', () => {
     });
 
     test('should return valid JSON', async () => {
-      createTestSandbox(DEFAULT_USER_ID, 'json-test-sandbox', 'JSON Test');
-      createTestChatSession('json-test-sandbox', 'json-test-session', 'JSON Session');
-      createTestPreferences(DEFAULT_USER_ID);
-      createTestOpenCodeConfig(DEFAULT_USER_ID);
+      await createTestSandbox(DEFAULT_USER_ID, 'json-test-sandbox', 'JSON Test');
+      await createTestChatSession('json-test-sandbox', 'json-test-session', 'JSON Session');
+      await createTestPreferences(DEFAULT_USER_ID);
+      await createTestOpenCodeConfig(DEFAULT_USER_ID);
       
       const res = await app.request('/api/account/data-export', {
         headers: AUTH_HEADER,
@@ -621,8 +658,8 @@ describe('Account Routes Integration Tests', () => {
     test('should handle user with large amount of data', async () => {
       // Create multiple sandboxes with sessions
       for (let i = 0; i < 10; i++) {
-        createTestSandbox(DEFAULT_USER_ID, `bulk-sandbox-${i}`, `Bulk Sandbox ${i}`);
-        createTestChatSession(`bulk-sandbox-${i}`, `bulk-session-${i}`, `Bulk Session ${i}`);
+        await createTestSandbox(DEFAULT_USER_ID, `bulk-sandbox-${i}`, `Bulk Sandbox ${i}`);
+        await createTestChatSession(`bulk-sandbox-${i}`, `bulk-session-${i}`, `Bulk Session ${i}`);
       }
       
       const res = await app.request('/api/account/data-export', {
@@ -637,7 +674,7 @@ describe('Account Routes Integration Tests', () => {
     });
 
     test('should handle concurrent account info requests', async () => {
-      createTestSandbox(DEFAULT_USER_ID, 'concurrent-sandbox', 'Concurrent Test');
+      await createTestSandbox(DEFAULT_USER_ID, 'concurrent-sandbox', 'Concurrent Test');
       
       const requests = Array(5).fill(null).map(() =>
         app.request('/api/account', {
@@ -656,7 +693,7 @@ describe('Account Routes Integration Tests', () => {
 
     test('should handle special characters in sandbox names', async () => {
       const specialName = "Test's Sandbox & More <> \"quotes\"";
-      createTestSandbox(DEFAULT_USER_ID, 'special-chars-sandbox', specialName);
+      await createTestSandbox(DEFAULT_USER_ID, 'special-chars-sandbox', specialName);
       
       const res = await app.request('/api/account/data-export', {
         headers: AUTH_HEADER,
@@ -671,21 +708,21 @@ describe('Account Routes Integration Tests', () => {
 
     test('should count chat sessions correctly across many sandboxes', async () => {
       // Create sandboxes with varying numbers of sessions
-      createTestSandbox(DEFAULT_USER_ID, 'count-sandbox-1', 'Count 1');
-      createTestSandbox(DEFAULT_USER_ID, 'count-sandbox-2', 'Count 2');
-      createTestSandbox(DEFAULT_USER_ID, 'count-sandbox-3', 'Count 3');
+      await createTestSandbox(DEFAULT_USER_ID, 'count-sandbox-1', 'Count 1');
+      await createTestSandbox(DEFAULT_USER_ID, 'count-sandbox-2', 'Count 2');
+      await createTestSandbox(DEFAULT_USER_ID, 'count-sandbox-3', 'Count 3');
       
       // Sandbox 1: 3 sessions
-      createTestChatSession('count-sandbox-1', 'count-s1-a', 'Session A');
-      createTestChatSession('count-sandbox-1', 'count-s1-b', 'Session B');
-      createTestChatSession('count-sandbox-1', 'count-s1-c', 'Session C');
+      await createTestChatSession('count-sandbox-1', 'count-s1-a', 'Session A');
+      await createTestChatSession('count-sandbox-1', 'count-s1-b', 'Session B');
+      await createTestChatSession('count-sandbox-1', 'count-s1-c', 'Session C');
       
       // Sandbox 2: 2 sessions
-      createTestChatSession('count-sandbox-2', 'count-s2-a', 'Session A');
-      createTestChatSession('count-sandbox-2', 'count-s2-b', 'Session B');
+      await createTestChatSession('count-sandbox-2', 'count-s2-a', 'Session A');
+      await createTestChatSession('count-sandbox-2', 'count-s2-b', 'Session B');
       
       // Sandbox 3: 1 session
-      createTestChatSession('count-sandbox-3', 'count-s3-a', 'Session A');
+      await createTestChatSession('count-sandbox-3', 'count-s3-a', 'Session A');
       
       const res = await app.request('/api/account', {
         headers: AUTH_HEADER,

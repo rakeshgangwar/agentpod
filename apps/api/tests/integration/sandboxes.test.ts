@@ -11,7 +11,7 @@ import '../setup';
 
 import { describe, test, expect, beforeAll, afterAll, beforeEach, afterEach, mock } from 'bun:test';
 import { db } from '../../src/db/drizzle';
-import { user } from '../../src/db/schema';
+import { user, userResourceLimits } from '../../src/db/schema';
 import { eq } from 'drizzle-orm';
 import * as SandboxModel from '../../src/models/sandbox';
 
@@ -338,7 +338,25 @@ async function createTestUser(id: string): Promise<void> {
  * Helper to delete a test user
  */
 async function deleteTestUser(id: string): Promise<void> {
+  await db.delete(userResourceLimits).where(eq(userResourceLimits.userId, id));
   await db.delete(user).where(eq(user.id, id));
+}
+
+async function createTestUserLimits(userId: string): Promise<void> {
+  const now = new Date();
+  await db.insert(userResourceLimits).values({
+    id: `limits-${userId}`,
+    userId,
+    maxSandboxes: 20,
+    maxConcurrentRunning: 5,
+    allowedTierIds: '["starter", "builder", "pro"]',
+    maxTierId: 'pro',
+    maxTotalStorageGb: 100,
+    maxTotalCpuCores: 16,
+    maxTotalMemoryGb: 32,
+    createdAt: now,
+    updatedAt: now,
+  }).onConflictDoNothing();
 }
 
 /**
@@ -362,10 +380,12 @@ async function cleanupTestSandboxes(): Promise<void> {
 // =============================================================================
 
 beforeAll(async () => {
-  // Create test users (including default-user used by API key auth)
   await createTestUser('default-user');
   await createTestUser(TEST_USER_ID);
   await createTestUser(TEST_USER_ID_2);
+  await createTestUserLimits('default-user');
+  await createTestUserLimits(TEST_USER_ID);
+  await createTestUserLimits(TEST_USER_ID_2);
 });
 
 afterAll(async () => {
@@ -775,8 +795,8 @@ describe('Sandbox Lifecycle Operations', () => {
         method: 'POST',
       });
       
-      expect(status).toBe(500);
-      expect((data as any).error).toContain('Failed to start sandbox');
+      expect(status).toBe(404);
+      expect((data as any).error).toBe('Sandbox not found');
     });
   });
 
