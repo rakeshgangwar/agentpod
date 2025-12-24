@@ -12,6 +12,11 @@ export default defineConfig(async () => ({
   //
   // 1. prevent vite from obscuring rust errors
   clearScreen: false,
+  
+  // Mark dev-only packages as external for SSR builds (they're dynamically imported only in dev mode)
+  ssr: {
+    external: ["tauri-plugin-mcp", "html2canvas"],
+  },
   // 2. tauri expects a fixed port, fail if that port is not available
   server: {
     port: 1420,
