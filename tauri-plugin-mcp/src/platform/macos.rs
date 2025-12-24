@@ -24,7 +24,7 @@ pub async fn take_screenshot<R: Runtime>(
         .unwrap_or_else(|| "main".to_string());
     
     // Get application name from params or use a default
-    let application_name = params.application_name.clone().unwrap_or_else(|| "".to_string());
+    let application_name = params.application_name.clone().unwrap_or_default();
 
     handle_screenshot_task(move || {
         // Get the window title to help identify the right window

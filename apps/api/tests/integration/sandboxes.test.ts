@@ -54,7 +54,7 @@ mock.module('../../src/services/sandbox-manager', () => {
             // Create in DB first
             const id = `sandbox-${Date.now()}`;
             const slug = options.name.toLowerCase().replace(/[^a-z0-9]/g, '-');
-            const sandbox = SandboxModel.createSandbox({
+            await SandboxModel.createSandbox({
               id,
               userId: options.userId,
               name: options.name,
@@ -79,14 +79,14 @@ mock.module('../../src/services/sandbox-manager', () => {
             await mockGitBackend.createRepo(`${slug}-repo`);
             
             // Update DB with container info
-            SandboxModel.updateSandbox(id, {
+            await SandboxModel.updateSandbox(id, {
               containerId: `container-${id}`,
               containerName: `agentpod-${slug}`,
               status: 'running',
               opencodeUrl: `http://localhost:4000`,
             });
             
-            const updatedSandbox = SandboxModel.getSandboxById(id);
+            const updatedSandbox = await SandboxModel.getSandboxById(id);
             
             return {
               sandbox: {
@@ -101,25 +101,25 @@ mock.module('../../src/services/sandbox-manager', () => {
           },
           
           startSandbox: async (id: string) => {
-            const sandbox = SandboxModel.getSandboxById(id);
+            const sandbox = await SandboxModel.getSandboxById(id);
             if (!sandbox) throw new Error(`Sandbox not found: ${id}`);
             
             addMockSandbox({ id, status: 'stopped' });
             await mockOrchestrator.startSandbox(id);
-            SandboxModel.updateSandboxStatus(id, 'running');
+            await SandboxModel.updateSandboxStatus(id, 'running');
           },
           
           stopSandbox: async (id: string, timeout?: number) => {
-            const sandbox = SandboxModel.getSandboxById(id);
+            const sandbox = await SandboxModel.getSandboxById(id);
             if (!sandbox) throw new Error(`Sandbox not found: ${id}`);
             
             addMockSandbox({ id, status: 'running' });
             await mockOrchestrator.stopSandbox(id, timeout);
-            SandboxModel.updateSandboxStatus(id, 'stopped');
+            await SandboxModel.updateSandboxStatus(id, 'stopped');
           },
           
           restartSandbox: async (id: string, timeout?: number) => {
-            const sandbox = SandboxModel.getSandboxById(id);
+            const sandbox = await SandboxModel.getSandboxById(id);
             if (!sandbox) throw new Error(`Sandbox not found: ${id}`);
             
             addMockSandbox({ id, status: 'running' });
@@ -127,35 +127,35 @@ mock.module('../../src/services/sandbox-manager', () => {
           },
           
           pauseSandbox: async (id: string) => {
-            const sandbox = SandboxModel.getSandboxById(id);
+            const sandbox = await SandboxModel.getSandboxById(id);
             if (!sandbox) throw new Error(`Sandbox not found: ${id}`);
             
             addMockSandbox({ id, status: 'running' });
             await mockOrchestrator.pauseSandbox(id);
-            SandboxModel.updateSandboxStatus(id, 'stopped');
+            await SandboxModel.updateSandboxStatus(id, 'stopped');
           },
           
           unpauseSandbox: async (id: string) => {
-            const sandbox = SandboxModel.getSandboxById(id);
+            const sandbox = await SandboxModel.getSandboxById(id);
             if (!sandbox) throw new Error(`Sandbox not found: ${id}`);
             
             addMockSandbox({ id, status: 'paused' });
             await mockOrchestrator.unpauseSandbox(id);
-            SandboxModel.updateSandboxStatus(id, 'running');
+            await SandboxModel.updateSandboxStatus(id, 'running');
           },
           
           deleteSandbox: async (id: string, options?: { deleteRepo?: boolean; removeVolumes?: boolean }) => {
-            const sandbox = SandboxModel.getSandboxById(id);
+            const sandbox = await SandboxModel.getSandboxById(id);
             if (!sandbox) throw new Error(`Sandbox not found: ${id}`);
             
             addMockSandbox({ id });
             await mockOrchestrator.deleteSandbox(id, options?.removeVolumes);
-            SandboxModel.deleteSandbox(id);
+            await SandboxModel.deleteSandbox(id);
           },
           
           // Query operations
           getSandbox: async (id: string) => {
-            const sandbox = SandboxModel.getSandboxById(id);
+            const sandbox = await SandboxModel.getSandboxById(id);
             if (!sandbox) return null;
             
             return {
@@ -165,7 +165,7 @@ mock.module('../../src/services/sandbox-manager', () => {
           },
           
           getSandboxInfo: async (id: string) => {
-            const sandbox = SandboxModel.getSandboxById(id);
+            const sandbox = await SandboxModel.getSandboxById(id);
             if (!sandbox) return null;
             
             return {
@@ -178,12 +178,12 @@ mock.module('../../src/services/sandbox-manager', () => {
           },
           
           listSandboxes: async (filter?: { userId?: string; status?: string[] }) => {
-            let sandboxes: ReturnType<typeof SandboxModel.listAllSandboxes>;
+            let sandboxes: Awaited<ReturnType<typeof SandboxModel.listAllSandboxes>>;
             
             if (filter?.userId) {
-              sandboxes = SandboxModel.listSandboxesByUserId(filter.userId);
+              sandboxes = await SandboxModel.listSandboxesByUserId(filter.userId);
             } else {
-              sandboxes = SandboxModel.listAllSandboxes();
+              sandboxes = await SandboxModel.listAllSandboxes();
             }
             
             // Filter by status if provided
@@ -198,13 +198,13 @@ mock.module('../../src/services/sandbox-manager', () => {
           },
           
           getSandboxStatus: async (id: string) => {
-            const sandbox = SandboxModel.getSandboxById(id);
+            const sandbox = await SandboxModel.getSandboxById(id);
             if (!sandbox) throw new Error(`Sandbox not found: ${id}`);
             return sandbox.status;
           },
           
           getSandboxLogs: async (id: string, options?: any) => {
-            const sandbox = SandboxModel.getSandboxById(id);
+            const sandbox = await SandboxModel.getSandboxById(id);
             if (!sandbox) throw new Error(`Sandbox not found: ${id}`);
             
             addMockSandbox({ id, logs: ['Log line 1', 'Log line 2', 'Log line 3'] });
@@ -212,7 +212,7 @@ mock.module('../../src/services/sandbox-manager', () => {
           },
           
           getSandboxStats: async (id: string) => {
-            const sandbox = SandboxModel.getSandboxById(id);
+            const sandbox = await SandboxModel.getSandboxById(id);
             if (!sandbox) throw new Error(`Sandbox not found: ${id}`);
             
             addMockSandbox({ id });
@@ -220,7 +220,7 @@ mock.module('../../src/services/sandbox-manager', () => {
           },
           
           exec: async (id: string, command: string[], options?: any) => {
-            const sandbox = SandboxModel.getSandboxById(id);
+            const sandbox = await SandboxModel.getSandboxById(id);
             if (!sandbox) throw new Error(`Sandbox not found: ${id}`);
             
             addMockSandbox({ id });
@@ -229,7 +229,7 @@ mock.module('../../src/services/sandbox-manager', () => {
           
           // Git operations
           commitChanges: async (id: string, message: string, author?: any) => {
-            const sandbox = SandboxModel.getSandboxById(id);
+            const sandbox = await SandboxModel.getSandboxById(id);
             if (!sandbox) throw new Error(`Sandbox not found: ${id}`);
             if (!sandbox.repoName) throw new Error(`Sandbox has no repository: ${id}`);
             
@@ -238,7 +238,7 @@ mock.module('../../src/services/sandbox-manager', () => {
           },
           
           getGitStatus: async (id: string) => {
-            const sandbox = SandboxModel.getSandboxById(id);
+            const sandbox = await SandboxModel.getSandboxById(id);
             if (!sandbox) throw new Error(`Sandbox not found: ${id}`);
             if (!sandbox.repoName) throw new Error(`Sandbox has no repository: ${id}`);
             
@@ -247,7 +247,7 @@ mock.module('../../src/services/sandbox-manager', () => {
           },
           
           getGitLog: async (id: string, options?: any) => {
-            const sandbox = SandboxModel.getSandboxById(id);
+            const sandbox = await SandboxModel.getSandboxById(id);
             if (!sandbox) throw new Error(`Sandbox not found: ${id}`);
             if (!sandbox.repoName) throw new Error(`Sandbox has no repository: ${id}`);
             
@@ -433,7 +433,7 @@ describe('GET /api/v2/sandboxes - List Sandboxes', () => {
 
   test('should list all sandboxes', async () => {
     // Create test sandboxes
-    SandboxModel.createSandbox({
+    await SandboxModel.createSandbox({
       id: 'test-list-001',
       userId: TEST_USER_ID,
       name: 'Test Sandbox 1',
@@ -444,7 +444,7 @@ describe('GET /api/v2/sandboxes - List Sandboxes', () => {
       addonIds: [],
     });
     
-    SandboxModel.createSandbox({
+    await SandboxModel.createSandbox({
       id: 'test-list-002',
       userId: TEST_USER_ID,
       name: 'Test Sandbox 2',
@@ -463,7 +463,7 @@ describe('GET /api/v2/sandboxes - List Sandboxes', () => {
   });
 
   test('should filter sandboxes by userId', async () => {
-    SandboxModel.createSandbox({
+    await SandboxModel.createSandbox({
       id: 'test-filter-user-001',
       userId: TEST_USER_ID,
       name: 'User 1 Sandbox',
@@ -474,7 +474,7 @@ describe('GET /api/v2/sandboxes - List Sandboxes', () => {
       addonIds: [],
     });
     
-    SandboxModel.createSandbox({
+    await SandboxModel.createSandbox({
       id: 'test-filter-user-002',
       userId: TEST_USER_ID_2,
       name: 'User 2 Sandbox',
@@ -493,7 +493,7 @@ describe('GET /api/v2/sandboxes - List Sandboxes', () => {
   });
 
   test('should filter sandboxes by status', async () => {
-    SandboxModel.createSandbox({
+    await SandboxModel.createSandbox({
       id: 'test-filter-status-001',
       userId: TEST_USER_ID,
       name: 'Running Sandbox',
@@ -503,9 +503,9 @@ describe('GET /api/v2/sandboxes - List Sandboxes', () => {
       flavorId: 'js',
       addonIds: [],
     });
-    SandboxModel.updateSandboxStatus('test-filter-status-001', 'running');
+    await SandboxModel.updateSandboxStatus('test-filter-status-001', 'running');
     
-    SandboxModel.createSandbox({
+    await SandboxModel.createSandbox({
       id: 'test-filter-status-002',
       userId: TEST_USER_ID,
       name: 'Stopped Sandbox',
@@ -515,7 +515,7 @@ describe('GET /api/v2/sandboxes - List Sandboxes', () => {
       flavorId: 'js',
       addonIds: [],
     });
-    SandboxModel.updateSandboxStatus('test-filter-status-002', 'stopped');
+    await SandboxModel.updateSandboxStatus('test-filter-status-002', 'stopped');
 
     const { status, data } = await request('/api/v2/sandboxes?status=running');
     
@@ -645,7 +645,7 @@ describe('POST /api/v2/sandboxes - Create Sandbox', () => {
 
 describe('GET /api/v2/sandboxes/:id - Get Sandbox', () => {
   test('should get sandbox by ID', async () => {
-    SandboxModel.createSandbox({
+    await SandboxModel.createSandbox({
       id: 'test-get-001',
       userId: TEST_USER_ID,
       name: 'Get Test Sandbox',
@@ -677,7 +677,7 @@ describe('GET /api/v2/sandboxes/:id - Get Sandbox', () => {
 
 describe('DELETE /api/v2/sandboxes/:id - Delete Sandbox', () => {
   test('should delete a sandbox', async () => {
-    SandboxModel.createSandbox({
+    await SandboxModel.createSandbox({
       id: 'test-delete-001',
       userId: TEST_USER_ID,
       name: 'Delete Test Sandbox',
@@ -697,12 +697,12 @@ describe('DELETE /api/v2/sandboxes/:id - Delete Sandbox', () => {
     expect((data as any).success).toBe(true);
     
     // Verify sandbox is deleted
-    const sandbox = SandboxModel.getSandboxById('test-delete-001');
+    const sandbox = await SandboxModel.getSandboxById('test-delete-001');
     expect(sandbox).toBeNull();
   });
 
   test('should delete sandbox with removeVolumes option', async () => {
-    SandboxModel.createSandbox({
+    await SandboxModel.createSandbox({
       id: 'test-delete-volumes-001',
       userId: TEST_USER_ID,
       name: 'Delete Volumes Test',
@@ -742,8 +742,8 @@ describe('DELETE /api/v2/sandboxes/:id - Delete Sandbox', () => {
 describe('Sandbox Lifecycle Operations', () => {
   const LIFECYCLE_SANDBOX_ID = 'test-lifecycle-001';
 
-  beforeEach(() => {
-    SandboxModel.createSandbox({
+  beforeEach(async () => {
+    await SandboxModel.createSandbox({
       id: LIFECYCLE_SANDBOX_ID,
       userId: TEST_USER_ID,
       name: 'Lifecycle Test Sandbox',
@@ -757,7 +757,7 @@ describe('Sandbox Lifecycle Operations', () => {
 
   describe('POST /api/v2/sandboxes/:id/start - Start Sandbox', () => {
     test('should start a stopped sandbox', async () => {
-      SandboxModel.updateSandboxStatus(LIFECYCLE_SANDBOX_ID, 'stopped');
+      await SandboxModel.updateSandboxStatus(LIFECYCLE_SANDBOX_ID, 'stopped');
 
       const { status, data } = await request(`/api/v2/sandboxes/${LIFECYCLE_SANDBOX_ID}/start`, {
         method: 'POST',
@@ -780,7 +780,7 @@ describe('Sandbox Lifecycle Operations', () => {
 
   describe('POST /api/v2/sandboxes/:id/stop - Stop Sandbox', () => {
     test('should stop a running sandbox', async () => {
-      SandboxModel.updateSandboxStatus(LIFECYCLE_SANDBOX_ID, 'running');
+      await SandboxModel.updateSandboxStatus(LIFECYCLE_SANDBOX_ID, 'running');
 
       const { status, data } = await request(`/api/v2/sandboxes/${LIFECYCLE_SANDBOX_ID}/stop`, {
         method: 'POST',
@@ -791,7 +791,7 @@ describe('Sandbox Lifecycle Operations', () => {
     });
 
     test('should stop sandbox with custom timeout', async () => {
-      SandboxModel.updateSandboxStatus(LIFECYCLE_SANDBOX_ID, 'running');
+      await SandboxModel.updateSandboxStatus(LIFECYCLE_SANDBOX_ID, 'running');
 
       const { status } = await request(`/api/v2/sandboxes/${LIFECYCLE_SANDBOX_ID}/stop?timeout=30`, {
         method: 'POST',
@@ -807,7 +807,7 @@ describe('Sandbox Lifecycle Operations', () => {
 
   describe('POST /api/v2/sandboxes/:id/restart - Restart Sandbox', () => {
     test('should restart a sandbox', async () => {
-      SandboxModel.updateSandboxStatus(LIFECYCLE_SANDBOX_ID, 'running');
+      await SandboxModel.updateSandboxStatus(LIFECYCLE_SANDBOX_ID, 'running');
 
       const { status, data } = await request(`/api/v2/sandboxes/${LIFECYCLE_SANDBOX_ID}/restart`, {
         method: 'POST',
@@ -818,7 +818,7 @@ describe('Sandbox Lifecycle Operations', () => {
     });
 
     test('should restart sandbox with custom timeout', async () => {
-      SandboxModel.updateSandboxStatus(LIFECYCLE_SANDBOX_ID, 'running');
+      await SandboxModel.updateSandboxStatus(LIFECYCLE_SANDBOX_ID, 'running');
 
       const { status } = await request(`/api/v2/sandboxes/${LIFECYCLE_SANDBOX_ID}/restart?timeout=20`, {
         method: 'POST',
@@ -834,7 +834,7 @@ describe('Sandbox Lifecycle Operations', () => {
 
   describe('POST /api/v2/sandboxes/:id/pause - Pause Sandbox', () => {
     test('should pause a running sandbox', async () => {
-      SandboxModel.updateSandboxStatus(LIFECYCLE_SANDBOX_ID, 'running');
+      await SandboxModel.updateSandboxStatus(LIFECYCLE_SANDBOX_ID, 'running');
 
       const { status, data } = await request(`/api/v2/sandboxes/${LIFECYCLE_SANDBOX_ID}/pause`, {
         method: 'POST',
@@ -848,7 +848,7 @@ describe('Sandbox Lifecycle Operations', () => {
 
   describe('POST /api/v2/sandboxes/:id/unpause - Unpause Sandbox', () => {
     test('should unpause a paused sandbox', async () => {
-      SandboxModel.updateSandboxStatus(LIFECYCLE_SANDBOX_ID, 'stopped');
+      await SandboxModel.updateSandboxStatus(LIFECYCLE_SANDBOX_ID, 'stopped');
 
       const { status, data } = await request(`/api/v2/sandboxes/${LIFECYCLE_SANDBOX_ID}/unpause`, {
         method: 'POST',
@@ -868,8 +868,8 @@ describe('Sandbox Lifecycle Operations', () => {
 describe('Sandbox Logs and Stats', () => {
   const LOGS_SANDBOX_ID = 'test-logs-001';
 
-  beforeEach(() => {
-    SandboxModel.createSandbox({
+  beforeEach(async () => {
+    await SandboxModel.createSandbox({
       id: LOGS_SANDBOX_ID,
       userId: TEST_USER_ID,
       name: 'Logs Test Sandbox',
@@ -879,7 +879,7 @@ describe('Sandbox Logs and Stats', () => {
       flavorId: 'js',
       addonIds: [],
     });
-    SandboxModel.updateSandboxStatus(LOGS_SANDBOX_ID, 'running');
+    await SandboxModel.updateSandboxStatus(LOGS_SANDBOX_ID, 'running');
   });
 
   describe('GET /api/v2/sandboxes/:id/logs - Get Logs', () => {
@@ -936,7 +936,7 @@ describe('Sandbox Logs and Stats', () => {
 
 describe('GET /api/v2/sandboxes/:id/status - Get Status', () => {
   test('should get sandbox status', async () => {
-    SandboxModel.createSandbox({
+    await SandboxModel.createSandbox({
       id: 'test-status-001',
       userId: TEST_USER_ID,
       name: 'Status Test Sandbox',
@@ -946,7 +946,7 @@ describe('GET /api/v2/sandboxes/:id/status - Get Status', () => {
       flavorId: 'js',
       addonIds: [],
     });
-    SandboxModel.updateSandboxStatus('test-status-001', 'running');
+    await SandboxModel.updateSandboxStatus('test-status-001', 'running');
 
     const { status, data } = await request('/api/v2/sandboxes/test-status-001/status');
     
@@ -969,8 +969,8 @@ describe('GET /api/v2/sandboxes/:id/status - Get Status', () => {
 describe('POST /api/v2/sandboxes/:id/exec - Execute Command', () => {
   const EXEC_SANDBOX_ID = 'test-exec-001';
 
-  beforeEach(() => {
-    SandboxModel.createSandbox({
+  beforeEach(async () => {
+    await SandboxModel.createSandbox({
       id: EXEC_SANDBOX_ID,
       userId: TEST_USER_ID,
       name: 'Exec Test Sandbox',
@@ -980,7 +980,7 @@ describe('POST /api/v2/sandboxes/:id/exec - Execute Command', () => {
       flavorId: 'js',
       addonIds: [],
     });
-    SandboxModel.updateSandboxStatus(EXEC_SANDBOX_ID, 'running');
+    await SandboxModel.updateSandboxStatus(EXEC_SANDBOX_ID, 'running');
   });
 
   test('should execute a command in sandbox', async () => {
@@ -1054,8 +1054,8 @@ describe('POST /api/v2/sandboxes/:id/exec - Execute Command', () => {
 describe('Sandbox Git Operations', () => {
   const GIT_SANDBOX_ID = 'test-git-001';
 
-  beforeEach(() => {
-    SandboxModel.createSandbox({
+  beforeEach(async () => {
+    await SandboxModel.createSandbox({
       id: GIT_SANDBOX_ID,
       userId: TEST_USER_ID,
       name: 'Git Test Sandbox',
@@ -1065,7 +1065,7 @@ describe('Sandbox Git Operations', () => {
       flavorId: 'js',
       addonIds: [],
     });
-    SandboxModel.updateSandboxStatus(GIT_SANDBOX_ID, 'running');
+    await SandboxModel.updateSandboxStatus(GIT_SANDBOX_ID, 'running');
   });
 
   describe('POST /api/v2/sandboxes/:id/git/commit - Commit Changes', () => {

@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use serde_json::Value;
 use std::sync::mpsc;
-use tauri::{AppHandle, Emitter, Listener, Manager, Runtime};
+use tauri::{AppHandle, Emitter, Listener, Runtime};
 
 fn default_window_label() -> String {
     "main".to_string()
