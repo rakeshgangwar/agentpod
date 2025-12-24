@@ -51,7 +51,7 @@ tauri-plugin-mcp = { path = "../../../tauri-plugin-mcp" }
 # Note: On Linux, we use ALSA. The alsa-sys crate will link dynamically by default.
 # For static linking (no runtime deps), build with ALSA_STATIC=1 environment variable.
 # Most desktop Linux distros have libasound2 pre-installed.
-cpal = { version = "0.15", optional = true }                    # Cross-platform audio I/O
+cpal = { version = "0.17", optional = true }                    # Cross-platform audio I/O
 hound = { version = "3.5", optional = true }                    # WAV file I/O
 whisper-rs = { git = "https://codeberg.org/tazz4843/whisper-rs.git", default-features = false, features = ["tracing_backend"], optional = true }
 parking_lot = "0.12"             # Fast synchronization primitives (always needed)
