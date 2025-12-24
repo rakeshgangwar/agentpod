@@ -24,6 +24,7 @@ pub struct ScreenshotContext<R: Runtime> {
 }
 
 /// Create a success response with data
+#[allow(dead_code)]
 pub fn create_success_response(data_url: String) -> ScreenshotResponse {
     ScreenshotResponse {
         data: Some(data_url),
