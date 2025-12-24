@@ -10,7 +10,7 @@
  * - Could be extended to show actual diffs in future
  */
 
-import { useState, type FC } from "react";
+import { useState, memo, type FC } from "react";
 import type { InternalPatch } from "../types/messages";
 
 interface PatchViewerProps {
@@ -52,10 +52,7 @@ function getFileIcon(filename: string): string {
   }
 }
 
-/**
- * Single patch item
- */
-const PatchItem: FC<{ patch: InternalPatch }> = ({ patch }) => {
+const PatchItem: FC<{ patch: InternalPatch }> = memo(({ patch }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   
   // Safely get files array
@@ -105,7 +102,7 @@ const PatchItem: FC<{ patch: InternalPatch }> = ({ patch }) => {
       )}
     </div>
   );
-};
+});
 
 /**
  * PatchViewer shows file changes

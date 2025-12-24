@@ -31,6 +31,12 @@ let isLoading = $state(false);
 let error = $state<string | null>(null);
 let dockerHealthy = $state<boolean | null>(null);
 
+// Memoized derived state (computed once per change, not on every access)
+const runningSandboxes = $derived(sandboxesList.filter(s => s.status === "running"));
+const stoppedSandboxes = $derived(sandboxesList.filter(s => s.status === "stopped"));
+const startingSandboxes = $derived(sandboxesList.filter(s => s.status === "starting"));
+const stoppingSandboxes = $derived(sandboxesList.filter(s => s.status === "stopping"));
+
 // =============================================================================
 // Derived State
 // =============================================================================
@@ -43,11 +49,10 @@ export const sandboxes = {
   get count() { return sandboxesList.length; },
   get dockerHealthy() { return dockerHealthy; },
   
-  // Derived getters - use API status values: created, starting, running, stopping, stopped, error
-  get running() { return sandboxesList.filter(s => s.status === "running"); },
-  get stopped() { return sandboxesList.filter(s => s.status === "stopped"); },
-  get starting() { return sandboxesList.filter(s => s.status === "starting"); },
-  get stopping() { return sandboxesList.filter(s => s.status === "stopping"); },
+  get running() { return runningSandboxes; },
+  get stopped() { return stoppedSandboxes; },
+  get starting() { return startingSandboxes; },
+  get stopping() { return stoppingSandboxes; },
 };
 
 // =============================================================================

@@ -10,7 +10,7 @@
  * - Shows timing if available
  */
 
-import { useState, type FC } from "react";
+import { useState, memo, type FC } from "react";
 import type { InternalReasoning } from "../types/messages";
 
 interface ReasoningDisplayProps {
@@ -28,10 +28,7 @@ function formatDuration(ms: number): string {
   return `${(ms / 60000).toFixed(1)}m`;
 }
 
-/**
- * Single reasoning block
- */
-const ReasoningBlock: FC<{ item: InternalReasoning; index: number }> = ({ item }) => {
+const ReasoningBlock: FC<{ item: InternalReasoning; index: number }> = memo(({ item }) => {
   const duration = item.startTime && item.endTime 
     ? item.endTime - item.startTime 
     : null;
@@ -54,7 +51,7 @@ const ReasoningBlock: FC<{ item: InternalReasoning; index: number }> = ({ item }
       )}
     </div>
   );
-};
+});
 
 /**
  * ReasoningDisplay shows AI reasoning/thinking in a collapsible section

@@ -27,6 +27,9 @@ let isInitialized = $state(false);
 let providersLoaded = $state(false);
 let error = $state<string | null>(null);
 
+let themeMediaQueryForCleanup: MediaQueryList | null = null;
+let themeListenerForCleanup: ((e: MediaQueryListEvent) => void) | null = null;
+
 // =============================================================================
 // Derived State
 // =============================================================================
@@ -81,12 +84,18 @@ function applyTheme(theme: Theme): void {
 function setupThemeListener(): void {
   if (typeof window === "undefined") return;
   
-  const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-  mediaQuery.addEventListener("change", (e) => {
+  // Cleanup existing listener to prevent memory leaks
+  if (themeMediaQueryForCleanup && themeListenerForCleanup) {
+    themeMediaQueryForCleanup.removeEventListener("change", themeListenerForCleanup);
+  }
+  
+  themeMediaQueryForCleanup = window.matchMedia("(prefers-color-scheme: dark)");
+  themeListenerForCleanup = (e) => {
     if (currentSettings.theme === "system") {
       document.documentElement.classList.toggle("dark", e.matches);
     }
-  });
+  };
+  themeMediaQueryForCleanup.addEventListener("change", themeListenerForCleanup);
 }
 
 // =============================================================================

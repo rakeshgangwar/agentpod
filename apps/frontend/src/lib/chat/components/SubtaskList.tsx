@@ -10,7 +10,7 @@
  * - Expandable to see full prompt
  */
 
-import { useState, type FC } from "react";
+import { useState, memo, type FC } from "react";
 import type { InternalSubtask } from "../types/messages";
 
 interface SubtaskListProps {
@@ -43,13 +43,10 @@ function getAgentColor(agent: string): string {
   }
 }
 
-/**
- * Single subtask item
- */
 const SubtaskItem: FC<{ 
   subtask: InternalSubtask; 
   onNavigate?: () => void;
-}> = ({ subtask, onNavigate }) => {
+}> = memo(({ subtask, onNavigate }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const agentColor = getAgentColor(subtask.agent);
   
@@ -115,7 +112,7 @@ const SubtaskItem: FC<{
       )}
     </div>
   );
-};
+});
 
 /**
  * SubtaskList shows spawned subtasks

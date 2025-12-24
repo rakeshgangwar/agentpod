@@ -79,6 +79,8 @@
   let lastDetectedWakeword = $state<string | null>(null);
   let detectionTimeout: ReturnType<typeof setTimeout> | null = null;
 
+  const builtinWakewordModels = $derived(wakewordModels.filter(m => m.isBuiltin));
+
   // Model descriptions
   const modelDescriptions: Record<ModelSize, { speed: string; accuracy: string; size: string }> = {
     tiny: { speed: "Very Fast", accuracy: "Basic", size: "~75 MB" },
@@ -724,7 +726,7 @@
       {:else}
         <!-- Wake Word Models -->
         <div class="grid gap-2">
-          {#each wakewordModels.filter(m => m.isBuiltin) as model}
+          {#each builtinWakewordModels as model}
             {@const isDownloaded = model.path !== null}
             {@const isLoaded = model.isLoaded}
             {@const isDownloading = downloadingWakewordModel === model.modelId}

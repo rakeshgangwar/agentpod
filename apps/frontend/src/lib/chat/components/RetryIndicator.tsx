@@ -10,7 +10,7 @@
  * - Collapsible for multiple retries
  */
 
-import { useState, type FC } from "react";
+import { useState, memo, type FC } from "react";
 import type { InternalRetry } from "../types/messages";
 
 interface RetryIndicatorProps {
@@ -31,10 +31,7 @@ function formatRelativeTime(timestamp: number): string {
   return `${Math.floor(seconds / 86400)}d ago`;
 }
 
-/**
- * Single retry item
- */
-const RetryItem: FC<{ retry: InternalRetry }> = ({ retry }) => {
+const RetryItem: FC<{ retry: InternalRetry }> = memo(({ retry }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   
   return (
@@ -97,7 +94,7 @@ const RetryItem: FC<{ retry: InternalRetry }> = ({ retry }) => {
       )}
     </div>
   );
-};
+});
 
 /**
  * RetryIndicator shows retry attempts

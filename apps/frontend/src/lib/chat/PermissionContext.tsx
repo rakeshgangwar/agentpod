@@ -9,7 +9,7 @@
  * in the UI, typically as a sticky bar at the bottom of the chat.
  */
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from "react";
 import {
   sandboxOpencodeRespondPermission,
   type PermissionRequest,
@@ -149,7 +149,7 @@ export function PermissionProvider({ projectId, children }: PermissionProviderPr
   const hasPendingPermissions = pendingPermissions.length > 0;
   const currentPermission = pendingPermissions.length > 0 ? pendingPermissions[0] : null;
 
-  const value: PermissionContextValue = {
+  const value = useMemo<PermissionContextValue>(() => ({
     pendingPermissions,
     addPermission,
     removePermission,
@@ -157,7 +157,7 @@ export function PermissionProvider({ projectId, children }: PermissionProviderPr
     clearPermissions,
     hasPendingPermissions,
     currentPermission,
-  };
+  }), [pendingPermissions, addPermission, removePermission, respondToPermission, clearPermissions, hasPendingPermissions, currentPermission]);
 
   return (
     <PermissionContext.Provider value={value}>

@@ -42,6 +42,14 @@ let isLoadingLog = $state(false);
 // Current sandbox ID being tracked
 let activeSandboxId = $state<string | null>(null);
 
+// Memoized derived state (computed once per change, not on every access)
+const stagedFilesDerived = $derived(gitStatus?.files.filter(f => 
+  f.staged && f.staged !== " " && f.staged !== "?" && f.staged !== "unmodified"
+) ?? []);
+const unstagedFilesDerived = $derived(gitStatus?.files.filter(f => 
+  f.unstaged && f.unstaged !== " " && f.unstaged !== "unmodified"
+) ?? []);
+
 // =============================================================================
 // Exported State (Reactive Getters)
 // =============================================================================
@@ -76,16 +84,8 @@ export const gitStore = {
            diffSummary.deleted.length + 
            diffSummary.renamed.length;
   },
-  get stagedFiles() {
-    return gitStatus?.files.filter(f => 
-      f.staged && f.staged !== " " && f.staged !== "?" && f.staged !== "unmodified"
-    ) ?? [];
-  },
-  get unstagedFiles() {
-    return gitStatus?.files.filter(f => 
-      f.unstaged && f.unstaged !== " " && f.unstaged !== "unmodified"
-    ) ?? [];
-  },
+  get stagedFiles() { return stagedFilesDerived; },
+  get unstagedFiles() { return unstagedFilesDerived; },
   
   // Active sandbox
   get activeSandboxId() { return activeSandboxId; },

@@ -11,7 +11,7 @@
  * This also integrates the Permission system for human-in-the-loop approvals.
  */
 
-import { useState, useEffect, useCallback, useRef, createContext, useContext, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, createContext, useContext, type ReactNode } from "react";
 import {
   AssistantRuntimeProvider,
   useExternalStoreRuntime,
@@ -898,6 +898,15 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
     setMessages,
   });
 
+  const attachmentContextValue = useMemo<AttachmentContextValue>(() => ({
+    sendWithAttachments,
+  }), [sendWithAttachments]);
+  
+  const sessionStatusContextValue = useMemo<SessionStatusContextValue>(() => ({
+    status: sessionStatus,
+    retryInfo,
+  }), [sessionStatus, retryInfo]);
+
   // Show loading state
   if (isLoading) {
     return (
@@ -915,16 +924,6 @@ function RuntimeProviderInner({ projectId, sessionId: initialSessionId, selected
       </div>
     );
   }
-
-  // Memoize the context values to prevent unnecessary re-renders
-  const attachmentContextValue: AttachmentContextValue = {
-    sendWithAttachments,
-  };
-  
-  const sessionStatusContextValue: SessionStatusContextValue = {
-    status: sessionStatus,
-    retryInfo,
-  };
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
