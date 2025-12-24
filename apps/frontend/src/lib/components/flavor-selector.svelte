@@ -276,7 +276,7 @@
         {@const isPulling = pullingFlavor === flavor.id}
         {@const status = imageStatus[flavor.id]}
         
-        <!-- Flavor card - only clickable if image is available -->
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
         <div
           class="w-full text-left p-3 rounded border transition-all font-mono relative
             {isSelected 

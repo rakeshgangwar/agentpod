@@ -734,6 +734,7 @@ import {
               <div class="p-2 space-y-1">
                 {#each topLevelSessions as session (session.id)}
                   <div>
+                    <!-- svelte-ignore node_invalid_placement_ssr - nested button is intentional for expand/collapse UX -->
                     <button
                       class="w-full text-left p-2.5 rounded transition-all group
                         {selectedSessionId === session.id

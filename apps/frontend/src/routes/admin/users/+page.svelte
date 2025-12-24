@@ -648,10 +648,11 @@
       </Dialog.Description>
     </Dialog.Header>
     <div class="py-4">
-      <label class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-red)] block mb-2">
+      <label for="ban-reason" class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-red)] block mb-2">
         Reason (required)
       </label>
       <textarea
+        id="ban-reason"
         bind:value={banReason}
         placeholder="Enter the reason for banning this user..."
         class="w-full h-24 p-3 text-sm font-mono border border-[var(--cyber-red)]/30 rounded bg-background/50 resize-none
@@ -690,6 +691,7 @@
       </Dialog.Description>
     </Dialog.Header>
     <div class="py-4">
+      <!-- svelte-ignore a11y_label_has_associated_control - Select component handles its own accessibility -->
       <label class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)] block mb-2">
         New Role
       </label>

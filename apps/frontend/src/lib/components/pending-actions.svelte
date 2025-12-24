@@ -42,7 +42,9 @@
   // State
   // =============================================================================
   
+  // svelte-ignore state_referenced_locally - intentional: we only want the initial value
   let pendingPermissions = $state<PendingPermission[]>(initialPermissions ?? []);
+  // svelte-ignore state_referenced_locally - intentional: we only want the initial value
   let isLoading = $state(initialPermissions === undefined);
   let error = $state<string | null>(null);
   let refreshInterval: ReturnType<typeof setInterval> | undefined;
