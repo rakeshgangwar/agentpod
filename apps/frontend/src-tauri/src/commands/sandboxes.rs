@@ -769,10 +769,15 @@ pub async fn get_sandbox_preview_ports(sandbox_id: String) -> Result<Vec<Preview
 }
 
 #[tauri::command]
-pub async fn detect_sandbox_preview_ports(sandbox_id: String) -> Result<DetectPortsResponse, AppError> {
+pub async fn detect_sandbox_preview_ports(
+    sandbox_id: String,
+) -> Result<DetectPortsResponse, AppError> {
     let client = get_client()?;
     client
-        .post(&format!("/api/v2/sandboxes/{}/preview/detect", sandbox_id), &())
+        .post(
+            &format!("/api/v2/sandboxes/{}/preview/detect", sandbox_id),
+            &(),
+        )
         .await
 }
 
@@ -793,7 +798,10 @@ pub async fn register_sandbox_preview_port(
 pub async fn delete_sandbox_preview_port(sandbox_id: String, port: i32) -> Result<(), AppError> {
     let client = get_client()?;
     let _: SuccessResponse = client
-        .delete(&format!("/api/v2/sandboxes/{}/preview/{}", sandbox_id, port))
+        .delete(&format!(
+            "/api/v2/sandboxes/{}/preview/{}",
+            sandbox_id, port
+        ))
         .await?;
     Ok(())
 }
@@ -807,7 +815,10 @@ pub async fn share_sandbox_preview_port(
     let client = get_client()?;
     let input = SharePreviewPortInput { expires_in };
     client
-        .post(&format!("/api/v2/sandboxes/{}/preview/{}/share", sandbox_id, port), &input)
+        .post(
+            &format!("/api/v2/sandboxes/{}/preview/{}/share", sandbox_id, port),
+            &input,
+        )
         .await
 }
 
@@ -815,9 +826,10 @@ pub async fn share_sandbox_preview_port(
 pub async fn unshare_sandbox_preview_port(sandbox_id: String, port: i32) -> Result<(), AppError> {
     let client = get_client()?;
     let _: SuccessResponse = client
-        .delete(&format!("/api/v2/sandboxes/{}/preview/{}/share", sandbox_id, port))
+        .delete(&format!(
+            "/api/v2/sandboxes/{}/preview/{}/share",
+            sandbox_id, port
+        ))
         .await?;
     Ok(())
 }
-
-

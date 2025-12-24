@@ -34,13 +34,13 @@ use commands::{
     create_sandbox_branch,
     delete_sandbox,
     delete_sandbox_branch,
+    delete_sandbox_preview_port,
     delete_user_opencode_file,
+    // Preview port commands (web preview)
+    detect_sandbox_preview_ports,
     disconnect,
     // Sandbox commands (v2, direct Docker orchestration)
     docker_health,
-    // Preview port commands (web preview)
-    detect_sandbox_preview_ports,
-    delete_sandbox_preview_port,
     exec_in_sandbox,
     export_settings,
     get_all_pending_permissions,
@@ -51,7 +51,6 @@ use commands::{
     get_docker_info,
     // Docker image management commands
     get_flavor_images,
-    get_sandbox_preview_ports,
     // Onboarding commands
     get_onboarding_session,
     get_onboarding_session_by_id,
@@ -61,6 +60,7 @@ use commands::{
     get_sandbox_git_log,
     get_sandbox_git_status,
     get_sandbox_logs,
+    get_sandbox_preview_ports,
     get_sandbox_stats,
     get_sandbox_status,
     // Settings commands
@@ -89,9 +89,9 @@ use commands::{
     pause_sandbox,
     poll_oauth_flow,
     pull_image_sync,
+    register_sandbox_preview_port,
     remove_provider_credentials,
     reset_onboarding,
-    register_sandbox_preview_port,
     restart_sandbox,
     sandbox_opencode_abort_session,
     sandbox_opencode_create_session,
@@ -130,11 +130,11 @@ use commands::{
     terminal_send_input,
     test_connection,
     unpause_sandbox,
-    wake_sandbox,
     unshare_sandbox_preview_port,
     update_user_agents_md,
     update_user_opencode_settings,
     upsert_user_opencode_file,
+    wake_sandbox,
 };
 
 #[cfg(feature = "voice")]
@@ -187,9 +187,11 @@ pub fn run() {
     // Initialize tracing subscriber for logging
     tracing_subscriber::registry()
         .with(fmt::layer())
-        .with(EnvFilter::from_default_env()
-            .add_directive("agentpod_lib=debug".parse().unwrap())
-            .add_directive("tauri_plugin_mcp=debug".parse().unwrap()))
+        .with(
+            EnvFilter::from_default_env()
+                .add_directive("agentpod_lib=debug".parse().unwrap())
+                .add_directive("tauri_plugin_mcp=debug".parse().unwrap()),
+        )
         .init();
 
     tracing::info!("Starting AgentPod with tracing enabled");
@@ -210,7 +212,7 @@ pub fn run() {
         builder = builder.plugin(tauri_plugin_mcp::init_with_config(
             tauri_plugin_mcp::PluginConfig::new("agentpod".to_string())
                 .socket_path(std::path::PathBuf::from("/tmp/tauri-mcp.sock"))
-                .start_socket_server(true)
+                .start_socket_server(true),
         ));
     }
 

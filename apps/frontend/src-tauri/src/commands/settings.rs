@@ -461,5 +461,3 @@ pub async fn list_agent_catalog() -> Result<crate::models::AgentCatalogResponse,
     let client = ApiClient::new()?;
     client.get("/api/v2/agents/catalog").await
 }
-
-

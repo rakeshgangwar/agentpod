@@ -10,7 +10,9 @@
 import '../setup';
 
 import { describe, test, expect, beforeAll, afterAll, beforeEach, afterEach, mock } from 'bun:test';
-import { db } from '../../src/db/index';
+import { db } from '../../src/db/drizzle';
+import { user } from '../../src/db/schema';
+import { eq } from 'drizzle-orm';
 import * as SandboxModel from '../../src/models/sandbox';
 
 // Mock the sandbox-manager module before importing the app
@@ -320,32 +322,36 @@ async function request(
 /**
  * Helper to create a test user in the database
  */
-function createTestUser(id: string): void {
-  const now = new Date().toISOString();
-  db.run(`
-    INSERT OR IGNORE INTO user (id, name, email, emailVerified, createdAt, updatedAt)
-    VALUES (?, ?, ?, 0, ?, ?)
-  `, [id, `Test User ${id}`, `${id}@test.com`, now, now]);
+async function createTestUser(id: string): Promise<void> {
+  const now = new Date();
+  await db.insert(user).values({
+    id,
+    name: `Test User ${id}`,
+    email: `${id}@test.com`,
+    emailVerified: false,
+    createdAt: now,
+    updatedAt: now,
+  }).onConflictDoNothing();
 }
 
 /**
  * Helper to delete a test user
  */
-function deleteTestUser(id: string): void {
-  db.run('DELETE FROM user WHERE id = ?', [id]);
+async function deleteTestUser(id: string): Promise<void> {
+  await db.delete(user).where(eq(user.id, id));
 }
 
 /**
  * Helper to clean up test sandboxes
  */
-function cleanupTestSandboxes(): void {
+async function cleanupTestSandboxes(): Promise<void> {
   try {
-    const sandboxes = SandboxModel.listAllSandboxes();
-    sandboxes.forEach(s => {
+    const sandboxes = await SandboxModel.listAllSandboxes();
+    for (const s of sandboxes) {
       if (s.id.startsWith('sandbox-') || s.id.startsWith('test-')) {
-        SandboxModel.deleteSandbox(s.id);
+        await SandboxModel.deleteSandbox(s.id);
       }
-    });
+    }
   } catch (e) {
     // Ignore errors during cleanup
   }
@@ -355,29 +361,29 @@ function cleanupTestSandboxes(): void {
 // Setup & Teardown
 // =============================================================================
 
-beforeAll(() => {
+beforeAll(async () => {
   // Create test users
-  createTestUser(TEST_USER_ID);
-  createTestUser(TEST_USER_ID_2);
+  await createTestUser(TEST_USER_ID);
+  await createTestUser(TEST_USER_ID_2);
 });
 
-afterAll(() => {
+afterAll(async () => {
   // Clean up test data
-  cleanupTestSandboxes();
-  deleteTestUser(TEST_USER_ID);
-  deleteTestUser(TEST_USER_ID_2);
+  await cleanupTestSandboxes();
+  await deleteTestUser(TEST_USER_ID);
+  await deleteTestUser(TEST_USER_ID_2);
 });
 
-beforeEach(() => {
+beforeEach(async () => {
   // Reset mocks before each test
   resetDockerMock();
   resetGitMock();
-  cleanupTestSandboxes();
+  await cleanupTestSandboxes();
 });
 
-afterEach(() => {
+afterEach(async () => {
   // Clean up after each test
-  cleanupTestSandboxes();
+  await cleanupTestSandboxes();
 });
 
 // =============================================================================

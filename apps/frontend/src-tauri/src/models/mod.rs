@@ -739,5 +739,3 @@ pub struct AgentCatalogResponse {
     #[serde(default)]
     pub mandatory_agent_slugs: Vec<String>,
 }
-
-
