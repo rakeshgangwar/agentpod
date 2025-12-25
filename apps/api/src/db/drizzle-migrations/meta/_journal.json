@@ -64,6 +64,13 @@
       "when": 1766424087411,
       "tag": "0008_careless_violations",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1766651020653,
+      "tag": "0009_chilly_red_hulk",
+      "breakpoints": true
     }
   ]
 }
