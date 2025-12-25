@@ -1,17 +1,35 @@
 <script lang="ts">
   import { Handle, Position, type NodeProps } from "@xyflow/svelte";
   import SendIcon from "@lucide/svelte/icons/send";
+  import ExecutionStatusBadge from "./ExecutionStatusBadge.svelte";
 
+  type ExecutionStatus = "idle" | "running" | "success" | "error";
   type Props = NodeProps;
 
   let { data, selected = false }: Props = $props();
+
+  const executionStatus = $derived((data.executionStatus as ExecutionStatus) || "idle");
+  const executionError = $derived(data.executionError as string | undefined);
+
+  const borderClass = $derived({
+    idle: "border-border",
+    running: "border-[var(--cyber-cyan)] node-running",
+    success: "border-[var(--cyber-emerald)]",
+    error: "border-[var(--cyber-red)]",
+  }[executionStatus]);
+
+  const shadowClass = $derived({
+    idle: "",
+    running: "shadow-[0_0_0_2px_color-mix(in_oklch,var(--cyber-cyan)_30%,transparent)]",
+    success: "shadow-[0_0_0_2px_color-mix(in_oklch,var(--cyber-emerald)_20%,transparent)]",
+    error: "shadow-[0_0_0_2px_color-mix(in_oklch,var(--cyber-red)_30%,transparent)]",
+  }[executionStatus]);
 </script>
 
 <div
-  class="relative bg-card/90 backdrop-blur-sm rounded-md border transition-all duration-200 min-w-[200px]"
-  class:border-cyber-cyan={selected}
-  class:shadow-[0_0_0_2px_color-mix(in_oklch,var(--cyber-cyan)_30%,transparent)]={selected}
-  class:border-border={!selected}
+  class="relative bg-card/90 backdrop-blur-sm rounded-md border-2 transition-all duration-200 min-w-[200px] {borderClass} {shadowClass}"
+  class:border-cyber-cyan={selected && executionStatus === "idle"}
+  class:shadow-[0_0_0_2px_color-mix(in_oklch,var(--cyber-cyan)_30%,transparent)]={selected && executionStatus === "idle"}
 >
   <div class="absolute -top-[1px] left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyber-cyan to-transparent opacity-60"></div>
   
@@ -31,12 +49,7 @@
       </div>
     </div>
 
-    <div class="flex items-center gap-2">
-      <div class="w-1.5 h-1.5 rounded-full bg-muted-foreground"></div>
-      <div class="text-[10px] text-muted-foreground font-mono uppercase tracking-wide">
-        Idle
-      </div>
-    </div>
+    <ExecutionStatusBadge status={executionStatus} error={executionError} />
   </div>
 
   <Handle type="target" position={Position.Top} />

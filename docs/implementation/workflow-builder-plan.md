@@ -1,12 +1,31 @@
 # Visual Workflow Builder: SvelteFlow + Cloudflare Workflows
 
-> **Status:** Planning  
+> **Status:** In Progress  
 > **Created:** December 2025  
+> **Updated:** December 2025 - Migrated from n8n-compatible to Cloudflare Workflows-native architecture  
 > **Related:** [Cloudflare Implementation Guide](./cloudflare-implementation-guide.md) | [Cloudflare Use Cases](../ideas/opencode-cloudflare-use-cases.md)
 
 ## Executive Summary
 
-Build an **n8n-style visual workflow builder** using **SvelteFlow** that compiles to **Cloudflare Workflows** for durable execution. This creates a unique **AI-first, edge-native workflow automation platform** that differentiates AgentPod from traditional automation tools.
+Build a **visual drag-and-drop workflow builder** using **SvelteFlow** that **compiles to Cloudflare Workflows TypeScript code** for durable execution. This creates a unique **AI-first, edge-native workflow automation platform** that differentiates AgentPod from traditional automation tools.
+
+### Architecture Decision: Cloudflare Workflows-Native (NOT n8n-Compatible)
+
+After analyzing Cloudflare Workflows SDK, we've decided to use a **Cloudflare-native data model** instead of n8n compatibility:
+
+| n8n Model (Rejected) | Cloudflare-Native Model (Adopted) |
+|---------------------|-----------------------------------|
+| Connections use node **names** | Connections use node **IDs** |
+| Graph-based execution | **Code-based** execution (`step.do()`) |
+| Limited parallel support | Native `Promise.all()` support |
+| Declarative JSON | **Compiles to TypeScript** |
+| External orchestration | **Built-in durable execution** |
+
+**Why this matters:**
+- Cloudflare Workflows are imperative TypeScript, not declarative JSON
+- `step.do()` returns must be captured for state persistence
+- Parallel execution requires `Promise.all()`, not connection graphs
+- Node names can be duplicated; IDs must be unique
 
 ### Why This Matters
 
@@ -187,15 +206,18 @@ As a user, I want to:
 
 ## Data Model
 
-### Workflow Definition (n8n-Compatible)
+### Cloudflare Workflows-Native Schema
 
-We adopt n8n's proven schema for compatibility and import/export:
+We use a **Cloudflare Workflows-native schema** that uses **node IDs** (not names) for connections. This directly maps to how Cloudflare Workflows execute code.
 
 ```typescript
 // packages/types/src/workflow.ts
 
 /**
- * Main workflow definition - compatible with n8n schema
+ * Main workflow definition - Cloudflare Workflows-native
+ * 
+ * Key difference from n8n: Connections use node IDs, not names.
+ * This enables unique identification and direct code generation.
  */
 export interface IWorkflowBase {
   id: string;
@@ -205,7 +227,7 @@ export interface IWorkflowBase {
   
   // Core structure
   nodes: INode[];
-  connections: IConnections;
+  connections: IConnections;  // Uses node IDs
   
   // Settings
   settings?: IWorkflowSettings;
@@ -220,9 +242,9 @@ export interface IWorkflowBase {
  * Node definition
  */
 export interface INode {
-  id: string;
-  name: string;
-  type: string;  // e.g., 'trigger', 'ai-agent', 'http', 'approval'
+  id: string;           // Unique identifier (e.g., "http-request-1234567890")
+  name: string;         // User-friendly label (can be duplicated)
+  type: WorkflowNodeType;
   
   // Position for visual editor
   position: [number, number];
@@ -230,52 +252,60 @@ export interface INode {
   // Type-specific configuration
   parameters: Record<string, unknown>;
   
-  // Execution settings
+  // Cloudflare Workflows execution settings
+  disabled?: boolean;
   retryOnFail?: boolean;
   maxRetries?: number;
-  retryDelay?: number;
-  timeout?: number;
-  
-  // UI state
-  disabled?: boolean;
+  retryDelayMs?: number;
+  timeoutMs?: number;
   notes?: string;
 }
 
 /**
- * Connection graph - maps source nodes to their outputs
+ * Connection graph - maps source node IDs to target node IDs
+ * 
+ * IMPORTANT: Unlike n8n, we use node IDs, not names.
+ * This ensures unique identification even with duplicate node names.
  */
 export interface IConnections {
-  [sourceNodeName: string]: {
-    main: Array<Array<{
-      node: string;      // Target node name
-      type: string;      // Connection type (usually 'main')
-      index: number;     // Input index on target
-    }>>;
-  };
+  [sourceNodeId: string]: INodeConnections;
+}
+
+export interface INodeConnections {
+  main: IConnection[][];  // Array of output ports, each containing connections
+}
+
+export interface IConnection {
+  node: string;    // Target node ID (not name!)
+  type: string;    // Connection type (usually 'main')
+  index: number;   // Input index on target
 }
 
 /**
- * Workflow settings
+ * Workflow settings with Cloudflare-specific options
  */
 export interface IWorkflowSettings {
-  executionOrder?: 'v0' | 'v1';
+  executionOrder?: "v0" | "v1";
   timezone?: string;
   saveExecutionProgress?: boolean;
   saveManualExecutions?: boolean;
   
-  // Cloudflare-specific
-  cloudflare?: {
-    retryPolicy?: {
-      limit: number;
-      delay: string;
-      backoff: 'constant' | 'linear' | 'exponential';
-    };
-    timeout?: string;
+  // Cloudflare Workflows-specific settings
+  cloudflare?: ICloudflareWorkflowSettings;
+}
+
+export interface ICloudflareWorkflowSettings {
+  retryPolicy?: {
+    limit: number;
+    delay: string;           // e.g., "5 seconds", "1 minute"
+    backoff: "constant" | "linear" | "exponential";
   };
+  timeout?: string;          // e.g., "15 minutes"
+  cpuLimitMs?: number;       // CPU time limit
 }
 ```
 
-### SvelteFlow ↔ n8n Conversion
+### SvelteFlow ↔ Cloudflare Conversion
 
 ```typescript
 // packages/types/src/workflow-conversion.ts
@@ -283,7 +313,9 @@ export interface IWorkflowSettings {
 import type { Node, Edge } from '@xyflow/svelte';
 
 /**
- * Convert SvelteFlow nodes/edges to n8n-compatible format
+ * Convert SvelteFlow nodes/edges to Cloudflare Workflows format
+ * 
+ * Key: Uses node IDs directly for connections (no name mapping needed)
  */
 export function svelteFlowToWorkflow(
   nodes: Node[],
@@ -292,30 +324,24 @@ export function svelteFlowToWorkflow(
   // Convert nodes
   const workflowNodes: INode[] = nodes.map(node => ({
     id: node.id,
-    name: node.data.label || node.id,
-    type: node.type || 'default',
+    name: node.data.label || node.data.name || node.id,
+    type: node.data.nodeType || node.type || 'default',
     position: [node.position.x, node.position.y],
     parameters: node.data,
   }));
   
-  // Build connections from edges
+  // Build connections from edges using node IDs directly
   const connections: IConnections = {};
   
   for (const edge of edges) {
-    const sourceNode = nodes.find(n => n.id === edge.source);
-    if (!sourceNode) continue;
-    
-    const sourceName = sourceNode.data.label || sourceNode.id;
-    
-    if (!connections[sourceName]) {
-      connections[sourceName] = { main: [[]] };
+    // Use source node ID directly (no name lookup needed!)
+    if (!connections[edge.source]) {
+      connections[edge.source] = { main: [[]] };
     }
     
-    const targetNode = nodes.find(n => n.id === edge.target);
-    if (!targetNode) continue;
-    
-    connections[sourceName].main[0].push({
-      node: targetNode.data.label || targetNode.id,
+    // Use target node ID directly
+    connections[edge.source].main[0].push({
+      node: edge.target,  // Node ID, not name
       type: 'main',
       index: 0,
     });
@@ -325,7 +351,9 @@ export function svelteFlowToWorkflow(
 }
 
 /**
- * Convert n8n-compatible format to SvelteFlow nodes/edges
+ * Convert Cloudflare Workflows format to SvelteFlow nodes/edges
+ * 
+ * Simple because connections already use node IDs
  */
 export function workflowToSvelteFlow(
   workflow: IWorkflowBase
@@ -337,32 +365,91 @@ export function workflowToSvelteFlow(
     position: { x: node.position[0], y: node.position[1] },
     data: {
       label: node.name,
+      nodeType: node.type,
       ...node.parameters,
     },
   }));
   
-  // Convert connections to edges
+  // Convert connections to edges (direct ID mapping!)
   const edges: Edge[] = [];
   
-  for (const [sourceName, outputs] of Object.entries(workflow.connections)) {
-    const sourceNode = workflow.nodes.find(n => n.name === sourceName);
-    if (!sourceNode) continue;
-    
-    for (const connections of outputs.main) {
-      for (const conn of connections) {
-        const targetNode = workflow.nodes.find(n => n.name === conn.node);
-        if (!targetNode) continue;
-        
+  for (const [sourceId, outputs] of Object.entries(workflow.connections)) {
+    for (const connectionList of outputs.main) {
+      for (const conn of connectionList) {
         edges.push({
-          id: `e-${sourceNode.id}-${targetNode.id}`,
-          source: sourceNode.id,
-          target: targetNode.id,
+          id: `e-${sourceId}-${conn.node}`,
+          source: sourceId,
+          target: conn.node,  // Already a node ID
         });
       }
     }
   }
   
   return { nodes, edges };
+}
+```
+
+### Why Node IDs Instead of Names?
+
+| Problem with Names | Solution with IDs |
+|-------------------|-------------------|
+| Multiple "HTTP Request" nodes conflict | Each node has unique ID like `http-request-1734567890` |
+| Name changes break connections | IDs are immutable |
+| Lookup required for every connection | Direct mapping |
+| Ambiguous in compiled code | `step.do("http-request-1234", ...)` is unique |
+
+### Execution Order Computation
+
+Cloudflare Workflows execute code sequentially. We compute execution order from the connection graph:
+
+```typescript
+/**
+ * Build execution DAG from connections
+ * Returns nodes in topological order (respects dependencies)
+ */
+export function computeExecutionOrder(
+  nodes: INode[],
+  connections: IConnections
+): string[] {
+  // Build adjacency list
+  const graph = new Map<string, string[]>();
+  const inDegree = new Map<string, number>();
+  
+  // Initialize
+  for (const node of nodes) {
+    graph.set(node.id, []);
+    inDegree.set(node.id, 0);
+  }
+  
+  // Build edges
+  for (const [sourceId, outputs] of Object.entries(connections)) {
+    for (const connectionList of outputs.main) {
+      for (const conn of connectionList) {
+        graph.get(sourceId)?.push(conn.node);
+        inDegree.set(conn.node, (inDegree.get(conn.node) || 0) + 1);
+      }
+    }
+  }
+  
+  // Topological sort (Kahn's algorithm)
+  const queue: string[] = [];
+  for (const [nodeId, degree] of inDegree) {
+    if (degree === 0) queue.push(nodeId);
+  }
+  
+  const result: string[] = [];
+  while (queue.length > 0) {
+    const nodeId = queue.shift()!;
+    result.push(nodeId);
+    
+    for (const targetId of graph.get(nodeId) || []) {
+      const newDegree = (inDegree.get(targetId) || 0) - 1;
+      inDegree.set(targetId, newDegree);
+      if (newDegree === 0) queue.push(targetId);
+    }
+  }
+  
+  return result;
 }
 ```
 
@@ -376,7 +463,7 @@ import type { IWorkflowBase } from './workflow';
 /**
  * AgentPod-specific workflow extensions
  */
-export interface AgentPodWorkflow extends IWorkflowBase {
+export interface IAgentPodWorkflow extends IWorkflowBase {
   // Ownership
   userId: string;
   organizationId?: string;
@@ -401,7 +488,7 @@ export interface AgentPodWorkflow extends IWorkflowBase {
 /**
  * Workflow execution record
  */
-export interface WorkflowExecution {
+export interface IWorkflowExecution {
   id: string;
   workflowId: string;
   userId: string;
@@ -409,11 +496,14 @@ export interface WorkflowExecution {
   // Cloudflare Workflow instance
   instanceId: string;
   
-  // Status
-  status: 'queued' | 'running' | 'waiting' | 'completed' | 'errored' | 'cancelled';
+  // Status (matches Cloudflare Workflows statuses)
+  status: WorkflowExecutionStatus;
   
-  // Input/output
+  // Trigger info
+  triggerType: 'manual' | 'webhook' | 'schedule' | 'event';
   triggerData?: Record<string, unknown>;
+  
+  // Results
   result?: Record<string, unknown>;
   error?: string;
   
@@ -427,17 +517,25 @@ export interface WorkflowExecution {
   durationMs?: number;
 }
 
+export type WorkflowExecutionStatus =
+  | 'queued'
+  | 'running'
+  | 'waiting'    // Hibernating (waitForEvent, sleep)
+  | 'completed'
+  | 'errored'
+  | 'cancelled';
+
 /**
  * Step execution log
  */
-export interface WorkflowStepLog {
+export interface IWorkflowStepLog {
   id: string;
   executionId: string;
   nodeId: string;
   stepName: string;
   
   // Status
-  status: 'running' | 'success' | 'error' | 'retrying' | 'skipped';
+  status: WorkflowStepStatus;
   attemptNumber: number;
   
   // Data
@@ -449,6 +547,89 @@ export interface WorkflowStepLog {
   startedAt: Date;
   completedAt?: Date;
   durationMs?: number;
+}
+
+export type WorkflowStepStatus =
+  | 'pending'
+  | 'running'
+  | 'success'
+  | 'error'
+  | 'retrying'
+  | 'skipped'
+  | 'waiting';   // For approval/waitForEvent nodes
+```
+
+### Code Generation Architecture
+
+The visual workflow is compiled to TypeScript code that runs on Cloudflare Workflows:
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  Visual Editor  │ ──▶ │   JSON Schema   │ ──▶ │ TypeScript Code │
+│   (SvelteFlow)  │     │   (IWorkflow)   │     │ (WorkflowEntry) │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+                                                        │
+                                                        ▼
+                                               ┌─────────────────┐
+                                               │    Cloudflare   │
+                                               │    Workflows    │
+                                               │    (step.do)    │
+                                               └─────────────────┘
+```
+
+**Example Compilation:**
+
+Visual workflow:
+```
+[Manual Trigger] ──▶ [HTTP Request] ──▶ [AI Agent]
+                           │
+                           ▼
+                     [Email Notify]
+```
+
+Generated TypeScript:
+```typescript
+export class DynamicWorkflow extends WorkflowEntrypoint<Env, Params> {
+  async run(event: WorkflowEvent<Params>, step: WorkflowStep) {
+    const context = { trigger: event.payload, steps: {} };
+    
+    // Node: manual-trigger-1734567890
+    // (Trigger nodes just pass through)
+    
+    // Node: http-request-1734567891
+    context.steps["http-request-1734567891"] = await step.do(
+      "http-request-1734567891",
+      { retries: { limit: 3, delay: "5s", backoff: "exponential" } },
+      async () => {
+        const response = await fetch("https://api.example.com/data");
+        return await response.json();
+      }
+    );
+    
+    // Parallel execution: AI Agent + Email (both depend on HTTP Request)
+    const [aiResult, emailResult] = await Promise.all([
+      step.do("ai-agent-1734567892", async () => {
+        const sandbox = await getSandbox(this.env.SANDBOX);
+        return await runAgent(sandbox, {
+          prompt: `Analyze: ${JSON.stringify(context.steps["http-request-1734567891"])}`
+        });
+      }),
+      
+      step.do("email-notify-1734567893", async () => {
+        await sendEmail({
+          to: context.trigger.email,
+          subject: "Workflow Update",
+          body: `Data fetched: ${context.steps["http-request-1734567891"].status}`
+        });
+        return { sent: true };
+      })
+    ]);
+    
+    context.steps["ai-agent-1734567892"] = aiResult;
+    context.steps["email-notify-1734567893"] = emailResult;
+    
+    return context.steps;
+  }
 }
 ```
 
@@ -619,41 +800,43 @@ const aiAgentNodeSchema: JSONSchema = {
 
 ## Implementation Roadmap
 
-### Phase 1: Foundation (Week 1-2)
+### Phase 1: Foundation (Week 1-2) ✅ COMPLETE
 
 **Goal**: Basic visual editor with 3 node types
 
-| Task | Time | Description |
-|------|------|-------------|
-| Set up SvelteFlow | 0.5d | Install `@xyflow/svelte`, create wrapper component |
-| WorkflowEditor component | 1d | Main canvas with nodes, edges, background, controls |
-| Node palette | 1d | Draggable node list organized by category |
-| Drag-and-drop | 0.5d | Drop nodes from palette onto canvas |
-| Basic nodes (Trigger, AI Agent, HTTP) | 1d | Three custom node components |
-| Properties panel | 1d | JSON Schema → form for node configuration |
-| Variable interpolation UI | 0.5d | Autocomplete for `{{step.output}}` syntax |
-| Save/load API | 1d | CRUD endpoints for workflows |
-| PostgreSQL storage | 0.5d | Table for workflow definitions |
+| Task | Time | Status | Description |
+|------|------|--------|-------------|
+| Set up SvelteFlow | 0.5d | ✅ | Install `@xyflow/svelte`, create wrapper component |
+| WorkflowEditor component | 1d | ✅ | Main canvas with nodes, edges, background, controls |
+| Node palette | 1d | ✅ | Draggable node list organized by category |
+| Drag-and-drop | 0.5d | ✅ | Drop nodes from palette onto canvas |
+| Basic nodes (Trigger, AI Agent, HTTP) | 1d | ✅ | Three custom node components |
+| Properties panel | 1d | ✅ | JSON Schema → form for node configuration |
+| Variable interpolation UI | 0.5d | ⏳ | Autocomplete for `{{step.output}}` syntax |
+| Save/load API | 1d | ✅ | CRUD endpoints for workflows |
+| PostgreSQL storage | 0.5d | ✅ | Table for workflow definitions |
 
-**Deliverable**: Create, edit, save, and load visual workflows (not yet executable)
+**Deliverable**: Create, edit, save, and load visual workflows ✅
 
-### Phase 2: Execution Engine (Week 3-4)
+### Phase 2: Execution Engine (Week 3-4) ✅ COMPLETE
 
 **Goal**: Convert visual → executable Cloudflare Workflow
 
-| Task | Time | Description |
-|------|------|-------------|
-| DynamicWorkflow class | 1.5d | Base Cloudflare Workflow that loads definitions |
-| DAG builder | 1d | Convert connections graph to execution order |
-| Variable interpolation | 0.5d | Replace `{{var}}` with actual values |
-| AI Agent node execution | 1d | Integrate with Cloudflare Sandbox |
-| HTTP node execution | 0.5d | Fetch with retry logic |
-| Approval node | 1d | Implement `step.waitForEvent` |
-| Execution tracking | 1d | Store execution status, step logs |
-| Execution history UI | 1d | List past executions, view details |
-| Real-time status updates | 0.5d | Poll or SSE for live status |
+| Task | Time | Status | Description |
+|------|------|--------|-------------|
+| DynamicWorkflow class | 1.5d | ✅ | Workflow executor in Cloudflare Worker |
+| DAG builder | 1d | ✅ | Topological sort for execution order |
+| Variable interpolation | 0.5d | ✅ | Replace `{{var}}` with actual values |
+| AI Agent node execution | 1d | ✅ | Integrate with Cloudflare Sandbox |
+| HTTP node execution | 0.5d | ✅ | Fetch with retry logic |
+| Condition node | 0.5d | ✅ | If/else branching with multiple operators |
+| Code node (JavaScript) | 0.5d | ✅ | Safe JavaScript execution |
+| Execution tracking | 1d | ✅ | Store execution status, step logs |
+| API integration | 0.5d | ✅ | Trigger Cloudflare Worker from API |
+| Execution history UI | 1d | ⏳ | List past executions, view details |
+| Real-time status updates | 0.5d | ⏳ | Poll or SSE for live status |
 
-**Deliverable**: Execute workflows end-to-end with status tracking
+**Deliverable**: Execute workflows end-to-end with status tracking ✅
 
 ### Phase 3: Polish & Ship (Week 5-6)
 
@@ -1399,7 +1582,9 @@ export const executionRoutes = new Hono()
 
 ## Execution Engine
 
-### DynamicWorkflow Class
+### Dynamic Workflow Executor
+
+The DynamicWorkflow class loads workflow definitions at runtime and executes them using Cloudflare Workflows primitives.
 
 ```typescript
 // cloudflare/worker/src/workflows/dynamic-workflow.ts
@@ -1409,10 +1594,10 @@ import {
   WorkflowStep, 
   WorkflowEvent 
 } from 'cloudflare:workers';
-import { buildDAG, topologicalSort } from './utils/dag-builder';
+import { computeExecutionOrder } from './utils/dag-builder';
 import { interpolateVariables } from './utils/variable-interpolator';
 import { nodeExecutors } from './nodes';
-import type { IWorkflowBase, INode, IConnections } from '@agentpod/types';
+import type { IWorkflowBase, INode } from '@agentpod/types';
 
 interface DynamicWorkflowParams {
   workflowId: string;
@@ -1422,7 +1607,7 @@ interface DynamicWorkflowParams {
 
 interface ExecutionContext {
   trigger: Record<string, unknown>;
-  steps: Record<string, unknown>;
+  steps: Record<string, unknown>;  // Keyed by node ID
   env: Env;
 }
 
@@ -1431,9 +1616,8 @@ export class DynamicWorkflow extends WorkflowEntrypoint<Env, DynamicWorkflowPara
   async run(event: WorkflowEvent<DynamicWorkflowParams>, step: WorkflowStep) {
     const { workflowId, triggerType, triggerData } = event.payload;
     
-    // Step 1: Load workflow definition
+    // Step 1: Load workflow definition (durable - survives hibernation)
     const workflow = await step.do('load-workflow', async () => {
-      // Load from D1 for edge performance
       const result = await this.env.DB.prepare(
         'SELECT definition FROM workflows WHERE id = ?'
       ).bind(workflowId).first<{ definition: string }>();
@@ -1445,13 +1629,12 @@ export class DynamicWorkflow extends WorkflowEntrypoint<Env, DynamicWorkflowPara
       return JSON.parse(result.definition) as IWorkflowBase;
     });
     
-    // Step 2: Build execution DAG
-    const executionOrder = await step.do('build-dag', async () => {
-      const dag = buildDAG(workflow.nodes, workflow.connections);
-      return topologicalSort(dag);
+    // Step 2: Compute execution order (topological sort)
+    const executionOrder = await step.do('compute-order', async () => {
+      return computeExecutionOrder(workflow.nodes, workflow.connections);
     });
     
-    // Step 3: Initialize context
+    // Step 3: Initialize context (from step returns for durability)
     const context: ExecutionContext = {
       trigger: {
         type: triggerType,
@@ -1462,24 +1645,20 @@ export class DynamicWorkflow extends WorkflowEntrypoint<Env, DynamicWorkflowPara
       env: this.env,
     };
     
-    // Step 4: Execute nodes in order
+    // Step 4: Execute nodes in topological order
     for (const nodeId of executionOrder) {
       const node = workflow.nodes.find(n => n.id === nodeId);
-      if (!node) continue;
+      if (!node || node.disabled) continue;
       
-      // Skip disabled nodes
-      if (node.disabled) continue;
-      
-      // Get node executor
       const executor = nodeExecutors[node.type];
       if (!executor) {
         throw new Error(`Unknown node type: ${node.type}`);
       }
       
-      // Interpolate parameters with context
+      // Interpolate {{steps.nodeId.field}} variables
       const parameters = interpolateVariables(node.parameters, context);
       
-      // Execute node with durable step
+      // Execute with Cloudflare Workflows step.do (durable!)
       const result = await executor.execute(
         {
           nodeId: node.id,
@@ -1491,15 +1670,10 @@ export class DynamicWorkflow extends WorkflowEntrypoint<Env, DynamicWorkflowPara
         this.env
       );
       
-      // Store result in context
+      // Store result by node ID (survives hibernation via step returns)
       context.steps[node.id] = result;
-      context.steps[node.name] = result; // Also by name for convenience
-      
-      // Notify API of step completion
-      await this.notifyStepComplete(workflowId, event.instanceId, node.id, result);
     }
     
-    // Return final context
     return {
       success: true,
       trigger: context.trigger,
@@ -1507,38 +1681,71 @@ export class DynamicWorkflow extends WorkflowEntrypoint<Env, DynamicWorkflowPara
       completedAt: new Date().toISOString(),
     };
   }
-  
-  private async notifyStepComplete(
-    workflowId: string,
-    instanceId: string,
-    nodeId: string,
-    result: unknown
-  ) {
-    try {
-      await fetch(`${this.env.AGENTPOD_API_URL}/api/workflow-internal/step-complete`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.env.AGENTPOD_API_TOKEN}`,
-        },
-        body: JSON.stringify({
-          workflowId,
-          instanceId,
-          nodeId,
-          result,
-          completedAt: new Date().toISOString(),
-        }),
-      });
-    } catch (error) {
-      // Non-critical, continue execution
-      console.error('Failed to notify step completion:', error);
-    }
-  }
 }
+```
+
+### Variable Interpolation
+
+Variables reference previous step outputs using node IDs:
+
+```typescript
+// cloudflare/worker/src/workflows/utils/variable-interpolator.ts
+
+/**
+ * Replace {{steps.nodeId.field}} with actual values from context
+ * 
+ * Examples:
+ *   {{trigger.data.email}} -> context.trigger.data.email
+ *   {{steps.http-request-123.data.userId}} -> context.steps["http-request-123"].data.userId
+ */
+export function interpolateVariables(
+  obj: unknown,
+  context: ExecutionContext
+): unknown {
+  if (typeof obj === 'string') {
+    return obj.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
+      const value = getValueByPath(context, path.trim());
+      return value !== undefined ? String(value) : match;
+    });
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => interpolateVariables(item, context));
+  }
+  
+  if (obj && typeof obj === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] = interpolateVariables(value, context);
+    }
+    return result;
+  }
+  
+  return obj;
+}
+
+function getValueByPath(obj: unknown, path: string): unknown {
+  const parts = path.split('.');
+  let current = obj;
+  
+  for (const part of parts) {
+    if (current === null || current === undefined) return undefined;
+    current = (current as Record<string, unknown>)[part];
+  }
+  
+  return current;
+}
+```
+
+### Worker API Routes
+
+```typescript
+// cloudflare/worker/src/index.ts
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    // ... existing routes ...
+    const url = new URL(request.url);
+    const pathParts = url.pathname.split('/').filter(Boolean);
     
     // POST /workflow/execute - Execute a workflow
     if (request.method === 'POST' && pathParts[0] === 'workflow' && pathParts[1] === 'execute') {
@@ -1559,11 +1766,10 @@ export default {
     if (request.method === 'GET' && pathParts[0] === 'workflow' && pathParts[1] === 'status') {
       const instanceId = pathParts[2];
       const instance = await env.DYNAMIC_WORKFLOW.get(instanceId);
-      
       return Response.json(await instance.status());
     }
     
-    // POST /workflow/event/:instanceId - Send event to execution
+    // POST /workflow/event/:instanceId - Send event (for approvals)
     if (request.method === 'POST' && pathParts[0] === 'workflow' && pathParts[1] === 'event') {
       const instanceId = pathParts[2];
       const event = await request.json() as { type: string; payload: unknown };
@@ -1573,8 +1779,11 @@ export default {
       
       return Response.json({ sent: true });
     }
+    
+    return new Response('Not Found', { status: 404 });
   }
 };
+```
 ```
 
 ### Node Executors
@@ -1852,10 +2061,11 @@ export const nodeExecutors: Record<string, NodeExecutor> = {
 
 ## Open Questions
 
-### Technical Decisions
+### Technical Decisions (RESOLVED)
 
-1. **Data Model**: Use n8n-compatible schema (easier import/export) or custom schema?
-   - **Recommendation**: n8n-compatible for portability
+1. ~~**Data Model**: Use n8n-compatible schema (easier import/export) or custom schema?~~
+   - ✅ **RESOLVED**: Use Cloudflare-native schema with node IDs (not names)
+   - Rationale: n8n names cause ambiguity with duplicate nodes; IDs enable direct code generation
 
 2. **Storage**: Store in PostgreSQL (existing) or D1 (edge performance)?
    - **Recommendation**: PostgreSQL primary, sync to D1 for execution
@@ -1917,3 +2127,9 @@ export const nodeExecutors: Record<string, NodeExecutor> = {
 | Date | Author | Changes |
 |------|--------|---------|
 | 2025-12-25 | AI | Initial planning document |
+| 2025-12-25 | AI | **MAJOR**: Migrated from n8n-compatible to Cloudflare Workflows-native architecture |
+| | | - Changed connections to use node IDs instead of names |
+| | | - Added execution order computation (topological sort) |
+| | | - Added code generation architecture section |
+| | | - Updated variable interpolation to use node IDs |
+| | | - Simplified SvelteFlow ↔ Cloudflare conversion |

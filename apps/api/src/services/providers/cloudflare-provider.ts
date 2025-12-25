@@ -308,6 +308,87 @@ export class CloudflareSandboxProvider implements SandboxProvider {
       totalSize: result.totalSize ?? 0,
     };
   }
+
+  async executeWorkflow(options: {
+    executionId: string;
+    workflowId: string;
+    workflow: {
+      id: string;
+      name: string;
+      nodes: Array<{
+        id: string;
+        name: string;
+        type: string;
+        position: [number, number];
+        parameters: Record<string, unknown>;
+        disabled?: boolean;
+      }>;
+      connections: Record<string, { main: Array<Array<{ node: string; type: string; index: number }>> }>;
+      settings?: Record<string, unknown>;
+    };
+    triggerType: "manual" | "webhook" | "schedule" | "event";
+    triggerData?: Record<string, unknown>;
+    userId?: string;
+  }): Promise<{
+    success: boolean;
+    executionId: string;
+    workflowId: string;
+    status: "completed" | "errored";
+    trigger: Record<string, unknown>;
+    steps: Record<string, unknown>;
+    error?: string;
+    startedAt: string;
+    completedAt: string;
+    durationMs: number;
+  }> {
+    log.info("Executing workflow via Cloudflare Worker", {
+      executionId: options.executionId,
+      workflowId: options.workflowId,
+    });
+
+    const result = await this.workerFetch("/workflow/execute", {
+      method: "POST",
+      body: JSON.stringify({
+        executionId: options.executionId,
+        workflowId: options.workflowId,
+        workflow: options.workflow,
+        triggerType: options.triggerType,
+        triggerData: options.triggerData ?? {},
+        userId: options.userId,
+      }),
+    }) as {
+      success: boolean;
+      executionId: string;
+      workflowId: string;
+      status: "completed" | "errored";
+      trigger: Record<string, unknown>;
+      steps: Record<string, unknown>;
+      error?: string;
+      startedAt: string;
+      completedAt: string;
+      durationMs: number;
+    };
+
+    return result;
+  }
+
+  async validateWorkflow(workflow: {
+    nodes: Array<{
+      id: string;
+      name: string;
+      type: string;
+      position: [number, number];
+      parameters: Record<string, unknown>;
+    }>;
+    connections: Record<string, { main: Array<Array<{ node: string; type: string; index: number }>> }>;
+  }): Promise<{ valid: boolean; errors: string[] }> {
+    const result = await this.workerFetch("/workflow/validate", {
+      method: "POST",
+      body: JSON.stringify({ workflow }),
+    }) as { valid: boolean; errors: string[] };
+
+    return result;
+  }
 }
 
 let cloudflareProviderInstance: CloudflareSandboxProvider | null = null;

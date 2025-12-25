@@ -41,17 +41,25 @@
 
   const { screenToFlowPosition } = useSvelteFlow();
 
-  let nodes = $state.raw<Node[]>(
-    initialNodes.map((n) => ({
-      id: n.id,
-      type: n.type,
-      position: { ...n.position },
-      data: { ...n.data },
-    })) as Node[]
-  );
+  let nodes = $state.raw<Node[]>([]);
+  let edges = $state.raw<Edge[]>([]);
+  let lastInitialNodesJson = $state("");
 
-  let edges = $state.raw<Edge[]>(
-    initialEdges.map((e) => ({
+  $effect(() => {
+    const newJson = JSON.stringify(initialNodes.map(n => ({ id: n.id, data: n.data })));
+    if (newJson !== lastInitialNodesJson) {
+      lastInitialNodesJson = newJson;
+      nodes = initialNodes.map((n) => ({
+        id: n.id,
+        type: n.type,
+        position: { ...n.position },
+        data: { ...n.data },
+      })) as Node[];
+    }
+  });
+
+  $effect(() => {
+    edges = initialEdges.map((e) => ({
       id: e.id,
       source: e.source,
       target: e.target,
@@ -61,8 +69,8 @@
       animated: e.animated ?? true,
       label: e.label,
       data: e.data,
-    })) as Edge[]
-  );
+    })) as Edge[];
+  });
 
   function handleNodeDragStop(event: { targetNode: Node | null; nodes: Node[]; event: MouseEvent | TouchEvent }) {
     console.log("[WorkflowEditor] handleNodeDragStop triggered", event.targetNode?.id);
@@ -276,25 +284,23 @@
 </div>
 
 <style>
+  /* Custom node components handle their own styling - keep wrapper transparent */
   :global(.svelte-flow__node) {
-    background: hsl(var(--card) / 0.9);
-    border: 1px solid hsl(var(--border));
-    border-radius: 6px;
-    padding: 12px 16px;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
     color: hsl(var(--foreground));
     font-family: var(--font-body), system-ui, sans-serif;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    transition: all 0.2s ease;
   }
 
   :global(.svelte-flow__node:hover) {
-    border-color: color-mix(in oklch, var(--cyber-cyan) 40%, transparent);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    box-shadow: none !important;
   }
 
   :global(.svelte-flow__node.selected) {
-    border-color: var(--cyber-cyan);
-    box-shadow: 0 0 0 2px color-mix(in oklch, var(--cyber-cyan) 30%, transparent);
+    box-shadow: none !important;
   }
 
   :global(.svelte-flow__edge-path) {
@@ -303,8 +309,8 @@
   }
 
   :global(.svelte-flow__edge.animated path) {
-    stroke-dasharray: 5;
-    animation: dashdraw 0.5s linear infinite;
+    stroke-dasharray: 6 4;
+    animation: dashdraw 0.8s linear infinite;
   }
 
   :global(.svelte-flow__edge.selected .svelte-flow__edge-path) {
@@ -346,17 +352,24 @@
     background: hsl(var(--card) / 0.9) !important;
   }
 
+  /* Theme-aware canvas background */
+  :global(.svelte-flow) {
+    background: hsl(var(--background)) !important;
+  }
+
+  :global(.svelte-flow__background) {
+    background: hsl(var(--background)) !important;
+  }
+
+  :global(.svelte-flow__background pattern circle) {
+    fill: hsl(var(--muted-foreground) / 0.3) !important;
+  }
+
   @keyframes dashdraw {
     to {
-      stroke-dashoffset: -10;
+      stroke-dashoffset: -20;
     }
   }
 
-  :global(.dark .svelte-flow__node) {
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
-  }
-
-  :global(.dark .svelte-flow__node:hover) {
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
-  }
+  /* Dark mode shadows handled by inner node components */
 </style>

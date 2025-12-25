@@ -6,6 +6,8 @@ import {
 } from "@cloudflare/sandbox/opencode";
 import type { Config, OpencodeClient } from "@opencode-ai/sdk";
 import { WorkspaceStorage } from "./storage";
+import { executeWorkflow, validateWorkflowForExecution } from "./workflows/executor";
+import type { WorkflowDefinition } from "./workflows/utils/context";
 
 export { Sandbox } from "@cloudflare/sandbox";
 
@@ -85,6 +87,14 @@ export default {
 
       if (request.method === "POST" && pathParts[2] === "sync") {
         return handleSyncWorkspace(env, pathParts[1]);
+      }
+
+      if (request.method === "POST" && pathParts[0] === "workflow" && pathParts[1] === "execute") {
+        return handleWorkflowExecute(request, env);
+      }
+
+      if (request.method === "POST" && pathParts[0] === "workflow" && pathParts[1] === "validate") {
+        return handleWorkflowValidate(request);
       }
 
       return new Response("Not Found", { status: 404 });
@@ -533,4 +543,56 @@ async function notifyAgentPodAPI(
   } catch (error) {
     console.error("Failed to notify AgentPod API:", error);
   }
+}
+
+interface WorkflowExecuteBody {
+  executionId: string;
+  workflowId: string;
+  workflow: WorkflowDefinition;
+  triggerType: "manual" | "webhook" | "schedule" | "event";
+  triggerData?: Record<string, unknown>;
+  userId?: string;
+}
+
+async function handleWorkflowExecute(request: Request, env: Env): Promise<Response> {
+  const body = (await request.json()) as WorkflowExecuteBody;
+  
+  const validationErrors = validateWorkflowForExecution(body.workflow);
+  if (validationErrors.length > 0) {
+    return Response.json(
+      { error: "Invalid workflow", errors: validationErrors },
+      { status: 400 }
+    );
+  }
+
+  console.log(`[Workflow] Starting execution ${body.executionId} for workflow ${body.workflowId}`);
+
+  const result = await executeWorkflow({
+    executionId: body.executionId,
+    workflowId: body.workflowId,
+    workflow: body.workflow,
+    triggerType: body.triggerType,
+    triggerData: body.triggerData || {},
+    userId: body.userId,
+    env: {
+      Sandbox: env.Sandbox,
+      WORKSPACE_BUCKET: env.WORKSPACE_BUCKET,
+      AGENTPOD_API_URL: env.AGENTPOD_API_URL,
+      AGENTPOD_API_TOKEN: env.AGENTPOD_API_TOKEN,
+    },
+  });
+
+  // Always return 200 - the workflow executed, result contains success/error info
+  return Response.json(result, { status: 200 });
+}
+
+async function handleWorkflowValidate(request: Request): Promise<Response> {
+  const body = (await request.json()) as { workflow: WorkflowDefinition };
+  
+  const errors = validateWorkflowForExecution(body.workflow);
+  
+  return Response.json({
+    valid: errors.length === 0,
+    errors,
+  });
 }

@@ -1,6 +1,10 @@
 /**
- * Workflow Builder Types - n8n-compatible schema for visual workflow editor
- * @see https://docs.n8n.io/api/workflow/
+ * Workflow Builder Types - Cloudflare Workflows-native schema
+ * 
+ * Key difference from n8n: Connections use node IDs (not names).
+ * This enables unique identification and direct code generation for Cloudflare Workflows.
+ * 
+ * @see https://developers.cloudflare.com/workflows/
  */
 
 export interface IWorkflowBase {
@@ -31,7 +35,7 @@ export interface INode {
 }
 
 export interface IConnections {
-  [sourceNodeName: string]: INodeConnections;
+  [sourceNodeId: string]: INodeConnections;
 }
 
 export interface INodeConnections {

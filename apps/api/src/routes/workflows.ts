@@ -7,6 +7,7 @@ import { workflows, workflowExecutions } from "../db/schema/workflows.ts";
 import { eq, and, desc } from "drizzle-orm";
 import { validateWorkflow } from "../utils/workflow-validation.ts";
 import { createLogger } from "../utils/logger.ts";
+import { getCloudflareProvider, isCloudflareConfigured } from "../services/providers/cloudflare-provider.ts";
 
 const log = createLogger("workflow-routes");
 
@@ -288,6 +289,70 @@ export const workflowRoutes = new Hono()
       .where(eq(workflows.id, id));
 
     log.info("Queued workflow execution", { workflowId: id, executionId });
+
+    if (isCloudflareConfigured()) {
+      const provider = getCloudflareProvider();
+      
+      provider.executeWorkflow({
+        executionId,
+        workflowId: id,
+        workflow: {
+          id: workflow.id,
+          name: workflow.name,
+          nodes: workflow.nodes as Array<{
+            id: string;
+            name: string;
+            type: string;
+            position: [number, number];
+            parameters: Record<string, unknown>;
+            disabled?: boolean;
+          }>,
+          connections: workflow.connections as Record<string, { main: Array<Array<{ node: string; type: string; index: number }>> }>,
+          settings: workflow.settings as Record<string, unknown> | undefined,
+        },
+        triggerType: "manual",
+        triggerData: body.triggerData,
+        userId,
+      }).then(async (result) => {
+        log.info("Workflow execution result received", { 
+          executionId, 
+          status: result.status,
+          success: result.success,
+          durationMs: result.durationMs,
+        });
+        
+        await db
+          .update(workflowExecutions)
+          .set({
+            status: result.status,
+            result: result.steps,
+            error: result.error,
+            completedAt: new Date(result.completedAt),
+            durationMs: result.durationMs,
+          })
+          .where(eq(workflowExecutions.id, executionId));
+        
+        log.info("Workflow execution completed", { executionId, status: result.status });
+      }).catch(async (error) => {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        
+        log.error("Workflow execution failed", { 
+          executionId, 
+          errorMessage,
+          errorStack,
+        });
+        
+        await db
+          .update(workflowExecutions)
+          .set({
+            status: "errored",
+            error: errorMessage,
+            completedAt: new Date(),
+          })
+          .where(eq(workflowExecutions.id, executionId));
+      });
+    }
 
     return c.json({ execution }, 202);
   })

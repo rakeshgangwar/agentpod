@@ -2,7 +2,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import { connection } from "$lib/stores/connection.svelte";
-  import { workflows, fetchWorkflow, updateWorkflow, executeWorkflow, validateWorkflow } from "$lib/stores/workflows.svelte";
+  import { workflows, fetchWorkflow, updateWorkflow, executeWorkflow, validateWorkflow, fetchExecution } from "$lib/stores/workflows.svelte";
   import { WorkflowEditor } from "$lib/components/workflow";
   import NodePalette from "$lib/components/workflow/NodePalette.svelte";
   import PropertiesPanel from "$lib/components/workflow/PropertiesPanel.svelte";
@@ -10,7 +10,7 @@
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import ThemeToggle from "$lib/components/theme-toggle.svelte";
-  import type { ISvelteFlowNode, ISvelteFlowEdge, INode, IConnections, IWorkflowValidationResult, WorkflowNodeType } from "@agentpod/types";
+  import type { ISvelteFlowNode, ISvelteFlowEdge, INode, IConnections, IWorkflowValidationResult, WorkflowNodeType, IWorkflowExecution } from "@agentpod/types";
   import { SvelteFlowProvider, type NodeTypes } from "@xyflow/svelte";
 
   import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
@@ -20,6 +20,10 @@
   import PanelLeftIcon from "@lucide/svelte/icons/panel-left";
   import PanelRightIcon from "@lucide/svelte/icons/panel-right";
   import LoaderIcon from "@lucide/svelte/icons/loader-2";
+  import XCircleIcon from "@lucide/svelte/icons/x-circle";
+  import CheckIcon from "@lucide/svelte/icons/check";
+
+  type ExecutionStatus = "idle" | "running" | "success" | "error";
 
   const workflowId = $derived($page.params.id);
 
@@ -48,6 +52,8 @@
   let validationResult = $state<IWorkflowValidationResult | null>(null);
   let isLoaded = $state(false);
   let deleteNodeId = $state<string | null>(null);
+  let executionResult = $state<IWorkflowExecution | null>(null);
+  let executionBannerVisible = $state(false);
 
   const nodeTypes: NodeTypes = {
     trigger: TriggerNode,
@@ -62,14 +68,14 @@
     if (workflow) {
       workflowName = workflow.name;
       workflowDescription = workflow.description || "";
-      nodes = convertFromN8nFormat(workflow.nodes, workflow.connections);
-      edges = convertEdgesFromN8n(workflow.nodes, workflow.connections);
+      nodes = convertFromWorkflowFormat(workflow.nodes, workflow.connections);
+      edges = convertEdgesFromWorkflow(workflow.nodes, workflow.connections);
       isLoaded = true;
     }
   }
 
-  function convertFromN8nFormat(n8nNodes: INode[], connections: IConnections): ISvelteFlowNode[] {
-    return n8nNodes.map(node => {
+  function convertFromWorkflowFormat(workflowNodes: INode[], connections: IConnections): ISvelteFlowNode[] {
+    return workflowNodes.map(node => {
       const nodeType = node.type.includes("trigger") ? "trigger"
         : node.type.includes("ai") ? "ai-agent"
         : node.type.includes("condition") || node.type.includes("switch") ? "condition"
@@ -88,12 +94,17 @@
     });
   }
 
-  function convertEdgesFromN8n(n8nNodes: INode[], connections: IConnections): ISvelteFlowEdge[] {
+  function convertEdgesFromWorkflow(workflowNodes: INode[], connections: IConnections): ISvelteFlowEdge[] {
     const edgeList: ISvelteFlowEdge[] = [];
+    const nodeIds = new Set(workflowNodes.map(n => n.id));
     
     Object.entries(connections).forEach(([sourceId, nodeConnections]) => {
+      if (!nodeIds.has(sourceId)) return;
+      
       nodeConnections.main.forEach((outputs, outputIndex) => {
         outputs.forEach((conn, connIndex) => {
+          if (!nodeIds.has(conn.node)) return;
+          
           edgeList.push({
             id: `${sourceId}-${conn.node}-${outputIndex}-${connIndex}`,
             source: sourceId,
@@ -137,8 +148,8 @@
     deleteNodeId = nodeId;
   }
 
-  function convertToN8nFormat(): { nodes: INode[]; connections: IConnections } {
-    const n8nNodes: INode[] = nodes.map(node => ({
+  function convertToWorkflowFormat(): { nodes: INode[]; connections: IConnections } {
+    const workflowNodes: INode[] = nodes.map(node => ({
       id: node.id,
       name: node.data.label as string || node.id,
       type: (node.data.nodeType as WorkflowNodeType) || "http-request",
@@ -162,7 +173,7 @@
       });
     });
 
-    return { nodes: n8nNodes, connections };
+    return { nodes: workflowNodes, connections };
   }
 
   async function handleSave() {
@@ -170,12 +181,12 @@
     
     isSaving = true;
     try {
-      const { nodes: n8nNodes, connections } = convertToN8nFormat();
+      const { nodes: workflowNodes, connections } = convertToWorkflowFormat();
       
       await updateWorkflow(workflowId, {
         name: workflowName.trim(),
         description: workflowDescription.trim() || undefined,
-        nodes: n8nNodes,
+        nodes: workflowNodes,
         connections,
       });
     } finally {
@@ -193,17 +204,106 @@
     }
   }
 
+  function updateNodeExecutionStatus(nodeId: string, status: ExecutionStatus, error?: string) {
+    nodes = nodes.map(n => {
+      if (n.id === nodeId) {
+        return {
+          ...n,
+          data: {
+            ...n.data,
+            executionStatus: status,
+            executionError: error,
+          },
+        };
+      }
+      return n;
+    });
+  }
+
+  function setAllNodesStatus(status: ExecutionStatus) {
+    nodes = nodes.map(n => ({
+      ...n,
+      data: {
+        ...n.data,
+        executionStatus: status,
+        executionError: undefined,
+      },
+    }));
+  }
+
+  function applyExecutionResult(result: IWorkflowExecution) {
+    const stepResults = result.result as Record<string, { success: boolean; error?: string }> | undefined;
+    
+    console.log("[Execution] Applying results:", { 
+      stepResults, 
+      nodeIds: nodes.map(n => n.id),
+      resultKeys: stepResults ? Object.keys(stepResults) : []
+    });
+    
+    if (stepResults) {
+      Object.entries(stepResults).forEach(([nodeId, stepResult]) => {
+        const status: ExecutionStatus = stepResult.success ? "success" : "error";
+        console.log("[Execution] Updating node:", { nodeId, status, error: stepResult.error });
+        updateNodeExecutionStatus(nodeId, status, stepResult.error);
+      });
+    }
+    
+    executionResult = result;
+    executionBannerVisible = true;
+    
+    setTimeout(() => {
+      executionBannerVisible = false;
+    }, 10000);
+  }
+
   async function handleExecute() {
     if (!workflowId) return;
     isExecuting = true;
+    executionResult = null;
+    
+    setAllNodesStatus("running");
+    
     try {
       const execution = await executeWorkflow(workflowId);
       if (execution) {
-        console.log("Workflow execution started:", execution.id);
+        const maxAttempts = 30;
+        let attempts = 0;
+        
+        const poll = async () => {
+          attempts++;
+          const result = await fetchExecution(execution.id);
+          
+          if (result) {
+            if (result.status === "completed" || result.status === "errored") {
+              applyExecutionResult(result);
+              isExecuting = false;
+              return;
+            }
+          }
+          
+          if (attempts < maxAttempts) {
+            setTimeout(poll, 1000);
+          } else {
+            setAllNodesStatus("idle");
+            isExecuting = false;
+          }
+        };
+        
+        setTimeout(poll, 500);
+      } else {
+        setAllNodesStatus("idle");
+        isExecuting = false;
       }
-    } finally {
+    } catch {
+      setAllNodesStatus("error");
       isExecuting = false;
     }
+  }
+  
+  function clearExecutionStatus() {
+    setAllNodesStatus("idle");
+    executionResult = null;
+    executionBannerVisible = false;
   }
 </script>
 
@@ -309,14 +409,48 @@
     </div>
   {/if}
 
+  {#if executionBannerVisible && executionResult}
+    {@const isSuccess = executionResult.status === "completed" && !executionResult.error}
+    <div 
+      class="px-4 py-3 border-b flex items-center justify-between transition-all duration-300 {isSuccess ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-red-500/10 border-red-500/30'}"
+    >
+      <div class="flex items-center gap-3">
+        {#if isSuccess}
+          <CheckIcon class="h-5 w-5 text-emerald-500" />
+          <div>
+            <span class="font-mono text-xs uppercase text-emerald-500">[execution complete]</span>
+            <span class="text-sm text-muted-foreground ml-2">
+              Completed in {executionResult.durationMs || 0}ms
+            </span>
+          </div>
+        {:else}
+          <XCircleIcon class="h-5 w-5 text-red-500" />
+          <div>
+            <span class="font-mono text-xs uppercase text-red-500">[execution failed]</span>
+            <span class="text-sm text-red-400 ml-2">
+              {executionResult.error || "Unknown error"}
+            </span>
+          </div>
+        {/if}
+      </div>
+      
+      <Button
+        variant="ghost"
+        size="sm"
+        onclick={clearExecutionStatus}
+        class="h-7 text-xs font-mono uppercase"
+      >
+        Clear
+      </Button>
+    </div>
+  {/if}
+
   <SvelteFlowProvider>
     <div class="flex-1 flex overflow-hidden">
-      {#if showPalette}
-        <NodePalette />
-      {/if}
+      <NodePalette collapsed={!showPalette} />
 
       <div class="flex-1 relative" role="application">
-        {#if workflows.isLoading && !isLoaded}
+        {#if !isLoaded}
           <div class="absolute inset-0 flex items-center justify-center bg-background/50">
             <div class="flex items-center gap-3 text-muted-foreground">
               <LoaderIcon class="h-6 w-6 animate-spin" />
@@ -336,16 +470,13 @@
         {/if}
       </div>
 
-      {#if showProperties}
-        <div class="w-80">
-          <PropertiesPanel
-            {selectedNode}
-            onNodeUpdate={handleNodeUpdate}
-            onNodeDelete={handleNodeDelete}
-            onClose={() => selectedNode = null}
-          />
-        </div>
-      {/if}
+      <PropertiesPanel
+        {selectedNode}
+        onNodeUpdate={handleNodeUpdate}
+        onNodeDelete={handleNodeDelete}
+        onClose={() => selectedNode = null}
+        collapsed={!showProperties}
+      />
     </div>
   </SvelteFlowProvider>
 </main>

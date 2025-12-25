@@ -249,6 +249,27 @@ export async function executeWorkflow(id: string, triggerData?: Record<string, u
   }
 }
 
+export async function fetchExecution(executionId: string): Promise<IWorkflowExecution | null> {
+  try {
+    const { baseUrl, token } = await getApiContext();
+    const response = await fetch(`${baseUrl}/api/workflows/executions/${executionId}`, {
+      headers: getHeaders(token),
+      credentials: "include",
+    });
+    
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || `Failed to fetch execution: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.execution;
+  } catch (e) {
+    console.error("Failed to fetch execution:", e);
+    return null;
+  }
+}
+
 export async function duplicateWorkflow(id: string, newName?: string): Promise<IAgentPodWorkflow | null> {
   isSaving = true;
   error = null;

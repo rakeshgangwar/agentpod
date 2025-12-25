@@ -29,7 +29,7 @@
       id: "trigger-1",
       type: "trigger",
       position: { x: 250, y: 100 },
-      data: { label: "Manual Trigger", triggerType: "manual" },
+      data: { label: "Manual Trigger", nodeType: "manual-trigger" },
     },
   ]);
   let edges = $state<ISvelteFlowEdge[]>([]);
@@ -77,8 +77,8 @@
     deleteNodeId = nodeId;
   }
 
-  function convertToN8nFormat(): { nodes: INode[]; connections: IConnections } {
-    const n8nNodes: INode[] = nodes.map(node => ({
+  function convertToWorkflowFormat(): { nodes: INode[]; connections: IConnections } {
+    const workflowNodes: INode[] = nodes.map(node => ({
       id: node.id,
       name: node.data.label as string || node.id,
       type: (node.data.nodeType as WorkflowNodeType) || "http-request",
@@ -102,7 +102,7 @@
       });
     });
 
-    return { nodes: n8nNodes, connections };
+    return { nodes: workflowNodes, connections };
   }
 
   async function handleSave() {
@@ -110,12 +110,12 @@
     
     isSaving = true;
     try {
-      const { nodes: n8nNodes, connections } = convertToN8nFormat();
+      const { nodes: workflowNodes, connections } = convertToWorkflowFormat();
       
       const workflow = await createWorkflow({
         name: workflowName.trim(),
         description: workflowDescription.trim() || undefined,
-        nodes: n8nNodes,
+        nodes: workflowNodes,
         connections,
       });
 
@@ -198,16 +198,13 @@
         bind:deleteNodeId
       />
 
-      {#if showProperties}
-        <div class="w-80">
-          <PropertiesPanel
-            {selectedNode}
-            onNodeUpdate={handleNodeUpdate}
-            onNodeDelete={handleNodeDelete}
-            onClose={() => selectedNode = null}
-          />
-        </div>
-      {/if}
+      <PropertiesPanel
+        {selectedNode}
+        onNodeUpdate={handleNodeUpdate}
+        onNodeDelete={handleNodeDelete}
+        onClose={() => selectedNode = null}
+        collapsed={!showProperties}
+      />
     </div>
   </SvelteFlowProvider>
 </main>

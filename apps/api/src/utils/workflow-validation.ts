@@ -86,7 +86,6 @@ export function validateNodes(nodes: INode[]): {
   const errors: IWorkflowValidationError[] = [];
   const warnings: IWorkflowValidationError[] = [];
   const seenIds = new Set<string>();
-  const seenNames = new Set<string>();
 
   for (const node of nodes) {
     if (!node.id || node.id.trim() === "") {
@@ -111,14 +110,6 @@ export function validateNodes(nodes: INode[]): {
         message: "Node name is required",
         severity: "error",
       });
-    } else if (seenNames.has(node.name)) {
-      errors.push({
-        nodeId: node.id,
-        message: `Duplicate node name: ${node.name}`,
-        severity: "error",
-      });
-    } else {
-      seenNames.add(node.name);
     }
 
     if (node.disabled) {
@@ -142,12 +133,13 @@ export function validateConnections(
 } {
   const errors: IWorkflowValidationError[] = [];
   const warnings: IWorkflowValidationError[] = [];
-  const nodeNames = new Set(nodes.map((n) => n.name));
+  const nodeIds = new Set(nodes.map((n) => n.id));
 
-  for (const [sourceName, nodeConnections] of Object.entries(connections)) {
-    if (!nodeNames.has(sourceName)) {
+  for (const [sourceId, nodeConnections] of Object.entries(connections)) {
+    if (!nodeIds.has(sourceId)) {
       errors.push({
-        message: `Connection source "${sourceName}" does not exist`,
+        nodeId: sourceId,
+        message: `Connection source node "${sourceId}" does not exist`,
         severity: "error",
       });
       continue;
@@ -155,14 +147,16 @@ export function validateConnections(
 
     for (const outputConnections of nodeConnections.main) {
       for (const connection of outputConnections) {
-        if (!nodeNames.has(connection.node)) {
+        if (!nodeIds.has(connection.node)) {
           errors.push({
-            message: `Connection target "${connection.node}" does not exist`,
+            nodeId: sourceId,
+            message: `Connection target node "${connection.node}" does not exist`,
             severity: "error",
           });
-        } else if (connection.node === sourceName) {
+        } else if (connection.node === sourceId) {
           errors.push({
-            message: `Node "${sourceName}" has a self-referencing connection`,
+            nodeId: sourceId,
+            message: `Node "${sourceId}" has a self-referencing connection`,
             severity: "error",
           });
         }
@@ -179,12 +173,9 @@ export function findUnreachableNodes(
 ): string[] {
   if (nodes.length === 0) return [];
 
-  const nodeNameToId = new Map<string, string>();
-  for (const node of nodes) {
-    nodeNameToId.set(node.name, node.id);
-  }
-
+  const nodeIds = new Set(nodes.map((n) => n.id));
   const triggers = nodes.filter((n) => isTriggerNode(n.type));
+  
   if (triggers.length === 0) {
     return nodes.map((n) => n.id);
   }
@@ -193,27 +184,27 @@ export function findUnreachableNodes(
 
   for (const trigger of triggers) {
     reachable.add(trigger.id);
-    traverseFromNode(trigger.name, connections, nodeNameToId, reachable);
+    traverseFromNode(trigger.id, connections, nodeIds, reachable);
   }
 
   return nodes.filter((n) => !reachable.has(n.id)).map((n) => n.id);
 }
 
 function traverseFromNode(
-  nodeName: string,
+  nodeId: string,
   connections: IConnections,
-  nodeNameToId: Map<string, string>,
+  nodeIds: Set<string>,
   visited: Set<string>
 ): void {
-  const nodeConnections = connections[nodeName];
+  const nodeConnections = connections[nodeId];
   if (!nodeConnections) return;
 
   for (const outputConnections of nodeConnections.main) {
     for (const connection of outputConnections) {
-      const targetId = nodeNameToId.get(connection.node);
-      if (targetId && !visited.has(targetId)) {
+      const targetId = connection.node;
+      if (nodeIds.has(targetId) && !visited.has(targetId)) {
         visited.add(targetId);
-        traverseFromNode(connection.node, connections, nodeNameToId, visited);
+        traverseFromNode(targetId, connections, nodeIds, visited);
       }
     }
   }
@@ -226,31 +217,30 @@ export function detectCycles(
   if (nodes.length === 0) return [];
 
   const cycles: string[][] = [];
-  const nodeNameToId = new Map<string, string>();
-  for (const node of nodes) {
-    nodeNameToId.set(node.name, node.id);
-  }
+  const nodeIds = new Set(nodes.map((n) => n.id));
 
   const visited = new Set<string>();
   const recursionStack = new Set<string>();
   const path: string[] = [];
 
-  function dfs(nodeName: string): void {
-    visited.add(nodeName);
-    recursionStack.add(nodeName);
-    path.push(nodeName);
+  function dfs(nodeId: string): void {
+    visited.add(nodeId);
+    recursionStack.add(nodeId);
+    path.push(nodeId);
 
-    const nodeConnections = connections[nodeName];
+    const nodeConnections = connections[nodeId];
     if (nodeConnections) {
       for (const outputConnections of nodeConnections.main) {
         for (const connection of outputConnections) {
-          const targetName = connection.node;
+          const targetId = connection.node;
 
-          if (!visited.has(targetName)) {
-            dfs(targetName);
-          } else if (recursionStack.has(targetName)) {
-            const cycleStart = path.indexOf(targetName);
-            const cycle = [...path.slice(cycleStart), targetName];
+          if (!nodeIds.has(targetId)) continue;
+
+          if (!visited.has(targetId)) {
+            dfs(targetId);
+          } else if (recursionStack.has(targetId)) {
+            const cycleStart = path.indexOf(targetId);
+            const cycle = [...path.slice(cycleStart), targetId];
             cycles.push(cycle);
           }
         }
@@ -258,12 +248,12 @@ export function detectCycles(
     }
 
     path.pop();
-    recursionStack.delete(nodeName);
+    recursionStack.delete(nodeId);
   }
 
   for (const node of nodes) {
-    if (!visited.has(node.name)) {
-      dfs(node.name);
+    if (!visited.has(node.id)) {
+      dfs(node.id);
     }
   }
 

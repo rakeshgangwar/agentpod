@@ -4,19 +4,17 @@
   import { Label } from "$lib/components/ui/label";
   import * as Select from "$lib/components/ui/select";
   import Trash2Icon from "@lucide/svelte/icons/trash-2";
-  import ZapIcon from "@lucide/svelte/icons/zap";
-  import BotIcon from "@lucide/svelte/icons/bot";
-  import GitBranchIcon from "@lucide/svelte/icons/git-branch";
-  import SendIcon from "@lucide/svelte/icons/send";
   import XIcon from "@lucide/svelte/icons/x";
-  import type { ISvelteFlowNode } from "@agentpod/types";
-  import type { Component } from "svelte";
+  import AlertCircleIcon from "@lucide/svelte/icons/alert-circle";
+  import type { ISvelteFlowNode, WorkflowNodeType } from "@agentpod/types";
+  import { getNodeDefinition, isNodeImplemented, type NodeRegistryEntry } from "./node-registry";
 
   interface Props {
     selectedNode: ISvelteFlowNode | null;
     onNodeUpdate: (nodeId: string, updates: Partial<ISvelteFlowNode>) => void;
     onNodeDelete?: (nodeId: string) => void;
     onClose?: () => void;
+    collapsed?: boolean;
   }
 
   let {
@@ -24,6 +22,7 @@
     onNodeUpdate,
     onNodeDelete,
     onClose,
+    collapsed = false,
   }: Props = $props();
 
   let nodeName = $state("");
@@ -33,8 +32,28 @@
   let nodeTriggerType = $state("manual");
   let nodeUrl = $state("");
   let nodeMethod = $state("GET");
-  let nodeCondition = $state("");
+  let nodeConditionField = $state("");
+  let nodeConditionOperator = $state("equals");
+  let nodeConditionValue = $state("");
   let nodeHeaders = $state<Array<{ key: string; value: string }>>([]);
+  let nodeCode = $state("");
+  let nodeCron = $state("");
+  let nodeTimezone = $state("UTC");
+
+  const actualNodeType = $derived.by(() => {
+    if (!selectedNode) return undefined;
+    const fromData = selectedNode.data?.nodeType as WorkflowNodeType | undefined;
+    if (fromData) return fromData;
+    return selectedNode.type as WorkflowNodeType | undefined;
+  });
+
+  const nodeDefinition = $derived.by(() => 
+    actualNodeType ? getNodeDefinition(actualNodeType) : undefined
+  );
+
+  const isImplemented = $derived(
+    actualNodeType ? isNodeImplemented(actualNodeType) : false
+  );
 
   $effect(() => {
     if (selectedNode) {
@@ -45,8 +64,21 @@
       nodeTriggerType = selectedNode.data.triggerType as string || "manual";
       nodeUrl = selectedNode.data.url as string || "";
       nodeMethod = selectedNode.data.method as string || "GET";
-      nodeCondition = selectedNode.data.condition as string || "";
       nodeHeaders = selectedNode.data.headers as Array<{ key: string; value: string }> || [];
+      nodeCode = selectedNode.data.code as string || "";
+      nodeCron = selectedNode.data.cron as string || "";
+      nodeTimezone = selectedNode.data.timezone as string || "UTC";
+      
+      const conditions = selectedNode.data.conditions as Array<{ field: string; operator: string; value: unknown }> || [];
+      if (conditions.length > 0) {
+        nodeConditionField = conditions[0].field || "";
+        nodeConditionOperator = conditions[0].operator || "equals";
+        nodeConditionValue = String(conditions[0].value || "");
+      } else {
+        nodeConditionField = "";
+        nodeConditionOperator = "equals";
+        nodeConditionValue = "";
+      }
     }
   });
 
@@ -56,7 +88,11 @@
     const baseData = { ...selectedNode.data, label: nodeName };
     let updatedData: Record<string, unknown> = baseData;
 
-    if (selectedNode.type?.includes("ai")) {
+    const nodeType = selectedNode.type as WorkflowNodeType;
+
+    const actualType = (selectedNode.data?.nodeType as string) || selectedNode.type;
+
+    if (actualType === "ai-agent" || actualType === "ai-prompt") {
       updatedData = {
         ...updatedData,
         prompt: nodePrompt,
@@ -65,14 +101,19 @@
       };
     }
 
-    if (selectedNode.type?.includes("trigger")) {
+    if (actualType?.includes("trigger")) {
       updatedData = {
         ...updatedData,
         triggerType: nodeTriggerType,
       };
+      
+      if (actualType === "schedule-trigger") {
+        updatedData.cron = nodeCron;
+        updatedData.timezone = nodeTimezone;
+      }
     }
 
-    if (selectedNode.type?.includes("http") || selectedNode.type === "action") {
+    if (actualType === "http-request") {
       updatedData = {
         ...updatedData,
         url: nodeUrl,
@@ -81,10 +122,23 @@
       };
     }
 
-    if (selectedNode.type?.includes("condition")) {
+    if (actualType === "condition" || actualType === "switch") {
       updatedData = {
         ...updatedData,
-        condition: nodeCondition,
+        conditions: nodeConditionField ? [{
+          field: nodeConditionField,
+          operator: nodeConditionOperator,
+          value: nodeConditionValue,
+          outputBranch: "true",
+        }] : [],
+        defaultBranch: "false",
+      };
+    }
+
+    if (actualType === "javascript") {
+      updatedData = {
+        ...updatedData,
+        code: nodeCode,
       };
     }
 
@@ -104,62 +158,69 @@
     nodeHeaders = nodeHeaders.filter((_, i) => i !== index);
   }
 
-  function getNodeIcon(nodeType?: string): Component {
-    if (nodeType?.includes("trigger")) return ZapIcon;
-    if (nodeType?.includes("ai")) return BotIcon;
-    if (nodeType?.includes("condition")) return GitBranchIcon;
-    return SendIcon;
+  function getColorClass(category?: string): string {
+    switch (category) {
+      case "trigger": return "cyber-cyan";
+      case "ai": return "cyber-emerald";
+      case "logic": return "cyber-amber";
+      case "action": return "cyber-magenta";
+      case "human": return "cyber-cyan";
+      case "code": return "cyber-amber";
+      default: return "muted-foreground";
+    }
   }
 
-  function getNodeColor(nodeType?: string) {
-    if (nodeType?.includes("trigger")) return "cyber-cyan";
-    if (nodeType?.includes("ai")) return "cyber-emerald";
-    if (nodeType?.includes("condition")) return "cyber-amber";
-    return "muted-foreground";
-  }
+  const CONDITION_OPERATORS = [
+    { value: "equals", label: "Equals" },
+    { value: "notEquals", label: "Not Equals" },
+    { value: "contains", label: "Contains" },
+    { value: "notContains", label: "Not Contains" },
+    { value: "startsWith", label: "Starts With" },
+    { value: "endsWith", label: "Ends With" },
+    { value: "greaterThan", label: "Greater Than" },
+    { value: "lessThan", label: "Less Than" },
+    { value: "isEmpty", label: "Is Empty" },
+    { value: "isNotEmpty", label: "Is Not Empty" },
+    { value: "isTrue", label: "Is True" },
+    { value: "isFalse", label: "Is False" },
+  ];
 
-  function getTriggerTypeLabel(value: string): string {
-    const labels: Record<string, string> = {
-      manual: "Manual",
-      webhook: "Webhook",
-      schedule: "Schedule",
-      event: "Event",
-    };
-    return labels[value] || value;
-  }
+  const MODEL_OPTIONS = [
+    { value: "claude-3-5-sonnet", label: "Claude 3.5 Sonnet" },
+    { value: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" },
+    { value: "claude-3-opus", label: "Claude 3 Opus" },
+    { value: "gpt-4", label: "GPT-4" },
+    { value: "gpt-4-turbo", label: "GPT-4 Turbo" },
+    { value: "gpt-4o", label: "GPT-4o" },
+  ];
 
-  function getModelLabel(value: string): string {
-    const labels: Record<string, string> = {
-      "claude-3-5-sonnet": "Claude 3.5 Sonnet",
-      "claude-3-opus": "Claude 3 Opus",
-      "gpt-4": "GPT-4",
-      "gpt-4-turbo": "GPT-4 Turbo",
-      "gpt-3.5-turbo": "GPT-3.5 Turbo",
-    };
-    return labels[value] || value;
-  }
-
+  const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 </script>
 
-{#if selectedNode}
-  {@const NodeIcon = getNodeIcon(selectedNode.type)}
-  <div class="h-full flex flex-col bg-card/90 backdrop-blur-sm border-l border-border">
+<div class="sidebar h-full overflow-hidden" class:collapsed={collapsed}>
+{#if selectedNode && nodeDefinition}
+  {@const NodeIcon = nodeDefinition.icon}
+  {@const colorClass = getColorClass(nodeDefinition.category)}
+  <div class="h-full flex flex-col bg-card/90 backdrop-blur-sm border-l border-border w-80">
     <div class="relative border-b border-border bg-gradient-to-br from-card to-card/50">
-      <div class="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[var(--{getNodeColor(selectedNode.type)})] to-transparent opacity-40"></div>
+      <div class="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[var(--{colorClass})] to-transparent opacity-40"></div>
       
       <div class="p-4 space-y-3">
         <div class="flex items-start justify-between gap-3">
           <div class="flex items-center gap-3 flex-1 min-w-0">
-            <div class="flex-shrink-0 w-10 h-10 rounded-sm bg-[var(--{getNodeColor(selectedNode.type)})]/20 flex items-center justify-center border border-[var(--{getNodeColor(selectedNode.type)})]/30">
-              <NodeIcon class="w-5 h-5 text-[var(--{getNodeColor(selectedNode.type)})]" />
+            <div 
+              class="flex-shrink-0 w-10 h-10 rounded-sm flex items-center justify-center border"
+              style="background: color-mix(in oklch, var(--{colorClass}) 20%, transparent); border-color: color-mix(in oklch, var(--{colorClass}) 30%, transparent);"
+            >
+              <NodeIcon class="w-5 h-5" style="color: var(--{colorClass});" />
             </div>
             
             <div class="flex-1 min-w-0">
               <div class="text-sm font-semibold text-foreground truncate">
-                {selectedNode.data.label || selectedNode.type}
+                {nodeDefinition.name}
               </div>
               <div class="text-xs text-muted-foreground font-mono uppercase tracking-wider">
-                Properties
+                {nodeDefinition.category}
               </div>
             </div>
           </div>
@@ -175,6 +236,13 @@
             </Button>
           {/if}
         </div>
+
+        {#if !isImplemented}
+          <div class="flex items-center gap-2 px-3 py-2 rounded-md bg-amber-500/10 border border-amber-500/30">
+            <AlertCircleIcon class="w-4 h-4 text-amber-500 flex-shrink-0" />
+            <span class="text-xs text-amber-500">Node not yet implemented</span>
+          </div>
+        {/if}
       </div>
     </div>
 
@@ -190,31 +258,46 @@
         />
       </div>
 
-      {#if selectedNode.type?.includes("trigger")}
-        <div class="space-y-2">
-          <Label for="trigger-type" class="text-foreground/90">Trigger Type</Label>
-          <Select.Root
-            type="single"
-            value={nodeTriggerType}
-            onValueChange={(v) => { if (v) { nodeTriggerType = v; handleUpdate(); } }}
-          >
-            <Select.Trigger 
-              id="trigger-type"
-              class="w-full bg-background/50 border-border"
-            >
-              {getTriggerTypeLabel(nodeTriggerType)}
-            </Select.Trigger>
-            <Select.Content>
-              <Select.Item value="manual" label="Manual" />
-              <Select.Item value="webhook" label="Webhook" />
-              <Select.Item value="schedule" label="Schedule" />
-              <Select.Item value="event" label="Event" />
-            </Select.Content>
-          </Select.Root>
-        </div>
+      {#if nodeDefinition.isTrigger}
+        {#if actualNodeType === "schedule-trigger"}
+          <div class="space-y-2">
+            <Label for="cron" class="text-foreground/90">Cron Expression</Label>
+            <Input 
+              id="cron"
+              bind:value={nodeCron}
+              placeholder="0 9 * * * (every day at 9 AM)"
+              class="bg-background/50 border-border font-mono"
+              onblur={handleUpdate}
+            />
+            <p class="text-xs text-muted-foreground">Standard cron format: minute hour day month weekday</p>
+          </div>
+          
+          <div class="space-y-2">
+            <Label for="timezone" class="text-foreground/90">Timezone</Label>
+            <Input 
+              id="timezone"
+              bind:value={nodeTimezone}
+              placeholder="UTC"
+              class="bg-background/50 border-border"
+              onblur={handleUpdate}
+            />
+          </div>
+        {:else}
+          <div class="p-4 rounded-md border border-dashed border-border bg-background/30 text-center">
+            <p class="text-xs text-muted-foreground">
+              {#if actualNodeType === "manual-trigger"}
+                This node starts the workflow when you click "Run"
+              {:else if actualNodeType === "webhook-trigger"}
+                Triggers via HTTP POST to the workflow webhook URL
+              {:else}
+                Trigger configuration
+              {/if}
+            </p>
+          </div>
+        {/if}
       {/if}
 
-      {#if selectedNode.type?.includes("ai")}
+      {#if nodeDefinition.category === "ai"}
         <div class="space-y-2">
           <Label for="model" class="text-foreground/90">AI Model</Label>
           <Select.Root
@@ -226,14 +309,12 @@
               id="model"
               class="w-full bg-background/50 border-border"
             >
-              {getModelLabel(nodeModel)}
+              {MODEL_OPTIONS.find(m => m.value === nodeModel)?.label || nodeModel}
             </Select.Trigger>
             <Select.Content>
-              <Select.Item value="claude-3-5-sonnet" label="Claude 3.5 Sonnet" />
-              <Select.Item value="claude-3-opus" label="Claude 3 Opus" />
-              <Select.Item value="gpt-4" label="GPT-4" />
-              <Select.Item value="gpt-4-turbo" label="GPT-4 Turbo" />
-              <Select.Item value="gpt-3.5-turbo" label="GPT-3.5 Turbo" />
+              {#each MODEL_OPTIONS as option}
+                <Select.Item value={option.value} label={option.label} />
+              {/each}
             </Select.Content>
           </Select.Root>
         </div>
@@ -248,6 +329,9 @@
             class="w-full min-h-[120px] px-3 py-2 text-sm rounded-md border border-border bg-background/50 placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-[var(--cyber-emerald)] focus-visible:ring-[3px] focus-visible:ring-[var(--cyber-emerald)]/20 disabled:cursor-not-allowed disabled:opacity-50 resize-y"
             onblur={handleUpdate}
           ></textarea>
+          <p class="text-xs text-muted-foreground">
+            Use {"{{steps.nodeId.data}}"} to reference previous step outputs
+          </p>
         </div>
 
         <div class="space-y-2">
@@ -263,7 +347,7 @@
         </div>
       {/if}
 
-      {#if selectedNode.type === "action" || selectedNode.type?.includes("http")}
+      {#if actualNodeType === "http-request"}
         <div class="space-y-2">
           <Label for="method" class="text-foreground/90">HTTP Method</Label>
           <Select.Root
@@ -278,11 +362,9 @@
               {nodeMethod}
             </Select.Trigger>
             <Select.Content>
-              <Select.Item value="GET" label="GET" />
-              <Select.Item value="POST" label="POST" />
-              <Select.Item value="PUT" label="PUT" />
-              <Select.Item value="PATCH" label="PATCH" />
-              <Select.Item value="DELETE" label="DELETE" />
+              {#each HTTP_METHODS as method}
+                <Select.Item value={method} label={method} />
+              {/each}
             </Select.Content>
           </Select.Root>
         </div>
@@ -297,6 +379,9 @@
             class="bg-background/50 border-border"
             onblur={handleUpdate}
           />
+          <p class="text-xs text-muted-foreground">
+            Use {"{{steps.nodeId.data.field}}"} for dynamic values
+          </p>
         </div>
 
         <div class="space-y-2">
@@ -347,18 +432,105 @@
         </div>
       {/if}
 
-      {#if selectedNode.type?.includes("condition")}
+      {#if actualNodeType === "condition" || actualNodeType === "switch"}
+        <div class="space-y-4">
+          <div class="space-y-2">
+            <Label for="condition-field" class="text-foreground/90">Field Path</Label>
+            <Input 
+              id="condition-field"
+              bind:value={nodeConditionField}
+              placeholder="steps.http-request-123.data.status"
+              class="bg-background/50 border-border font-mono text-sm"
+              onblur={handleUpdate}
+            />
+            <p class="text-xs text-muted-foreground">
+              Path to the value to evaluate (e.g., trigger.data.email or steps.nodeId.data.field)
+            </p>
+          </div>
+
+          <div class="space-y-2">
+            <Label for="operator" class="text-foreground/90">Operator</Label>
+            <Select.Root
+              type="single"
+              value={nodeConditionOperator}
+              onValueChange={(v) => { if (v) { nodeConditionOperator = v; handleUpdate(); } }}
+            >
+              <Select.Trigger 
+                id="operator"
+                class="w-full bg-background/50 border-border"
+              >
+                {CONDITION_OPERATORS.find(o => o.value === nodeConditionOperator)?.label || nodeConditionOperator}
+              </Select.Trigger>
+              <Select.Content>
+                {#each CONDITION_OPERATORS as op}
+                  <Select.Item value={op.value} label={op.label} />
+                {/each}
+              </Select.Content>
+            </Select.Root>
+          </div>
+
+          {#if !["isEmpty", "isNotEmpty", "isTrue", "isFalse"].includes(nodeConditionOperator)}
+            <div class="space-y-2">
+              <Label for="condition-value" class="text-foreground/90">Value</Label>
+              <Input 
+                id="condition-value"
+                bind:value={nodeConditionValue}
+                placeholder="Expected value"
+                class="bg-background/50 border-border"
+                onblur={handleUpdate}
+              />
+            </div>
+          {/if}
+        </div>
+      {/if}
+
+      {#if actualNodeType === "javascript"}
         <div class="space-y-2">
-          <Label for="condition" class="text-foreground/90">Condition Expression</Label>
+          <Label for="code" class="text-foreground/90">JavaScript Code</Label>
           <textarea
-            id="condition"
-            bind:value={nodeCondition}
-            placeholder="e.g., data.status === 'success'"
-            rows={4}
-            class="w-full min-h-[80px] px-3 py-2 text-sm rounded-md border border-border bg-background/50 placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-[var(--cyber-amber)] focus-visible:ring-[3px] focus-visible:ring-[var(--cyber-amber)]/20 disabled:cursor-not-allowed disabled:opacity-50 resize-y font-mono"
+            id="code"
+            bind:value={nodeCode}
+            placeholder="// Your JavaScript code here"
+            rows={10}
+            class="w-full min-h-[200px] px-3 py-2 text-sm rounded-md border border-border bg-background/50 placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-[var(--cyber-amber)] focus-visible:ring-[3px] focus-visible:ring-[var(--cyber-amber)]/20 disabled:cursor-not-allowed disabled:opacity-50 resize-y font-mono"
             onblur={handleUpdate}
           ></textarea>
-          <p class="text-xs text-muted-foreground">JavaScript expression that returns true or false</p>
+          <p class="text-xs text-muted-foreground">
+            Available: <code class="px-1 py-0.5 rounded bg-muted">trigger</code>, 
+            <code class="px-1 py-0.5 rounded bg-muted">steps</code>, 
+            <code class="px-1 py-0.5 rounded bg-muted">inputs</code>, 
+            <code class="px-1 py-0.5 rounded bg-muted">console</code>
+          </p>
+        </div>
+      {/if}
+
+      {#if actualNodeType === "loop"}
+        <div class="space-y-2">
+          <Label for="items-path" class="text-foreground/90">Items Path</Label>
+          <Input 
+            id="items-path"
+            bind:value={nodeUrl}
+            placeholder="steps.http-request-123.data.items"
+            class="bg-background/50 border-border font-mono text-sm"
+            onblur={handleUpdate}
+          />
+          <p class="text-xs text-muted-foreground">Path to the array to iterate over</p>
+        </div>
+      {/if}
+
+      {#if actualNodeType === "merge"}
+        <div class="p-4 rounded-md border border-dashed border-border bg-background/30 text-center">
+          <p class="text-xs text-muted-foreground">
+            Waits for all incoming branches to complete before continuing
+          </p>
+        </div>
+      {/if}
+
+      {#if !isImplemented && !nodeDefinition.isTrigger && nodeDefinition.category !== "ai" && actualNodeType !== "condition" && actualNodeType !== "switch" && actualNodeType !== "javascript" && actualNodeType !== "http-request"}
+        <div class="p-4 rounded-md border border-dashed border-border bg-background/30 space-y-2">
+          <p class="text-sm font-medium text-foreground/70">{nodeDefinition.name}</p>
+          <p class="text-xs text-muted-foreground">{nodeDefinition.description}</p>
+          <p class="text-xs text-amber-500">This node type is planned but not yet implemented.</p>
         </div>
       {/if}
     </div>
@@ -377,8 +549,26 @@
       </div>
     {/if}
   </div>
+{:else if selectedNode}
+  <div class="h-full flex flex-col bg-card/90 backdrop-blur-sm border-l border-border w-80">
+    <div class="p-4 border-b border-border">
+      <div class="flex items-center justify-between">
+        <span class="text-sm font-medium">Unknown Node Type</span>
+        {#if onClose}
+          <Button variant="ghost" size="icon" onclick={onClose} class="h-8 w-8">
+            <XIcon class="w-4 h-4" />
+          </Button>
+        {/if}
+      </div>
+    </div>
+    <div class="flex-1 p-4">
+      <p class="text-sm text-muted-foreground">
+        Node type "{actualNodeType || selectedNode.type}" is not in the registry.
+      </p>
+    </div>
+  </div>
 {:else}
-  <div class="h-full flex items-center justify-center bg-card/40 backdrop-blur-sm border-l border-border">
+  <div class="h-full flex items-center justify-center bg-card/40 backdrop-blur-sm border-l border-border w-80">
     <div class="text-center p-8 space-y-3 max-w-sm">
       <div class="w-16 h-16 mx-auto rounded-full bg-muted/30 flex items-center justify-center">
         <div class="w-8 h-8 rounded-full border-2 border-dashed border-muted-foreground/30"></div>
@@ -392,3 +582,26 @@
     </div>
   </div>
 {/if}
+</div>
+
+<style>
+  .sidebar {
+    width: 20rem;
+    min-width: 20rem;
+    opacity: 1;
+    transition: 
+      width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 0.2s ease-out;
+  }
+
+  .sidebar.collapsed {
+    width: 0;
+    min-width: 0;
+    opacity: 0;
+    transition: 
+      width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 0.15s ease-in;
+  }
+</style>
