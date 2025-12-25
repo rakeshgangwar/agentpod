@@ -5,7 +5,7 @@
  * Styled to match our shadcn-based design system.
  */
 
-import { type FC, type PropsWithChildren, useState, useRef, useCallback, useEffect, useMemo, createContext, useContext } from "react";
+import { type FC, type PropsWithChildren, useState, useRef, useCallback, useEffect, useMemo, createContext, useContext, memo } from "react";
 import {
   ThreadPrimitive,
   MessagePrimitive,
@@ -228,8 +228,10 @@ const markdownComponents = {
  * MarkdownTextPrimitive automatically reads text from the message context.
  * Uses assistant-ui markdown classes (.aui-md-*) for styling.
  * remarkGfm enables GitHub Flavored Markdown (tables, task lists, strikethrough, etc.)
+ * 
+ * Memoized to prevent unnecessary re-renders in long chat threads.
  */
-function TextPart() {
+const TextPart = memo(function TextPart() {
   return (
     <MarkdownTextPrimitive 
       remarkPlugins={[remarkGfm]}
@@ -237,16 +239,13 @@ function TextPart() {
       components={markdownComponents}
     />
   );
-}
+});
 
-/**
- * ImagePart component renders an image attachment
- */
 interface ImagePartProps {
   image: string;
 }
 
-function ImagePart({ image }: ImagePartProps) {
+const ImagePart = memo(function ImagePart({ image }: ImagePartProps) {
   return (
     <div className="my-2">
       <img 
@@ -256,11 +255,8 @@ function ImagePart({ image }: ImagePartProps) {
       />
     </div>
   );
-}
+});
 
-/**
- * FilePart component renders a non-image file attachment
- */
 interface FilePartProps {
   file: {
     url: string;
@@ -269,17 +265,16 @@ interface FilePartProps {
   };
 }
 
-function FilePart({ file }: FilePartProps) {
-  // Get file icon based on MIME type
-  const getFileIcon = (mime?: string): string => {
-    if (!mime) return "document";
-    if (mime === "application/pdf") return "pdf";
-    if (mime.startsWith("text/")) return "text";
-    if (mime.startsWith("audio/")) return "audio";
-    if (mime.startsWith("video/")) return "video";
-    return "document";
-  };
-  
+const getFileIcon = (mime?: string): string => {
+  if (!mime) return "document";
+  if (mime === "application/pdf") return "pdf";
+  if (mime.startsWith("text/")) return "text";
+  if (mime.startsWith("audio/")) return "audio";
+  if (mime.startsWith("video/")) return "video";
+  return "document";
+};
+
+const FilePart = memo(function FilePart({ file }: FilePartProps) {
   const iconType = getFileIcon(file.mime);
   
   return (
@@ -296,30 +291,18 @@ function FilePart({ file }: FilePartProps) {
       </span>
     </div>
   );
-}
+});
 
-/**
- * UserTextPart - text rendering for user messages with markdown support
- */
-function UserTextPart() {
+const UserTextPart = memo(function UserTextPart() {
   return (
     <MarkdownTextPrimitive 
       remarkPlugins={[remarkGfm]}
       className="aui-root max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
     />
   );
-}
+});
 
-/**
- * ToolCallPart component renders a tool call with its status
- * Props are passed by assistant-ui via ToolCallMessagePartProps
- * 
- * Special handling for "task" tool: Shows a navigation link to view the child session
- * Since task tool results don't contain the session ID, we match by description to child sessions
- * 
- * Error handling: Detects error status from result.error or result object structure
- */
-function ToolCallPart({ toolName, args, result, isError }: ToolCallMessagePartProps) {
+const ToolCallPart = memo(function ToolCallPart({ toolName, args, result, isError }: ToolCallMessagePartProps) {
   const { onSessionSelect, childSessions } = useContext(SessionNavigationContext);
   
   // Detect completion state
@@ -459,16 +442,13 @@ function ToolCallPart({ toolName, args, result, isError }: ToolCallMessagePartPr
       </details>
     </div>
   );
-}
+});
 
-/**
- * ToolGroup component groups consecutive tool calls
- */
-const ToolGroup: FC<PropsWithChildren<{ startIndex: number; endIndex: number }>> = ({ 
+const ToolGroup = memo<PropsWithChildren<{ startIndex: number; endIndex: number }>>(function ToolGroup({ 
   startIndex, 
   endIndex, 
   children 
-}) => {
+}) {
   const toolCount = endIndex - startIndex + 1;
 
   return (
@@ -479,13 +459,9 @@ const ToolGroup: FC<PropsWithChildren<{ startIndex: number; endIndex: number }>>
       <div className="mt-1 space-y-1">{children}</div>
     </details>
   );
-};
+});
 
-/**
- * UserMessage component renders user messages with text and file attachments
- * Includes action bar with Edit and Copy buttons
- */
-function UserMessage() {
+const UserMessage = memo(function UserMessage() {
   const message = useMessage();
   
   // Extract custom file attachments from message content (we add these via ThreadMessageLike)
@@ -556,13 +532,9 @@ function UserMessage() {
       </ActionBarPrimitive.Root>
     </MessagePrimitive.Root>
   );
-}
+});
 
-/**
- * EditComposer component - shown when editing a user message
- * This replaces the user message content during edit mode
- */
-function EditComposer() {
+const EditComposer = memo(function EditComposer() {
   return (
     <MessagePrimitive.Root className="flex justify-end mb-4">
       <ComposerPrimitive.Root className="w-full max-w-[80%] flex flex-col rounded bg-[var(--cyber-cyan)]/10 border border-[var(--cyber-cyan)] shadow-[0_0_12px_var(--cyber-cyan)/20]">
@@ -592,11 +564,8 @@ function EditComposer() {
       </ComposerPrimitive.Root>
     </MessagePrimitive.Root>
   );
-}
+});
 
-/**
- * Message type from useMessage() - includes content, metadata, etc.
- */
 type ThreadMessageState = {
   role: string;
   content: Array<{ type: string; text?: string; [key: string]: unknown }>;
@@ -632,11 +601,7 @@ function getMessageReasoning(message: ThreadMessageState): InternalReasoning[] {
   return reasoning;
 }
 
-/**
- * MessageMetadataFooter - shows cost and other metadata
- * Token counts removed - will be shown at session level instead
- */
-function MessageMetadataFooter({ message }: { message: ThreadMessageState }) {
+const MessageMetadataFooter = memo(function MessageMetadataFooter({ message }: { message: ThreadMessageState }) {
   // Extract metadata using converters
   const cost = getMessageCost(message as Parameters<typeof getMessageCost>[0]);
   const compacted = isMessageCompacted(message as Parameters<typeof isMessageCompacted>[0]);
@@ -665,21 +630,9 @@ function MessageMetadataFooter({ message }: { message: ThreadMessageState }) {
       </div>
     </div>
   );
-}
+});
 
-/**
- * AssistantMessage component renders assistant messages
- * Hides empty messages (e.g., auto-created placeholder when isRunning)
- * 
- * Enhanced to display:
- * - Reasoning/thinking sections (collapsible)
- * - File patches (changed files)
- * - Subtasks spawned
- * - Retry attempts
- * - Cost/token usage footer
- * - Action bar with Reload and Copy buttons
- */
-function AssistantMessage() {
+const AssistantMessage = memo(function AssistantMessage() {
   const { onSessionSelect } = useContext(SessionNavigationContext);
   const message = useMessage();
   
@@ -767,7 +720,7 @@ function AssistantMessage() {
       </ActionBarPrimitive.Root>
     </MessagePrimitive.Root>
   );
-}
+});
 
 interface ComposerProps {
   projectId?: string;
@@ -1257,9 +1210,8 @@ function Composer({ projectId, findFiles, onFilePickerRequest, pendingFilePath, 
   );
 }
 
-/**
- * EmptyState component for when there are no messages
- */
+
+
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center h-full text-center p-8">
