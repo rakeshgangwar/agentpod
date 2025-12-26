@@ -12,6 +12,19 @@ export interface ExecutionContext {
   steps: Record<string, StepResult>;
   /** Environment bindings */
   env: WorkflowEnv;
+  /** Loop context - set during loop iterations */
+  loop?: LoopContext;
+}
+
+export interface LoopContext {
+  /** Current item being processed */
+  $item: unknown;
+  /** Current iteration index (0-based) */
+  $index: number;
+  /** Total array being iterated */
+  $items: unknown[];
+  /** Loop node ID for tracking */
+  loopNodeId: string;
 }
 
 export interface TriggerContext {
@@ -50,6 +63,16 @@ export interface WorkflowEnv {
   AGENTPOD_API_TOKEN: string;
   /** D1 database (optional, for workflow definitions) */
   DB?: D1Database;
+  /** Workers AI binding (optional) */
+  AI?: unknown;
+  /** OpenAI API key (optional) */
+  OPENAI_API_KEY?: string;
+  /** Anthropic API key (optional) */
+  ANTHROPIC_API_KEY?: string;
+  /** Google API key (optional) */
+  GOOGLE_API_KEY?: string;
+  /** Ollama base URL (optional) */
+  OLLAMA_BASE_URL?: string;
 }
 
 /**

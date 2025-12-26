@@ -170,15 +170,56 @@
     }));
 
     const connections: IConnections = {};
+    
+    // Group edges by source node
+    const edgesBySource = new Map<string, typeof edges>();
     edges.forEach(edge => {
-      if (!connections[edge.source]) {
-        connections[edge.source] = { main: [[]] };
+      if (!edgesBySource.has(edge.source)) {
+        edgesBySource.set(edge.source, []);
       }
-      connections[edge.source].main[0].push({
-        node: edge.target,
-        type: "main",
-        index: 0,
-      });
+      edgesBySource.get(edge.source)!.push(edge);
+    });
+
+    // Convert edges to connections format
+    edgesBySource.forEach((sourceEdges, sourceId) => {
+      const sourceNode = nodes.find(n => n.id === sourceId);
+      const isConditionalNode = sourceNode?.data.nodeType === 'switch' || sourceNode?.data.nodeType === 'condition';
+      
+      if (isConditionalNode) {
+        // For switch/condition nodes, group by sourceHandle (branch name)
+        const branchesByHandle = new Map<string, typeof edges>();
+        sourceEdges.forEach(edge => {
+          const handle = edge.sourceHandle || 'main';
+          if (!branchesByHandle.has(handle)) {
+            branchesByHandle.set(handle, []);
+          }
+          branchesByHandle.get(handle)!.push(edge);
+        });
+
+        // Create output arrays for each branch
+        const mainOutputs: Array<Array<{ node: string; type: string; index: number }>> = [];
+        branchesByHandle.forEach((branchEdges, handle) => {
+          const branchConnections = branchEdges.map(edge => ({
+            node: edge.target,
+            type: handle,
+            index: 0,
+          }));
+          mainOutputs.push(branchConnections);
+        });
+
+        connections[sourceId] = { main: mainOutputs };
+      } else {
+        // For regular nodes, all connections go to main[0]
+        connections[sourceId] = {
+          main: [[
+            ...sourceEdges.map(edge => ({
+              node: edge.target,
+              type: edge.sourceHandle || 'main',
+              index: 0,
+            }))
+          ]]
+        };
+      }
     });
 
     return { nodes: workflowNodes, connections };
@@ -253,21 +294,43 @@
   }
 
   function applyExecutionResult(result: IWorkflowExecution) {
-    const stepResults = result.result as Record<string, { success: boolean; error?: string }> | undefined;
+    const stepResults = result.result as Record<string, { success: boolean; error?: string; data?: { skipped?: boolean } }> | undefined;
+    const completedSteps = result.completedSteps || [];
     
     console.log("[Execution] Applying results:", { 
+      status: result.status,
       stepResults, 
+      completedSteps,
       nodeIds: nodes.map(n => n.id),
       resultKeys: stepResults ? Object.keys(stepResults) : []
     });
     
+    // First, apply step results from the execution
     if (stepResults) {
       Object.entries(stepResults).forEach(([nodeId, stepResult]) => {
-        const status: ExecutionStatus = stepResult.success ? "success" : "error";
-        console.log("[Execution] Updating node:", { nodeId, status, error: stepResult.error });
-        updateNodeExecutionStatus(nodeId, status, stepResult.error);
+        // Check if node was skipped
+        if (stepResult.data?.skipped) {
+          updateNodeExecutionStatus(nodeId, "idle");
+        } else {
+          const status: ExecutionStatus = stepResult.success ? "success" : "error";
+          console.log("[Execution] Updating node:", { nodeId, status, error: stepResult.error });
+          updateNodeExecutionStatus(nodeId, status, stepResult.error);
+        }
       });
     }
+    
+    // For any node still showing "running" that wasn't processed, reset to idle
+    // This handles nodes that were never reached due to early exit/error
+    nodes.forEach(node => {
+      const nodeId = node.id;
+      const currentStatus = node.data.executionStatus;
+      const wasProcessed = stepResults ? nodeId in stepResults : false;
+      
+      if (currentStatus === "running" && !wasProcessed) {
+        console.log("[Execution] Resetting unreached node to idle:", nodeId);
+        updateNodeExecutionStatus(nodeId, "idle");
+      }
+    });
     
     executionResult = result;
     executionBannerVisible = true;

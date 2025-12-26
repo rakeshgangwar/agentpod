@@ -33,11 +33,19 @@ import UploadIcon from "@lucide/svelte/icons/upload";
 import DatabaseIcon from "@lucide/svelte/icons/database";
 import UserCheckIcon from "@lucide/svelte/icons/user-check";
 import StickyNoteIcon from "@lucide/svelte/icons/sticky-note";
+import VariableIcon from "@lucide/svelte/icons/variable";
+import FileJson2Icon from "@lucide/svelte/icons/file-json-2";
+import CalculatorIcon from "@lucide/svelte/icons/calculator";
+import GitForkIcon from "@lucide/svelte/icons/git-fork";
+import MessageCircleIcon from "@lucide/svelte/icons/message-circle";
+import SendIcon from "@lucide/svelte/icons/send";
+import HardDriveIcon from "@lucide/svelte/icons/hard-drive";
 import TriggerNode from "./nodes/TriggerNode.svelte";
 import ActionNode from "./nodes/ActionNode.svelte";
 import AIAgentNode from "./nodes/AIAgentNode.svelte";
 import ConditionNode from "./nodes/ConditionNode.svelte";
 import SwitchNode from "./nodes/SwitchNode.svelte";
+import SplitNode from "./nodes/SplitNode.svelte";
 
 /**
  * Implementation status for each node
@@ -276,12 +284,165 @@ export const NODE_REGISTRY: Record<WorkflowNodeType, NodeRegistryEntry> = {
   // ============================================
   // AI NODES
   // ============================================
-  "ai-agent": {
-    type: "ai-agent",
-    name: "AI Agent",
-    description: "Execute AI agent in Cloudflare Sandbox",
+  "ai-chat": {
+    type: "ai-chat",
+    name: "AI Chat",
+    description: "LLM chat with multiple providers (OpenAI, Anthropic, Ollama, Workers AI)",
     category: "ai",
     status: "implemented",
+    icon: MessageSquareIcon,
+    color: "var(--cyber-emerald)",
+    component: AIAgentNode,
+    parameters: {
+      type: "object",
+      properties: {
+        provider: {
+          type: "string",
+          title: "Provider",
+          description: "AI provider to use",
+          enum: ["openai", "anthropic", "ollama", "workers-ai"],
+          default: "openai",
+        },
+        model: {
+          type: "string",
+          title: "Model",
+          description: "Model ID (e.g., gpt-4o-mini, claude-3-5-sonnet-20241022)",
+          default: "gpt-4o-mini",
+        },
+        systemPrompt: {
+          type: "string",
+          title: "System Prompt",
+          description: "System instruction for the AI",
+          format: "textarea",
+        },
+        prompt: {
+          type: "string",
+          title: "Prompt",
+          description: "User prompt (supports {{$variable}} interpolation)",
+          format: "textarea",
+        },
+        temperature: {
+          type: "number",
+          title: "Temperature",
+          description: "Creativity (0-2, default 0.7)",
+          default: 0.7,
+        },
+        maxTokens: {
+          type: "number",
+          title: "Max Tokens",
+          description: "Maximum response length",
+          default: 1024,
+        },
+        responseFormat: {
+          type: "string",
+          title: "Response Format",
+          enum: ["text", "json"],
+          default: "text",
+        },
+        apiKey: {
+          type: "string",
+          title: "API Key (optional)",
+          description: "Override environment API key",
+        },
+        baseUrl: {
+          type: "string",
+          title: "Base URL (optional)",
+          description: "Custom endpoint (e.g., for Ollama)",
+        },
+      },
+      required: ["provider", "model", "prompt"],
+    },
+    defaultData: {
+      label: "AI Chat",
+      provider: "openai",
+      model: "gpt-4o-mini",
+      prompt: "",
+      temperature: 0.7,
+      maxTokens: 1024,
+      responseFormat: "text",
+    },
+  },
+
+  "ai-agent-tools": {
+    type: "ai-agent-tools",
+    name: "AI Agent",
+    description: "AI agent with tool calling (calculator, HTTP, code execution)",
+    category: "ai",
+    status: "implemented",
+    icon: BotIcon,
+    color: "var(--cyber-emerald)",
+    component: AIAgentNode,
+    parameters: {
+      type: "object",
+      properties: {
+        provider: {
+          type: "string",
+          title: "Provider",
+          description: "AI provider (currently only OpenAI supports tool calling)",
+          enum: ["openai"],
+          default: "openai",
+        },
+        model: {
+          type: "string",
+          title: "Model",
+          description: "Model ID (e.g., gpt-4o, gpt-4o-mini)",
+          default: "gpt-4o-mini",
+        },
+        systemPrompt: {
+          type: "string",
+          title: "System Prompt",
+          description: "System instruction for the agent",
+          format: "textarea",
+        },
+        prompt: {
+          type: "string",
+          title: "Prompt",
+          description: "Task for the agent to accomplish",
+          format: "textarea",
+        },
+        useBuiltinTools: {
+          type: "boolean",
+          title: "Use Built-in Tools",
+          description: "Enable calculator, HTTP, code execution, time tools",
+          default: true,
+        },
+        maxIterations: {
+          type: "number",
+          title: "Max Iterations",
+          description: "Maximum tool calling rounds (default 10)",
+          default: 10,
+        },
+        temperature: {
+          type: "number",
+          title: "Temperature",
+          description: "Creativity (0-2, default 0.7)",
+          default: 0.7,
+        },
+        apiKey: {
+          type: "string",
+          title: "API Key (optional)",
+          description: "Override environment API key",
+        },
+      },
+      required: ["provider", "model", "prompt"],
+    },
+    defaultData: {
+      label: "AI Agent",
+      provider: "openai",
+      model: "gpt-4o-mini",
+      prompt: "",
+      useBuiltinTools: true,
+      maxIterations: 10,
+      temperature: 0.7,
+    },
+  },
+
+  "ai-agent": {
+    type: "ai-agent",
+    name: "AI Agent (Legacy)",
+    description: "Execute AI agent in Cloudflare Sandbox (deprecated, use AI Agent)",
+    category: "ai",
+    status: "planned",
     icon: BotIcon,
     color: "var(--cyber-emerald)",
     component: AIAgentNode,
@@ -351,10 +512,10 @@ export const NODE_REGISTRY: Record<WorkflowNodeType, NodeRegistryEntry> = {
 
   "ai-prompt": {
     type: "ai-prompt",
-    name: "AI Prompt",
-    description: "Direct LLM call without sandbox",
+    name: "AI Prompt (Legacy)",
+    description: "Direct LLM call (deprecated, use AI Chat)",
     category: "ai",
-    status: "implemented",
+    status: "planned",
     icon: MessageSquareIcon,
     color: "var(--cyber-emerald)",
     component: AIAgentNode,
@@ -540,7 +701,7 @@ export const NODE_REGISTRY: Record<WorkflowNodeType, NodeRegistryEntry> = {
     category: "logic",
     status: "implemented",
     icon: RouteIcon,
-    color: "var(--cyber-purple)",
+    color: "var(--cyber-amber)",
     component: SwitchNode,
     hasBranches: true,
     parameters: {
@@ -644,6 +805,365 @@ export const NODE_REGISTRY: Record<WorkflowNodeType, NodeRegistryEntry> = {
     },
   },
 
+  "filter": {
+    type: "filter",
+    name: "Filter",
+    description: "Filter array items based on conditions",
+    category: "logic",
+    status: "implemented",
+    icon: GitBranchIcon,
+    color: "var(--cyber-amber)",
+    component: ActionNode,
+    parameters: {
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          title: "Items",
+          description: "Direct array input",
+        },
+        itemsPath: {
+          type: "string",
+          title: "Items Path",
+          description: "Path to array in context (e.g., steps.http-1.data.items)",
+        },
+        conditions: {
+          type: "array",
+          title: "Conditions",
+          items: {
+            type: "object",
+            properties: {
+              field: { type: "string", title: "Field" },
+              operator: {
+                type: "string",
+                title: "Operator",
+                enum: [
+                  "equals", "notEquals", "contains", "notContains",
+                  "startsWith", "endsWith", "greaterThan", "lessThan",
+                  "greaterThanOrEqual", "lessThanOrEqual",
+                  "isEmpty", "isNotEmpty", "isTrue", "isFalse", "regex"
+                ],
+              },
+              value: { type: "string", title: "Value" },
+            },
+          },
+        },
+        mode: {
+          type: "string",
+          title: "Match Mode",
+          enum: ["all", "any"],
+          default: "all",
+        },
+      },
+    },
+    defaultData: {
+      label: "Filter",
+      conditions: [],
+      mode: "all",
+    },
+  },
+
+  "transform": {
+    type: "transform",
+    name: "Transform Data",
+    description: "Transform data structure with mapping, pick, omit, flatten operations",
+    category: "logic",
+    status: "implemented",
+    icon: GitMergeIcon,
+    color: "var(--cyber-amber)",
+    component: ActionNode,
+    parameters: {
+      type: "object",
+      properties: {
+        input: {
+          type: "object",
+          title: "Input",
+          description: "Direct input data",
+        },
+        inputPath: {
+          type: "string",
+          title: "Input Path",
+          description: "Path to input in context",
+        },
+        mode: {
+          type: "string",
+          title: "Mode",
+          enum: ["map", "pick", "omit", "rename", "flatten", "unflatten"],
+          default: "map",
+        },
+        mapping: {
+          type: "array",
+          title: "Field Mapping",
+          description: "For map/rename modes",
+          items: {
+            type: "object",
+            properties: {
+              from: { type: "string", title: "From" },
+              to: { type: "string", title: "To" },
+              transform: {
+                type: "string",
+                title: "Transform",
+                enum: ["uppercase", "lowercase", "trim", "number", "string", "boolean", "json"],
+              },
+            },
+          },
+        },
+        fields: {
+          type: "array",
+          title: "Fields",
+          description: "For pick/omit modes",
+          items: { type: "string" },
+        },
+        separator: {
+          type: "string",
+          title: "Separator",
+          description: "For flatten/unflatten modes",
+          default: ".",
+        },
+      },
+      required: ["mode"],
+    },
+    defaultData: {
+      label: "Transform",
+      mode: "map",
+      mapping: [],
+      separator: ".",
+    },
+  },
+
+  "wait": {
+    type: "wait",
+    name: "Wait / Delay",
+    description: "Pause workflow execution for a duration",
+    category: "logic",
+    status: "implemented",
+    icon: CalendarIcon,
+    color: "var(--cyber-amber)",
+    component: ActionNode,
+    parameters: {
+      type: "object",
+      properties: {
+        duration: {
+          type: "string",
+          title: "Duration",
+          description: "Wait time (e.g., '5 seconds', '1 minute', '500ms')",
+          default: "5 seconds",
+        },
+      },
+      required: ["duration"],
+    },
+    defaultData: {
+      label: "Wait",
+      duration: "5 seconds",
+    },
+  },
+
+  "error-handler": {
+    type: "error-handler",
+    name: "Error Handler",
+    description: "Handle errors from previous nodes with retry, fallback, or continue",
+    category: "logic",
+    status: "implemented",
+    icon: GitBranchIcon,
+    color: "var(--cyber-amber)",
+    component: ActionNode,
+    parameters: {
+      type: "object",
+      properties: {
+        onError: {
+          type: "string",
+          title: "On Error",
+          enum: ["continue", "stop", "retry", "fallback"],
+          default: "continue",
+        },
+        maxRetries: {
+          type: "number",
+          title: "Max Retries",
+          description: "For retry mode",
+          default: 3,
+        },
+        retryDelay: {
+          type: "string",
+          title: "Retry Delay",
+          description: "Delay between retries",
+          default: "5 seconds",
+        },
+        fallbackValue: {
+          type: "object",
+          title: "Fallback Value",
+          description: "Value to use for fallback mode",
+        },
+        errorPath: {
+          type: "string",
+          title: "Error Path",
+          description: "Custom path to check for errors",
+        },
+      },
+    },
+    defaultData: {
+      label: "Error Handler",
+      onError: "continue",
+      maxRetries: 3,
+      retryDelay: "5 seconds",
+    },
+  },
+
+  "split": {
+    type: "split",
+    name: "Split (Fan-out)",
+    description: "Split flow into parallel branches for concurrent execution",
+    category: "logic",
+    status: "implemented",
+    icon: GitForkIcon,
+    color: "var(--cyber-amber)",
+    component: SplitNode,
+    hasBranches: true,
+    parameters: {
+      type: "object",
+      properties: {
+        branches: {
+          type: "number",
+          title: "Number of Branches",
+          description: "How many parallel branches to create (2-10)",
+          default: 2,
+        },
+      },
+    },
+    defaultData: {
+      label: "Split",
+      branches: 2,
+    },
+  },
+
+  "set-variable": {
+    type: "set-variable",
+    name: "Set Variable",
+    description: "Store or modify workflow variables with type coercion",
+    category: "logic",
+    status: "implemented",
+    icon: VariableIcon,
+    color: "var(--cyber-amber)",
+    component: ActionNode,
+    parameters: {
+      type: "object",
+      properties: {
+        variables: {
+          type: "array",
+          title: "Variables",
+          description: "Variables to set",
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string", title: "Variable Name" },
+              value: { type: "string", title: "Value" },
+              type: {
+                type: "string",
+                title: "Type",
+                enum: ["auto", "string", "number", "boolean", "object", "array"],
+                default: "auto",
+              },
+            },
+          },
+        },
+      },
+      required: ["variables"],
+    },
+    defaultData: {
+      label: "Set Variable",
+      variables: [],
+    },
+  },
+
+  "parse-json": {
+    type: "parse-json",
+    name: "Parse JSON",
+    description: "Parse JSON string to object with error handling options",
+    category: "logic",
+    status: "implemented",
+    icon: FileJson2Icon,
+    color: "var(--cyber-amber)",
+    component: ActionNode,
+    parameters: {
+      type: "object",
+      properties: {
+        input: {
+          type: "string",
+          title: "JSON Input",
+          description: "Direct JSON string to parse",
+          format: "textarea",
+        },
+        inputPath: {
+          type: "string",
+          title: "Input Path",
+          description: "Path to JSON string in context (e.g., steps.http-1.data.body)",
+        },
+        errorHandling: {
+          type: "string",
+          title: "Error Handling",
+          enum: ["error", "default"],
+          default: "error",
+        },
+        defaultValue: {
+          type: "object",
+          title: "Default Value",
+          description: "Value to use if parsing fails (when error handling is 'default')",
+        },
+      },
+    },
+    defaultData: {
+      label: "Parse JSON",
+      errorHandling: "error",
+    },
+  },
+
+  "aggregate": {
+    type: "aggregate",
+    name: "Aggregate",
+    description: "Perform aggregations (sum, avg, count, min, max) on arrays",
+    category: "logic",
+    status: "implemented",
+    icon: CalculatorIcon,
+    color: "var(--cyber-amber)",
+    component: ActionNode,
+    parameters: {
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          title: "Items",
+          description: "Direct array input",
+        },
+        itemsPath: {
+          type: "string",
+          title: "Items Path",
+          description: "Path to array in context",
+        },
+        operations: {
+          type: "array",
+          title: "Operations",
+          description: "Aggregation operations to perform",
+          items: {
+            type: "object",
+            properties: {
+              operation: {
+                type: "string",
+                title: "Operation",
+                enum: ["count", "sum", "avg", "min", "max", "first", "last", "concat", "unique"],
+              },
+              field: { type: "string", title: "Field" },
+              outputName: { type: "string", title: "Output Name" },
+            },
+          },
+        },
+      },
+      required: ["operations"],
+    },
+    defaultData: {
+      label: "Aggregate",
+      operations: [],
+    },
+  },
+
   // ============================================
   // ACTION NODES
   // ============================================
@@ -721,7 +1241,7 @@ export const NODE_REGISTRY: Record<WorkflowNodeType, NodeRegistryEntry> = {
     name: "Send Email",
     description: "Send email via SMTP or provider",
     category: "action",
-    status: "planned",
+    status: "implemented",
     icon: MailIcon,
     color: "var(--cyber-magenta)",
     component: ActionNode,
@@ -762,82 +1282,6 @@ export const NODE_REGISTRY: Record<WorkflowNodeType, NodeRegistryEntry> = {
     },
   },
 
-  "database": {
-    type: "database",
-    name: "D1 Query",
-    description: "Execute SQL query on Cloudflare D1",
-    category: "action",
-    status: "planned",
-    icon: DatabaseIcon,
-    color: "var(--cyber-magenta)",
-    component: ActionNode,
-    parameters: {
-      type: "object",
-      properties: {
-        database: {
-          type: "string",
-          title: "Database",
-          description: "D1 database binding",
-        },
-        query: {
-          type: "string",
-          title: "SQL Query",
-          format: "code",
-        },
-        params: {
-          type: "array",
-          title: "Parameters",
-        },
-      },
-      required: ["database", "query"],
-    },
-    defaultData: {
-      label: "D1 Query",
-    },
-  },
-
-  "storage": {
-    type: "storage",
-    name: "R2 Storage",
-    description: "Upload/download from Cloudflare R2",
-    category: "action",
-    status: "planned",
-    icon: UploadIcon,
-    color: "var(--cyber-magenta)",
-    component: ActionNode,
-    parameters: {
-      type: "object",
-      properties: {
-        operation: {
-          type: "string",
-          title: "Operation",
-          enum: ["upload", "download", "delete", "list"],
-        },
-        bucket: {
-          type: "string",
-          title: "Bucket",
-        },
-        key: {
-          type: "string",
-          title: "Key/Path",
-        },
-        content: {
-          type: "string",
-          title: "Content",
-        },
-        contentType: {
-          type: "string",
-          title: "Content Type",
-        },
-      },
-      required: ["operation", "bucket"],
-    },
-    defaultData: {
-      label: "R2 Storage",
-      operation: "upload",
-    },
-  },
-
   "notification": {
     type: "notification",
     name: "Slack Message",
@@ -874,6 +1318,203 @@ export const NODE_REGISTRY: Record<WorkflowNodeType, NodeRegistryEntry> = {
     },
     defaultData: {
       label: "Slack Message",
+    },
+  },
+
+  "discord": {
+    type: "discord",
+    name: "Discord Message",
+    description: "Send message to Discord via webhook",
+    category: "action",
+    status: "implemented",
+    icon: MessageCircleIcon,
+    color: "var(--cyber-magenta)",
+    component: ActionNode,
+    parameters: {
+      type: "object",
+      properties: {
+        webhookUrl: {
+          type: "string",
+          title: "Webhook URL",
+          description: "Discord webhook URL",
+          format: "uri",
+        },
+        content: {
+          type: "string",
+          title: "Message Content",
+          format: "textarea",
+        },
+        username: {
+          type: "string",
+          title: "Username Override",
+          description: "Override the webhook's default username",
+        },
+        avatarUrl: {
+          type: "string",
+          title: "Avatar URL",
+          description: "Override the webhook's default avatar",
+          format: "uri",
+        },
+        embeds: {
+          type: "array",
+          title: "Embeds",
+          description: "Rich embed objects",
+        },
+      },
+      required: ["webhookUrl"],
+    },
+    defaultData: {
+      label: "Discord",
+    },
+  },
+
+  "telegram": {
+    type: "telegram",
+    name: "Telegram Message",
+    description: "Send message via Telegram bot",
+    category: "action",
+    status: "implemented",
+    icon: SendIcon,
+    color: "var(--cyber-cyan)",
+    component: ActionNode,
+    parameters: {
+      type: "object",
+      properties: {
+        botToken: {
+          type: "string",
+          title: "Bot Token",
+          description: "Telegram bot API token",
+        },
+        chatId: {
+          type: "string",
+          title: "Chat ID",
+          description: "Target chat/user ID",
+        },
+        text: {
+          type: "string",
+          title: "Message Text",
+          format: "textarea",
+        },
+        parseMode: {
+          type: "string",
+          title: "Parse Mode",
+          enum: ["HTML", "Markdown", "MarkdownV2"],
+          default: "HTML",
+        },
+        disableNotification: {
+          type: "boolean",
+          title: "Silent Message",
+          default: false,
+        },
+      },
+      required: ["botToken", "chatId", "text"],
+    },
+    defaultData: {
+      label: "Telegram",
+      parseMode: "HTML",
+      disableNotification: false,
+    },
+  },
+
+  "d1-query": {
+    type: "d1-query",
+    name: "D1 Query",
+    description: "Execute SQL query on Cloudflare D1 database",
+    category: "action",
+    status: "implemented",
+    icon: DatabaseIcon,
+    color: "var(--cyber-magenta)",
+    component: ActionNode,
+    parameters: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          title: "SQL Query",
+          description: "SQL query to execute",
+          format: "code",
+        },
+        params: {
+          type: "array",
+          title: "Query Parameters",
+          description: "Bound parameters for prepared statement",
+        },
+        operation: {
+          type: "string",
+          title: "Operation Type",
+          enum: ["all", "first", "run"],
+          default: "all",
+        },
+        database: {
+          type: "string",
+          title: "Database Binding",
+          description: "D1 database binding name",
+        },
+      },
+      required: ["query"],
+    },
+    defaultData: {
+      label: "D1 Query",
+      operation: "all",
+    },
+  },
+
+  "r2-storage": {
+    type: "r2-storage",
+    name: "R2 Storage",
+    description: "Upload, download, or manage objects in Cloudflare R2",
+    category: "action",
+    status: "implemented",
+    icon: HardDriveIcon,
+    color: "var(--cyber-magenta)",
+    component: ActionNode,
+    parameters: {
+      type: "object",
+      properties: {
+        operation: {
+          type: "string",
+          title: "Operation",
+          enum: ["get", "put", "delete", "list", "head"],
+          default: "get",
+        },
+        key: {
+          type: "string",
+          title: "Object Key",
+          description: "Object key/path in bucket",
+        },
+        content: {
+          type: "string",
+          title: "Content",
+          description: "Content to upload (for put operation)",
+          format: "textarea",
+        },
+        contentType: {
+          type: "string",
+          title: "Content Type",
+          description: "MIME type for upload",
+        },
+        prefix: {
+          type: "string",
+          title: "Prefix",
+          description: "Prefix filter for list operation",
+        },
+        limit: {
+          type: "number",
+          title: "Limit",
+          description: "Max objects to list",
+          default: 100,
+        },
+        bucket: {
+          type: "string",
+          title: "Bucket Binding",
+          description: "R2 bucket binding name",
+        },
+      },
+      required: ["operation"],
+    },
+    defaultData: {
+      label: "R2 Storage",
+      operation: "get",
     },
   },
 

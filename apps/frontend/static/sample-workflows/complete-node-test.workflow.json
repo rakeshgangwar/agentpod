@@ -76,16 +76,15 @@
       "type": "ai-agent",
       "position": { "x": 1350, "y": 200 },
       "data": {
-        "nodeType": "ai-prompt",
+        "nodeType": "ai-chat",
         "label": "Categorize Post",
+        "provider": "openai",
+        "model": "gpt-4o-mini",
         "prompt": "Categorize this blog post title into one of these categories: technology, business, lifestyle, other.\n\nTitle: {{$item.title}}\n\nRespond with just the category name in lowercase.",
         "systemPrompt": "You are a content categorization assistant. Respond with only the category name.",
-        "model": {
-          "providerId": "anthropic",
-          "modelId": "claude-sonnet-4-20250514"
-        },
         "temperature": 0.3,
-        "maxTokens": 50
+        "maxTokens": 50,
+        "responseFormat": "text"
       }
     },
     {
@@ -164,14 +163,15 @@
       "type": "ai-agent",
       "position": { "x": 2600, "y": 200 },
       "data": {
-        "nodeType": "ai-agent",
+        "nodeType": "ai-chat",
         "label": "Generate Report",
+        "provider": "openai",
+        "model": "gpt-4o-mini",
         "prompt": "Based on this workflow execution summary, write a brief 2-sentence report:\n\n{{steps['js-summary'].data.output}}\n\nInclude the total items processed and category breakdown.",
-        "model": {
-          "providerId": "anthropic",
-          "modelId": "claude-sonnet-4-20250514"
-        },
-        "timeout": "1 minute"
+        "systemPrompt": "You are a workflow reporting assistant. Be concise and informative.",
+        "temperature": 0.7,
+        "maxTokens": 200,
+        "responseFormat": "text"
       }
     },
     {

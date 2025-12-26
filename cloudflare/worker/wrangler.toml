@@ -1,0 +1,102 @@
+# =============================================================================
+# AgentPod Sandbox Worker - Wrangler Configuration
+# =============================================================================
+# This worker provides isolated sandbox environments for workflow execution.
+#
+# Environments:
+#   - (default): Production deployment
+#   - dev: Local development with wrangler dev
+#
+# Usage:
+#   Development: npm run dev (uses .dev.vars for secrets)
+#   Production:  npm run deploy
+#   Tail logs:   npm run tail
+# =============================================================================
+
+name = "agentpod-sandbox"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+# -----------------------------------------------------------------------------
+# Durable Objects - Sandbox instances
+# -----------------------------------------------------------------------------
+[durable_objects]
+bindings = [
+  { name = "Sandbox", class_name = "Sandbox" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Sandbox"]
+
+# -----------------------------------------------------------------------------
+# Containers - Cloudflare Containers for sandboxed execution
+# -----------------------------------------------------------------------------
+[[containers]]
+class_name = "Sandbox"
+image = "./Dockerfile"
+instance_type = "basic"
+
+# -----------------------------------------------------------------------------
+# R2 Storage - Workspace file storage
+# -----------------------------------------------------------------------------
+[[r2_buckets]]
+binding = "WORKSPACE_BUCKET"
+bucket_name = "agentpod-workspaces"
+
+# =============================================================================
+# Production Environment (default)
+# =============================================================================
+# Secrets (set via `wrangler secret put`):
+#   - AGENTPOD_API_TOKEN: API authentication token
+#
+# To deploy:
+#   1. Set secrets: wrangler secret put AGENTPOD_API_TOKEN
+#   2. Deploy: npm run deploy
+# =============================================================================
+
+[vars]
+AGENTPOD_API_URL = "https://api.agentpod.app"
+
+# =============================================================================
+# Development Environment
+# =============================================================================
+# For local development with `wrangler dev`
+#
+# Create .dev.vars file with:
+#   AGENTPOD_API_URL=http://localhost:3001
+#   AGENTPOD_API_TOKEN=your-local-api-token
+#
+# Or use a tunnel (ngrok/cloudflared) if testing against deployed worker:
+#   AGENTPOD_API_URL=https://your-tunnel-url.ngrok.io
+# =============================================================================
+
+[env.dev]
+name = "agentpod-sandbox-dev"
+
+[env.dev.vars]
+AGENTPOD_API_URL = "http://localhost:3001"
+
+# Development R2 bucket (optional - can use same bucket or separate)
+# [[env.dev.r2_buckets]]
+# binding = "WORKSPACE_BUCKET"
+# bucket_name = "agentpod-workspaces-dev"
+
+# =============================================================================
+# Staging Environment (optional)
+# =============================================================================
+# Uncomment to enable staging environment
+#
+# [env.staging]
+# name = "agentpod-sandbox-staging"
+#
+# [env.staging.vars]
+# AGENTPOD_API_URL = "https://api.staging.agentpod.app"
+#
+# [[env.staging.r2_buckets]]
+# binding = "WORKSPACE_BUCKET"
+# bucket_name = "agentpod-workspaces-staging"

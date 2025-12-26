@@ -59,3 +59,38 @@ export const scheduleTriggerExecutor: NodeExecutor = {
     });
   },
 };
+
+export const eventTriggerExecutor: NodeExecutor = {
+  type: "event-trigger",
+  category: "trigger",
+  
+  validate(params: Record<string, unknown>) {
+    const errors: string[] = [];
+    
+    if (!params.eventType || typeof params.eventType !== "string") {
+      errors.push("Event type is required");
+    }
+    
+    return errors;
+  },
+  
+  async execute(params: NodeExecutionParams) {
+    const { eventType, filter, timeout } = params.parameters as {
+      eventType?: string;
+      filter?: Record<string, unknown>;
+      timeout?: string;
+    };
+    
+    const eventData = params.context.trigger.data;
+    
+    return createStepResult({
+      triggered: true,
+      triggerType: "event",
+      timestamp: new Date().toISOString(),
+      eventType: eventType || "unknown",
+      filter: filter || {},
+      timeout: timeout || "24h",
+      eventData,
+    });
+  },
+};

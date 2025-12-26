@@ -1,24 +1,14 @@
 <script lang="ts">
   import { Handle, Position, type NodeProps } from "@xyflow/svelte";
-  import RouteIcon from "@lucide/svelte/icons/route";
+  import GitForkIcon from "@lucide/svelte/icons/git-fork";
   import ExecutionStatusBadge from "./ExecutionStatusBadge.svelte";
-  import { NODE_REGISTRY } from "../node-registry";
-  import type { WorkflowNodeType } from "@agentpod/types";
 
   type ExecutionStatus = "idle" | "running" | "success" | "error";
-  type SwitchCase = { value: string; outputBranch: string };
   type Props = NodeProps;
 
   let { data, selected = false }: Props = $props();
 
-  const nodeType = $derived(data.nodeType as WorkflowNodeType | undefined);
-  const nodeEntry = $derived(nodeType ? NODE_REGISTRY[nodeType] : undefined);
-  const NodeIcon = $derived(nodeEntry?.icon || RouteIcon);
-  const nodeColor = $derived(nodeEntry?.color || "var(--cyber-purple)");
-
-  const cases = $derived((data.cases as SwitchCase[]) || []);
-  const defaultCase = $derived((data.defaultCase as string) || "default");
-  const allBranches = $derived([...cases.map(c => c.outputBranch), defaultCase]);
+  const branches = $derived(Math.max(2, Math.min(10, (data.branches as number) || 2)));
 
   const executionStatus = $derived((data.executionStatus as ExecutionStatus) || "idle");
   const executionError = $derived(data.executionError as string | undefined);
@@ -43,6 +33,9 @@
     "cyber-amber",
     "cyber-purple",
     "cyber-red",
+    "cyber-magenta",
+    "cyber-orange",
+    "cyber-indigo",
   ];
 
   function getBranchColor(index: number): string {
@@ -55,42 +48,36 @@
     if (total === 1) return 50;
     return padding + (index * availableWidth / (total - 1));
   }
+
+  const branchArray = $derived(Array.from({ length: branches }, (_, i) => i + 1));
 </script>
 
 <div
   class="relative bg-card/90 backdrop-blur-sm rounded-md border-2 transition-all duration-200 min-w-[220px] {borderClass} {shadowClass}"
-  class:border-cyber-purple={selected && executionStatus === "idle"}
-  class:shadow-[0_0_0_2px_color-mix(in_oklch,var(--cyber-purple)_30%,transparent)]={selected && executionStatus === "idle"}
+  class:border-cyber-amber={selected && executionStatus === "idle"}
+  class:shadow-[0_0_0_2px_color-mix(in_oklch,var(--cyber-amber)_30%,transparent)]={selected && executionStatus === "idle"}
 >
-  <div 
-    class="absolute -top-[1px] left-0 right-0 h-[1px] opacity-60"
-    style="background-image: linear-gradient(to right, transparent, {nodeColor}, transparent);"
-  ></div>
+  <div class="absolute -top-[1px] left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyber-amber to-transparent opacity-60"></div>
   
   <div class="p-4 space-y-3">
     <div class="flex items-center gap-3">
-      <div 
-        class="flex-shrink-0 w-10 h-10 rounded-sm flex items-center justify-center"
-        style="background: linear-gradient(to bottom right, color-mix(in oklch, {nodeColor} 20%, transparent), color-mix(in oklch, {nodeColor} 5%, transparent)); border: 1px solid color-mix(in oklch, {nodeColor} 30%, transparent);"
-      >
-        <span style="color: {nodeColor}; filter: drop-shadow(0 0 8px {nodeColor});">
-          <NodeIcon class="w-5 h-5" />
-        </span>
+      <div class="flex-shrink-0 w-10 h-10 rounded-sm bg-gradient-to-br from-cyber-amber/20 to-cyber-amber/5 flex items-center justify-center border border-cyber-amber/30">
+        <GitForkIcon class="w-5 h-5 text-cyber-amber drop-shadow-[0_0_8px_var(--cyber-amber)]" />
       </div>
       
       <div class="flex-1 min-w-0">
         <div class="text-sm font-semibold text-foreground truncate">
-          {data.label || "Switch"}
+          {data.label || "Split"}
         </div>
         <div class="text-xs text-muted-foreground font-mono uppercase tracking-wider">
-          Router
+          Fan-out
         </div>
       </div>
     </div>
 
     {#if executionStatus === "idle"}
       <div class="flex flex-wrap items-center gap-2 pt-1">
-        {#each allBranches as branch, i}
+        {#each branchArray as branchNum, i}
           <div class="flex items-center gap-1.5 px-2 py-0.5 rounded bg-muted/50 border border-border/50">
             <div 
               class="w-1.5 h-1.5 rounded-full"
@@ -100,7 +87,7 @@
               class="text-[10px] font-mono uppercase tracking-wide"
               style="color: var(--{getBranchColor(i)});"
             >
-              {branch}
+              Branch {branchNum}
             </div>
           </div>
         {/each}
@@ -112,12 +99,12 @@
 
   <Handle type="target" position={Position.Top} />
   
-  {#each allBranches as branch, i}
+  {#each branchArray as branchNum, i}
     <Handle 
-      id={branch} 
+      id="branch-{branchNum}" 
       type="source" 
       position={Position.Bottom} 
-      style="left: {getHandlePosition(i, allBranches.length)}% !important"
+      style="left: {getHandlePosition(i, branches)}% !important"
     />
   {/each}
 </div>

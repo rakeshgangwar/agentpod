@@ -34,6 +34,10 @@ interface Env {
   WORKSPACE_BUCKET: R2Bucket;
   AGENTPOD_API_URL: string;
   AGENTPOD_API_TOKEN: string;
+  OPENAI_API_KEY?: string;
+  ANTHROPIC_API_KEY?: string;
+  OLLAMA_BASE_URL?: string;
+  AI?: unknown;
 }
 
 interface CreateSandboxBody {
@@ -569,6 +573,8 @@ async function handleWorkflowExecute(request: Request, env: Env): Promise<Respon
   }
 
   console.log(`[Workflow] Starting execution ${body.executionId} for workflow ${body.workflowId}`);
+  console.log("[Workflow] ENV DEBUG: AGENTPOD_API_URL=" + (env.AGENTPOD_API_URL || "NOT SET"));
+  console.log("[Workflow] ENV DEBUG: AGENTPOD_API_TOKEN=" + (env.AGENTPOD_API_TOKEN ? "SET (" + env.AGENTPOD_API_TOKEN.length + " chars)" : "NOT SET"));
 
   const result = await executeWorkflow({
     executionId: body.executionId,
@@ -582,6 +588,10 @@ async function handleWorkflowExecute(request: Request, env: Env): Promise<Respon
       WORKSPACE_BUCKET: env.WORKSPACE_BUCKET,
       AGENTPOD_API_URL: env.AGENTPOD_API_URL,
       AGENTPOD_API_TOKEN: env.AGENTPOD_API_TOKEN,
+      OPENAI_API_KEY: env.OPENAI_API_KEY,
+      ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY,
+      OLLAMA_BASE_URL: env.OLLAMA_BASE_URL,
+      AI: env.AI,
     },
   });
 

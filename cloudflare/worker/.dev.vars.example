@@ -1,0 +1,48 @@
+# =============================================================================
+# Local Development Environment Variables
+# =============================================================================
+# Copy this file to .dev.vars and fill in your values:
+#   cp .dev.vars.example .dev.vars
+#
+# These values are used when running `npm run dev` (wrangler dev)
+# =============================================================================
+
+# AgentPod API Configuration
+# --------------------------
+# URL of your local API server
+AGENTPOD_API_URL=http://localhost:3001
+
+# API authentication token (must match API_TOKEN in apps/api/.env)
+# Generate with: openssl rand -hex 32
+AGENTPOD_API_TOKEN=your-local-api-token-here
+
+# =============================================================================
+# AI Provider API Keys
+# =============================================================================
+# Add your API keys for AI providers used in workflows
+
+# OpenAI API Key (for ai-chat and ai-agent-tools nodes)
+# Get yours at: https://platform.openai.com/api-keys
+OPENAI_API_KEY=sk-...
+
+# Anthropic API Key (for Claude models)
+# Get yours at: https://console.anthropic.com/
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Ollama Base URL (for local models, no API key needed)
+# Default: http://localhost:11434
+# OLLAMA_BASE_URL=http://localhost:11434
+
+# =============================================================================
+# Optional: Testing Against Remote API
+# =============================================================================
+# If you need to test the local worker against a remote API (e.g., staging),
+# you can use a tunnel service to expose your local API:
+#
+# Using ngrok:
+#   ngrok http 3001
+#   AGENTPOD_API_URL=https://your-tunnel-url.ngrok.io
+#
+# Using cloudflared:
+#   cloudflared tunnel --url http://localhost:3001
+#   AGENTPOD_API_URL=https://your-tunnel-url.trycloudflare.com

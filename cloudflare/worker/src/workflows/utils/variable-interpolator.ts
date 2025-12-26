@@ -78,17 +78,52 @@ function interpolateString(str: string, context: ExecutionContext): string {
   });
 }
 
-/**
- * Get value from context by dot-notation path
- * 
- * Supports:
- * - trigger.data.field
- * - steps.nodeId.data.field
- * - steps["node-with-dashes"].data
- * - Array access: items[0].name
- */
 function getValueByPath(obj: unknown, path: string): unknown {
+  const context = obj as Record<string, unknown>;
   const parts = parsePath(path);
+  
+  const isLoopVariable = parts.length > 0 && typeof parts[0] === "string" && parts[0].startsWith("$");
+  
+  if (isLoopVariable) {
+    const loopVar = parts[0] as string;
+    const loop = context.loop as { $item?: unknown; $index?: number; $items?: unknown[] } | undefined;
+    
+    if (!loop) {
+      return undefined;
+    }
+    
+    let current: unknown;
+    if (loopVar === "$item") {
+      current = loop.$item;
+    } else if (loopVar === "$index") {
+      current = loop.$index;
+    } else if (loopVar === "$items") {
+      current = loop.$items;
+    } else {
+      return undefined;
+    }
+    
+    if (parts.length === 1) {
+      return current;
+    }
+    
+    for (let i = 1; i < parts.length; i++) {
+      const part = parts[i];
+      if (current === null || current === undefined) {
+        return undefined;
+      }
+      if (typeof part === "number") {
+        if (!Array.isArray(current)) {
+          return undefined;
+        }
+        current = current[part];
+      } else {
+        current = (current as Record<string, unknown>)[part];
+      }
+    }
+    return current;
+  }
+  
   let current = obj;
 
   for (const part of parts) {
@@ -97,13 +132,11 @@ function getValueByPath(obj: unknown, path: string): unknown {
     }
 
     if (typeof part === "number") {
-      // Array access
       if (!Array.isArray(current)) {
         return undefined;
       }
       current = current[part];
     } else {
-      // Object property access
       current = (current as Record<string, unknown>)[part];
     }
   }

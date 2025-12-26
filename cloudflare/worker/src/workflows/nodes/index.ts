@@ -1,9 +1,17 @@
 import type { NodeExecutor } from "./base";
-import { manualTriggerExecutor, webhookTriggerExecutor, scheduleTriggerExecutor } from "./trigger";
+import { manualTriggerExecutor, webhookTriggerExecutor, scheduleTriggerExecutor, eventTriggerExecutor } from "./trigger";
 import { httpRequestExecutor } from "./http";
 import { conditionExecutor, switchExecutor } from "./condition";
 import { javascriptExecutor, mergeExecutor, loopExecutor } from "./code";
-import { aiAgentExecutor, aiPromptExecutor } from "./ai-agent";
+import { aiChatExecutor, aiAgentExecutor } from "./ai";
+import { filterExecutor } from "./filter";
+import { transformExecutor } from "./transform";
+import { waitExecutor, errorHandlerExecutor } from "./utility";
+import { setVariableExecutor, parseJsonExecutor, aggregateExecutor } from "./data";
+import { splitExecutor } from "./split";
+import { emailExecutor, discordExecutor, telegramExecutor } from "./notification";
+import { d1QueryExecutor, r2StorageExecutor } from "./cloudflare";
+import { approvalExecutor } from "./human";
 
 export type { NodeExecutor } from "./base";
 export { createStepResult, createErrorResult } from "./base";
@@ -17,14 +25,29 @@ function registerExecutor(executor: NodeExecutor) {
 registerExecutor(manualTriggerExecutor);
 registerExecutor(webhookTriggerExecutor);
 registerExecutor(scheduleTriggerExecutor);
+registerExecutor(eventTriggerExecutor);
 registerExecutor(httpRequestExecutor);
 registerExecutor(conditionExecutor);
 registerExecutor(switchExecutor);
 registerExecutor(javascriptExecutor);
 registerExecutor(mergeExecutor);
 registerExecutor(loopExecutor);
+registerExecutor(aiChatExecutor);
 registerExecutor(aiAgentExecutor);
-registerExecutor(aiPromptExecutor);
+registerExecutor(filterExecutor);
+registerExecutor(transformExecutor);
+registerExecutor(waitExecutor);
+registerExecutor(errorHandlerExecutor);
+registerExecutor(setVariableExecutor);
+registerExecutor(parseJsonExecutor);
+registerExecutor(aggregateExecutor);
+registerExecutor(splitExecutor);
+registerExecutor(emailExecutor);
+registerExecutor(discordExecutor);
+registerExecutor(telegramExecutor);
+registerExecutor(d1QueryExecutor);
+registerExecutor(r2StorageExecutor);
+registerExecutor(approvalExecutor);
 
 export function getExecutor(nodeType: string): NodeExecutor | undefined {
   return executorRegistry.get(nodeType);

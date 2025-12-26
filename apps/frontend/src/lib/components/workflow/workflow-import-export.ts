@@ -41,6 +41,8 @@ const VALID_NODE_TYPES: WorkflowNodeType[] = [
   "webhook-trigger",
   "schedule-trigger",
   "event-trigger",
+  "ai-chat",
+  "ai-agent-tools",
   "ai-agent",
   "ai-prompt",
   "embeddings",
@@ -49,11 +51,21 @@ const VALID_NODE_TYPES: WorkflowNodeType[] = [
   "switch",
   "loop",
   "merge",
+  "filter",
+  "transform",
+  "wait",
+  "error-handler",
+  "split",
+  "set-variable",
+  "parse-json",
+  "aggregate",
   "http-request",
   "email",
-  "database",
-  "storage",
   "notification",
+  "discord",
+  "telegram",
+  "d1-query",
+  "r2-storage",
   "approval",
   "form",
   "javascript",
@@ -213,6 +225,7 @@ function inferNodeType(type: string, data: Record<string, unknown>): WorkflowNod
   if (data.conditions) return "condition";
   if (data.cases) return "switch";
   if (data.code) return "javascript";
+  if (data.provider && data.prompt) return "ai-chat";
   if (data.prompt && (data.model || data.sandboxConfig)) return "ai-agent";
   if (data.prompt) return "ai-prompt";
   if (data.itemsPath || data.items) return "loop";

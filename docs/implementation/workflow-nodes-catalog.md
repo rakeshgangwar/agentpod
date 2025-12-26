@@ -2,7 +2,7 @@
 
 > **Purpose:** Blueprint for frontend NodeTypeRegistry, PropertiesPanel forms, and backend executors
 > **Created:** December 2025
-> **Total Nodes:** 32 (11 implemented, 21 planned)
+> **Total Nodes:** 32 (17 implemented, 15 planned)
 
 ---
 
@@ -27,8 +27,8 @@
 
 | Status | Count | Description |
 |--------|-------|-------------|
-| **Implemented** | 11 | Full backend executor + frontend support |
-| **Planned** | 15 | High priority, will implement soon |
+| **Implemented** | 17 | Full backend executor + frontend support |
+| **Planned** | 9 | High priority, will implement soon |
 | **Future** | 6 | Lower priority, for later phases |
 
 ### Currently Implemented Nodes
@@ -40,10 +40,16 @@
 | `schedule-trigger` | Trigger | `trigger.ts` | `TriggerNode.svelte` |
 | `http-request` | HTTP/API | `http.ts` | `ActionNode.svelte` |
 | `condition` | Logic | `condition.ts` | `ConditionNode.svelte` |
-| `switch` | Logic | `condition.ts` | `ConditionNode.svelte` |
+| `switch` | Logic | `condition.ts` | `SwitchNode.svelte` |
 | `javascript` | Code | `code.ts` | `ActionNode.svelte` |
 | `merge` | Logic | `code.ts` | `ActionNode.svelte` |
 | `loop` | Logic | `code.ts` | `ActionNode.svelte` |
+| `filter` | Logic | `filter.ts` | `ActionNode.svelte` |
+| `transform` | Logic | `transform.ts` | `ActionNode.svelte` |
+| `wait` | Logic | `utility.ts` | `ActionNode.svelte` |
+| `error-handler` | Logic | `utility.ts` | `ActionNode.svelte` |
+| `ai-chat` | AI | `ai/chat.ts` | `AIAgentNode.svelte` |
+| `ai-agent-tools` | AI | `ai/agent.ts` | `AIAgentNode.svelte` |
 | `ai-agent` | AI | `ai-agent.ts` | `AIAgentNode.svelte` |
 | `ai-prompt` | AI | `ai-agent.ts` | `AIAgentNode.svelte` |
 
@@ -405,7 +411,7 @@
 
 **Display Name:** Filter
 **Icon:** `Filter`
-**Status:** Planned
+**Status:** Implemented
 **Description:** Filter array items based on conditions
 
 **Parameters:**
@@ -475,7 +481,7 @@
 
 **Display Name:** Transform Data
 **Icon:** `ArrowRightLeft`
-**Status:** Planned
+**Status:** Implemented
 **Description:** Transform data structure using mapping
 
 **Parameters:**
@@ -1003,7 +1009,7 @@ return {
 
 **Display Name:** Wait / Delay
 **Icon:** `Timer`
-**Status:** Planned
+**Status:** Implemented
 **Description:** Pause workflow execution
 
 **Parameters:**
@@ -1056,7 +1062,7 @@ return {
 
 **Display Name:** Error Handler
 **Icon:** `ShieldAlert`
-**Status:** Planned
+**Status:** Implemented
 **Description:** Handle errors from previous nodes
 
 **Parameters:**
@@ -1104,30 +1110,17 @@ return {
 
 ## Known Issues
 
-### Switch Node Bug (CRITICAL)
+### Switch Node Bug - FIXED ✅
 
 **File:** `cloudflare/worker/src/workflows/nodes/condition.ts`
 **Issue:** `resolveField` function doesn't handle undefined `field` parameter
-**Error:** `Cannot read properties of undefined (reading 'startsWith')`
+**Status:** Fixed - The function now handles undefined/null field parameter correctly.
 
-**Fix Required:**
-```typescript
-function resolveField(field: string | undefined, context: ExecutionContext): unknown {
-  if (!field || typeof field !== 'string') {
-    return undefined;
-  }
-  if (field.startsWith("trigger.")) {
-    return getValueByPath(context.trigger, field.substring(8));
-  }
-  // ... rest of function
-}
-```
-
-### AI Prompt Node (Stub)
+### AI Prompt Node (Legacy)
 
 **File:** `cloudflare/worker/src/workflows/nodes/ai-agent.ts`
-**Issue:** Returns stub response, no actual LLM call
-**Action:** Implement Workers AI integration or external provider calls
+**Status:** Deprecated - Use `ai-chat` or `ai-agent-tools` nodes instead.
+**Note:** The new AI nodes support multiple providers (OpenAI, Anthropic, Ollama, Workers AI) with fast execution.
 
 ---
 
@@ -1149,14 +1142,14 @@ function resolveField(field: string | undefined, context: ExecutionContext): unk
 ### Phase 2: Essential Additions
 - [ ] event-trigger
 - [ ] http-response
-- [ ] filter
+- [x] filter
 - [ ] split
 - [ ] set-variable
-- [ ] transform
+- [x] transform
 - [ ] parse-json
-- [ ] wait
+- [x] wait
 - [ ] approval
-- [ ] error-handler
+- [x] error-handler
 
 ### Phase 3: Integrations
 - [ ] email

@@ -2,11 +2,18 @@
   import { Handle, Position, type NodeProps } from "@xyflow/svelte";
   import GitBranchIcon from "@lucide/svelte/icons/git-branch";
   import ExecutionStatusBadge from "./ExecutionStatusBadge.svelte";
+  import { NODE_REGISTRY } from "../node-registry";
+  import type { WorkflowNodeType } from "@agentpod/types";
 
   type ExecutionStatus = "idle" | "running" | "success" | "error";
   type Props = NodeProps;
 
   let { data, selected = false }: Props = $props();
+
+  const nodeType = $derived(data.nodeType as WorkflowNodeType | undefined);
+  const nodeEntry = $derived(nodeType ? NODE_REGISTRY[nodeType] : undefined);
+  const NodeIcon = $derived(nodeEntry?.icon || GitBranchIcon);
+  const nodeColor = $derived(nodeEntry?.color || "var(--cyber-amber)");
 
   const executionStatus = $derived((data.executionStatus as ExecutionStatus) || "idle");
   const executionError = $derived(data.executionError as string | undefined);
@@ -31,12 +38,20 @@
   class:border-cyber-amber={selected && executionStatus === "idle"}
   class:shadow-[0_0_0_2px_color-mix(in_oklch,var(--cyber-amber)_30%,transparent)]={selected && executionStatus === "idle"}
 >
-  <div class="absolute -top-[1px] left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyber-amber to-transparent opacity-60"></div>
+  <div 
+    class="absolute -top-[1px] left-0 right-0 h-[1px] opacity-60"
+    style="background-image: linear-gradient(to right, transparent, {nodeColor}, transparent);"
+  ></div>
   
   <div class="p-4 space-y-3">
     <div class="flex items-center gap-3">
-      <div class="flex-shrink-0 w-10 h-10 rounded-sm bg-gradient-to-br from-cyber-amber/20 to-cyber-amber/5 flex items-center justify-center border border-cyber-amber/30">
-        <GitBranchIcon class="w-5 h-5 text-cyber-amber drop-shadow-[0_0_8px_var(--cyber-amber)]" />
+      <div 
+        class="flex-shrink-0 w-10 h-10 rounded-sm flex items-center justify-center"
+        style="background: linear-gradient(to bottom right, color-mix(in oklch, {nodeColor} 20%, transparent), color-mix(in oklch, {nodeColor} 5%, transparent)); border: 1px solid color-mix(in oklch, {nodeColor} 30%, transparent);"
+      >
+        <span style="color: {nodeColor}; filter: drop-shadow(0 0 8px {nodeColor});">
+          <NodeIcon class="w-5 h-5" />
+        </span>
       </div>
       
       <div class="flex-1 min-w-0">
