@@ -65,6 +65,17 @@ const executeWorkflowSchema = z.object({
   triggerData: z.record(z.unknown()).optional(),
 });
 
+const executionStatusUpdateSchema = z.object({
+  executionId: z.string(),
+  workflowId: z.string(),
+  status: z.enum(["running", "waiting", "completed", "errored"]),
+  currentStep: z.string().optional(),
+  completedSteps: z.array(z.string()),
+  result: z.record(z.unknown()).optional(),
+  error: z.string().optional(),
+  durationMs: z.number().optional(),
+});
+
 const duplicateWorkflowSchema = z.object({
   name: z.string().min(1).max(100).optional(),
 });
@@ -455,4 +466,57 @@ export const workflowRoutes = new Hono()
     log.info("Duplicated workflow", { originalId: id, newId: workflow.id });
 
     return c.json({ workflow }, 201);
+  });
+
+export const workflowExecutionRoutes = new Hono()
+  .patch("/:executionId/status", zValidator("json", executionStatusUpdateSchema), async (c) => {
+    const { executionId } = c.req.param();
+    const body = c.req.valid("json");
+
+    const [existing] = await db
+      .select()
+      .from(workflowExecutions)
+      .where(eq(workflowExecutions.id, executionId))
+      .limit(1);
+
+    if (!existing) {
+      log.warn("Execution status update for non-existent execution", { executionId });
+      return c.json({ error: "Execution not found" }, 404);
+    }
+
+    const updateData: Record<string, unknown> = {
+      status: body.status,
+      currentStep: body.currentStep,
+      completedSteps: body.completedSteps,
+    };
+
+    if (body.result !== undefined) {
+      updateData.result = body.result;
+    }
+
+    if (body.error !== undefined) {
+      updateData.error = body.error;
+    }
+
+    if (body.durationMs !== undefined) {
+      updateData.durationMs = body.durationMs;
+    }
+
+    if (body.status === "completed" || body.status === "errored") {
+      updateData.completedAt = new Date();
+    }
+
+    await db
+      .update(workflowExecutions)
+      .set(updateData)
+      .where(eq(workflowExecutions.id, executionId));
+
+    log.info("Execution status updated", { 
+      executionId, 
+      status: body.status, 
+      currentStep: body.currentStep,
+      completedSteps: body.completedSteps?.length || 0,
+    });
+
+    return c.json({ success: true });
   });

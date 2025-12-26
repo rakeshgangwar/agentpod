@@ -38,7 +38,7 @@ import { previewRoutes, publicPreviewRoutes } from './routes/preview.ts';
 // Cloudflare sandbox integration
 import { agentRoutes } from './routes/agents.ts';
 import { cloudflareWebhookRoutes } from './routes/cloudflare-webhook.ts';
-import { workflowRoutes } from './routes/workflows.ts';
+import { workflowRoutes, workflowExecutionRoutes } from './routes/workflows.ts';
 // Middleware
 import { activityLoggerMiddleware } from './middleware/activity-logger.ts';
 // Sync services
@@ -124,6 +124,7 @@ origin: (origin) => {
   // Cloudflare sandbox integration
   .route('/api/v2/agents', agentRoutes)
   .route('/api/v2/cloudflare', cloudflareWebhookRoutes)
+  .route('/api/v2/workflow-executions', workflowExecutionRoutes)
   .route('/api/workflows', workflowRoutes);
 
 app.onError((err, c) => {

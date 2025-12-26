@@ -239,6 +239,19 @@
     }));
   }
 
+  function applyIntermediateProgress(result: IWorkflowExecution) {
+    const completedSteps = result.completedSteps || [];
+    const currentStep = result.currentStep;
+    
+    completedSteps.forEach((nodeId: string) => {
+      updateNodeExecutionStatus(nodeId, "success");
+    });
+    
+    if (currentStep) {
+      updateNodeExecutionStatus(currentStep, "running");
+    }
+  }
+
   function applyExecutionResult(result: IWorkflowExecution) {
     const stepResults = result.result as Record<string, { success: boolean; error?: string }> | undefined;
     
@@ -282,6 +295,10 @@
           const result = await fetchExecution(execution.id);
           
           if (result) {
+            if (result.status === "running") {
+              applyIntermediateProgress(result);
+            }
+            
             if (result.status === "completed" || result.status === "errored") {
               applyExecutionResult(result);
               isExecuting = false;
