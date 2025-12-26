@@ -96,6 +96,9 @@ importers:
       '@assistant-ui/styles':
         specifier: ^0.2.10
         version: 0.2.10
+      '@dagrejs/dagre':
+        specifier: ^1.1.8
+        version: 1.1.8
       '@tauri-apps/api':
         specifier: ^2.9.1
         version: 2.9.1
@@ -181,6 +184,9 @@ importers:
       '@tauri-apps/cli':
         specifier: ^2.9.6
         version: 2.9.6
+      '@types/dagre':
+        specifier: ^0.7.53
+        version: 0.7.53
       '@types/react':
         specifier: ^19.2.7
         version: 19.2.7
@@ -502,6 +508,13 @@ packages:
   '@capsizecss/unpack@3.0.1':
     resolution: {integrity: sha512-8XqW8xGn++Eqqbz3e9wKuK7mxryeRjs4LOHLxbh2lwKeSbuNR4NFifDZT4KzvjU6HMOPbiNTsWpniK5EJfTWkg==}
     engines: {node: '>=18'}
+
+  '@dagrejs/dagre@1.1.8':
+    resolution: {integrity: sha512-5SEDlndt4W/LaVzPYJW+bSmSEZc9EzTf8rJ20WCKvjS5EAZAN0b+x0Yww7VMT4R3Wootkg+X9bUfUxazYw6Blw==}
+
+  '@dagrejs/graphlib@2.2.4':
+    resolution: {integrity: sha512-mepCf/e9+SKYy1d02/UkvSy6+6MoyXhVxP8lLDfA7BPE1X1d4dR0sZznmbM8/XVJ1GPM+Svnx7Xj6ZweByWUkw==}
+    engines: {node: '>17.0.0'}
 
   '@drizzle-team/brocli@0.10.2':
     resolution: {integrity: sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w==}
@@ -1800,6 +1813,9 @@ packages:
 
   '@types/d3-zoom@3.0.8':
     resolution: {integrity: sha512-iqMC4/YlFCSlO8+2Ii1GGGliCAY4XdeG748w5vQUbevlbDu0zSjH/+jojorQVBK/se0j6DUFNPBGSqD3YWYnDw==}
+
+  '@types/dagre@0.7.53':
+    resolution: {integrity: sha512-f4gkWqzPZvYmKhOsDnhq/R8mO4UMcKdxZo+i5SCkOU1wvGeHJeUXGIHeE9pnwGyPMDof1Vx5ZQo4nxpeg2TTVQ==}
 
   '@types/debug@4.1.12':
     resolution: {integrity: sha512-vIChWdVG3LG1SMxEvI/AK+FWJthlrqlTu7fbrlywTkkaONwk/UAGaULXRlf8vkzFBLVm0zkMdCquhL5aOjhXPQ==}
@@ -5289,6 +5305,12 @@ snapshots:
     dependencies:
       fontkit: 2.0.4
 
+  '@dagrejs/dagre@1.1.8':
+    dependencies:
+      '@dagrejs/graphlib': 2.2.4
+
+  '@dagrejs/graphlib@2.2.4': {}
+
   '@drizzle-team/brocli@0.10.2': {}
 
   '@emmetio/abbreviation@2.3.3':
@@ -6323,6 +6345,8 @@ snapshots:
     dependencies:
       '@types/d3-interpolate': 3.0.4
       '@types/d3-selection': 3.0.11
+
+  '@types/dagre@0.7.53': {}
 
   '@types/debug@4.1.12':
     dependencies:

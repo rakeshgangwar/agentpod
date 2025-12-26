@@ -6,6 +6,7 @@
     MiniMap,
     Panel,
     BackgroundVariant,
+    Position,
     useSvelteFlow,
     type Node,
     type Edge,
@@ -13,10 +14,12 @@
     type Connection,
   } from "@xyflow/svelte";
   import "@xyflow/svelte/dist/style.css";
+  import dagre from "@dagrejs/dagre";
   import { Button } from "$lib/components/ui/button";
   import SaveIcon from "@lucide/svelte/icons/save";
   import CheckCircleIcon from "@lucide/svelte/icons/check-circle";
   import PlayIcon from "@lucide/svelte/icons/play";
+  import LayoutGridIcon from "@lucide/svelte/icons/layout-grid";
   import type { ISvelteFlowNode, ISvelteFlowEdge } from "@agentpod/types";
   import NodePalette from "./NodePalette.svelte";
 
@@ -76,6 +79,54 @@
       data: e.data,
     })) as Edge[];
   });
+
+  // Auto-layout configuration
+  const NODE_WIDTH = 180;
+  const NODE_HEIGHT = 60;
+
+  function getLayoutedElements(
+    nodesToLayout: Node[],
+    edgesToLayout: Edge[],
+    direction: "TB" | "LR" = "TB"
+  ): { nodes: Node[]; edges: Edge[] } {
+    const dagreGraph = new dagre.graphlib.Graph();
+    dagreGraph.setDefaultEdgeLabel(() => ({}));
+    dagreGraph.setGraph({ rankdir: direction, nodesep: 50, ranksep: 80 });
+
+    const isHorizontal = direction === "LR";
+
+    nodesToLayout.forEach((node) => {
+      dagreGraph.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
+    });
+
+    edgesToLayout.forEach((edge) => {
+      dagreGraph.setEdge(edge.source, edge.target);
+    });
+
+    dagre.layout(dagreGraph);
+
+    const layoutedNodes = nodesToLayout.map((node) => {
+      const nodeWithPosition = dagreGraph.node(node.id);
+      return {
+        ...node,
+        targetPosition: isHorizontal ? Position.Left : Position.Top,
+        sourcePosition: isHorizontal ? Position.Right : Position.Bottom,
+        position: {
+          x: nodeWithPosition.x - NODE_WIDTH / 2,
+          y: nodeWithPosition.y - NODE_HEIGHT / 2,
+        },
+      };
+    });
+
+    return { nodes: layoutedNodes, edges: edgesToLayout };
+  }
+
+  function handleAutoLayout(direction: "TB" | "LR" = "TB") {
+    if (nodes.length === 0) return;
+    const { nodes: layoutedNodes } = getLayoutedElements(nodes, edges, direction);
+    nodes = layoutedNodes;
+    notifyNodesChange();
+  }
 
   const nodeTypeLabels: Record<string, string> = {
     "manual-trigger": "Manual Trigger",
@@ -277,6 +328,17 @@
         class="bg-card/80 backdrop-blur-sm border border-border rounded-lg shadow-lg"
       />
       <Panel position="top-right" class="flex gap-2 m-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onclick={() => handleAutoLayout("TB")}
+          disabled={readonly || nodes.length === 0}
+          class="bg-card/80 backdrop-blur-sm hover:bg-accent/50 shadow-md"
+          title="Auto arrange nodes vertically"
+        >
+          <LayoutGridIcon class="w-4 h-4 mr-2" />
+          Auto Layout
+        </Button>
         <Button
           variant="outline"
           size="sm"
