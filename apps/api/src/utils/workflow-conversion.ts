@@ -36,21 +36,30 @@ export function svelteFlowToWorkflow(
 
     if (!sourceName || !targetName) continue;
 
-    let sourceConn = connections[sourceName];
-    if (!sourceConn) {
-      sourceConn = { main: [[]] };
-      connections[sourceName] = sourceConn;
+    if (!connections[sourceName]) {
+      connections[sourceName] = { main: [] };
+    }
+    const sourceConn = connections[sourceName];
+
+    const handleType = edge.sourceHandle || "main";
+    
+    let handleIndex = sourceConn.main.findIndex(group => 
+      group.length > 0 && group[0]?.type === handleType
+    );
+    
+    if (handleIndex === -1) {
+      handleIndex = sourceConn.main.length;
+      sourceConn.main.push([]);
     }
 
-    if (!sourceConn.main[0]) {
-      sourceConn.main[0] = [];
+    const handleGroup = sourceConn.main[handleIndex];
+    if (handleGroup) {
+      handleGroup.push({
+        node: targetName,
+        type: handleType,
+        index: handleGroup.length,
+      });
     }
-
-    sourceConn.main[0].push({
-      node: targetName,
-      type: edge.type || "main",
-      index: 0,
-    });
   }
 
   return { nodes, connections };
@@ -89,7 +98,7 @@ export function workflowToSvelteFlow(workflow: IWorkflowBase): {
           id: `e-${sourceId}-${targetId}-${edgeIndex++}`,
           source: sourceId,
           target: targetId,
-          type: connection.type || undefined,
+          sourceHandle: connection.type !== "main" ? connection.type : undefined,
         });
       }
     }

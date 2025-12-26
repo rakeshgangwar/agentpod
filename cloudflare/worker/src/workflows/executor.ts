@@ -5,10 +5,13 @@ import type {
   ExecutionContext,
   WorkflowDefinition,
   WorkflowNode,
+  WorkflowConnections,
   WorkflowEnv,
   ExecutionStatusUpdate,
   StepResult,
 } from "./utils/context";
+
+const NODE_TYPES_WITH_CONDITIONAL_OUTPUTS = ["condition", "switch"];
 
 export interface ExecuteWorkflowParams {
   executionId: string;
@@ -56,6 +59,58 @@ async function notifyStatus(
   }
 }
 
+function shouldSkipNode(
+  nodeId: string,
+  nodes: WorkflowNode[],
+  connections: WorkflowConnections,
+  context: ExecutionContext
+): { skip: boolean; reason?: string } {
+  const conditionalSources: Map<string, { hasMatch: boolean; takenBranch: string; checkedBranches: string[] }> = new Map();
+
+  for (const [sourceId, outputs] of Object.entries(connections)) {
+    for (const connectionGroup of outputs.main) {
+      for (const conn of connectionGroup) {
+        if (conn.node !== nodeId) continue;
+
+        const sourceNode = nodes.find(n => n.id === sourceId);
+        if (!sourceNode) continue;
+
+        if (!NODE_TYPES_WITH_CONDITIONAL_OUTPUTS.includes(sourceNode.type)) continue;
+
+        const sourceResult = context.steps[sourceId];
+        if (!sourceResult?.success || !sourceResult.data) continue;
+
+        const resultData = sourceResult.data as { branch?: string };
+        const takenBranch = resultData.branch;
+
+        if (!takenBranch) continue;
+
+        if (!conditionalSources.has(sourceId)) {
+          conditionalSources.set(sourceId, { hasMatch: false, takenBranch, checkedBranches: [] });
+        }
+
+        const sourceInfo = conditionalSources.get(sourceId)!;
+        sourceInfo.checkedBranches.push(conn.type);
+
+        if (conn.type === takenBranch) {
+          sourceInfo.hasMatch = true;
+        }
+      }
+    }
+  }
+
+  for (const [sourceId, info] of conditionalSources) {
+    if (!info.hasMatch) {
+      return {
+        skip: true,
+        reason: `No connection matches branch '${info.takenBranch}' from ${sourceId} (checked: ${info.checkedBranches.join(", ")})`,
+      };
+    }
+  }
+
+  return { skip: false };
+}
+
 export async function executeWorkflow(
   params: ExecuteWorkflowParams
 ): Promise<ExecutionResult> {
@@ -98,6 +153,14 @@ export async function executeWorkflow(
       if (node.disabled) {
         console.log(`[Workflow ${executionId}] Node ${nodeId} is disabled, skipping`);
         context.steps[nodeId] = { success: true, data: { skipped: true } };
+        completedSteps.push(nodeId);
+        continue;
+      }
+
+      const branchCheck = shouldSkipNode(nodeId, workflow.nodes, workflow.connections, context);
+      if (branchCheck.skip) {
+        console.log(`[Workflow ${executionId}] Node ${nodeId} skipped: ${branchCheck.reason}`);
+        context.steps[nodeId] = { success: true, data: { skipped: true, reason: branchCheck.reason } };
         completedSteps.push(nodeId);
         continue;
       }

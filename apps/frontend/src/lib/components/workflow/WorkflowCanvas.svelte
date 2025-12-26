@@ -46,17 +46,25 @@
 
   const { screenToFlowPosition } = useSvelteFlow();
 
-  let nodes = $state.raw<Node[]>(
-    initialNodes.map((n) => ({
-      id: n.id,
-      type: n.type,
-      position: { ...n.position },
-      data: { ...n.data },
-    })) as Node[]
-  );
+  let nodes = $state.raw<Node[]>([]);
+  let edges = $state.raw<Edge[]>([]);
+  let lastInitialNodesJson = $state("");
 
-  let edges = $state.raw<Edge[]>(
-    initialEdges.map((e) => ({
+  $effect(() => {
+    const newJson = JSON.stringify(initialNodes.map(n => ({ id: n.id, pos: n.position })));
+    if (newJson !== lastInitialNodesJson) {
+      lastInitialNodesJson = newJson;
+      nodes = initialNodes.map((n) => ({
+        id: n.id,
+        type: n.type,
+        position: { ...n.position },
+        data: { ...n.data },
+      })) as Node[];
+    }
+  });
+
+  $effect(() => {
+    edges = initialEdges.map((e) => ({
       id: e.id,
       source: e.source,
       target: e.target,
@@ -66,8 +74,8 @@
       animated: e.animated ?? true,
       label: e.label,
       data: e.data,
-    })) as Edge[]
-  );
+    })) as Edge[];
+  });
 
   const nodeTypeLabels: Record<string, string> = {
     "manual-trigger": "Manual Trigger",
@@ -142,7 +150,8 @@
 
     const nodeType = type.includes("trigger") ? "trigger"
       : type.includes("ai") ? "ai-agent"
-      : type.includes("condition") || type.includes("switch") ? "condition"
+      : type === "switch" ? "switch"
+      : type === "condition" ? "condition"
       : "action";
 
     const label = nodeTypeLabels[type] || type;

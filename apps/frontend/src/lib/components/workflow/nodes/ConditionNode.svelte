@@ -71,8 +71,8 @@
   </div>
 
   <Handle type="target" position={Position.Top} />
-  <Handle id="true" type="source" position={Position.Bottom} style="left: 35%" />
-  <Handle id="false" type="source" position={Position.Bottom} style="left: 65%" />
+  <Handle id="true" type="source" position={Position.Bottom} style="left: 35% !important" />
+  <Handle id="false" type="source" position={Position.Bottom} style="left: 65% !important" />
 </div>
 
 <style>

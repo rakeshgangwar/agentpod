@@ -37,6 +37,7 @@ import TriggerNode from "./nodes/TriggerNode.svelte";
 import ActionNode from "./nodes/ActionNode.svelte";
 import AIAgentNode from "./nodes/AIAgentNode.svelte";
 import ConditionNode from "./nodes/ConditionNode.svelte";
+import SwitchNode from "./nodes/SwitchNode.svelte";
 
 /**
  * Implementation status for each node
@@ -539,8 +540,8 @@ export const NODE_REGISTRY: Record<WorkflowNodeType, NodeRegistryEntry> = {
     category: "logic",
     status: "implemented",
     icon: RouteIcon,
-    color: "var(--cyber-amber)",
-    component: ConditionNode,
+    color: "var(--cyber-purple)",
+    component: SwitchNode,
     hasBranches: true,
     parameters: {
       type: "object",
@@ -1080,8 +1081,8 @@ export function getSvelteFlowNodeType(type: WorkflowNodeType): string {
   const entry = NODE_REGISTRY[type];
   if (!entry) return "default";
   
-  // Map to SvelteFlow node types based on category
   if (entry.isTrigger) return "trigger";
+  if (type === "switch") return "switch";
   if (entry.hasBranches) return "condition";
   if (entry.category === "ai") return "ai-agent";
   return "action";

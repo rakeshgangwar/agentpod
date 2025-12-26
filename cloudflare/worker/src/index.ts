@@ -8,6 +8,7 @@ import type { Config, OpencodeClient } from "@opencode-ai/sdk";
 import { WorkspaceStorage } from "./storage";
 import { executeWorkflow, validateWorkflowForExecution } from "./workflows/executor";
 import type { WorkflowDefinition } from "./workflows/utils/context";
+import { normalizeWorkflow, type FrontendWorkflow } from "./workflows/utils/format-transformer";
 
 export { Sandbox } from "@cloudflare/sandbox";
 
@@ -548,7 +549,7 @@ async function notifyAgentPodAPI(
 interface WorkflowExecuteBody {
   executionId: string;
   workflowId: string;
-  workflow: WorkflowDefinition;
+  workflow: WorkflowDefinition | FrontendWorkflow;
   triggerType: "manual" | "webhook" | "schedule" | "event";
   triggerData?: Record<string, unknown>;
   userId?: string;
@@ -557,7 +558,9 @@ interface WorkflowExecuteBody {
 async function handleWorkflowExecute(request: Request, env: Env): Promise<Response> {
   const body = (await request.json()) as WorkflowExecuteBody;
   
-  const validationErrors = validateWorkflowForExecution(body.workflow);
+  const normalizedWorkflow = normalizeWorkflow(body.workflow, body.workflowId);
+  
+  const validationErrors = validateWorkflowForExecution(normalizedWorkflow);
   if (validationErrors.length > 0) {
     return Response.json(
       { error: "Invalid workflow", errors: validationErrors },
@@ -570,7 +573,7 @@ async function handleWorkflowExecute(request: Request, env: Env): Promise<Respon
   const result = await executeWorkflow({
     executionId: body.executionId,
     workflowId: body.workflowId,
-    workflow: body.workflow,
+    workflow: normalizedWorkflow,
     triggerType: body.triggerType,
     triggerData: body.triggerData || {},
     userId: body.userId,
@@ -582,14 +585,14 @@ async function handleWorkflowExecute(request: Request, env: Env): Promise<Respon
     },
   });
 
-  // Always return 200 - the workflow executed, result contains success/error info
   return Response.json(result, { status: 200 });
 }
 
 async function handleWorkflowValidate(request: Request): Promise<Response> {
-  const body = (await request.json()) as { workflow: WorkflowDefinition };
+  const body = (await request.json()) as { workflow: WorkflowDefinition | FrontendWorkflow };
   
-  const errors = validateWorkflowForExecution(body.workflow);
+  const normalizedWorkflow = normalizeWorkflow(body.workflow, "validation");
+  const errors = validateWorkflowForExecution(normalizedWorkflow);
   
   return Response.json({
     valid: errors.length === 0,

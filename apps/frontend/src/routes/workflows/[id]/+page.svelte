@@ -6,12 +6,15 @@
   import { WorkflowEditor } from "$lib/components/workflow";
   import NodePalette from "$lib/components/workflow/NodePalette.svelte";
   import PropertiesPanel from "$lib/components/workflow/PropertiesPanel.svelte";
-  import { TriggerNode, AIAgentNode, ActionNode, ConditionNode } from "$lib/components/workflow/nodes";
+  import { TriggerNode, AIAgentNode, ActionNode, ConditionNode, SwitchNode } from "$lib/components/workflow/nodes";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import ThemeToggle from "$lib/components/theme-toggle.svelte";
   import type { ISvelteFlowNode, ISvelteFlowEdge, INode, IConnections, IWorkflowValidationResult, WorkflowNodeType, IWorkflowExecution } from "@agentpod/types";
   import { SvelteFlowProvider, type NodeTypes } from "@xyflow/svelte";
+
+  import WorkflowImportModal from "$lib/components/workflow/WorkflowImportModal.svelte";
+  import { convertToExportFormat, downloadWorkflowJson } from "$lib/components/workflow/workflow-import-export";
 
   import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
   import SaveIcon from "@lucide/svelte/icons/save";
@@ -22,6 +25,8 @@
   import LoaderIcon from "@lucide/svelte/icons/loader-2";
   import XCircleIcon from "@lucide/svelte/icons/x-circle";
   import CheckIcon from "@lucide/svelte/icons/check";
+  import UploadIcon from "@lucide/svelte/icons/upload";
+  import DownloadIcon from "@lucide/svelte/icons/download";
 
   type ExecutionStatus = "idle" | "running" | "success" | "error";
 
@@ -54,12 +59,14 @@
   let deleteNodeId = $state<string | null>(null);
   let executionResult = $state<IWorkflowExecution | null>(null);
   let executionBannerVisible = $state(false);
+  let showImportModal = $state(false);
 
   const nodeTypes: NodeTypes = {
     trigger: TriggerNode,
     "ai-agent": AIAgentNode,
     action: ActionNode,
     condition: ConditionNode,
+    switch: SwitchNode,
   };
 
   async function loadWorkflow() {
@@ -78,7 +85,8 @@
     return workflowNodes.map(node => {
       const nodeType = node.type.includes("trigger") ? "trigger"
         : node.type.includes("ai") ? "ai-agent"
-        : node.type.includes("condition") || node.type.includes("switch") ? "condition"
+        : node.type === "switch" ? "switch"
+        : node.type === "condition" ? "condition"
         : "action";
 
       return {
@@ -109,7 +117,7 @@
             id: `${sourceId}-${conn.node}-${outputIndex}-${connIndex}`,
             source: sourceId,
             target: conn.node,
-            sourceHandle: outputIndex > 0 ? `output-${outputIndex}` : undefined,
+            sourceHandle: conn.type && conn.type !== 'main' ? conn.type : undefined,
             targetHandle: conn.index > 0 ? `input-${conn.index}` : undefined,
             animated: true,
           });
@@ -305,6 +313,20 @@
     executionResult = null;
     executionBannerVisible = false;
   }
+
+  function handleImport(importedNodes: ISvelteFlowNode[], importedEdges: ISvelteFlowEdge[], name?: string, description?: string) {
+    nodes = importedNodes;
+    edges = importedEdges;
+    if (name) workflowName = name;
+    if (description) workflowDescription = description;
+    selectedNode = null;
+    showImportModal = false;
+  }
+
+  function handleExport() {
+    const workflow = convertToExportFormat(workflowName, workflowDescription, nodes, edges);
+    downloadWorkflowJson(workflow);
+  }
 </script>
 
 <div class="noise-overlay"></div>
@@ -356,6 +378,33 @@
       </Button>
 
       <ThemeToggle />
+
+      <div class="w-px h-6 bg-border/30"></div>
+
+      <Button
+        variant="ghost"
+        size="sm"
+        onclick={() => showImportModal = true}
+        class="h-8 font-mono text-xs uppercase tracking-wider"
+        title="Import workflow from JSON"
+      >
+        <UploadIcon class="h-4 w-4 mr-1" />
+        Import
+      </Button>
+
+      <Button
+        variant="ghost"
+        size="sm"
+        onclick={handleExport}
+        disabled={nodes.length === 0}
+        class="h-8 font-mono text-xs uppercase tracking-wider"
+        title="Export workflow to JSON"
+      >
+        <DownloadIcon class="h-4 w-4 mr-1" />
+        Export
+      </Button>
+
+      <div class="w-px h-6 bg-border/30"></div>
 
       <Button
         variant="outline"
@@ -480,3 +529,9 @@
     </div>
   </SvelteFlowProvider>
 </main>
+
+<WorkflowImportModal
+  bind:open={showImportModal}
+  onImport={handleImport}
+  onClose={() => showImportModal = false}
+/>

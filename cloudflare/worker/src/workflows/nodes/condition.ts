@@ -44,6 +44,15 @@ function getValueByPath(obj: unknown, path: string): unknown {
   return current;
 }
 
+function toNumber(value: unknown): number | null {
+  if (typeof value === "number") return value;
+  if (typeof value === "string") {
+    const num = parseFloat(value);
+    if (!isNaN(num)) return num;
+  }
+  return null;
+}
+
 function evaluateCondition(
   actualValue: unknown,
   operator: ComparisonOperator,
@@ -51,10 +60,10 @@ function evaluateCondition(
 ): boolean {
   switch (operator) {
     case "equals":
-      return actualValue === expectedValue;
+      return actualValue === expectedValue || String(actualValue) === String(expectedValue);
       
     case "notEquals":
-      return actualValue !== expectedValue;
+      return actualValue !== expectedValue && String(actualValue) !== String(expectedValue);
       
     case "contains":
       if (typeof actualValue === "string" && typeof expectedValue === "string") {
@@ -84,25 +93,41 @@ function evaluateCondition(
              typeof expectedValue === "string" && 
              actualValue.endsWith(expectedValue);
              
-    case "greaterThan":
-      return typeof actualValue === "number" && 
-             typeof expectedValue === "number" && 
-             actualValue > expectedValue;
+    case "greaterThan": {
+      const numActual = toNumber(actualValue);
+      const numExpected = toNumber(expectedValue);
+      if (numActual !== null && numExpected !== null) {
+        return numActual > numExpected;
+      }
+      return false;
+    }
              
-    case "lessThan":
-      return typeof actualValue === "number" && 
-             typeof expectedValue === "number" && 
-             actualValue < expectedValue;
+    case "lessThan": {
+      const numActual = toNumber(actualValue);
+      const numExpected = toNumber(expectedValue);
+      if (numActual !== null && numExpected !== null) {
+        return numActual < numExpected;
+      }
+      return false;
+    }
              
-    case "greaterThanOrEqual":
-      return typeof actualValue === "number" && 
-             typeof expectedValue === "number" && 
-             actualValue >= expectedValue;
+    case "greaterThanOrEqual": {
+      const numActual = toNumber(actualValue);
+      const numExpected = toNumber(expectedValue);
+      if (numActual !== null && numExpected !== null) {
+        return numActual >= numExpected;
+      }
+      return false;
+    }
              
-    case "lessThanOrEqual":
-      return typeof actualValue === "number" && 
-             typeof expectedValue === "number" && 
-             actualValue <= expectedValue;
+    case "lessThanOrEqual": {
+      const numActual = toNumber(actualValue);
+      const numExpected = toNumber(expectedValue);
+      if (numActual !== null && numExpected !== null) {
+        return numActual <= numExpected;
+      }
+      return false;
+    }
              
     case "isEmpty":
       if (actualValue === null || actualValue === undefined) return true;
@@ -144,12 +169,24 @@ function resolveField(field: string | undefined | null, context: ExecutionContex
   if (!field || typeof field !== "string") {
     return undefined;
   }
+  
   if (field.startsWith("trigger.")) {
     return getValueByPath(context.trigger, field.substring(8));
   }
-  if (field.startsWith("steps.")) {
-    return getValueByPath(context.steps, field.substring(6));
+  if (field.startsWith("steps.") || field.startsWith("steps[")) {
+    const stepsPath = field.startsWith("steps.") ? field.substring(6) : field.substring(5);
+    return getValueByPath(context.steps, stepsPath);
   }
+  
+  const numValue = parseFloat(field);
+  if (!isNaN(numValue) && String(numValue) === field) {
+    return numValue;
+  }
+  
+  if (!field.includes(".") && !field.includes("[")) {
+    return field;
+  }
+  
   return getValueByPath(context, field);
 }
 

@@ -153,7 +153,8 @@
 
     const nodeType = type.includes("trigger") ? "trigger"
       : type.includes("ai") ? "ai-agent"
-      : type.includes("condition") || type.includes("switch") ? "condition"
+      : type === "switch" ? "switch"
+      : type === "condition" ? "condition"
       : "action";
 
     const label = nodeTypeLabels[type] || type;
