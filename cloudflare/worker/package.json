@@ -7,16 +7,21 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "types": "wrangler types",
-    "tail": "wrangler tail"
+    "tail": "wrangler tail",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@opencode-ai/sdk": "^1.0.137",
-    "@cloudflare/sandbox": "^0.6.7"
+    "@cloudflare/sandbox": "^0.6.7",
+    "@opencode-ai/sdk": "^1.0.137"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241218.0",
     "@types/node": "^22.10.1",
+    "@vitest/coverage-v8": "^4.0.16",
     "typescript": "^5.7.2",
+    "vitest": "^4.0.16",
     "wrangler": "^4.56.0"
   }
 }

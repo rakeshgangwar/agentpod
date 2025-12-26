@@ -93,18 +93,19 @@ export const httpRequestExecutor: NodeExecutor = {
       let data: unknown;
       const contentType = response.headers.get("content-type") || "";
       
-      if (responseType === "json" || contentType.includes("application/json")) {
-        try {
-          data = await response.json();
-        } catch {
-          data = await response.text();
-        }
-      } else if (responseType === "binary") {
+      if (responseType === "binary") {
         const arrayBuffer = await response.arrayBuffer();
         data = {
           base64: btoa(String.fromCharCode(...new Uint8Array(arrayBuffer))),
           size: arrayBuffer.byteLength,
         };
+      } else if (responseType === "json" || contentType.includes("application/json")) {
+        const text = await response.text();
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = text;
+        }
       } else {
         data = await response.text();
       }

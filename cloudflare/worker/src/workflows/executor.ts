@@ -59,7 +59,7 @@ async function notifyStatus(
   }
 }
 
-function shouldSkipNode(
+export function shouldSkipNode(
   nodeId: string,
   nodes: WorkflowNode[],
   connections: WorkflowConnections,
