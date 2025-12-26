@@ -2,7 +2,8 @@
   import { goto } from "$app/navigation";
   import { connection } from "$lib/stores/connection.svelte";
   import { createWorkflow } from "$lib/stores/workflows.svelte";
-  import { WorkflowCanvas } from "$lib/components/workflow";
+  import { WorkflowEditor } from "$lib/components/workflow";
+  import NodePalette from "$lib/components/workflow/NodePalette.svelte";
   import PropertiesPanel from "$lib/components/workflow/PropertiesPanel.svelte";
   import { TriggerNode, AIAgentNode, ActionNode, ConditionNode, SwitchNode } from "$lib/components/workflow/nodes";
   import { Button } from "$lib/components/ui/button";
@@ -276,16 +277,19 @@
 
   <SvelteFlowProvider>
     <div class="flex-1 flex overflow-hidden">
-      <WorkflowCanvas
-        initialNodes={nodes}
-        initialEdges={edges}
-        onNodesChange={handleNodesChange}
-        onEdgesChange={handleEdgesChange}
-        onNodeSelect={handleNodeSelect}
-        nodeTypes={nodeTypes}
-        showPalette={showPalette}
-        bind:deleteNodeId
-      />
+      <NodePalette collapsed={!showPalette} />
+
+      <div class="flex-1 relative" role="application">
+        <WorkflowEditor
+          initialNodes={nodes}
+          initialEdges={edges}
+          onNodesChange={handleNodesChange}
+          onEdgesChange={handleEdgesChange}
+          onNodeSelect={handleNodeSelect}
+          nodeTypes={nodeTypes}
+          bind:deleteNodeId
+        />
+      </div>
 
       <PropertiesPanel
         {selectedNode}

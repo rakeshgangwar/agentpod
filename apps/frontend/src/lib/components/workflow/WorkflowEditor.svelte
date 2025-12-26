@@ -16,7 +16,7 @@
   import "@xyflow/svelte/dist/style.css";
   import dagre from "@dagrejs/dagre";
   import { Button } from "$lib/components/ui/button";
-  import { Save, CheckCircle, Play, LayoutGrid } from "@lucide/svelte";
+  import { LayoutGrid } from "@lucide/svelte";
   import type { ISvelteFlowNode, ISvelteFlowEdge } from "@agentpod/types";
 
   interface Props {
@@ -250,19 +250,6 @@
       deleteNodeId = null;
     }
   });
-
-  function handleSave() {
-    notifyNodesChange();
-    notifyEdgesChange();
-  }
-
-  function handleValidate() {
-    console.log("Validate workflow:", { nodes, edges });
-  }
-
-  function handleExecute() {
-    console.log("Execute workflow:", { nodes, edges });
-  }
 </script>
 
 <div class="w-full h-full bg-background" style="position: absolute; inset: 0;">
