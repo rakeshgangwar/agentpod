@@ -28,6 +28,7 @@
     deleteNodeId?: string | null;
     readonly?: boolean;
     nodeTypes?: NodeTypes;
+    executedEdgeIds?: Set<string>;
   }
 
   let {
@@ -39,6 +40,7 @@
     deleteNodeId = $bindable(null),
     readonly = false,
     nodeTypes = undefined,
+    executedEdgeIds = new Set(),
   }: Props = $props();
 
   const { screenToFlowPosition } = useSvelteFlow();
@@ -61,17 +63,24 @@
   });
 
   $effect(() => {
-    edges = initialEdges.map((e) => ({
-      id: e.id,
-      source: e.source,
-      target: e.target,
-      sourceHandle: e.sourceHandle,
-      targetHandle: e.targetHandle,
-      type: e.type,
-      animated: e.animated ?? true,
-      label: e.label,
-      data: e.data,
-    })) as Edge[];
+    edges = initialEdges.map((e) => {
+      const isExecuted = executedEdgeIds.has(e.id);
+      return {
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        sourceHandle: e.sourceHandle,
+        targetHandle: e.targetHandle,
+        type: e.type,
+        animated: e.animated ?? true,
+        label: e.label,
+        data: { ...e.data, executed: isExecuted },
+        style: isExecuted 
+          ? "stroke: #10b981; stroke-width: 3px; filter: drop-shadow(0 0 4px rgba(16, 185, 129, 0.5));"
+          : undefined,
+        className: isExecuted ? "executed-edge" : undefined,
+      };
+    }) as Edge[];
   });
 
   function handleNodeDragStop(event: { targetNode: Node | null; nodes: Node[]; event: MouseEvent | TouchEvent }) {
@@ -406,6 +415,18 @@
     to {
       stroke-dashoffset: -20;
     }
+  }
+
+  /* Executed edge styling */
+  :global(.svelte-flow__edge.executed-edge .svelte-flow__edge-path) {
+    stroke: #10b981 !important;
+    stroke-width: 3px !important;
+    filter: drop-shadow(0 0 6px rgba(16, 185, 129, 0.6));
+  }
+
+  :global(.svelte-flow__edge.executed-edge.animated path) {
+    stroke-dasharray: 8 4;
+    animation: dashdraw 0.5s linear infinite;
   }
 
   /* Dark mode shadows handled by inner node components */

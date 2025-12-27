@@ -64,6 +64,7 @@
   let executionResult = $state<IWorkflowExecution | null>(null);
   let executionBannerVisible = $state(false);
   let showImportModal = $state(false);
+  let executedEdgeIds = $state<Set<string>>(new Set());
 
   const nodeTypes: NodeTypes = {
     trigger: TriggerNode,
@@ -81,6 +82,7 @@
       workflowDescription = workflow.description || "";
       nodes = convertFromWorkflowFormat(workflow.nodes, workflow.connections);
       edges = convertEdgesFromWorkflow(workflow.nodes, workflow.connections);
+      executedEdgeIds = new Set();
       isLoaded = true;
     }
   }
@@ -287,6 +289,38 @@
     }));
   }
 
+  function computeExecutedEdges(stepResults: Record<string, { success: boolean; data?: { skipped?: boolean; branch?: string } }>) {
+    const executed = new Set<string>();
+    
+    for (const edge of edges) {
+      const sourceResult = stepResults[edge.source];
+      const targetResult = stepResults[edge.target];
+      
+      // Both source and target must be executed (not skipped)
+      const sourceExecuted = sourceResult && sourceResult.success && !sourceResult.data?.skipped;
+      const targetExecuted = targetResult && targetResult.success && !targetResult.data?.skipped;
+      
+      if (!sourceExecuted || !targetExecuted) continue;
+      
+      // For conditional nodes (condition/switch), check if this edge's branch was taken
+      const sourceNode = nodes.find(n => n.id === edge.source);
+      if (sourceNode?.data.nodeType === "condition" || sourceNode?.data.nodeType === "switch") {
+        const takenBranch = sourceResult.data?.branch;
+        const edgeBranch = edge.sourceHandle || "default";
+        
+        // Only mark edge as executed if it's on the taken branch
+        if (takenBranch && edgeBranch === takenBranch) {
+          executed.add(edge.id);
+        }
+      } else {
+        // Non-conditional node: edge is executed if both ends are executed
+        executed.add(edge.id);
+      }
+    }
+    
+    return executed;
+  }
+
   function applyIntermediateProgress(result: IWorkflowExecution) {
     const completedSteps = result.completedSteps || [];
     const currentStep = result.currentStep;
@@ -342,6 +376,12 @@
       }
     });
     
+    // Compute which edges were executed based on step results
+    if (stepResults) {
+      executedEdgeIds = computeExecutedEdges(stepResults);
+      console.log("[Execution] Executed edges:", Array.from(executedEdgeIds));
+    }
+    
     executionResult = result;
     executionBannerVisible = true;
     
@@ -355,6 +395,7 @@
     isExecuting = true;
     isPaused = false;
     executionResult = null;
+    executedEdgeIds = new Set();
     
     setAllNodesStatus("running");
     
@@ -443,6 +484,7 @@
     setAllNodesStatus("idle");
     executionResult = null;
     executionBannerVisible = false;
+    executedEdgeIds = new Set();
   }
 
   function handleImport(importedNodes: ISvelteFlowNode[], importedEdges: ISvelteFlowEdge[], name?: string, description?: string) {
@@ -683,6 +725,7 @@
             onNodeSelect={handleNodeSelect}
             nodeTypes={nodeTypes}
             bind:deleteNodeId
+            {executedEdgeIds}
           />
         {/if}
       </div>
