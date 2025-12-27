@@ -376,6 +376,9 @@
   /* Theme-aware canvas background */
   :global(.svelte-flow) {
     background: hsl(var(--background)) !important;
+    /* Theme-aware edge label colors using SvelteFlow CSS variables */
+    --xy-edge-label-background-color: hsl(var(--card));
+    --xy-edge-label-color: hsl(var(--card-foreground));
   }
 
   :global(.svelte-flow__background) {
@@ -384,6 +387,19 @@
 
   :global(.svelte-flow__background pattern circle) {
     fill: hsl(var(--muted-foreground) / 0.3) !important;
+  }
+
+  /* Edge label styling with theme support */
+  :global(.svelte-flow__edge-label) {
+    background: hsl(var(--card)) !important;
+    color: hsl(var(--card-foreground)) !important;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid hsl(var(--border));
+    font-size: 11px;
+    font-weight: 500;
+    box-shadow: 0 2px 4px hsl(var(--foreground) / 0.1);
+    transition: all 0.2s ease;
   }
 
   @keyframes dashdraw {

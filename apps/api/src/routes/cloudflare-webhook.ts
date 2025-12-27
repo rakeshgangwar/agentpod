@@ -5,6 +5,7 @@ import { createLogger } from "../utils/logger";
 import { db } from "../db/drizzle";
 import { cloudflareSandboxes } from "../db/schema/cloudflare";
 import { sandboxes } from "../db/schema/sandboxes";
+import { workflowExecutions } from "../db/schema/workflows";
 import { eq } from "drizzle-orm";
 
 const log = createLogger("cloudflare-webhook");
@@ -21,13 +22,24 @@ const webhookPayloadSchema = z.object({
     "session.created",
     "session.message",
     "workspace.synced",
+    "workflow.execution.started",
+    "workflow.execution.step_completed",
+    "workflow.execution.completed",
+    "workflow.execution.failed",
   ]),
   data: z.object({
-    sandboxId: z.string(),
+    sandboxId: z.string().optional(),
     userId: z.string().optional(),
     provider: z.string().optional(),
     sessionId: z.string().optional(),
     error: z.string().optional(),
+    executionId: z.string().optional(),
+    workflowId: z.string().optional(),
+    stepId: z.string().optional(),
+    stepName: z.string().optional(),
+    status: z.string().optional(),
+    result: z.record(z.unknown()).optional(),
+    durationMs: z.number().optional(),
   }),
   timestamp: z.string(),
 });
@@ -44,31 +56,47 @@ export const cloudflareWebhookRoutes = new Hono()
       try {
         switch (body.event) {
           case "sandbox.created":
-            await handleSandboxCreated(body.data);
+            if (body.data.sandboxId) await handleSandboxCreated({ sandboxId: body.data.sandboxId, userId: body.data.userId });
             break;
 
           case "sandbox.hibernated":
-            await handleSandboxHibernated(body.data);
+            if (body.data.sandboxId) await handleSandboxHibernated({ sandboxId: body.data.sandboxId });
             break;
 
           case "sandbox.woken":
-            await handleSandboxWoken(body.data);
+            if (body.data.sandboxId) await handleSandboxWoken({ sandboxId: body.data.sandboxId });
             break;
 
           case "sandbox.deleted":
-            await handleSandboxDeleted(body.data);
+            if (body.data.sandboxId) await handleSandboxDeleted({ sandboxId: body.data.sandboxId });
             break;
 
           case "sandbox.error":
-            await handleSandboxError(body.data);
+            if (body.data.sandboxId) await handleSandboxError({ sandboxId: body.data.sandboxId, error: body.data.error });
             break;
 
           case "session.message":
-            await handleSessionMessage(body.data);
+            if (body.data.sandboxId) await handleSessionMessage({ sandboxId: body.data.sandboxId, sessionId: body.data.sessionId });
             break;
 
           case "workspace.synced":
-            await handleWorkspaceSynced(body.data);
+            if (body.data.sandboxId) await handleWorkspaceSynced({ sandboxId: body.data.sandboxId });
+            break;
+
+          case "workflow.execution.started":
+            if (body.data.executionId) await handleWorkflowExecutionStarted(body.data);
+            break;
+
+          case "workflow.execution.step_completed":
+            if (body.data.executionId) await handleWorkflowStepCompleted(body.data);
+            break;
+
+          case "workflow.execution.completed":
+            if (body.data.executionId) await handleWorkflowExecutionCompleted(body.data);
+            break;
+
+          case "workflow.execution.failed":
+            if (body.data.executionId) await handleWorkflowExecutionFailed(body.data);
             break;
 
           default:
@@ -213,4 +241,112 @@ async function handleWorkspaceSynced(data: { sandboxId: string }) {
     .where(eq(cloudflareSandboxes.id, data.sandboxId));
 
   log.info("Workspace synced", { sandboxId: data.sandboxId });
+}
+
+async function handleWorkflowExecutionStarted(data: { 
+  executionId?: string; 
+  workflowId?: string;
+}) {
+  if (!data.executionId) return;
+
+  await db
+    .update(workflowExecutions)
+    .set({
+      status: "running",
+    })
+    .where(eq(workflowExecutions.id, data.executionId));
+
+  log.info("Workflow execution started", { 
+    executionId: data.executionId, 
+    workflowId: data.workflowId,
+  });
+}
+
+async function handleWorkflowStepCompleted(data: { 
+  executionId?: string;
+  stepId?: string;
+  stepName?: string;
+  result?: Record<string, unknown>;
+}) {
+  if (!data.executionId) return;
+
+  const [execution] = await db
+    .select()
+    .from(workflowExecutions)
+    .where(eq(workflowExecutions.id, data.executionId))
+    .limit(1);
+
+  if (!execution) {
+    log.warn("Step completed for unknown execution", { executionId: data.executionId });
+    return;
+  }
+
+  const completedSteps = (execution.completedSteps as string[]) || [];
+  if (data.stepId && !completedSteps.includes(data.stepId)) {
+    completedSteps.push(data.stepId);
+  }
+
+  await db
+    .update(workflowExecutions)
+    .set({
+      currentStep: data.stepId,
+      completedSteps,
+    })
+    .where(eq(workflowExecutions.id, data.executionId));
+
+  log.debug("Workflow step completed", { 
+    executionId: data.executionId, 
+    stepId: data.stepId,
+    stepName: data.stepName,
+  });
+}
+
+async function handleWorkflowExecutionCompleted(data: { 
+  executionId?: string;
+  workflowId?: string;
+  result?: Record<string, unknown>;
+  durationMs?: number;
+}) {
+  if (!data.executionId) return;
+
+  await db
+    .update(workflowExecutions)
+    .set({
+      status: "completed",
+      result: data.result,
+      completedAt: new Date(),
+      durationMs: data.durationMs,
+    })
+    .where(eq(workflowExecutions.id, data.executionId));
+
+  log.info("Workflow execution completed", { 
+    executionId: data.executionId, 
+    workflowId: data.workflowId,
+    durationMs: data.durationMs,
+  });
+}
+
+async function handleWorkflowExecutionFailed(data: { 
+  executionId?: string;
+  workflowId?: string;
+  error?: string;
+  durationMs?: number;
+}) {
+  if (!data.executionId) return;
+
+  await db
+    .update(workflowExecutions)
+    .set({
+      status: "errored",
+      error: data.error,
+      completedAt: new Date(),
+      durationMs: data.durationMs,
+    })
+    .where(eq(workflowExecutions.id, data.executionId));
+
+  log.error("Workflow execution failed", { 
+    executionId: data.executionId, 
+    workflowId: data.workflowId,
+    error: data.error,
+  });
 }

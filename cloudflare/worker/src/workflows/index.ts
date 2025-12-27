@@ -1,5 +1,4 @@
-export { executeWorkflow, validateWorkflowForExecution } from "./executor";
-export type { ExecuteWorkflowParams, ExecutionResult } from "./executor";
+export { validateWorkflowForExecution, shouldSkipNode } from "./executor";
 
 export { getExecutor, hasExecutor, getAllExecutorTypes, validateNodeParams } from "./nodes";
 export type { NodeExecutor } from "./nodes";

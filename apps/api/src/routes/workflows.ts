@@ -28,6 +28,7 @@ const connectionSchema = z.record(
           node: z.string(),
           type: z.string(),
           index: z.number(),
+          label: z.string().optional(),
         })
       )
     ),
@@ -69,10 +70,10 @@ const executionStatusUpdateSchema = z.object({
   executionId: z.string(),
   workflowId: z.string(),
   status: z.enum(["running", "waiting", "completed", "errored"]),
-  currentStep: z.string().optional(),
+  currentStep: z.string().nullish(),
   completedSteps: z.array(z.string()),
   result: z.record(z.unknown()).optional(),
-  error: z.string().optional(),
+  error: z.string().nullish(),
   durationMs: z.number().optional(),
 });
 
@@ -325,30 +326,24 @@ export const workflowRoutes = new Hono()
         triggerData: body.triggerData,
         userId,
       }).then(async (result) => {
-        log.info("Workflow execution result received", { 
+        log.info("Workflow execution queued in Cloudflare", { 
           executionId, 
+          instanceId: result.instanceId,
           status: result.status,
-          success: result.success,
-          durationMs: result.durationMs,
         });
         
         await db
           .update(workflowExecutions)
           .set({
-            status: result.status,
-            result: result.steps,
-            error: result.error,
-            completedAt: new Date(result.completedAt),
-            durationMs: result.durationMs,
+            status: "running",
+            instanceId: result.instanceId,
           })
           .where(eq(workflowExecutions.id, executionId));
-        
-        log.info("Workflow execution completed", { executionId, status: result.status });
       }).catch(async (error) => {
         const errorMessage = error instanceof Error ? error.message : String(error);
         const errorStack = error instanceof Error ? error.stack : undefined;
         
-        log.error("Workflow execution failed", { 
+        log.error("Workflow execution failed to start", { 
           executionId, 
           errorMessage,
           errorStack,
@@ -519,4 +514,238 @@ export const workflowExecutionRoutes = new Hono()
     });
 
     return c.json({ success: true });
+  })
+
+  .get("/:executionId/poll", async (c) => {
+    const { executionId } = c.req.param();
+    const userId = getUserId(c);
+
+    const [execution] = await db
+      .select()
+      .from(workflowExecutions)
+      .where(and(eq(workflowExecutions.id, executionId), eq(workflowExecutions.userId, userId)))
+      .limit(1);
+
+    if (!execution) {
+      return c.json({ error: "Execution not found" }, 404);
+    }
+
+    if (!isCloudflareConfigured()) {
+      return c.json({ 
+        execution,
+        cloudflareStatus: null,
+        message: "Cloudflare not configured",
+      });
+    }
+
+    try {
+      const provider = getCloudflareProvider();
+      const cloudflareStatus = await provider.getWorkflowStatus(executionId);
+      
+      const statusMap: Record<string, typeof execution.status> = {
+        queued: "queued",
+        running: "running",
+        paused: "waiting",
+        complete: "completed",
+        errored: "errored",
+        terminated: "cancelled",
+      };
+
+      const mappedStatus = statusMap[cloudflareStatus.status] ?? execution.status;
+      const isTerminal = ["complete", "errored", "terminated"].includes(cloudflareStatus.status);
+
+      if (mappedStatus !== execution.status || isTerminal) {
+        const updateData: Record<string, unknown> = {
+          status: mappedStatus,
+        };
+
+        if (cloudflareStatus.output) {
+          const output = cloudflareStatus.output as { steps?: Record<string, unknown> };
+          log.info("Cloudflare output received", {
+            executionId,
+            outputKeys: Object.keys(output),
+            hasSteps: !!output.steps,
+            stepsKeys: output.steps ? Object.keys(output.steps) : [],
+            rawOutput: JSON.stringify(output).slice(0, 500),
+          });
+          updateData.result = output.steps ?? cloudflareStatus.output;
+        }
+
+        if (cloudflareStatus.error) {
+          updateData.error = cloudflareStatus.error;
+        }
+
+        if (isTerminal) {
+          updateData.completedAt = new Date();
+          if (execution.startedAt) {
+            updateData.durationMs = Date.now() - new Date(execution.startedAt).getTime();
+          }
+        }
+
+        await db
+          .update(workflowExecutions)
+          .set(updateData)
+          .where(eq(workflowExecutions.id, executionId));
+
+        const [updated] = await db
+          .select()
+          .from(workflowExecutions)
+          .where(eq(workflowExecutions.id, executionId))
+          .limit(1);
+
+        return c.json({ 
+          execution: updated,
+          cloudflareStatus,
+        });
+      }
+
+      return c.json({ 
+        execution,
+        cloudflareStatus,
+      });
+    } catch (error) {
+      log.error("Failed to poll Cloudflare workflow status", { 
+        executionId, 
+        error: error instanceof Error ? error.message : String(error),
+      });
+      
+      return c.json({ 
+        execution,
+        cloudflareStatus: null,
+        error: error instanceof Error ? error.message : "Failed to poll status",
+      });
+    }
+  })
+
+  .post("/:executionId/pause", async (c) => {
+    const { executionId } = c.req.param();
+    const userId = getUserId(c);
+
+    const [execution] = await db
+      .select()
+      .from(workflowExecutions)
+      .where(and(eq(workflowExecutions.id, executionId), eq(workflowExecutions.userId, userId)))
+      .limit(1);
+
+    if (!execution) {
+      return c.json({ error: "Execution not found" }, 404);
+    }
+
+    if (execution.status !== "running") {
+      return c.json({ error: "Can only pause running executions" }, 400);
+    }
+
+    if (!isCloudflareConfigured()) {
+      return c.json({ error: "Cloudflare not configured" }, 503);
+    }
+
+    try {
+      const provider = getCloudflareProvider();
+      await provider.pauseWorkflow(executionId);
+
+      await db
+        .update(workflowExecutions)
+        .set({ status: "waiting" })
+        .where(eq(workflowExecutions.id, executionId));
+
+      log.info("Workflow execution paused", { executionId });
+
+      return c.json({ success: true, status: "waiting" });
+    } catch (error) {
+      log.error("Failed to pause workflow", { 
+        executionId, 
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return c.json({ error: "Failed to pause workflow" }, 500);
+    }
+  })
+
+  .post("/:executionId/resume", async (c) => {
+    const { executionId } = c.req.param();
+    const userId = getUserId(c);
+
+    const [execution] = await db
+      .select()
+      .from(workflowExecutions)
+      .where(and(eq(workflowExecutions.id, executionId), eq(workflowExecutions.userId, userId)))
+      .limit(1);
+
+    if (!execution) {
+      return c.json({ error: "Execution not found" }, 404);
+    }
+
+    if (execution.status !== "waiting") {
+      return c.json({ error: "Can only resume paused executions" }, 400);
+    }
+
+    if (!isCloudflareConfigured()) {
+      return c.json({ error: "Cloudflare not configured" }, 503);
+    }
+
+    try {
+      const provider = getCloudflareProvider();
+      await provider.resumeWorkflow(executionId);
+
+      await db
+        .update(workflowExecutions)
+        .set({ status: "running" })
+        .where(eq(workflowExecutions.id, executionId));
+
+      log.info("Workflow execution resumed", { executionId });
+
+      return c.json({ success: true, status: "running" });
+    } catch (error) {
+      log.error("Failed to resume workflow", { 
+        executionId, 
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return c.json({ error: "Failed to resume workflow" }, 500);
+    }
+  })
+
+  .post("/:executionId/terminate", async (c) => {
+    const { executionId } = c.req.param();
+    const userId = getUserId(c);
+
+    const [execution] = await db
+      .select()
+      .from(workflowExecutions)
+      .where(and(eq(workflowExecutions.id, executionId), eq(workflowExecutions.userId, userId)))
+      .limit(1);
+
+    if (!execution) {
+      return c.json({ error: "Execution not found" }, 404);
+    }
+
+    if (execution.status === "completed" || execution.status === "errored" || execution.status === "cancelled") {
+      return c.json({ error: "Execution already terminated" }, 400);
+    }
+
+    if (!isCloudflareConfigured()) {
+      return c.json({ error: "Cloudflare not configured" }, 503);
+    }
+
+    try {
+      const provider = getCloudflareProvider();
+      await provider.terminateWorkflow(executionId);
+
+      await db
+        .update(workflowExecutions)
+        .set({ 
+          status: "cancelled",
+          completedAt: new Date(),
+          durationMs: execution.startedAt ? Date.now() - new Date(execution.startedAt).getTime() : undefined,
+        })
+        .where(eq(workflowExecutions.id, executionId));
+
+      log.info("Workflow execution terminated", { executionId });
+
+      return c.json({ success: true, status: "cancelled" });
+    } catch (error) {
+      log.error("Failed to terminate workflow", { 
+        executionId, 
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return c.json({ error: "Failed to terminate workflow" }, 500);
+    }
   });

@@ -48,6 +48,14 @@ instance_type = "basic"
 binding = "WORKSPACE_BUCKET"
 bucket_name = "agentpod-workspaces"
 
+# -----------------------------------------------------------------------------
+# Workflows - Cloudflare Workflows for durable execution
+# -----------------------------------------------------------------------------
+[[workflows]]
+name = "agentpod-workflow"
+binding = "WORKFLOW"
+class_name = "AgentPodWorkflow"
+
 # =============================================================================
 # Production Environment (default)
 # =============================================================================

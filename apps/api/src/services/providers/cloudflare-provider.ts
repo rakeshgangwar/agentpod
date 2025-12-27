@@ -309,6 +309,11 @@ export class CloudflareSandboxProvider implements SandboxProvider {
     };
   }
 
+  /**
+   * Starts workflow execution asynchronously.
+   * Returns immediately with execution ID and "queued" status.
+   * Use getWorkflowStatus() to poll for completion.
+   */
   async executeWorkflow(options: {
     executionId: string;
     workflowId: string;
@@ -330,18 +335,11 @@ export class CloudflareSandboxProvider implements SandboxProvider {
     triggerData?: Record<string, unknown>;
     userId?: string;
   }): Promise<{
-    success: boolean;
     executionId: string;
-    workflowId: string;
-    status: "completed" | "errored";
-    trigger: Record<string, unknown>;
-    steps: Record<string, unknown>;
-    error?: string;
-    startedAt: string;
-    completedAt: string;
-    durationMs: number;
+    instanceId: string;
+    status: "queued";
   }> {
-    log.info("Executing workflow via Cloudflare Worker", {
+    log.info("Starting workflow execution via Cloudflare Worker", {
       executionId: options.executionId,
       workflowId: options.workflowId,
     });
@@ -357,19 +355,102 @@ export class CloudflareSandboxProvider implements SandboxProvider {
         userId: options.userId,
       }),
     }) as {
-      success: boolean;
       executionId: string;
-      workflowId: string;
-      status: "completed" | "errored";
-      trigger: Record<string, unknown>;
-      steps: Record<string, unknown>;
-      error?: string;
-      startedAt: string;
-      completedAt: string;
-      durationMs: number;
+      instanceId: string;
+      status: "queued";
     };
 
+    log.info("Workflow execution queued", {
+      executionId: result.executionId,
+      instanceId: result.instanceId,
+    });
+
     return result;
+  }
+
+  /**
+   * Gets the current status of a workflow execution from Cloudflare.
+   */
+  async getWorkflowStatus(executionId: string): Promise<{
+    executionId: string;
+    status: "queued" | "running" | "paused" | "complete" | "errored" | "terminated" | "unknown";
+    output?: Record<string, unknown>;
+    error?: string;
+  }> {
+    log.debug("Getting workflow status", { executionId });
+
+    const result = await this.workerFetch(`/workflow/${executionId}/status`, {
+      method: "GET",
+    }) as {
+      executionId: string;
+      status: string;
+      output?: Record<string, unknown>;
+      error?: string;
+    };
+
+    const statusMap: Record<string, "queued" | "running" | "paused" | "complete" | "errored" | "terminated" | "unknown"> = {
+      queued: "queued",
+      running: "running",
+      paused: "paused",
+      complete: "complete",
+      errored: "errored",
+      terminated: "terminated",
+    };
+
+    return {
+      executionId: result.executionId,
+      status: statusMap[result.status] ?? "unknown",
+      output: result.output,
+      error: result.error,
+    };
+  }
+
+  /**
+   * Pauses a running workflow execution.
+   */
+  async pauseWorkflow(executionId: string): Promise<{ executionId: string; status: "paused" }> {
+    log.info("Pausing workflow execution", { executionId });
+
+    const result = await this.workerFetch(`/workflow/${executionId}/pause`, {
+      method: "POST",
+    }) as { executionId: string; status: string };
+
+    return {
+      executionId: result.executionId,
+      status: "paused",
+    };
+  }
+
+  /**
+   * Resumes a paused workflow execution.
+   */
+  async resumeWorkflow(executionId: string): Promise<{ executionId: string; status: "running" }> {
+    log.info("Resuming workflow execution", { executionId });
+
+    const result = await this.workerFetch(`/workflow/${executionId}/resume`, {
+      method: "POST",
+    }) as { executionId: string; status: string };
+
+    return {
+      executionId: result.executionId,
+      status: "running",
+    };
+  }
+
+  /**
+   * Terminates a workflow execution.
+   */
+  async terminateWorkflow(executionId: string): Promise<{ executionId: string; status: "terminated" }> {
+    log.info("Terminating workflow execution", { executionId });
+
+    const result = await this.workerFetch(`/workflow/${executionId}/terminate`, {
+      method: "POST",
+    }) as { executionId: string; status: string };
+
+    return {
+      executionId: result.executionId,
+      status: "terminated",
+    };
   }
 
   async validateWorkflow(workflow: {

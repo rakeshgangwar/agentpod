@@ -270,6 +270,96 @@ export async function fetchExecution(executionId: string): Promise<IWorkflowExec
   }
 }
 
+export async function pollExecutionStatus(executionId: string): Promise<{
+  execution: IWorkflowExecution | null;
+  cloudflareStatus: { status: string; output?: Record<string, unknown>; error?: string } | null;
+  error?: string;
+}> {
+  try {
+    const { baseUrl, token } = await getApiContext();
+    const response = await fetch(`${baseUrl}/api/v2/workflow-executions/${executionId}/poll`, {
+      headers: getHeaders(token),
+      credentials: "include",
+    });
+    
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || `Failed to poll execution: ${response.status}`);
+    }
+    
+    return await response.json();
+  } catch (e) {
+    console.error("Failed to poll execution:", e);
+    return { execution: null, cloudflareStatus: null, error: e instanceof Error ? e.message : "Unknown error" };
+  }
+}
+
+export async function pauseExecution(executionId: string): Promise<boolean> {
+  try {
+    const { baseUrl, token } = await getApiContext();
+    const response = await fetch(`${baseUrl}/api/v2/workflow-executions/${executionId}/pause`, {
+      method: "POST",
+      headers: getHeaders(token),
+      credentials: "include",
+    });
+    
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || `Failed to pause execution: ${response.status}`);
+    }
+    
+    return true;
+  } catch (e) {
+    error = e instanceof Error ? e.message : "Failed to pause execution";
+    console.error("Failed to pause execution:", e);
+    return false;
+  }
+}
+
+export async function resumeExecution(executionId: string): Promise<boolean> {
+  try {
+    const { baseUrl, token } = await getApiContext();
+    const response = await fetch(`${baseUrl}/api/v2/workflow-executions/${executionId}/resume`, {
+      method: "POST",
+      headers: getHeaders(token),
+      credentials: "include",
+    });
+    
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || `Failed to resume execution: ${response.status}`);
+    }
+    
+    return true;
+  } catch (e) {
+    error = e instanceof Error ? e.message : "Failed to resume execution";
+    console.error("Failed to resume execution:", e);
+    return false;
+  }
+}
+
+export async function terminateExecution(executionId: string): Promise<boolean> {
+  try {
+    const { baseUrl, token } = await getApiContext();
+    const response = await fetch(`${baseUrl}/api/v2/workflow-executions/${executionId}/terminate`, {
+      method: "POST",
+      headers: getHeaders(token),
+      credentials: "include",
+    });
+    
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || `Failed to terminate execution: ${response.status}`);
+    }
+    
+    return true;
+  } catch (e) {
+    error = e instanceof Error ? e.message : "Failed to terminate execution";
+    console.error("Failed to terminate execution:", e);
+    return false;
+  }
+}
+
 export async function duplicateWorkflow(id: string, newName?: string): Promise<IAgentPodWorkflow | null> {
   isSaving = true;
   error = null;

@@ -126,12 +126,13 @@
         });
 
         // Create output arrays for each branch
-        const mainOutputs: Array<Array<{ node: string; type: string; index: number }>> = [];
+        const mainOutputs: Array<Array<{ node: string; type: string; index: number; label?: string }>> = [];
         branchesByHandle.forEach((branchEdges, handle) => {
           const branchConnections = branchEdges.map(edge => ({
             node: edge.target,
             type: handle,
             index: 0,
+            label: edge.label as string | undefined,
           }));
           mainOutputs.push(branchConnections);
         });
@@ -145,6 +146,7 @@
               node: edge.target,
               type: edge.sourceHandle || 'main',
               index: 0,
+              label: edge.label as string | undefined,
             }))
           ]]
         };

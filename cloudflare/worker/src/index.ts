@@ -1,4 +1,4 @@
-import { getSandbox, type Sandbox as SandboxInstance } from "@cloudflare/sandbox";
+import { getSandbox } from "@cloudflare/sandbox";
 import {
   createOpencode,
   createOpencodeServer,
@@ -6,11 +6,13 @@ import {
 } from "@cloudflare/sandbox/opencode";
 import type { Config, OpencodeClient } from "@opencode-ai/sdk";
 import { WorkspaceStorage } from "./storage";
-import { executeWorkflow, validateWorkflowForExecution } from "./workflows/executor";
+import { validateWorkflowForExecution } from "./workflows/executor";
 import type { WorkflowDefinition } from "./workflows/utils/context";
 import { normalizeWorkflow, type FrontendWorkflow } from "./workflows/utils/format-transformer";
+import type { WorkflowParams } from "./workflows/sdk/types";
 
 export { Sandbox } from "@cloudflare/sandbox";
+export { AgentPodWorkflow } from "./workflows/sdk/workflow";
 
 const DEFAULT_WORKSPACE_DIR = "/home/user/workspace";
 
@@ -31,13 +33,14 @@ const SYNC_EXCLUDED_PATHS = [
 interface Env {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   Sandbox: DurableObjectNamespace<any>;
+  WORKFLOW: Workflow;
   WORKSPACE_BUCKET: R2Bucket;
   AGENTPOD_API_URL: string;
   AGENTPOD_API_TOKEN: string;
   OPENAI_API_KEY?: string;
   ANTHROPIC_API_KEY?: string;
   OLLAMA_BASE_URL?: string;
-  AI?: unknown;
+  AI?: Ai;
 }
 
 interface CreateSandboxBody {
@@ -100,6 +103,22 @@ export default {
 
       if (request.method === "POST" && pathParts[0] === "workflow" && pathParts[1] === "validate") {
         return handleWorkflowValidate(request);
+      }
+
+      if (request.method === "GET" && pathParts[0] === "workflow" && pathParts[1] && pathParts[2] === "status") {
+        return handleWorkflowStatus(env, pathParts[1]);
+      }
+
+      if (request.method === "POST" && pathParts[0] === "workflow" && pathParts[1] && pathParts[2] === "pause") {
+        return handleWorkflowPause(env, pathParts[1]);
+      }
+
+      if (request.method === "POST" && pathParts[0] === "workflow" && pathParts[1] && pathParts[2] === "resume") {
+        return handleWorkflowResume(env, pathParts[1]);
+      }
+
+      if (request.method === "POST" && pathParts[0] === "workflow" && pathParts[1] && pathParts[2] === "terminate") {
+        return handleWorkflowTerminate(env, pathParts[1]);
       }
 
       return new Response("Not Found", { status: 404 });
@@ -576,26 +595,23 @@ async function handleWorkflowExecute(request: Request, env: Env): Promise<Respon
   console.log("[Workflow] ENV DEBUG: AGENTPOD_API_URL=" + (env.AGENTPOD_API_URL || "NOT SET"));
   console.log("[Workflow] ENV DEBUG: AGENTPOD_API_TOKEN=" + (env.AGENTPOD_API_TOKEN ? "SET (" + env.AGENTPOD_API_TOKEN.length + " chars)" : "NOT SET"));
 
-  const result = await executeWorkflow({
-    executionId: body.executionId,
-    workflowId: body.workflowId,
-    workflow: normalizedWorkflow,
-    triggerType: body.triggerType,
-    triggerData: body.triggerData || {},
-    userId: body.userId,
-    env: {
-      Sandbox: env.Sandbox,
-      WORKSPACE_BUCKET: env.WORKSPACE_BUCKET,
-      AGENTPOD_API_URL: env.AGENTPOD_API_URL,
-      AGENTPOD_API_TOKEN: env.AGENTPOD_API_TOKEN,
-      OPENAI_API_KEY: env.OPENAI_API_KEY,
-      ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY,
-      OLLAMA_BASE_URL: env.OLLAMA_BASE_URL,
-      AI: env.AI,
-    },
+  const instance = await env.WORKFLOW.create({
+    id: body.executionId,
+    params: {
+      executionId: body.executionId,
+      workflowId: body.workflowId,
+      definition: normalizedWorkflow,
+      triggerType: body.triggerType,
+      triggerData: body.triggerData || {},
+      userId: body.userId,
+    } as WorkflowParams,
   });
 
-  return Response.json(result, { status: 200 });
+  return Response.json({
+    executionId: body.executionId,
+    instanceId: instance.id,
+    status: "queued",
+  }, { status: 202 });
 }
 
 async function handleWorkflowValidate(request: Request): Promise<Response> {
@@ -608,4 +624,74 @@ async function handleWorkflowValidate(request: Request): Promise<Response> {
     valid: errors.length === 0,
     errors,
   });
+}
+
+async function handleWorkflowStatus(env: Env, executionId: string): Promise<Response> {
+  try {
+    const instance = await env.WORKFLOW.get(executionId);
+    const status = await instance.status();
+    
+    return Response.json({
+      executionId,
+      status: status.status,
+      output: status.output,
+      error: status.error,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("not found")) {
+      return Response.json({ error: "Workflow instance not found" }, { status: 404 });
+    }
+    throw error;
+  }
+}
+
+async function handleWorkflowPause(env: Env, executionId: string): Promise<Response> {
+  try {
+    const instance = await env.WORKFLOW.get(executionId);
+    await instance.pause();
+    
+    return Response.json({
+      executionId,
+      status: "paused",
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("not found")) {
+      return Response.json({ error: "Workflow instance not found" }, { status: 404 });
+    }
+    throw error;
+  }
+}
+
+async function handleWorkflowResume(env: Env, executionId: string): Promise<Response> {
+  try {
+    const instance = await env.WORKFLOW.get(executionId);
+    await instance.resume();
+    
+    return Response.json({
+      executionId,
+      status: "running",
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("not found")) {
+      return Response.json({ error: "Workflow instance not found" }, { status: 404 });
+    }
+    throw error;
+  }
+}
+
+async function handleWorkflowTerminate(env: Env, executionId: string): Promise<Response> {
+  try {
+    const instance = await env.WORKFLOW.get(executionId);
+    await instance.terminate();
+    
+    return Response.json({
+      executionId,
+      status: "terminated",
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("not found")) {
+      return Response.json({ error: "Workflow instance not found" }, { status: 404 });
+    }
+    throw error;
+  }
 }

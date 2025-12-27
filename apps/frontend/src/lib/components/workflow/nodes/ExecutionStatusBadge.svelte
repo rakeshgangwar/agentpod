@@ -2,8 +2,9 @@
   import CheckIcon from "@lucide/svelte/icons/check";
   import XIcon from "@lucide/svelte/icons/x";
   import LoaderIcon from "@lucide/svelte/icons/loader-2";
+  import SkipForwardIcon from "@lucide/svelte/icons/skip-forward";
 
-  type ExecutionStatus = "idle" | "running" | "success" | "error";
+  type ExecutionStatus = "idle" | "running" | "success" | "error" | "skipped";
 
   interface Props {
     status: ExecutionStatus;
@@ -20,33 +21,41 @@
       dotClass: "bg-muted-foreground",
     },
     running: {
-      bgClass: "bg-[var(--cyber-cyan)]/20",
-      textClass: "text-[var(--cyber-cyan)]",
+      bgClass: "bg-amber-500/20",
+      textClass: "text-amber-500",
       label: "Running",
-      dotClass: "bg-[var(--cyber-cyan)]",
+      dotClass: "bg-amber-500",
     },
     success: {
-      bgClass: "bg-[var(--cyber-emerald)]/20",
-      textClass: "text-[var(--cyber-emerald)]",
+      bgClass: "bg-emerald-500/20",
+      textClass: "text-emerald-500",
       label: "Success",
-      dotClass: "bg-[var(--cyber-emerald)]",
+      dotClass: "bg-emerald-500",
     },
     error: {
-      bgClass: "bg-[var(--cyber-red)]/20",
-      textClass: "text-[var(--cyber-red)]",
+      bgClass: "bg-red-500/20",
+      textClass: "text-red-500",
       label: "Error",
-      dotClass: "bg-[var(--cyber-red)]",
+      dotClass: "bg-red-500",
+    },
+    skipped: {
+      bgClass: "bg-slate-400/20",
+      textClass: "text-slate-400",
+      label: "Skipped",
+      dotClass: "bg-slate-400",
     },
   }[status]);
 </script>
 
 <div class="flex items-center gap-2">
   {#if status === "running"}
-    <LoaderIcon class="w-3 h-3 text-[var(--cyber-cyan)] animate-spin" />
+    <LoaderIcon class="w-3 h-3 text-amber-500 animate-spin" />
   {:else if status === "success"}
-    <CheckIcon class="w-3 h-3 text-[var(--cyber-emerald)]" />
+    <CheckIcon class="w-3 h-3 text-emerald-500" />
   {:else if status === "error"}
-    <XIcon class="w-3 h-3 text-[var(--cyber-red)]" />
+    <XIcon class="w-3 h-3 text-red-500" />
+  {:else if status === "skipped"}
+    <SkipForwardIcon class="w-3 h-3 text-slate-400" />
   {:else}
     <div class="w-1.5 h-1.5 rounded-full {statusConfig.dotClass}"></div>
   {/if}
@@ -57,8 +66,8 @@
 </div>
 
 {#if status === "error" && error}
-  <div class="mt-2 p-2 rounded bg-[var(--cyber-red)]/10 border border-[var(--cyber-red)]/30">
-    <div class="text-[10px] text-[var(--cyber-red)] font-mono truncate" title={error}>
+  <div class="mt-2 p-2 rounded bg-red-500/10 border border-red-500/30">
+    <div class="text-[10px] text-red-500 font-mono truncate" title={error}>
       {error}
     </div>
   </div>

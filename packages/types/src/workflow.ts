@@ -46,6 +46,7 @@ export interface IConnection {
   node: string;
   type: string;
   index: number;
+  label?: string;
 }
 
 export interface IWorkflowSettings {

@@ -2,7 +2,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import { connection } from "$lib/stores/connection.svelte";
-  import { workflows, fetchWorkflow, updateWorkflow, executeWorkflow, validateWorkflow, fetchExecution } from "$lib/stores/workflows.svelte";
+  import { workflows, fetchWorkflow, updateWorkflow, executeWorkflow, validateWorkflow, pollExecutionStatus, pauseExecution, resumeExecution, terminateExecution } from "$lib/stores/workflows.svelte";
   import { WorkflowEditor } from "$lib/components/workflow";
   import NodePalette from "$lib/components/workflow/NodePalette.svelte";
   import PropertiesPanel from "$lib/components/workflow/PropertiesPanel.svelte";
@@ -19,6 +19,8 @@
   import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
   import SaveIcon from "@lucide/svelte/icons/save";
   import PlayIcon from "@lucide/svelte/icons/play";
+  import PauseIcon from "@lucide/svelte/icons/pause";
+  import SquareIcon from "@lucide/svelte/icons/square";
   import CheckCircleIcon from "@lucide/svelte/icons/check-circle";
   import PanelLeftIcon from "@lucide/svelte/icons/panel-left";
   import PanelRightIcon from "@lucide/svelte/icons/panel-right";
@@ -28,7 +30,7 @@
   import UploadIcon from "@lucide/svelte/icons/upload";
   import DownloadIcon from "@lucide/svelte/icons/download";
 
-  type ExecutionStatus = "idle" | "running" | "success" | "error";
+  type ExecutionStatus = "idle" | "running" | "success" | "error" | "skipped";
 
   const workflowId = $derived($page.params.id);
 
@@ -51,6 +53,8 @@
   let selectedNode = $state<ISvelteFlowNode | null>(null);
   let isSaving = $state(false);
   let isExecuting = $state(false);
+  let isPaused = $state(false);
+  let currentExecutionId = $state<string | null>(null);
   let isValidating = $state(false);
   let showPalette = $state(true);
   let showProperties = $state(true);
@@ -120,6 +124,7 @@
             sourceHandle: conn.type && conn.type !== 'main' ? conn.type : undefined,
             targetHandle: conn.index > 0 ? `input-${conn.index}` : undefined,
             animated: true,
+            label: conn.label,
           });
         });
       });
@@ -197,12 +202,13 @@
         });
 
         // Create output arrays for each branch
-        const mainOutputs: Array<Array<{ node: string; type: string; index: number }>> = [];
+        const mainOutputs: Array<Array<{ node: string; type: string; index: number; label?: string }>> = [];
         branchesByHandle.forEach((branchEdges, handle) => {
           const branchConnections = branchEdges.map(edge => ({
             node: edge.target,
             type: handle,
             index: 0,
+            label: edge.label as string | undefined,
           }));
           mainOutputs.push(branchConnections);
         });
@@ -216,6 +222,7 @@
               node: edge.target,
               type: edge.sourceHandle || 'main',
               index: 0,
+              label: edge.label as string | undefined,
             }))
           ]]
         };
@@ -310,7 +317,7 @@
       Object.entries(stepResults).forEach(([nodeId, stepResult]) => {
         // Check if node was skipped
         if (stepResult.data?.skipped) {
-          updateNodeExecutionStatus(nodeId, "idle");
+          updateNodeExecutionStatus(nodeId, "skipped");
         } else {
           const status: ExecutionStatus = stepResult.success ? "success" : "error";
           console.log("[Execution] Updating node:", { nodeId, status, error: stepResult.error });
@@ -319,16 +326,19 @@
       });
     }
     
-    // For any node still showing "running" that wasn't processed, reset to idle
-    // This handles nodes that were never reached due to early exit/error
+    // For any node still showing "running" that wasn't processed, mark as skipped
+    // This handles nodes in branches that weren't taken due to conditional logic
     nodes.forEach(node => {
       const nodeId = node.id;
       const currentStatus = node.data.executionStatus;
       const wasProcessed = stepResults ? nodeId in stepResults : false;
       
       if (currentStatus === "running" && !wasProcessed) {
-        console.log("[Execution] Resetting unreached node to idle:", nodeId);
-        updateNodeExecutionStatus(nodeId, "idle");
+        // If workflow completed successfully, unreached nodes were skipped
+        // If workflow errored, they might not have been reached - still mark as skipped
+        const newStatus: ExecutionStatus = (result.status === "completed" || result.status === "errored") ? "skipped" : "idle";
+        console.log("[Execution] Marking unreached node as:", { nodeId, newStatus });
+        updateNodeExecutionStatus(nodeId, newStatus);
       }
     });
     
@@ -343,6 +353,7 @@
   async function handleExecute() {
     if (!workflowId) return;
     isExecuting = true;
+    isPaused = false;
     executionResult = null;
     
     setAllNodesStatus("running");
@@ -350,30 +361,40 @@
     try {
       const execution = await executeWorkflow(workflowId);
       if (execution) {
-        const maxAttempts = 30;
+        currentExecutionId = execution.id;
+        const maxAttempts = 300;
         let attempts = 0;
         
         const poll = async () => {
+          if (!isExecuting) return;
+          
           attempts++;
-          const result = await fetchExecution(execution.id);
+          const { execution: result, cloudflareStatus } = await pollExecutionStatus(execution.id);
           
           if (result) {
-            if (result.status === "running") {
+            isPaused = result.status === "waiting";
+            
+            if (result.status === "running" || result.status === "waiting") {
               applyIntermediateProgress(result);
             }
             
-            if (result.status === "completed" || result.status === "errored") {
+            if (result.status === "completed" || result.status === "errored" || result.status === "cancelled") {
               applyExecutionResult(result);
               isExecuting = false;
+              isPaused = false;
+              currentExecutionId = null;
               return;
             }
           }
           
-          if (attempts < maxAttempts) {
-            setTimeout(poll, 1000);
-          } else {
+          if (attempts < maxAttempts && isExecuting) {
+            const interval = isPaused ? 2000 : 1000;
+            setTimeout(poll, interval);
+          } else if (attempts >= maxAttempts) {
             setAllNodesStatus("idle");
             isExecuting = false;
+            isPaused = false;
+            currentExecutionId = null;
           }
         };
         
@@ -381,10 +402,40 @@
       } else {
         setAllNodesStatus("idle");
         isExecuting = false;
+        currentExecutionId = null;
       }
     } catch {
       setAllNodesStatus("error");
       isExecuting = false;
+      isPaused = false;
+      currentExecutionId = null;
+    }
+  }
+  
+  async function handlePause() {
+    if (!currentExecutionId) return;
+    const success = await pauseExecution(currentExecutionId);
+    if (success) {
+      isPaused = true;
+    }
+  }
+  
+  async function handleResume() {
+    if (!currentExecutionId) return;
+    const success = await resumeExecution(currentExecutionId);
+    if (success) {
+      isPaused = false;
+    }
+  }
+  
+  async function handleTerminate() {
+    if (!currentExecutionId) return;
+    const success = await terminateExecution(currentExecutionId);
+    if (success) {
+      isExecuting = false;
+      isPaused = false;
+      setAllNodesStatus("idle");
+      currentExecutionId = null;
     }
   }
   
@@ -515,6 +566,43 @@
         {/if}
         Execute
       </Button>
+
+      {#if isExecuting}
+        {#if isPaused}
+          <Button
+            variant="outline"
+            size="sm"
+            onclick={handleResume}
+            class="h-8 font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)] border-[var(--cyber-cyan)]/30 hover:bg-[var(--cyber-cyan)]/10"
+            title="Resume execution"
+          >
+            <PlayIcon class="h-4 w-4 mr-1" />
+            Resume
+          </Button>
+        {:else}
+          <Button
+            variant="outline"
+            size="sm"
+            onclick={handlePause}
+            class="h-8 font-mono text-xs uppercase tracking-wider text-[var(--cyber-yellow)] border-[var(--cyber-yellow)]/30 hover:bg-[var(--cyber-yellow)]/10"
+            title="Pause execution"
+          >
+            <PauseIcon class="h-4 w-4 mr-1" />
+            Pause
+          </Button>
+        {/if}
+
+        <Button
+          variant="outline"
+          size="sm"
+          onclick={handleTerminate}
+          class="h-8 font-mono text-xs uppercase tracking-wider text-[var(--cyber-red)] border-[var(--cyber-red)]/30 hover:bg-[var(--cyber-red)]/10"
+          title="Stop execution"
+        >
+          <SquareIcon class="h-4 w-4 mr-1" />
+          Stop
+        </Button>
+      {/if}
 
       <Button
         onclick={handleSave}

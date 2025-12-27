@@ -213,3 +213,69 @@ export function isTerminalNode(
 ): boolean {
   return getSuccessors(nodeId, connections).length === 0;
 }
+
+/**
+ * Compute execution levels for parallel execution
+ * 
+ * Nodes at the same level have all their dependencies satisfied by previous levels
+ * and can be executed in parallel.
+ * 
+ * @param nodes - Array of workflow nodes
+ * @param connections - Connection graph
+ * @returns Array of levels, each level is an array of node IDs
+ */
+export function computeExecutionLevels(
+  nodes: WorkflowNode[],
+  connections: WorkflowConnections
+): string[][] {
+  const inDegree = new Map<string, number>();
+  const graph = new Map<string, string[]>();
+
+  for (const node of nodes) {
+    if (node.disabled) continue;
+    inDegree.set(node.id, 0);
+    graph.set(node.id, []);
+  }
+
+  for (const [sourceId, outputs] of Object.entries(connections)) {
+    if (!graph.has(sourceId)) continue;
+
+    for (const connectionList of outputs.main) {
+      for (const conn of connectionList) {
+        if (!graph.has(conn.node)) continue;
+
+        graph.get(sourceId)?.push(conn.node);
+        inDegree.set(conn.node, (inDegree.get(conn.node) || 0) + 1);
+      }
+    }
+  }
+
+  const levels: string[][] = [];
+  let currentLevel: string[] = [];
+
+  for (const [nodeId, degree] of inDegree) {
+    if (degree === 0) {
+      currentLevel.push(nodeId);
+    }
+  }
+
+  while (currentLevel.length > 0) {
+    levels.push(currentLevel);
+    const nextLevel: string[] = [];
+
+    for (const nodeId of currentLevel) {
+      for (const targetId of graph.get(nodeId) || []) {
+        const newDegree = (inDegree.get(targetId) || 0) - 1;
+        inDegree.set(targetId, newDegree);
+
+        if (newDegree === 0) {
+          nextLevel.push(targetId);
+        }
+      }
+    }
+
+    currentLevel = nextLevel;
+  }
+
+  return levels;
+}

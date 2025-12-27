@@ -5,7 +5,7 @@
   import { NODE_REGISTRY } from "../node-registry";
   import type { WorkflowNodeType } from "@agentpod/types";
 
-  type ExecutionStatus = "idle" | "running" | "success" | "error";
+  type ExecutionStatus = "idle" | "running" | "success" | "error" | "skipped";
   type SwitchCase = { value: string; outputBranch: string };
   type Props = NodeProps;
 
@@ -23,19 +23,16 @@
   const executionStatus = $derived((data.executionStatus as ExecutionStatus) || "idle");
   const executionError = $derived(data.executionError as string | undefined);
 
-  const borderClass = $derived({
-    idle: "border-border",
-    running: "border-[var(--cyber-cyan)] node-running",
-    success: "border-[var(--cyber-emerald)]",
-    error: "border-[var(--cyber-red)]",
-  }[executionStatus]);
+  const statusColors = {
+    idle: { border: "hsl(var(--border) / 0.5)", shadow: "none" },
+    running: { border: "#f59e0b", shadow: "0 0 12px rgba(245,158,11,0.4)" },
+    success: { border: "#10b981", shadow: "0 0 12px rgba(16,185,129,0.3)" },
+    error: { border: "#ef4444", shadow: "0 0 12px rgba(239,68,68,0.4)" },
+    skipped: { border: "#94a3b8", shadow: "0 0 8px rgba(148,163,184,0.3)" },
+  };
 
-  const shadowClass = $derived({
-    idle: "",
-    running: "shadow-[0_0_0_2px_color-mix(in_oklch,var(--cyber-cyan)_30%,transparent)]",
-    success: "shadow-[0_0_0_2px_color-mix(in_oklch,var(--cyber-emerald)_20%,transparent)]",
-    error: "shadow-[0_0_0_2px_color-mix(in_oklch,var(--cyber-red)_30%,transparent)]",
-  }[executionStatus]);
+  const statusStyle = $derived(statusColors[executionStatus] || statusColors.idle);
+  const isRunning = $derived(executionStatus === "running");
 
   const branchColors = [
     "cyber-emerald",
@@ -58,9 +55,11 @@
 </script>
 
 <div
-  class="relative bg-card/90 backdrop-blur-sm rounded-md border-2 transition-all duration-200 min-w-[220px] {borderClass} {shadowClass}"
+  class="relative bg-card/90 backdrop-blur-sm rounded-md border-2 transition-all duration-200 min-w-[220px]"
+  class:node-running={isRunning}
   class:border-cyber-purple={selected && executionStatus === "idle"}
   class:shadow-[0_0_0_2px_color-mix(in_oklch,var(--cyber-purple)_30%,transparent)]={selected && executionStatus === "idle"}
+  style="border-color: {statusStyle.border}; box-shadow: {statusStyle.shadow};"
 >
   <div 
     class="absolute -top-[1px] left-0 right-0 h-[1px] opacity-60"
