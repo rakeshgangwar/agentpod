@@ -74,8 +74,6 @@ export type WorkflowNodeType =
   | "event-trigger"
   | "ai-chat"
   | "ai-agent-tools"
-  | "ai-agent"
-  | "ai-prompt"
   | "embeddings"
   | "vector-search"
   | "condition"

@@ -222,7 +222,7 @@
 
     const actualType = (selectedNode.data?.nodeType as string) || selectedNode.type;
 
-    if (actualType === "ai-agent" || actualType === "ai-prompt") {
+    if (actualType === "ai-agent-tools" || actualType === "ai-chat") {
       updatedData = {
         ...updatedData,
         prompt: nodePrompt,

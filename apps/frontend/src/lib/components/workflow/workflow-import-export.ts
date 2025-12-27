@@ -43,8 +43,6 @@ const VALID_NODE_TYPES: WorkflowNodeType[] = [
   "event-trigger",
   "ai-chat",
   "ai-agent-tools",
-  "ai-agent",
-  "ai-prompt",
   "embeddings",
   "vector-search",
   "condition",
@@ -226,14 +224,14 @@ function inferNodeType(type: string, data: Record<string, unknown>): WorkflowNod
   if (data.cases) return "switch";
   if (data.code) return "javascript";
   if (data.provider && data.prompt) return "ai-chat";
-  if (data.prompt && (data.model || data.sandboxConfig)) return "ai-agent";
-  if (data.prompt) return "ai-prompt";
+  if (data.prompt && (data.model || data.sandboxConfig)) return "ai-agent-tools";
+  if (data.prompt) return "ai-chat";
   if (data.itemsPath || data.items) return "loop";
   if (data.mode === "wait" || data.inputCount) return "merge";
 
   switch (type) {
     case "trigger": return "manual-trigger";
-    case "ai-agent": return "ai-agent";
+    case "ai-agent": return "ai-agent-tools";
     case "condition": return "condition";
     default: return "http-request";
   }
