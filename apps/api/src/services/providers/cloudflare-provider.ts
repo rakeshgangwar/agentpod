@@ -114,6 +114,15 @@ export class CloudflareSandboxProvider implements SandboxProvider {
     });
   }
 
+  async startSandboxWithConfig(id: string, config?: Record<string, unknown>): Promise<void> {
+    log.info("Starting/waking Cloudflare sandbox with config", { sandboxId: id, hasConfig: !!config });
+
+    await this.workerFetch(`/sandbox/${id}/wake`, {
+      method: "POST",
+      body: JSON.stringify({ config }),
+    });
+  }
+
   async stopSandbox(id: string): Promise<void> {
     log.info("Stopping Cloudflare sandbox (no-op, auto-hibernates)", { sandboxId: id });
   }

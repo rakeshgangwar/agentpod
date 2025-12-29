@@ -30,6 +30,8 @@ const SYNC_EXCLUDED_PATHS = [
   ".DS_Store",
 ];
 
+
+
 interface Env {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   Sandbox: DurableObjectNamespace<any>;
@@ -43,10 +45,22 @@ interface Env {
   AI?: Ai;
 }
 
+interface ConfigFile {
+  type: "agent" | "command" | "tool" | "plugin";
+  name: string;
+  extension: "md" | "ts" | "js";
+  content: string;
+  isSystem?: boolean;
+}
+
 interface CreateSandboxBody {
   id: string;
   userId: string;
-  config?: Config;
+  config?: Config & {
+    files?: ConfigFile[];
+    agents_md?: string;
+    auth?: Record<string, AuthEntry>;
+  };
   directory?: string;
   gitUrl?: string;
   gitBranch?: string;
@@ -56,6 +70,7 @@ interface SendMessageBody {
   sessionId?: string;
   message: string;
   model?: { providerID: string; modelID: string };
+  agent?: string;
   config?: Config;
 }
 
@@ -132,6 +147,125 @@ export default {
   },
 };
 
+type SandboxInstance = ReturnType<typeof getSandbox>;
+
+interface AuthEntry {
+  type: "api" | "oauth";
+  key?: string;
+  refresh?: string;
+  access?: string;
+  expires?: number;
+}
+
+async function writeConfigFiles(
+  sandbox: SandboxInstance,
+  workspaceDir: string,
+  config?: { files?: ConfigFile[]; agents_md?: string },
+  opencodeConfig?: Config,
+  authConfig?: Record<string, AuthEntry>
+): Promise<number> {
+  if (!config && !opencodeConfig && !authConfig) return 0;
+  
+  let filesWritten = 0;
+  const opencodeDir = `${workspaceDir}/.opencode`;
+  
+  if (config?.agents_md) {
+    const agentsMdPath = `${workspaceDir}/AGENTS.md`;
+    await sandbox.writeFile(agentsMdPath, config.agents_md);
+    filesWritten++;
+    console.log(`[CONFIG] Wrote AGENTS.md to ${agentsMdPath}`);
+  }
+  
+  const needsOpencodeDir = opencodeConfig || authConfig || config?.files?.length;
+  if (needsOpencodeDir) {
+    await sandbox.mkdir(opencodeDir, { recursive: true });
+  }
+  
+  if (opencodeConfig && Object.keys(opencodeConfig).length > 0) {
+    const opencodeJsonPath = `${opencodeDir}/opencode.json`;
+    await sandbox.writeFile(opencodeJsonPath, JSON.stringify(opencodeConfig, null, 2));
+    filesWritten++;
+    console.log(`[CONFIG] Wrote opencode.json to ${opencodeJsonPath}`);
+  }
+  
+  if (authConfig && Object.keys(authConfig).length > 0) {
+    const authJsonPath = `${opencodeDir}/auth.json`;
+    await sandbox.writeFile(authJsonPath, JSON.stringify(authConfig, null, 2));
+    filesWritten++;
+    console.log(`[CONFIG] Wrote auth.json to ${authJsonPath}`);
+  }
+  
+  if (!config?.files || config.files.length === 0) {
+    return filesWritten;
+  }
+  
+  const typeToDir: Record<string, string> = {
+    plugin: `${opencodeDir}/plugin`,
+    agent: `${opencodeDir}/agent`,
+    command: `${opencodeDir}/command`,
+    tool: `${opencodeDir}/tool`,
+  };
+  
+  const dirsToCreate = new Set<string>();
+  for (const file of config.files) {
+    const dir = typeToDir[file.type];
+    if (dir) dirsToCreate.add(dir);
+  }
+  
+  for (const dir of dirsToCreate) {
+    await sandbox.mkdir(dir, { recursive: true });
+    console.log(`[CONFIG] Created directory ${dir}`);
+  }
+  
+  for (const file of config.files) {
+    const dir = typeToDir[file.type];
+    if (!dir) {
+      console.warn(`[CONFIG] Unknown file type: ${file.type}`);
+      continue;
+    }
+    
+    const filePath = `${dir}/${file.name}.${file.extension}`;
+    await sandbox.writeFile(filePath, file.content);
+    filesWritten++;
+    console.log(`[CONFIG] Wrote ${file.type} file: ${filePath}`);
+  }
+  
+  return filesWritten;
+}
+
+async function setAuthCredentials(
+  sandbox: SandboxInstance,
+  directory: string,
+  authConfig: Record<string, AuthEntry>
+): Promise<void> {
+  const { client } = await createOpencode<OpencodeClient>(sandbox, { directory });
+  
+  for (const [providerId, credentials] of Object.entries(authConfig)) {
+    try {
+      if (credentials.type === "api" && credentials.key) {
+        await client.auth.set({
+          path: { id: providerId },
+          body: { type: "api", key: credentials.key },
+        });
+        console.log(`[AUTH] Set API key for provider: ${providerId}`);
+      } else if (credentials.type === "oauth" && (credentials.refresh || credentials.access)) {
+        await client.auth.set({
+          path: { id: providerId },
+          body: {
+            type: "oauth",
+            refresh: credentials.refresh || "",
+            access: credentials.access || "",
+            expires: credentials.expires || 0,
+          },
+        });
+        console.log(`[AUTH] Set OAuth credentials for provider: ${providerId}`);
+      }
+    } catch (error) {
+      console.error(`[AUTH] Failed to set credentials for ${providerId}:`, error);
+    }
+  }
+}
+
 async function handleCreateSandbox(request: Request, env: Env): Promise<Response> {
   const body = (await request.json()) as CreateSandboxBody;
   const sandboxId = body.id;
@@ -146,15 +280,31 @@ async function handleCreateSandbox(request: Request, env: Env): Promise<Response
     });
   }
 
+  const { files, agents_md, auth, ...openCodeConfig } = body.config ?? {};
+  const hasOpenCodeConfig = Object.keys(openCodeConfig).length > 0;
+  
+  const filesWritten = await writeConfigFiles(
+    sandbox, 
+    directory, 
+    { files, agents_md },
+    hasOpenCodeConfig ? openCodeConfig as Config : undefined,
+    auth as Record<string, AuthEntry> | undefined
+  );
+  console.log(`[CREATE] Wrote ${filesWritten} config files for sandbox ${sandboxId}`);
+  
   const server = await createOpencodeServer(sandbox, {
     directory,
-    config: body.config,
   });
+
+  if (auth && Object.keys(auth).length > 0) {
+    await setAuthCredentials(sandbox, directory, auth as Record<string, AuthEntry>);
+  }
 
   await notifyAgentPodAPI(env, "sandbox.created", {
     sandboxId,
     userId: body.userId,
     provider: "cloudflare",
+    filesWritten,
   });
 
   return Response.json({
@@ -163,6 +313,7 @@ async function handleCreateSandbox(request: Request, env: Env): Promise<Response
     status: "running",
     opencodeUrl: `/sandbox/${sandboxId}/opencode`,
     serverPort: server.port,
+    filesWritten,
   });
 }
 
@@ -200,7 +351,9 @@ async function handleWakeSandbox(
   env: Env,
   sandboxId: string
 ): Promise<Response> {
-  const body = (await request.json()) as { config?: Config };
+  const body = (await request.json()) as { 
+    config?: Config & { files?: ConfigFile[]; agents_md?: string; auth?: Record<string, AuthEntry> } 
+  };
 
   const sandbox = getSandbox(env.Sandbox, sandboxId);
   const storage = new WorkspaceStorage(env.WORKSPACE_BUCKET, sandboxId);
@@ -208,14 +361,30 @@ async function handleWakeSandbox(
   const restoreResult = await restoreR2ToSandbox(sandbox, storage, DEFAULT_WORKSPACE_DIR);
   console.log(`[WAKE] Restored ${restoreResult.restoredFiles} files from R2 for sandbox ${sandboxId}`);
 
+  const { files, agents_md, auth, ...openCodeConfig } = body.config ?? {};
+  const hasOpenCodeConfig = Object.keys(openCodeConfig).length > 0;
+
+  const filesWritten = await writeConfigFiles(
+    sandbox, 
+    DEFAULT_WORKSPACE_DIR, 
+    { files, agents_md },
+    hasOpenCodeConfig ? openCodeConfig as Config : undefined,
+    auth
+  );
+  console.log(`[WAKE] Wrote ${filesWritten} config files for sandbox ${sandboxId}`);
+
   const server = await createOpencodeServer(sandbox, {
     directory: DEFAULT_WORKSPACE_DIR,
-    config: body.config,
   });
+
+  if (auth && Object.keys(auth).length > 0) {
+    await setAuthCredentials(sandbox, DEFAULT_WORKSPACE_DIR, auth);
+  }
 
   await notifyAgentPodAPI(env, "sandbox.woken", {
     sandboxId,
     restoredFiles: restoreResult.restoredFiles,
+    filesWritten,
     provider: "cloudflare",
   });
 
@@ -224,6 +393,7 @@ async function handleWakeSandbox(
     status: "running",
     serverPort: server.port,
     restoredFiles: restoreResult.restoredFiles,
+    filesWritten,
   });
 }
 
@@ -328,6 +498,8 @@ async function handleSendMessage(
     sessionId,
     message: body.message?.slice(0, 50),
     hasModel: !!body.model,
+    hasAgent: !!body.agent,
+    agent: body.agent,
   });
   
   const response = await client.session.prompt({
@@ -335,6 +507,7 @@ async function handleSendMessage(
     body: {
       parts: [{ type: "text", text: body.message }],
       model: body.model,
+      agent: body.agent,
     },
   });
 

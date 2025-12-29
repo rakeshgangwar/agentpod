@@ -33,6 +33,10 @@ import {
 } from "../models/user-resource-limits.ts";
 import { getSandboxById, createSandbox as createSandboxRecord, updateSandbox, generateUniqueSlug, touchSandbox } from "../models/sandbox.ts";
 import { isCloudflareConfigured, getCloudflareProvider } from "../services/providers/index.ts";
+import { agentPodToCloudflareConfig } from "../services/providers/config-adapter.ts";
+import { getUserOpencodeFullConfig, getSandboxOpencodeConfig } from "../models/user-opencode-config.ts";
+import { buildOpenCodeAuthJson } from "../models/provider.ts";
+import { updateSandboxAgents } from "../services/agent-catalog-service.ts";
 import { nanoid } from "nanoid";
 import { db } from "../db/drizzle.ts";
 import { sandboxPermissions } from "../db/schema/sandboxes.ts";
@@ -157,6 +161,19 @@ export const sandboxRoutes = new Hono()
           addonIds: [],
         });
 
+        if (body.agentSlugs && body.agentSlugs.length > 0) {
+          await updateSandboxAgents(sandboxId, body.agentSlugs, body.userId);
+          log.info("Assigned agents to Cloudflare sandbox", { sandboxId, agentCount: body.agentSlugs.length });
+        } else {
+          const { getDefaultAgents, assignAgentsToSandbox } = await import("../services/agent-catalog-service.ts");
+          const defaultAgents = await getDefaultAgents();
+          const defaultSlugs = defaultAgents.map(a => a.slug);
+          if (defaultSlugs.length > 0) {
+            await assignAgentsToSandbox(sandboxId, defaultSlugs, body.userId);
+            log.info("Assigned default agents to Cloudflare sandbox", { sandboxId, agentCount: defaultSlugs.length });
+          }
+        }
+
         await updateSandbox(sandboxId, { status: "starting" });
 
         const cloudflareProvider = getCloudflareProvider();
@@ -166,11 +183,25 @@ export const sandboxRoutes = new Hono()
           try {
             log.info("Starting async Cloudflare sandbox provisioning", { sandboxId });
             
+            const [authJson, sandboxConfig] = await Promise.all([
+              buildOpenCodeAuthJson(body.userId),
+              getSandboxOpencodeConfig(sandboxId, body.userId),
+            ]);
+            
+            const auth = authJson ? JSON.parse(authJson) : null;
+            const adaptedConfig = sandboxConfig ? {
+              settings: sandboxConfig.settings as Record<string, unknown>,
+              agents_md: sandboxConfig.agents_md,
+              files: sandboxConfig.files,
+            } : null;
+            const openCodeConfig = agentPodToCloudflareConfig(auth, adaptedConfig);
+            
             await cloudflareProvider.createSandbox({
               id: sandboxId,
               userId: body.userId,
               name: body.name,
               gitUrl: body.githubUrl,
+              config: openCodeConfig,
             });
 
             await updateSandbox(sandboxId, {
@@ -496,8 +527,21 @@ export const sandboxRoutes = new Hono()
         return c.json({ error: "Wake endpoint only works for Cloudflare sandboxes" }, 400);
       }
 
+      const [authJson, userConfig] = await Promise.all([
+        buildOpenCodeAuthJson(sandboxInfo.userId),
+        getSandboxOpencodeConfig(id, sandboxInfo.userId),
+      ]);
+      
+      const auth = authJson ? JSON.parse(authJson) : null;
+      const adaptedUserConfig = userConfig ? {
+        settings: userConfig.settings as Record<string, unknown>,
+        agents_md: userConfig.agents_md,
+        files: userConfig.files,
+      } : null;
+      const openCodeConfig = agentPodToCloudflareConfig(auth, adaptedUserConfig);
+
       const cloudflareProvider = getCloudflareProvider();
-      await cloudflareProvider.startSandbox(id);
+      await cloudflareProvider.startSandboxWithConfig(id, openCodeConfig);
       
       await updateSandbox(id, { status: "running" });
       await touchSandbox(id);
@@ -1184,8 +1228,11 @@ export const sandboxRoutes = new Hono()
         const enabledAgentSlugs = new Set(
           sandboxAgents.map(a => a.slug.toLowerCase())
         );
+        // Convert agent name to slug format for comparison
+        // "Architect Aria" -> "architect-aria"
+        const nameToSlug = (name: string) => name.toLowerCase().replace(/\s+/g, "-");
         const filteredAgents = allAgents.filter(
-          agent => enabledAgentSlugs.has(agent.name.toLowerCase())
+          agent => enabledAgentSlugs.has(nameToSlug(agent.name))
         );
         return c.json({ agents: filteredAgents });
       }

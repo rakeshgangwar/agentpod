@@ -20,7 +20,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "@cloudflare/sandbox": "^0.6.7",
-    "@opencode-ai/sdk": "^1.0.137",
+    "@opencode-ai/sdk": "^1.0.207",
     "openai": "^4.77.0"
   },
   "devDependencies": {
