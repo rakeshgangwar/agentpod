@@ -1,0 +1,1 @@
+ALTER TABLE "user_opencode_files" ADD COLUMN "is_system" boolean DEFAULT false NOT NULL;

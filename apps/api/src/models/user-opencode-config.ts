@@ -12,6 +12,7 @@ import { userOpencodeConfig, userOpencodeFiles } from '../db/schema/settings';
 import { eq, and } from 'drizzle-orm';
 import { createLogger } from '../utils/logger.ts';
 import { getSandboxAgents } from '../services/agent-catalog-service';
+import { getSystemPluginsAsFiles } from '../services/default-plugins-service';
 
 const log = createLogger('user-opencode-config');
 
@@ -379,20 +380,26 @@ export async function deleteAllUserOpencodeFiles(userId: string): Promise<number
 /**
  * Get full user config (settings + files) for container startup
  * This is what the entrypoint script fetches
+ * 
+ * System plugins are always injected from code (not DB) to ensure
+ * all users get the latest version on every container start.
  */
 export async function getUserOpencodeFullConfig(userId: string): Promise<UserOpencodeFullConfig> {
   const config = await getUserOpencodeConfig(userId);
-  const files = await listUserOpencodeFiles(userId);
+  const userFiles = await listUserOpencodeFiles(userId);
+  const systemPlugins = getSystemPluginsAsFiles();
+
+  const userFilesFormatted = userFiles.map(f => ({
+    type: f.type,
+    name: f.name,
+    extension: f.extension,
+    content: f.content,
+  }));
 
   return {
     settings: config?.settings ?? {},
     agents_md: config?.agentsMd,
-    files: files.map(f => ({
-      type: f.type,
-      name: f.name,
-      extension: f.extension,
-      content: f.content,
-    })),
+    files: [...userFilesFormatted, ...systemPlugins],
   };
 }
 
@@ -403,6 +410,7 @@ export async function getSandboxOpencodeConfig(
   const config = await getUserOpencodeConfig(userId);
   const allUserFiles = await listUserOpencodeFiles(userId);
   const sandboxAgentRecords = await getSandboxAgents(sandboxId);
+  const systemPlugins = getSystemPluginsAsFiles();
   
   const agentFiles = sandboxAgentRecords
     .filter(agent => agent.opencodeContent)
@@ -413,8 +421,8 @@ export async function getSandboxOpencodeConfig(
       content: agent.opencodeContent!,
     }));
   
-  const nonAgentFiles = allUserFiles
-    .filter(f => f.type !== 'agent')
+  const nonAgentUserFiles = allUserFiles
+    .filter(f => f.type !== 'agent' && f.type !== 'plugin')
     .map(f => ({
       type: f.type,
       name: f.name,
@@ -425,13 +433,14 @@ export async function getSandboxOpencodeConfig(
   log.debug('Built sandbox-specific config', {
     sandboxId,
     agentCount: agentFiles.length,
-    nonAgentFilesCount: nonAgentFiles.length,
+    userFilesCount: nonAgentUserFiles.length,
+    systemPluginsCount: systemPlugins.length,
   });
 
   return {
     settings: config?.settings ?? {},
     agents_md: config?.agentsMd,
-    files: [...agentFiles, ...nonAgentFiles],
+    files: [...agentFiles, ...nonAgentUserFiles, ...systemPlugins],
   };
 }
 

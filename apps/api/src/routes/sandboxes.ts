@@ -34,6 +34,9 @@ import {
 import { getSandboxById, createSandbox as createSandboxRecord, updateSandbox, generateUniqueSlug, touchSandbox } from "../models/sandbox.ts";
 import { isCloudflareConfigured, getCloudflareProvider } from "../services/providers/index.ts";
 import { nanoid } from "nanoid";
+import { db } from "../db/drizzle.ts";
+import { sandboxPermissions } from "../db/schema/sandboxes.ts";
+import { eq, and, desc } from "drizzle-orm";
 
 const log = createLogger("sandbox-routes");
 
@@ -1271,6 +1274,148 @@ export const sandboxRoutes = new Hono()
       return c.json({ permissions });
     } catch (error) {
       return handleOpenCodeError(c, error, "Failed to get pending permissions");
+    }
+  })
+
+  // ===========================================================================
+  // Plugin: Persist Permission Request (POST)
+  // Called by agentpod-integration plugin to persist permission to database
+  // ===========================================================================
+  .post("/:id/permissions", async (c) => {
+    const sandboxId = c.req.param("id");
+    
+    try {
+      const body = await c.req.json();
+      const { permissionId, sessionId, type, title, message, status, created } = body;
+      
+      if (!permissionId || !sessionId || !type || !title) {
+        return c.json({ error: "Missing required fields" }, 400);
+      }
+      
+      const id = `perm_${nanoid(12)}`;
+      
+      await db.insert(sandboxPermissions)
+        .values({
+          id,
+          sandboxId,
+          sessionId,
+          permissionId,
+          type,
+          title,
+          message: message || null,
+          status: status || "pending",
+          createdAt: created || Date.now(),
+        })
+        .onConflictDoUpdate({
+          target: [sandboxPermissions.sandboxId, sandboxPermissions.permissionId],
+          set: {
+            status: status || "pending",
+            title,
+            message: message || null,
+          },
+        });
+      
+      log.debug("Persisted permission from plugin", { sandboxId, permissionId });
+      return c.json({ success: true, id });
+    } catch (error) {
+      log.error("Failed to persist permission", { sandboxId, error });
+      return c.json({ error: "Failed to persist permission" }, 500);
+    }
+  })
+
+  // ===========================================================================
+  // Plugin: Update Permission Status (PATCH)
+  // Called by agentpod-integration plugin when permission is resolved
+  // ===========================================================================
+  .patch("/:id/permissions/:permissionId", async (c) => {
+    const sandboxId = c.req.param("id");
+    const permissionId = c.req.param("permissionId");
+    
+    try {
+      const body = await c.req.json();
+      const { status, resolvedAt } = body;
+      
+      await db.update(sandboxPermissions)
+        .set({
+          status: status || "resolved",
+          resolvedAt: resolvedAt || Date.now(),
+        })
+        .where(
+          and(
+            eq(sandboxPermissions.sandboxId, sandboxId),
+            eq(sandboxPermissions.permissionId, permissionId)
+          )
+        );
+      
+      log.debug("Updated permission status from plugin", { sandboxId, permissionId, status });
+      return c.json({ success: true });
+    } catch (error) {
+      log.error("Failed to update permission status", { sandboxId, permissionId, error });
+      return c.json({ error: "Failed to update permission" }, 500);
+    }
+  })
+
+  // ===========================================================================
+  // Plugin: Get Persisted Permissions (GET)
+  // Returns permissions from database for reconnection recovery
+  // ===========================================================================
+  .get("/:id/permissions", async (c) => {
+    const sandboxId = c.req.param("id");
+    const status = c.req.query("status") || "pending";
+    
+    try {
+      const permissions = await db.select()
+        .from(sandboxPermissions)
+        .where(
+          and(
+            eq(sandboxPermissions.sandboxId, sandboxId),
+            eq(sandboxPermissions.status, status as "pending" | "resolved" | "expired")
+          )
+        )
+        .orderBy(desc(sandboxPermissions.createdAt));
+      
+      return c.json({ permissions });
+    } catch (error) {
+      log.error("Failed to get persisted permissions", { sandboxId, error });
+      return c.json({ error: "Failed to get permissions" }, 500);
+    }
+  })
+
+  // ===========================================================================
+  // Plugin: Session Status Update (POST)
+  // Called by agentpod-integration plugin to track session status
+  // ===========================================================================
+  .post("/:id/session-status", async (c) => {
+    const sandboxId = c.req.param("id");
+    
+    try {
+      const body = await c.req.json();
+      const { sessionId, status, timestamp } = body;
+      
+      log.debug("Session status update from plugin", { sandboxId, sessionId, status, timestamp });
+      return c.json({ success: true });
+    } catch (error) {
+      log.error("Failed to update session status", { sandboxId, error });
+      return c.json({ error: "Failed to update session status" }, 500);
+    }
+  })
+
+  // ===========================================================================
+  // Plugin: File Change Notification (POST)
+  // Called by agentpod-integration plugin to track file edits
+  // ===========================================================================
+  .post("/:id/file-changes", async (c) => {
+    const sandboxId = c.req.param("id");
+    
+    try {
+      const body = await c.req.json();
+      const { path, timestamp } = body;
+      
+      log.debug("File change from plugin", { sandboxId, path, timestamp });
+      return c.json({ success: true });
+    } catch (error) {
+      log.error("Failed to record file change", { sandboxId, error });
+      return c.json({ error: "Failed to record file change" }, 500);
     }
   });
 
