@@ -15,23 +15,24 @@ import { SandboxManager, getSandboxManager } from '../../../src/services/sandbox
 import { resetDockerMock, addMockSandbox, mockCalls as dockerMockCalls, MockDockerOrchestrator } from '../../mocks/docker.ts';
 import { resetGitMock, addMockRepo, mockCalls as gitMockCalls, MockGitBackend } from '../../mocks/git.ts';
 import * as SandboxModel from '../../../src/models/sandbox.ts';
-import { db } from '../../../src/db/index.ts';
+import { rawSql } from '../../../src/db/drizzle.ts';
 
 // Import test setup to ensure database is initialized
 import '../../setup.ts';
 
-// Helper to create a test user in the database
-function createTestUser(id: string): void {
-  const now = new Date().toISOString();
-  db.run(`
-    INSERT OR IGNORE INTO user (id, name, email, emailVerified, createdAt, updatedAt)
-    VALUES (?, ?, ?, 0, ?, ?)
-  `, [id, `Test User ${id}`, `${id}@test.com`, now, now]);
+// Helper to create a test user in the database using Drizzle
+async function createTestUser(id: string): Promise<void> {
+  const now = new Date();
+  await rawSql`
+    INSERT INTO "user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
+    VALUES (${id}, ${`Test User ${id}`}, ${`${id}@test.com`}, false, ${now}, ${now})
+    ON CONFLICT (id) DO NOTHING
+  `;
 }
 
 // Helper to clean up test users
-function deleteTestUser(id: string): void {
-  db.run('DELETE FROM user WHERE id = ?', [id]);
+async function deleteTestUser(id: string): Promise<void> {
+  await rawSql`DELETE FROM "user" WHERE id = ${id}`;
 }
 
 describe('SandboxManager Service', () => {
@@ -188,45 +189,41 @@ describe('Sandbox Manager Database Integration', () => {
   const TEST_USER_ID = 'test-user-sandbox-001';
   const TEST_USER_ID_2 = 'test-user-sandbox-002';
   
-  beforeEach(() => {
-    // Create test users first (required for foreign key constraint)
-    createTestUser(TEST_USER_ID);
-    createTestUser(TEST_USER_ID_2);
+  beforeEach(async () => {
+    await createTestUser(TEST_USER_ID);
+    await createTestUser(TEST_USER_ID_2);
     
-    // Clean up any existing test sandboxes
     try {
-      const sandboxes = SandboxModel.listAllSandboxes();
-      sandboxes.forEach(s => {
+      const allSandboxes = await SandboxModel.listAllSandboxes();
+      for (const s of allSandboxes) {
         if (s.id.startsWith('test-')) {
-          SandboxModel.deleteSandbox(s.id);
+          await SandboxModel.deleteSandbox(s.id);
         }
-      });
+      }
     } catch (e) {
       // Ignore errors during cleanup
     }
   });
 
-  afterEach(() => {
-    // Clean up test sandboxes
+  afterEach(async () => {
     try {
-      const sandboxes = SandboxModel.listAllSandboxes();
-      sandboxes.forEach(s => {
+      const allSandboxes = await SandboxModel.listAllSandboxes();
+      for (const s of allSandboxes) {
         if (s.id.startsWith('test-')) {
-          SandboxModel.deleteSandbox(s.id);
+          await SandboxModel.deleteSandbox(s.id);
         }
-      });
+      }
     } catch (e) {
       // Ignore errors during cleanup
     }
     
-    // Clean up test users
-    deleteTestUser(TEST_USER_ID);
-    deleteTestUser(TEST_USER_ID_2);
+    await deleteTestUser(TEST_USER_ID);
+    await deleteTestUser(TEST_USER_ID_2);
   });
 
   describe('SandboxModel operations', () => {
-    test('should create a sandbox in the database', () => {
-      const sandbox = SandboxModel.createSandbox({
+    test('should create a sandbox in the database', async () => {
+      const sandbox = await SandboxModel.createSandbox({
         id: 'test-sandbox-001',
         userId: TEST_USER_ID,
         name: 'Test Sandbox',
@@ -244,8 +241,8 @@ describe('Sandbox Manager Database Integration', () => {
       expect(sandbox.status).toBe('created');
     });
 
-    test('should retrieve a sandbox by ID', () => {
-      SandboxModel.createSandbox({
+    test('should retrieve a sandbox by ID', async () => {
+      await SandboxModel.createSandbox({
         id: 'test-sandbox-002',
         userId: TEST_USER_ID,
         name: 'Test Sandbox 2',
@@ -256,21 +253,21 @@ describe('Sandbox Manager Database Integration', () => {
         addonIds: [],
       });
 
-      const sandbox = SandboxModel.getSandboxById('test-sandbox-002');
+      const sandbox = await SandboxModel.getSandboxById('test-sandbox-002');
       
       expect(sandbox).not.toBeNull();
       expect(sandbox?.id).toBe('test-sandbox-002');
       expect(sandbox?.name).toBe('Test Sandbox 2');
     });
 
-    test('should return null for non-existent sandbox', () => {
-      const sandbox = SandboxModel.getSandboxById('non-existent-id');
+    test('should return null for non-existent sandbox', async () => {
+      const sandbox = await SandboxModel.getSandboxById('non-existent-id');
       
       expect(sandbox).toBeNull();
     });
 
-    test('should update sandbox status', () => {
-      SandboxModel.createSandbox({
+    test('should update sandbox status', async () => {
+      await SandboxModel.createSandbox({
         id: 'test-sandbox-003',
         userId: TEST_USER_ID,
         name: 'Test Sandbox 3',
@@ -281,14 +278,14 @@ describe('Sandbox Manager Database Integration', () => {
         addonIds: [],
       });
 
-      SandboxModel.updateSandboxStatus('test-sandbox-003', 'running');
+      await SandboxModel.updateSandboxStatus('test-sandbox-003', 'running');
       
-      const sandbox = SandboxModel.getSandboxById('test-sandbox-003');
+      const sandbox = await SandboxModel.getSandboxById('test-sandbox-003');
       expect(sandbox?.status).toBe('running');
     });
 
-    test('should update sandbox with error message', () => {
-      SandboxModel.createSandbox({
+    test('should update sandbox with error message', async () => {
+      await SandboxModel.createSandbox({
         id: 'test-sandbox-004',
         userId: TEST_USER_ID,
         name: 'Test Sandbox 4',
@@ -299,15 +296,15 @@ describe('Sandbox Manager Database Integration', () => {
         addonIds: [],
       });
 
-      SandboxModel.updateSandboxStatus('test-sandbox-004', 'error', 'Container failed to start');
+      await SandboxModel.updateSandboxStatus('test-sandbox-004', 'error', 'Container failed to start');
       
-      const sandbox = SandboxModel.getSandboxById('test-sandbox-004');
+      const sandbox = await SandboxModel.getSandboxById('test-sandbox-004');
       expect(sandbox?.status).toBe('error');
       expect(sandbox?.errorMessage).toBe('Container failed to start');
     });
 
-    test('should update sandbox properties', () => {
-      SandboxModel.createSandbox({
+    test('should update sandbox properties', async () => {
+      await SandboxModel.createSandbox({
         id: 'test-sandbox-005',
         userId: TEST_USER_ID,
         name: 'Test Sandbox 5',
@@ -318,20 +315,20 @@ describe('Sandbox Manager Database Integration', () => {
         addonIds: [],
       });
 
-      SandboxModel.updateSandbox('test-sandbox-005', {
+      await SandboxModel.updateSandbox('test-sandbox-005', {
         containerId: 'container-123',
         containerName: 'agentpod-test-sandbox-5',
         opencodeUrl: 'http://localhost:4096',
       });
       
-      const sandbox = SandboxModel.getSandboxById('test-sandbox-005');
+      const sandbox = await SandboxModel.getSandboxById('test-sandbox-005');
       expect(sandbox?.containerId).toBe('container-123');
       expect(sandbox?.containerName).toBe('agentpod-test-sandbox-5');
       expect(sandbox?.opencodeUrl).toBe('http://localhost:4096');
     });
 
-    test('should list sandboxes by user ID', () => {
-      SandboxModel.createSandbox({
+    test('should list sandboxes by user ID', async () => {
+      await SandboxModel.createSandbox({
         id: 'test-sandbox-006a',
         userId: TEST_USER_ID,
         name: 'Test Sandbox A',
@@ -342,7 +339,7 @@ describe('Sandbox Manager Database Integration', () => {
         addonIds: [],
       });
 
-      SandboxModel.createSandbox({
+      await SandboxModel.createSandbox({
         id: 'test-sandbox-006b',
         userId: TEST_USER_ID,
         name: 'Test Sandbox B',
@@ -353,7 +350,7 @@ describe('Sandbox Manager Database Integration', () => {
         addonIds: [],
       });
 
-      SandboxModel.createSandbox({
+      await SandboxModel.createSandbox({
         id: 'test-sandbox-006c',
         userId: TEST_USER_ID_2,
         name: 'Other Sandbox',
@@ -364,7 +361,7 @@ describe('Sandbox Manager Database Integration', () => {
         addonIds: [],
       });
 
-      const userSandboxes = SandboxModel.listSandboxesByUserId(TEST_USER_ID);
+      const userSandboxes = await SandboxModel.listSandboxesByUserId(TEST_USER_ID);
       
       expect(userSandboxes.length).toBe(2);
       expect(userSandboxes.map(s => s.id)).toContain('test-sandbox-006a');
@@ -372,8 +369,8 @@ describe('Sandbox Manager Database Integration', () => {
       expect(userSandboxes.map(s => s.id)).not.toContain('test-sandbox-006c');
     });
 
-    test('should delete a sandbox', () => {
-      SandboxModel.createSandbox({
+    test('should delete a sandbox', async () => {
+      await SandboxModel.createSandbox({
         id: 'test-sandbox-007',
         userId: TEST_USER_ID,
         name: 'Test Sandbox To Delete',
@@ -384,14 +381,14 @@ describe('Sandbox Manager Database Integration', () => {
         addonIds: [],
       });
 
-      SandboxModel.deleteSandbox('test-sandbox-007');
+      await SandboxModel.deleteSandbox('test-sandbox-007');
       
-      const sandbox = SandboxModel.getSandboxById('test-sandbox-007');
+      const sandbox = await SandboxModel.getSandboxById('test-sandbox-007');
       expect(sandbox).toBeNull();
     });
 
     test('should touch sandbox to update lastAccessedAt', async () => {
-      SandboxModel.createSandbox({
+      await SandboxModel.createSandbox({
         id: 'test-sandbox-008',
         userId: TEST_USER_ID,
         name: 'Test Sandbox Touch',
@@ -402,36 +399,31 @@ describe('Sandbox Manager Database Integration', () => {
         addonIds: [],
       });
 
-      const before = SandboxModel.getSandboxById('test-sandbox-008');
+      const before = await SandboxModel.getSandboxById('test-sandbox-008');
       const beforeAccessed = before?.lastAccessedAt;
 
-      // Wait a bit to ensure time difference
       await new Promise(resolve => setTimeout(resolve, 50));
       
-      SandboxModel.touchSandbox('test-sandbox-008');
+      await SandboxModel.touchSandbox('test-sandbox-008');
       
-      const after = SandboxModel.getSandboxById('test-sandbox-008');
+      const after = await SandboxModel.getSandboxById('test-sandbox-008');
       
-      // lastAccessedAt should be updated (or set if it was null)
       expect(after?.lastAccessedAt).not.toBe(beforeAccessed);
     });
 
-    test('should generate unique slug', () => {
-      const slug1 = SandboxModel.generateUniqueSlug(TEST_USER_ID, 'My Project');
-      const slug2 = SandboxModel.generateUniqueSlug(TEST_USER_ID, 'My Project');
+    test('should generate unique slug', async () => {
+      const slug1 = await SandboxModel.generateUniqueSlug(TEST_USER_ID, 'My Project');
+      const slug2 = await SandboxModel.generateUniqueSlug(TEST_USER_ID, 'My Project');
       
-      // Slugs should be generated (may or may not be unique depending on implementation)
       expect(slug1).toBeTruthy();
       expect(slug2).toBeTruthy();
       
-      // Should be URL-friendly
       expect(slug1).toMatch(/^[a-z0-9-]+$/);
     });
 
-    test('should sanitize project name for slug', () => {
-      const slug = SandboxModel.generateUniqueSlug(TEST_USER_ID, 'My Project With Spaces!');
+    test('should sanitize project name for slug', async () => {
+      const slug = await SandboxModel.generateUniqueSlug(TEST_USER_ID, 'My Project With Spaces!');
       
-      // Should not contain spaces or special characters
       expect(slug).not.toContain(' ');
       expect(slug).not.toContain('!');
       expect(slug).toMatch(/^[a-z0-9-]+$/);
