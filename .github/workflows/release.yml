@@ -81,6 +81,9 @@ jobs:
             rust_features: voice
 
     runs-on: ${{ matrix.platform.os }}
+    env:
+      # Increase Node.js heap size for large Vite builds
+      NODE_OPTIONS: '--max_old_space_size=8192'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
