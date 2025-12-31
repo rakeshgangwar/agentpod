@@ -1,4 +1,4 @@
-# CodeOpen JavaScript Flavor
+# AgentPod JavaScript Flavor
 
 JavaScript and TypeScript development environment.
 
@@ -49,7 +49,7 @@ JavaScript and TypeScript development environment.
 ## Usage
 
 ```bash
-docker run -it codeopen-js:latest
+docker run -it agentpod-js:latest
 ```
 
 ## Building

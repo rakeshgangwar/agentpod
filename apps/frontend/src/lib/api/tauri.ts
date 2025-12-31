@@ -1,0 +1,1855 @@
+/**
+ * Tauri API wrapper for CodeOpen
+ * 
+ * This module provides typed wrappers around Tauri invoke commands
+ * for communicating with the Rust backend.
+ */
+
+import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { goto } from "$app/navigation";
+
+// =============================================================================
+// Auth Error Handling
+// =============================================================================
+
+/**
+ * Check if an error is an unauthorized error (401/403 auth-related)
+ * 
+ * Note: We need to be careful to distinguish between:
+ * - Auth errors (session expired, invalid token) -> should trigger logout
+ * - Business logic 403s (sandbox limit reached, quota exceeded) -> should NOT trigger logout
+ */
+function isUnauthorizedError(error: unknown): boolean {
+  if (typeof error === "string") {
+    const message = error.toLowerCase();
+    
+    // Skip if it's a known business logic error (403 but not auth-related)
+    const businessLogicErrors = [
+      "limit reached",
+      "quota exceeded",
+      "resource limit",
+      "sandbox limit",
+      "maximum",
+      "too many",
+    ];
+    
+    if (businessLogicErrors.some(pattern => message.includes(pattern))) {
+      return false;
+    }
+    
+    // Only treat as auth error if it's clearly authentication/session related
+    return (
+      message.includes("unauthorized") ||
+      message.includes("session expired") ||
+      message.includes("invalid session") ||
+      message.includes("not authenticated") ||
+      message.includes("authentication failed") ||
+      message.includes("token expired") ||
+      message.includes("invalid token")
+    );
+  }
+  return false;
+}
+
+/**
+ * Handle unauthorized errors by clearing auth and redirecting to login
+ */
+async function handleUnauthorizedError(): Promise<void> {
+  console.warn("[Tauri] Unauthorized error detected, redirecting to login");
+  
+  // Clear auth state via Tauri command (don't use invoke wrapper to avoid recursion)
+  try {
+    await tauriInvoke("auth_logout");
+  } catch (e) {
+    console.error("[Tauri] Failed to logout:", e);
+  }
+  
+  // Redirect to login
+  await goto("/login");
+}
+
+/**
+ * Wrapped invoke that handles auth errors automatically.
+ * Use this instead of importing invoke directly from @tauri-apps/api/core.
+ */
+export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  try {
+    return await tauriInvoke<T>(cmd, args);
+  } catch (error) {
+    // Check for unauthorized errors and handle them
+    if (isUnauthorizedError(error)) {
+      await handleUnauthorizedError();
+      // Throw a specific error so callers know auth failed
+      throw new Error("Session expired. Please log in again.");
+    }
+    throw error;
+  }
+}
+
+// =============================================================================
+// Connection Types
+// =============================================================================
+
+export interface ConnectionStatus {
+  connected: boolean;
+  apiUrl: string | null;
+  lastTested: string | null;
+  error: string | null;
+}
+
+// =============================================================================
+// Modular Container Types
+// =============================================================================
+
+/** Resource tier - defines CPU, memory, and storage limits */
+export interface ResourceTier {
+  id: string;
+  name: string;
+  description: string | null;
+  resources: {
+    cpuCores: number;
+    memoryGb: number;
+    storageGb: number;
+  };
+  priceMonthly: number;
+  isDefault: boolean;
+  sortOrder: number;
+}
+
+/** Container flavor - language/framework-specific image */
+export interface ContainerFlavor {
+  id: string;
+  name: string;
+  description: string | null;
+  languages: string[];
+  imageSizeMb: number | null;
+  isDefault: boolean;
+  sortOrder: number;
+}
+
+/** Addon category for grouping */
+export type AddonCategory = "interface" | "compute" | "storage" | "devops";
+
+/** Container addon - optional feature that can be added to containers */
+export interface ContainerAddon {
+  id: string;
+  name: string;
+  description: string | null;
+  category: AddonCategory;
+  imageSizeMb: number | null;
+  port: number | null;
+  requiresGpu: boolean;
+  requiresFlavor: string | null;
+  priceMonthly: number;
+  sortOrder: number;
+}
+
+// =============================================================================
+// Connection Commands
+// =============================================================================
+
+/**
+ * Connect to a Management API instance
+ */
+export async function connect(apiUrl: string, apiKey?: string): Promise<ConnectionStatus> {
+  return invoke<ConnectionStatus>("connect", { apiUrl, apiKey });
+}
+
+/**
+ * Disconnect from the Management API
+ */
+export async function disconnect(): Promise<void> {
+  return invoke("disconnect");
+}
+
+/**
+ * Test the current connection with a health check
+ */
+export async function testConnection(): Promise<ConnectionStatus> {
+  return invoke<ConnectionStatus>("test_connection");
+}
+
+/**
+ * Get the current connection status (without health check)
+ */
+export async function getConnectionStatus(): Promise<ConnectionStatus> {
+  return invoke<ConnectionStatus>("get_connection_status");
+}
+
+// =============================================================================
+// Modular Container Commands
+// =============================================================================
+
+/**
+ * List all available resource tiers
+ */
+export async function listResourceTiers(): Promise<ResourceTier[]> {
+  return invoke<ResourceTier[]>("list_resource_tiers");
+}
+
+/**
+ * Get the default resource tier
+ */
+export async function getDefaultResourceTier(): Promise<ResourceTier | null> {
+  return invoke<ResourceTier | null>("get_default_resource_tier");
+}
+
+/**
+ * List all available container flavors
+ */
+export async function listContainerFlavors(): Promise<ContainerFlavor[]> {
+  return invoke<ContainerFlavor[]>("list_container_flavors");
+}
+
+/**
+ * Get the default container flavor
+ */
+export async function getDefaultContainerFlavor(): Promise<ContainerFlavor | null> {
+  return invoke<ContainerFlavor | null>("get_default_container_flavor");
+}
+
+/**
+ * List all available container addons
+ */
+export async function listContainerAddons(): Promise<ContainerAddon[]> {
+  return invoke<ContainerAddon[]>("list_container_addons");
+}
+
+// =============================================================================
+// Agent Catalog Types
+// =============================================================================
+
+export type AgentSquad = "orchestration" | "development" | "product" | "operations" | "security" | "data";
+
+export interface AgentSummary {
+  id: string;
+  slug: string;
+  name: string;
+  role: string;
+  emoji?: string;
+  description?: string;
+  squad: AgentSquad;
+  tier?: string;
+  mode?: "primary" | "subagent";
+  isBuiltin?: boolean;
+  isPremium?: boolean;
+  isMandatory?: boolean;
+  installCount?: number;
+  ratingAvg?: number;
+}
+
+export interface AgentsBySquad {
+  orchestration: AgentSummary[];
+  development: AgentSummary[];
+  product: AgentSummary[];
+  operations: AgentSummary[];
+  security: AgentSummary[];
+  research: AgentSummary[];
+  communication: AgentSummary[];
+  data: AgentSummary[];
+}
+
+export interface AgentCatalogResponse {
+  agents: AgentSummary[];
+  bySquad: AgentsBySquad;
+  mandatoryAgentSlugs: string[];
+}
+
+
+
+// =============================================================================
+// Agent Catalog Commands
+// =============================================================================
+
+/**
+ * List all agents from the catalog, grouped by squad
+ */
+export async function listAgentCatalog(): Promise<AgentCatalogResponse> {
+  return invoke<AgentCatalogResponse>("list_agent_catalog");
+}
+
+
+
+// =============================================================================
+// OpenCode Types
+// =============================================================================
+
+export type MessageRole = "user" | "assistant";
+export type MessagePartType = "text" | "tool-invocation" | "tool-result" | "tool" | "step-start" | "step-finish" | "file" | "patch";
+export type FileNodeType = "file" | "directory";
+
+/** Session time info */
+export interface SessionTime {
+  created: number;
+  updated: number;
+}
+
+/** OpenCode session - matches actual API response */
+export interface Session {
+  id: string;
+  version?: string;
+  projectID?: string;
+  directory?: string;
+  /** Parent session ID - set when this session was spawned as a child (e.g., via task tool) */
+  parentID?: string;
+  title?: string;
+  time?: SessionTime;
+  status?: string;
+  cost?: number;
+}
+
+/** Message time info */
+export interface MessageTime {
+  created: number;
+  completed?: number;
+}
+
+/** Part time info */
+export interface PartTime {
+  start: number;
+  end?: number;
+}
+
+/** Token cache info */
+export interface TokenCache {
+  read: number;
+  write: number;
+}
+
+/** Token usage info */
+export interface TokenUsage {
+  input: number;
+  output: number;
+  reasoning: number;
+  cache?: TokenCache;
+}
+
+/** Message path info */
+export interface MessagePath {
+  cwd: string;
+  root: string;
+}
+
+/** Message info (metadata) - matches actual OpenCode API response */
+export interface MessageInfo {
+  id: string;
+  sessionID: string;
+  role: MessageRole;
+  time?: MessageTime;
+  parentID?: string;
+  modelID?: string;
+  providerID?: string;
+  mode?: string;
+  agent?: string;  // Agent used for this message (e.g., "build", "plan")
+  path?: MessagePath;
+  cost?: number;
+  tokens?: TokenUsage;
+  finish?: string;
+}
+
+/** Tool invocation state */
+export interface ToolInvocation {
+  toolCallId: string;
+  toolName: string;
+  args?: unknown;
+  state?: string;
+  result?: unknown;
+}
+
+/** Tool state - used in "tool" type parts */
+export interface ToolState {
+  status?: string;
+  input?: Record<string, unknown>;
+  output?: unknown;
+  error?: string; // Error message when status is "error"
+  title?: string;
+  metadata?: Record<string, unknown>;
+  time?: PartTime;
+}
+
+/** A part of a message - matches actual OpenCode API */
+export interface MessagePart {
+  id: string;
+  sessionID: string;
+  messageID: string;
+  type: MessagePartType;
+  text?: string;
+  snapshot?: string;
+  reason?: string;
+  time?: PartTime;
+  cost?: number;
+  tokens?: TokenUsage;
+  toolInvocation?: ToolInvocation;
+  callID?: string;
+  tool?: string;
+  state?: ToolState;
+  url?: string;
+  filename?: string;
+  mime?: string;
+}
+
+export interface Message {
+  info: MessageInfo;
+  parts: MessagePart[];
+}
+
+/** File system node - matches actual OpenCode API */
+export interface FileNode {
+  name: string;
+  type: FileNodeType;
+  path: string;
+  absolute?: string;
+  ignored: boolean;
+  children?: FileNode[];
+}
+
+/** File content response - matches actual OpenCode API */
+export interface FileContent {
+  content: string;
+  type?: string;
+}
+
+export interface AppInfo {
+  name: string;
+  version: string;
+}
+
+export interface OpenCodeHealth {
+  healthy: boolean;
+  status?: string;
+  error?: string;
+}
+
+// =============================================================================
+// OpenCode - Provider/Model Types (from OpenCode API)
+// =============================================================================
+
+/** Model info as returned from OpenCode's /config/providers endpoint */
+export interface OpenCodeModel {
+  id: string;
+  name: string;
+}
+
+/** Provider info as returned from OpenCode's /config/providers endpoint */
+export interface OpenCodeProvider {
+  id: string;
+  name: string;
+  models: OpenCodeModel[];
+}
+
+/** Model selection for sending messages */
+export interface ModelSelection {
+  providerId: string;
+  modelId: string;
+}
+
+/** Agent info as returned from OpenCode's /app/agents endpoint */
+export interface OpenCodeAgent {
+  name: string;
+  description?: string;
+  mode: "primary" | "subagent" | "all";
+  builtIn: boolean;
+  color?: string;
+  hidden?: boolean;
+  default?: boolean;
+}
+
+// =============================================================================
+// OpenCode - Permission Types
+// =============================================================================
+
+/** Permission response types */
+export type PermissionResponseType = "once" | "always" | "reject";
+
+/** Permission time info */
+export interface PermissionTime {
+  created: number;
+}
+
+/**
+ * Permission request from OpenCode SSE stream.
+ */
+export interface PermissionRequest {
+  id: string;
+  type: string;
+  pattern?: string | string[];
+  sessionID: string;
+  messageID: string;
+  callID?: string;
+  title: string;
+  metadata: Record<string, unknown>;
+  time: PermissionTime;
+}
+
+/**
+ * Permission replied event from SSE stream.
+ */
+export interface PermissionReplied {
+  sessionID: string;
+  permissionID: string;
+  response: PermissionResponseType;
+}
+
+/**
+ * Pending permission with sandbox context.
+ * Used for the global pending actions view on the home page.
+ */
+export interface PendingPermission extends PermissionRequest {
+  /** The sandbox ID where this permission was requested */
+  sandboxId: string;
+}
+
+// =============================================================================
+// OpenCode - Event Types (SSE handled by browser-sse.ts)
+// =============================================================================
+
+export interface OpenCodeEvent {
+  eventType: string;
+  data: unknown;
+}
+
+// =============================================================================
+// Settings Types
+// =============================================================================
+
+export type Theme = "light" | "dark" | "system";
+
+export interface AppSettings {
+  theme: Theme;
+  defaultProviderId: string | null;
+  autoRefreshInterval: number;
+  inAppNotifications: boolean;
+  systemNotifications: boolean;
+}
+
+export interface Provider {
+  id: string;
+  name: string;
+  type: string;
+  isConfigured: boolean;
+  isDefault: boolean;
+}
+
+// =============================================================================
+// Enhanced Provider Types (with Models.dev data)
+// =============================================================================
+
+export type AuthType = "api_key" | "oauth" | "device_flow";
+
+export interface ModelCapabilities {
+  image: boolean;
+  video: boolean;
+  tools: boolean;
+  streaming: boolean;
+}
+
+export interface ModelPricing {
+  input: number;
+  output: number;
+}
+
+export interface ModelInfo {
+  id: string;
+  name: string;
+  context: number;
+  maxOutput: number;
+  pricing: ModelPricing;
+  capabilities: ModelCapabilities;
+}
+
+export interface ProviderWithModels {
+  id: string;
+  name: string;
+  authType: AuthType;
+  apiKeyEnvVar?: string;
+  isConfigured: boolean;
+  isDefault: boolean;
+  logoUrl: string;
+  models: ModelInfo[];
+}
+
+export interface OAuthFlowInit {
+  stateId: string;
+  userCode: string;
+  verificationUri: string;
+  expiresAt: string;
+  interval: number;
+}
+
+export type OAuthFlowStatusType = "pending" | "completed" | "expired" | "error";
+
+export interface OAuthFlowStatus {
+  status: OAuthFlowStatusType;
+  error?: string;
+  isConfigured: boolean;
+}
+
+export interface ExportData {
+  version: string;
+  exportedAt: string;
+  settings: AppSettings;
+  apiUrl: string | null;
+}
+
+// =============================================================================
+// Settings Commands
+// =============================================================================
+
+/**
+ * Get current app settings from local storage
+ */
+export async function getSettings(): Promise<AppSettings> {
+  return invoke<AppSettings>("get_settings");
+}
+
+/**
+ * Save app settings to local storage
+ */
+export async function saveSettings(settings: AppSettings): Promise<void> {
+  return invoke("save_settings", { settings });
+}
+
+/**
+ * List LLM providers from Management API
+ */
+export async function listProviders(): Promise<Provider[]> {
+  return invoke<Provider[]>("list_providers");
+}
+
+/**
+ * Get the default LLM provider from Management API
+ */
+export async function getDefaultProvider(): Promise<Provider | null> {
+  return invoke<Provider | null>("get_default_provider");
+}
+
+/**
+ * Export settings to a JSON string for backup/transfer
+ */
+export async function exportSettings(): Promise<string> {
+  return invoke<string>("export_settings");
+}
+
+/**
+ * Import settings from a JSON string
+ */
+export async function importSettings(json: string): Promise<AppSettings> {
+  return invoke<AppSettings>("import_settings", { json });
+}
+
+// =============================================================================
+// Provider Commands (Enhanced with Models.dev)
+// =============================================================================
+
+/**
+ * List LLM providers with their models from Models.dev
+ */
+export async function listProvidersWithModels(popularOnly = true): Promise<ProviderWithModels[]> {
+  return invoke<ProviderWithModels[]>("list_providers_with_models", { popularOnly });
+}
+
+/**
+ * List only configured LLM providers
+ */
+export async function listConfiguredProviders(): Promise<ProviderWithModels[]> {
+  return invoke<ProviderWithModels[]>("list_configured_providers");
+}
+
+/**
+ * Configure a provider with an API key
+ */
+export async function configureProviderApiKey(providerId: string, apiKey: string): Promise<void> {
+  return invoke("configure_provider_api_key", { providerId, apiKey });
+}
+
+/**
+ * Initialize OAuth device flow for a provider
+ */
+export async function initOAuthFlow(providerId: string): Promise<OAuthFlowInit> {
+  return invoke<OAuthFlowInit>("init_oauth_flow", { providerId });
+}
+
+/**
+ * Poll OAuth device flow status
+ */
+export async function pollOAuthFlow(providerId: string, stateId: string): Promise<OAuthFlowStatus> {
+  return invoke<OAuthFlowStatus>("poll_oauth_flow", { providerId, stateId });
+}
+
+/**
+ * Cancel an OAuth flow
+ */
+export async function cancelOAuthFlow(providerId: string, stateId: string): Promise<void> {
+  return invoke("cancel_oauth_flow", { providerId, stateId });
+}
+
+/**
+ * Remove provider credentials
+ */
+export async function removeProviderCredentials(providerId: string): Promise<void> {
+  return invoke("remove_provider_credentials", { providerId });
+}
+
+/**
+ * Set a provider as the default
+ */
+export async function setDefaultProvider(providerId: string): Promise<void> {
+  return invoke("set_default_provider", { providerId });
+}
+
+// =============================================================================
+// Auth Types (Better Auth Session)
+// =============================================================================
+
+/** User information from stored session */
+export interface AuthUser {
+  id: string;
+  email?: string;
+  name?: string;
+}
+
+/** Authentication status */
+export interface AuthStatus {
+  authenticated: boolean;
+  user: AuthUser | null;
+}
+
+// =============================================================================
+// Auth Commands (Better Auth Session Storage)
+// =============================================================================
+
+/**
+ * Store session token from Better Auth login
+ */
+export async function authStoreSession(
+  token: string,
+  userId: string,
+  email?: string,
+  name?: string
+): Promise<void> {
+  return invoke("auth_store_session", { token, userId, email, name });
+}
+
+/**
+ * Get the current authentication status
+ */
+export async function authGetStatus(): Promise<AuthStatus> {
+  return invoke<AuthStatus>("auth_get_status");
+}
+
+/**
+ * Logout the current user
+ */
+export async function authLogout(): Promise<void> {
+  return invoke("auth_logout");
+}
+
+/**
+ * Get current user info from stored session
+ */
+export async function authGetUser(): Promise<AuthUser | null> {
+  return invoke<AuthUser | null>("auth_get_user");
+}
+
+/**
+ * Get the stored session token for API calls
+ */
+export async function authGetToken(): Promise<string | null> {
+  return invoke<string | null>("auth_get_token");
+}
+
+/**
+ * Check if user is authenticated
+ */
+export async function authIsAuthenticated(): Promise<boolean> {
+  return invoke<boolean>("auth_is_authenticated");
+}
+
+// =============================================================================
+// V2 Sandbox Types (Direct Docker Orchestration)
+// =============================================================================
+
+// Must match the API's SandboxStatus: 'created' | 'starting' | 'running' | 'stopping' | 'stopped' | 'sleeping' | 'error'
+export type SandboxStatus = "created" | "starting" | "running" | "stopping" | "stopped" | "sleeping" | "error" | "unknown";
+
+export interface SandboxUrls {
+  homepage?: string;
+  opencode?: string;
+  codeServer?: string;
+  vnc?: string;
+  acpGateway?: string;
+}
+
+export interface SandboxHealth {
+  status: string;
+  failingStreak?: number;
+  lastCheck?: string;
+}
+
+export type SandboxProvider = "docker" | "cloudflare";
+
+export interface Sandbox {
+  id: string;
+  userId: string;
+  name: string;
+  slug: string;
+  description?: string;
+  
+  // Provider (docker or cloudflare)
+  provider?: SandboxProvider;
+  
+  // Git/Repository info
+  repoName: string;
+  githubUrl?: string;
+  
+  // Container configuration (Docker-only)
+  resourceTierId?: string;
+  flavorId?: string;
+  addonIds: string[];
+  
+  // Container runtime info
+  containerId?: string;
+  containerName?: string;
+  status: SandboxStatus;
+  errorMessage?: string;
+  
+  // Individual URL fields from DB
+  opencodeUrl?: string;
+  acpGatewayUrl?: string;
+  vncUrl?: string;
+  codeServerUrl?: string;
+  
+  // URLs object (for backward compatibility)
+  urls?: SandboxUrls;
+  
+  // Timestamps
+  createdAt: string;
+  updatedAt: string;
+  lastAccessedAt?: string;
+  
+  // Additional Docker runtime info (enriched at runtime, may not always be present)
+  image?: string;
+  labels?: Record<string, string>;
+  health?: SandboxHealth;
+  startedAt?: string;
+}
+
+export interface Repository {
+  name: string;
+  path: string;
+  createdAt: string;
+  lastModified: string;
+  currentBranch: string;
+  isDirty: boolean;
+  description?: string;
+}
+
+export interface CreateSandboxInput {
+  name: string;
+  description?: string;
+  githubUrl?: string;
+  userId: string;
+  flavor?: string;
+  resourceTier?: string;
+  addons?: string[];
+  agentSlugs?: string[];
+  autoStart?: boolean;
+  provider?: SandboxProvider;
+}
+
+export interface SandboxWithRepo {
+  sandbox: Sandbox;
+  repository?: Repository;
+}
+
+export interface SandboxInfo {
+  sandbox: Sandbox;
+  repository?: Repository;
+  config?: Record<string, unknown>;
+}
+
+export interface SandboxStats {
+  cpuPercent: number;
+  memoryUsage: number;
+  memoryLimit: number;
+  memoryPercent: number;
+  networkRx: number;
+  networkTx: number;
+  blockRead: number;
+  blockWrite: number;
+}
+
+export interface ExecResult {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+}
+
+export interface GitFileStatus {
+  path: string;
+  staged: string;
+  unstaged: string;
+  tracked: boolean;
+}
+
+export interface GitStatusResponse {
+  files: GitFileStatus[];
+}
+
+export interface GitAuthor {
+  name: string;
+  email: string;
+  timestamp: string;
+}
+
+export interface GitCommit {
+  sha: string;
+  message: string;
+  author: GitAuthor;
+  committer: GitAuthor;
+  parents: string[];
+  timestamp: string;
+}
+
+export interface GitLogResponse {
+  commits: GitCommit[];
+}
+
+export interface GitCommitResponse {
+  sha: string;
+  message: string;
+}
+
+// =============================================================================
+// Git Branch Types
+// =============================================================================
+
+export interface GitBranch {
+  name: string;
+  ref: string;
+  sha: string;
+  current: boolean;
+  upstream?: string;
+  ahead?: number;
+  behind?: number;
+}
+
+export interface GitBranchesResponse {
+  branches: GitBranch[];
+  current: string;
+}
+
+// =============================================================================
+// Git Diff Types
+// =============================================================================
+
+export interface GitRenamedFile {
+  from: string;
+  to: string;
+}
+
+export interface GitDiffSummary {
+  added: string[];
+  modified: string[];
+  deleted: string[];
+  renamed: GitRenamedFile[];
+}
+
+export interface GitDiffResponse {
+  diff: GitDiffSummary;
+}
+
+export type DiffLineType = "context" | "addition" | "deletion";
+
+export interface GitDiffLine {
+  type: DiffLineType;
+  content: string;
+  oldLineNumber?: number;
+  newLineNumber?: number;
+}
+
+export interface GitDiffHunk {
+  oldStart: number;
+  oldLines: number;
+  newStart: number;
+  newLines: number;
+  lines: GitDiffLine[];
+}
+
+export type GitDiffFileStatus = "added" | "modified" | "deleted" | "renamed";
+
+export interface GitFileDiff {
+  path: string;
+  status: GitDiffFileStatus;
+  additions: number;
+  deletions: number;
+  hunks: GitDiffHunk[];
+}
+
+export interface GitFileDiffResponse {
+  fileDiff: GitFileDiff;
+}
+
+export interface DockerContainerStats {
+  running: number;
+  stopped: number;
+}
+
+export interface DockerInfo {
+  version: string;
+  apiVersion: string;
+  os: string;
+  arch: string;
+  containers: DockerContainerStats;
+  images: number;
+}
+
+export interface DockerHealthResponse {
+  status: string;
+  docker?: DockerInfo;
+  message?: string;
+}
+
+// =============================================================================
+// Docker Image Management Types
+// =============================================================================
+
+/** Image availability status for a single flavor */
+export interface FlavorImageStatus {
+  available: boolean;
+  imageName: string;
+  size?: number;
+  error?: string;
+}
+
+/** Response from flavor images endpoint */
+export interface FlavorImagesResponse {
+  success: boolean;
+  images: Record<string, FlavorImageStatus>;
+}
+
+/** Docker image info */
+export interface DockerImageDetail {
+  name: string;
+  id: string;
+  size: number;
+  created: string;
+}
+
+/** Response for single image check */
+export interface ImageExistsResponse {
+  exists: boolean;
+  imageName?: string;
+  image?: DockerImageDetail;
+}
+
+/** Response for image pull (sync) */
+export interface ImagePullResponse {
+  success: boolean;
+  imageName: string;
+  error?: string;
+  image?: DockerImageDetail;
+}
+
+/** Docker daemon info (from image management endpoint) */
+export interface DockerDaemonInfo {
+  version: string;
+  apiVersion: string;
+  os: string;
+  arch: string;
+  containers: DockerContainerStats;
+  images: number;
+}
+
+/** Docker health check response (from image management endpoint) */
+export interface DockerHealthCheckResponse {
+  healthy: boolean;
+  timestamp: string;
+  error?: string;
+}
+
+// =============================================================================
+// Docker Image Management Commands
+// =============================================================================
+
+/**
+ * Get availability status of all flavor images
+ * Returns a map of flavor ID to image availability status
+ */
+export async function getFlavorImages(): Promise<FlavorImagesResponse> {
+  return invoke<FlavorImagesResponse>("get_flavor_images");
+}
+
+/**
+ * Check if a specific Docker image exists locally
+ * @param imageName - Full image name with tag (e.g., "agentpod-fullstack:0.4.0")
+ */
+export async function checkImageExists(imageName: string): Promise<ImageExistsResponse> {
+  return invoke<ImageExistsResponse>("check_image_exists", { imageName });
+}
+
+/**
+ * Pull a Docker image synchronously (without streaming progress)
+ * @param imageName - Full image name with tag (optional if flavorId provided)
+ * @param flavorId - Flavor ID to pull image for (optional if imageName provided)
+ */
+export async function pullImageSync(
+  imageName?: string,
+  flavorId?: string
+): Promise<ImagePullResponse> {
+  return invoke<ImagePullResponse>("pull_image_sync", { imageName, flavorId });
+}
+
+/**
+ * Get Docker daemon information
+ */
+export async function getDockerDaemonInfo(): Promise<DockerDaemonInfo> {
+  return invoke<DockerDaemonInfo>("get_docker_info");
+}
+
+/**
+ * Check Docker daemon health
+ */
+export async function checkDockerDaemonHealth(): Promise<DockerHealthCheckResponse> {
+  return invoke<DockerHealthCheckResponse>("check_docker_health");
+}
+
+// =============================================================================
+// V2 Sandbox Commands
+// =============================================================================
+
+/**
+ * Check Docker health
+ */
+export async function dockerHealth(): Promise<DockerHealthResponse> {
+  return invoke<DockerHealthResponse>("docker_health");
+}
+
+/**
+ * List all sandboxes
+ */
+export async function listSandboxes(): Promise<Sandbox[]> {
+  return invoke<Sandbox[]>("list_sandboxes");
+}
+
+/**
+ * Get a sandbox by ID
+ */
+export async function getSandbox(id: string): Promise<SandboxInfo> {
+  return invoke<SandboxInfo>("get_sandbox", { id });
+}
+
+/**
+ * Create a new sandbox
+ */
+export async function createSandbox(input: CreateSandboxInput): Promise<SandboxWithRepo> {
+  return invoke<SandboxWithRepo>("create_sandbox", {
+    name: input.name,
+    description: input.description ?? null,
+    githubUrl: input.githubUrl ?? null,
+    userId: input.userId,
+    flavor: input.flavor ?? null,
+    resourceTier: input.resourceTier ?? null,
+    addons: input.addons ?? null,
+    autoStart: input.autoStart ?? null,
+    provider: input.provider ?? null,
+    agentSlugs: input.agentSlugs ?? null,
+  });
+}
+
+/**
+ * Delete a sandbox
+ */
+export async function deleteSandbox(id: string): Promise<void> {
+  return invoke("delete_sandbox", { id });
+}
+
+/**
+ * Start a sandbox
+ */
+export async function startSandbox(id: string): Promise<Sandbox> {
+  return invoke<Sandbox>("start_sandbox", { id });
+}
+
+/**
+ * Stop a sandbox
+ */
+export async function stopSandbox(id: string): Promise<Sandbox> {
+  return invoke<Sandbox>("stop_sandbox", { id });
+}
+
+/**
+ * Restart a sandbox
+ */
+export async function restartSandbox(id: string): Promise<Sandbox> {
+  return invoke<Sandbox>("restart_sandbox", { id });
+}
+
+/**
+ * Pause a sandbox
+ */
+export async function pauseSandbox(id: string): Promise<Sandbox> {
+  return invoke<Sandbox>("pause_sandbox", { id });
+}
+
+/**
+ * Unpause a sandbox
+ */
+export async function unpauseSandbox(id: string): Promise<Sandbox> {
+  return invoke<Sandbox>("unpause_sandbox", { id });
+}
+
+/**
+ * Wake a sleeping Cloudflare sandbox
+ */
+export async function wakeSandbox(id: string): Promise<Sandbox> {
+  return invoke<Sandbox>("wake_sandbox", { id });
+}
+
+/**
+ * Get sandbox logs
+ */
+export async function getSandboxLogs(id: string, tail?: number): Promise<string> {
+  return invoke<string>("get_sandbox_logs", { id, tail });
+}
+
+/**
+ * Get sandbox resource stats
+ */
+export async function getSandboxStats(id: string): Promise<SandboxStats> {
+  return invoke<SandboxStats>("get_sandbox_stats", { id });
+}
+
+/**
+ * Get sandbox status
+ */
+export async function getSandboxStatus(id: string): Promise<string> {
+  return invoke<string>("get_sandbox_status", { id });
+}
+
+/**
+ * Execute a command in a sandbox
+ */
+export async function execInSandbox(
+  id: string,
+  command: string[],
+  workingDir?: string,
+  user?: string
+): Promise<ExecResult> {
+  return invoke<ExecResult>("exec_in_sandbox", { id, command, workingDir, user });
+}
+
+/**
+ * Get git status for a sandbox
+ */
+export async function getSandboxGitStatus(id: string): Promise<GitStatusResponse> {
+  return invoke<GitStatusResponse>("get_sandbox_git_status", { id });
+}
+
+/**
+ * Get git log for a sandbox
+ */
+export async function getSandboxGitLog(id: string): Promise<GitLogResponse> {
+  return invoke<GitLogResponse>("get_sandbox_git_log", { id });
+}
+
+/**
+ * Commit changes in a sandbox
+ */
+export async function commitSandboxChanges(id: string, message: string): Promise<GitCommitResponse> {
+  return invoke<GitCommitResponse>("commit_sandbox_changes", { id, message });
+}
+
+// =============================================================================
+// Git Branch Commands
+// =============================================================================
+
+/**
+ * List all branches in a sandbox's repository
+ */
+export async function listSandboxBranches(id: string): Promise<GitBranchesResponse> {
+  return invoke<GitBranchesResponse>("list_sandbox_branches", { id });
+}
+
+/**
+ * Create a new branch in a sandbox's repository
+ * @param id - Sandbox ID
+ * @param name - New branch name
+ * @param fromRef - Optional ref (commit SHA or branch name) to create branch from
+ */
+export async function createSandboxBranch(id: string, name: string, fromRef?: string): Promise<void> {
+  return invoke("create_sandbox_branch", { id, name, fromRef });
+}
+
+/**
+ * Checkout a branch in a sandbox's repository
+ * @param id - Sandbox ID
+ * @param branch - Branch name to checkout
+ */
+export async function checkoutSandboxBranch(id: string, branch: string): Promise<void> {
+  return invoke("checkout_sandbox_branch", { id, branch });
+}
+
+/**
+ * Delete a branch in a sandbox's repository
+ * @param id - Sandbox ID
+ * @param branch - Branch name to delete
+ */
+export async function deleteSandboxBranch(id: string, branch: string): Promise<void> {
+  return invoke("delete_sandbox_branch", { id, branch });
+}
+
+// =============================================================================
+// Git Diff Commands
+// =============================================================================
+
+/**
+ * Get diff summary for a sandbox's repository (list of changed files)
+ * @param id - Sandbox ID
+ * @param fromRef - Optional starting ref (defaults to HEAD)
+ * @param toRef - Optional ending ref (defaults to working tree)
+ */
+export async function getSandboxDiff(
+  id: string,
+  fromRef?: string,
+  toRef?: string
+): Promise<GitDiffResponse> {
+  return invoke<GitDiffResponse>("get_sandbox_diff", { id, fromRef, toRef });
+}
+
+/**
+ * Get detailed diff for a specific file with hunks
+ * @param id - Sandbox ID
+ * @param filePath - Path to the file relative to repo root
+ */
+export async function getSandboxFileDiff(id: string, filePath: string): Promise<GitFileDiffResponse> {
+  return invoke<GitFileDiffResponse>("get_sandbox_file_diff", { id, filePath });
+}
+
+// =============================================================================
+// V2 Sandbox OpenCode Commands
+// =============================================================================
+
+/**
+ * Get OpenCode app info for a sandbox
+ */
+export async function sandboxOpencodeGetAppInfo(sandboxId: string): Promise<AppInfo> {
+  return invoke<AppInfo>("sandbox_opencode_get_app_info", { sandboxId });
+}
+
+/**
+ * Check if OpenCode is healthy in a sandbox
+ */
+export async function sandboxOpencodeHealthCheck(sandboxId: string): Promise<OpenCodeHealth> {
+  return invoke<OpenCodeHealth>("sandbox_opencode_health_check", { sandboxId });
+}
+
+/**
+ * Get configured LLM providers for a sandbox
+ */
+export async function sandboxOpencodeGetProviders(sandboxId: string): Promise<OpenCodeProvider[]> {
+  return invoke<OpenCodeProvider[]>("sandbox_opencode_get_providers", { sandboxId });
+}
+
+/**
+ * Get available agents for a sandbox
+ */
+export async function sandboxOpencodeGetAgents(sandboxId: string): Promise<OpenCodeAgent[]> {
+  return invoke<OpenCodeAgent[]>("sandbox_opencode_get_agents", { sandboxId });
+}
+
+/**
+ * List all OpenCode sessions for a sandbox
+ */
+export async function sandboxOpencodeListSessions(sandboxId: string): Promise<Session[]> {
+  return invoke<Session[]>("sandbox_opencode_list_sessions", { sandboxId });
+}
+
+/**
+ * Create a new OpenCode session in a sandbox
+ */
+export async function sandboxOpencodeCreateSession(sandboxId: string, title?: string): Promise<Session> {
+  return invoke<Session>("sandbox_opencode_create_session", { sandboxId, title });
+}
+
+/**
+ * Get an OpenCode session by ID
+ */
+export async function sandboxOpencodeGetSession(sandboxId: string, sessionId: string): Promise<Session> {
+  return invoke<Session>("sandbox_opencode_get_session", { sandboxId, sessionId });
+}
+
+/**
+ * Delete an OpenCode session
+ */
+export async function sandboxOpencodeDeleteSession(sandboxId: string, sessionId: string): Promise<void> {
+  return invoke("sandbox_opencode_delete_session", { sandboxId, sessionId });
+}
+
+/**
+ * Abort a running OpenCode session
+ */
+export async function sandboxOpencodeAbortSession(sandboxId: string, sessionId: string): Promise<void> {
+  return invoke("sandbox_opencode_abort_session", { sandboxId, sessionId });
+}
+
+/**
+ * Respond to an OpenCode permission request in a sandbox
+ */
+export async function sandboxOpencodeRespondPermission(
+  sandboxId: string,
+  sessionId: string,
+  permissionId: string,
+  response: PermissionResponseType
+): Promise<boolean> {
+  return invoke<boolean>("sandbox_opencode_respond_permission", {
+    sandboxId,
+    sessionId,
+    permissionId,
+    response,
+  });
+}
+
+/**
+ * Get pending permission requests for a session.
+ * This fetches cached permissions from the API that were received via SSE
+ * but haven't been responded to yet. Useful after page refresh/reconnection.
+ */
+export async function sandboxOpencodeGetPendingPermissions(
+  sandboxId: string,
+  sessionId: string
+): Promise<PermissionRequest[]> {
+  return invoke<PermissionRequest[]>("sandbox_opencode_get_pending_permissions", {
+    sandboxId,
+    sessionId,
+  });
+}
+
+/**
+ * Get all pending permission requests across all sandboxes.
+ * This is used by the home page to show a global view of pending actions.
+ * 
+ * @returns Array of pending permissions with their associated sandbox IDs
+ */
+export async function getAllPendingPermissions(): Promise<PendingPermission[]> {
+  return invoke<PendingPermission[]>("get_all_pending_permissions", {});
+}
+
+/**
+ * Fork an OpenCode session at a specific message.
+ * Creates a new session that diverges from the original at the specified point.
+ * Used for branching conversations.
+ * 
+ * @param sandboxId - The sandbox ID
+ * @param sessionId - The session ID to fork from
+ * @param messageId - Optional message ID to fork at. If not provided, forks from the latest message.
+ * @returns The new forked session
+ */
+export async function sandboxOpencodeForkSession(
+  sandboxId: string,
+  sessionId: string,
+  messageId?: string
+): Promise<Session> {
+  return invoke<Session>("sandbox_opencode_fork_session", {
+    sandboxId,
+    sessionId,
+    messageId,
+  });
+}
+
+/**
+ * Revert a message in an OpenCode session (undo).
+ * Marks the message and all subsequent messages as reverted.
+ * The reverted messages are preserved and can be restored with unrevert.
+ * 
+ * @param sandboxId - The sandbox ID
+ * @param sessionId - The session ID
+ * @param messageId - The message ID to revert to
+ * @param partId - Optional part ID for partial revert
+ * @returns The updated session
+ */
+export async function sandboxOpencodeRevertMessage(
+  sandboxId: string,
+  sessionId: string,
+  messageId: string,
+  partId?: string
+): Promise<Session> {
+  return invoke<Session>("sandbox_opencode_revert_message", {
+    sandboxId,
+    sessionId,
+    messageId,
+    partId,
+  });
+}
+
+/**
+ * Unrevert an OpenCode session (redo).
+ * Restores all previously reverted messages.
+ * 
+ * @param sandboxId - The sandbox ID
+ * @param sessionId - The session ID
+ * @returns The updated session
+ */
+export async function sandboxOpencodeUnrevertSession(
+  sandboxId: string,
+  sessionId: string
+): Promise<Session> {
+  return invoke<Session>("sandbox_opencode_unrevert_session", {
+    sandboxId,
+    sessionId,
+  });
+}
+
+/**
+ * List messages in an OpenCode session for a sandbox
+ */
+export async function sandboxOpencodeListMessages(sandboxId: string, sessionId: string): Promise<Message[]> {
+  return invoke<Message[]>("sandbox_opencode_list_messages", { sandboxId, sessionId });
+}
+
+/**
+ * Input part for sending a message (text or file)
+ */
+export interface MessagePartInput {
+  type: "text" | "file";
+  text?: string;
+  url?: string;
+  filename?: string;
+  mime?: string;
+}
+
+/**
+ * Send a message to an OpenCode session in a sandbox
+ * @param sandboxId - The sandbox ID
+ * @param sessionId - The session ID
+ * @param text - The message text
+ * @param model - Optional model selection
+ * @param agent - Optional agent to use (e.g., "onboarding", "plan", "build")
+ */
+export async function sandboxOpencodeSendMessage(
+  sandboxId: string,
+  sessionId: string,
+  text: string,
+  model?: ModelSelection,
+  agent?: string
+): Promise<Message> {
+  const input = {
+    parts: [{ type: "text", text }],
+    model: model ? { providerID: model.providerId, modelID: model.modelId } : undefined,
+    agent,
+  };
+  return invoke<Message>("sandbox_opencode_send_message", { sandboxId, sessionId, input });
+}
+
+/**
+ * Send a message with multiple parts (text and/or files) to an OpenCode session
+ * @param sandboxId - The sandbox ID
+ * @param sessionId - The session ID
+ * @param parts - Array of message parts (text and/or files)
+ * @param model - Optional model selection
+ * @param agent - Optional agent to use (e.g., "onboarding", "plan", "build")
+ */
+export async function sandboxOpencodeSendMessageWithParts(
+  sandboxId: string,
+  sessionId: string,
+  parts: MessagePartInput[],
+  model?: ModelSelection,
+  agent?: string
+): Promise<Message> {
+  const input = {
+    parts,
+    model: model ? { providerID: model.providerId, modelID: model.modelId } : undefined,
+    agent,
+  };
+  return invoke<Message>("sandbox_opencode_send_message", { sandboxId, sessionId, input });
+}
+
+/**
+ * Get a specific message from an OpenCode session in a sandbox
+ */
+export async function sandboxOpencodeGetMessage(
+  sandboxId: string,
+  sessionId: string,
+  messageId: string
+): Promise<Message> {
+  return invoke<Message>("sandbox_opencode_get_message", { sandboxId, sessionId, messageId });
+}
+
+/**
+ * List files in a sandbox directory via OpenCode
+ */
+export async function sandboxOpencodeListFiles(sandboxId: string, path: string = "/"): Promise<FileNode[]> {
+  return invoke<FileNode[]>("sandbox_opencode_list_files", { sandboxId, path });
+}
+
+/**
+ * Get file content from a sandbox via OpenCode
+ */
+export async function sandboxOpencodeGetFileContent(sandboxId: string, path: string): Promise<FileContent> {
+  return invoke<FileContent>("sandbox_opencode_get_file_content", { sandboxId, path });
+}
+
+/**
+ * Find files in a sandbox by query via OpenCode
+ */
+export async function sandboxOpencodeFindFiles(sandboxId: string, query: string): Promise<string[]> {
+  return invoke<string[]>("sandbox_opencode_find_files", { sandboxId, query });
+}
+
+/**
+ * Write file content to a sandbox via shell command using heredoc
+ */
+export async function writeFileToSandbox(
+  sandboxId: string,
+  path: string,
+  content: string
+): Promise<void> {
+  let absolutePath = path;
+  if (!path.startsWith("/")) {
+    absolutePath = `/home/workspace/${path}`;
+  } else if (path.startsWith("/workspace/")) {
+    absolutePath = path.replace("/workspace/", "/home/workspace/");
+  }
+  
+  const escapedContent = content.replace(/'/g, "'\\''");
+  const command = `cat > '${absolutePath}' << 'EOFAGENTPOD'\n${escapedContent}\nEOFAGENTPOD`;
+  
+  const result = await execInSandbox(sandboxId, ["sh", "-c", command], undefined, "developer");
+  
+  if (result.exitCode !== 0) {
+    throw new Error(`Failed to write file: ${result.stderr || result.stdout || "Unknown error"}`);
+  }
+}
+
+
+
+
+
+// =============================================================================
+// User OpenCode Config Types
+// =============================================================================
+
+/** Permission level for OpenCode tools */
+export type PermissionLevel = "allow" | "ask" | "deny";
+
+/** User's OpenCode permission settings */
+export interface PermissionSettings {
+  bash?: PermissionLevel;
+  write?: PermissionLevel;
+  edit?: PermissionLevel;
+  webfetch?: PermissionLevel;
+  mcp?: PermissionLevel;
+  doom_loop?: PermissionLevel;
+  external_directory?: PermissionLevel;
+}
+
+/** User's OpenCode settings */
+export interface UserOpencodeSettings {
+  theme?: string;
+  permission?: PermissionSettings;
+  provider?: Record<string, unknown>;
+}
+
+/** User OpenCode config file */
+export interface UserOpencodeFile {
+  name: string;
+  type: "agent" | "command" | "tool" | "plugin";
+  extension: string;
+  content: string;
+  id?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** Full user OpenCode config */
+export interface UserOpencodeConfig {
+  settings: UserOpencodeSettings;
+  agents_md?: string;
+  files: UserOpencodeFile[];
+}
+
+// =============================================================================
+// User OpenCode Config Commands
+// =============================================================================
+
+/**
+ * Get user's full OpenCode configuration
+ */
+export async function getUserOpencodeConfig(userId: string): Promise<UserOpencodeConfig> {
+  return invoke<UserOpencodeConfig>("get_user_opencode_config", { userId });
+}
+
+/**
+ * Update user's OpenCode settings
+ */
+export async function updateUserOpencodeSettings(
+  userId: string,
+  settings: UserOpencodeSettings
+): Promise<UserOpencodeSettings> {
+  return invoke<UserOpencodeSettings>("update_user_opencode_settings", { 
+    userId, 
+    settings 
+  });
+}
+
+/**
+ * Update user's AGENTS.md content
+ */
+export async function updateUserAgentsMd(userId: string, content: string): Promise<void> {
+  return invoke("update_user_agents_md", { userId, content });
+}
+
+/**
+ * List user's OpenCode config files
+ */
+export async function listUserOpencodeFiles(
+  userId: string,
+  fileType?: "agent" | "command" | "tool" | "plugin"
+): Promise<UserOpencodeFile[]> {
+  return invoke<UserOpencodeFile[]>("list_user_opencode_files", { 
+    userId, 
+    fileType 
+  });
+}
+
+/**
+ * Create or update a user's OpenCode config file
+ */
+export async function upsertUserOpencodeFile(
+  userId: string,
+  fileType: "agent" | "command" | "tool" | "plugin",
+  name: string,
+  content: string,
+  extension?: string
+): Promise<UserOpencodeFile> {
+  return invoke<UserOpencodeFile>("upsert_user_opencode_file", { 
+    userId, 
+    fileType, 
+    name, 
+    content,
+    extension
+  });
+}
+
+/**
+ * Delete a user's OpenCode config file
+ */
+export async function deleteUserOpencodeFile(
+  userId: string,
+  fileType: "agent" | "command" | "tool" | "plugin",
+  name: string
+): Promise<void> {
+  return invoke("delete_user_opencode_file", { userId, fileType, name });
+}
+
+// =============================================================================
+// Terminal Types (Interactive Shell)
+// =============================================================================
+
+/** Terminal connection info returned when connecting */
+export interface TerminalConnection {
+  terminalId: string;
+  sandboxId: string;
+}
+
+/** Terminal status */
+export type TerminalStatusType = "connecting" | "connected" | "disconnected" | "error";
+
+/** Payload emitted for terminal output events */
+export interface TerminalOutputPayload {
+  terminal_id: string;
+  sandbox_id: string;
+  data: string;
+}
+
+/** Payload emitted for terminal status events */
+export interface TerminalStatusPayload {
+  terminal_id: string;
+  sandbox_id: string;
+  status: TerminalStatusType;
+  shell?: string;
+  exit_code?: number;
+  error?: string;
+}
+
+// =============================================================================
+// Terminal Commands
+// =============================================================================
+
+/**
+ * Connect to a terminal session for a sandbox.
+ * Establishes a WebSocket connection to the Management API.
+ */
+export async function terminalConnect(sandboxId: string): Promise<TerminalConnection> {
+  const result = await invoke<{ terminal_id: string; sandbox_id: string }>(
+    "terminal_connect",
+    { sandboxId }
+  );
+  // Convert snake_case from Rust to camelCase for frontend
+  return {
+    terminalId: result.terminal_id,
+    sandboxId: result.sandbox_id,
+  };
+}
+
+/**
+ * Send input data to a terminal session
+ */
+export async function terminalSendInput(terminalId: string, data: string): Promise<void> {
+  return invoke("terminal_send_input", { terminalId, data });
+}
+
+/**
+ * Resize a terminal session
+ */
+export async function terminalResize(terminalId: string, cols: number, rows: number): Promise<void> {
+  return invoke("terminal_resize", { terminalId, cols, rows });
+}
+
+/**
+ * Disconnect from a terminal session
+ */
+export async function terminalDisconnect(terminalId: string): Promise<void> {
+  return invoke("terminal_disconnect", { terminalId });
+}
+
+/**
+ * List active terminal connections for a sandbox
+ */
+export async function terminalList(sandboxId: string): Promise<string[]> {
+  return invoke<string[]>("terminal_list", { sandboxId });
+}
+
+/**
+ * Disconnect all terminals for a sandbox
+ */
+export async function terminalDisconnectAll(sandboxId: string): Promise<void> {
+  return invoke("terminal_disconnect_all", { sandboxId });
+}
+
+// =============================================================================
+// Terminal Event Listeners
+// =============================================================================
+
+/**
+ * Listen for terminal output events
+ */
+export async function onTerminalOutput(
+  callback: (payload: TerminalOutputPayload) => void
+): Promise<UnlistenFn> {
+  return listen<TerminalOutputPayload>("terminal:output", (event) => {
+    callback(event.payload);
+  });
+}
+
+/**
+ * Listen for terminal status events
+ */
+export async function onTerminalStatus(
+  callback: (payload: TerminalStatusPayload) => void
+): Promise<UnlistenFn> {
+  return listen<TerminalStatusPayload>("terminal:status", (event) => {
+    callback(event.payload);
+  });
+}

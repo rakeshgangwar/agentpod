@@ -1,4 +1,4 @@
-# CodeOpen Python Flavor
+# AgentPod Python Flavor
 
 Python development environment with ML/AI support.
 
@@ -45,7 +45,7 @@ Python development environment with ML/AI support.
 ## Usage
 
 ```bash
-docker run -it codeopen-python:latest
+docker run -it agentpod-python:latest
 ```
 
 ### Creating a Virtual Environment

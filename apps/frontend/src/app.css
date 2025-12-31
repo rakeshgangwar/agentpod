@@ -1,0 +1,1763 @@
+@import "tailwindcss";
+
+@import "tw-animate-css";
+
+/* assistant-ui styles */
+@import "@assistant-ui/styles/index.css";
+@import "@assistant-ui/styles/markdown.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================
+   BUNDLED FONT DEFINITIONS
+   All fonts loaded locally from /static/fonts/
+   ============================================ */
+
+/* Inter - Clean, modern sans-serif */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/inter/inter-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/inter/inter-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/inter/inter-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/inter/inter-700.woff2') format('woff2');
+}
+
+/* JetBrains Mono - Developer's favorite monospace */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/jetbrains-mono/jetbrains-mono-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/jetbrains-mono/jetbrains-mono-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/jetbrains-mono/jetbrains-mono-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/jetbrains-mono/jetbrains-mono-700.woff2') format('woff2');
+}
+
+/* Nunito - Friendly rounded sans-serif */
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/nunito/nunito-latin-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/nunito/nunito-latin-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/nunito/nunito-latin-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/nunito/nunito-latin-700.woff2') format('woff2');
+}
+
+/* Orbitron - Futuristic display font */
+@font-face {
+  font-family: 'Orbitron';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/orbitron/orbitron-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Orbitron';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/orbitron/orbitron-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Orbitron';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/orbitron/orbitron-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Orbitron';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/orbitron/orbitron-700.woff2') format('woff2');
+}
+
+/* Rajdhani - Technical, angular sans-serif */
+@font-face {
+  font-family: 'Rajdhani';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/rajdhani/rajdhani-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Rajdhani';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/rajdhani/rajdhani-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Rajdhani';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/rajdhani/rajdhani-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Rajdhani';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/rajdhani/rajdhani-700.woff2') format('woff2');
+}
+
+/* Space Grotesk - Geometric sans with personality */
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/space-grotesk/space-grotesk-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/space-grotesk/space-grotesk-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/space-grotesk/space-grotesk-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/space-grotesk/space-grotesk-700.woff2') format('woff2');
+}
+
+/* Fira Code - Ligature-rich monospace */
+@font-face {
+  font-family: 'Fira Code';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/fira-code/fira-code-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Fira Code';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/fira-code/fira-code-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Fira Code';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/fira-code/fira-code-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Fira Code';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/fira-code/fira-code-700.woff2') format('woff2');
+}
+
+/* Quicksand - Rounded, friendly display */
+@font-face {
+  font-family: 'Quicksand';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/quicksand/quicksand-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Quicksand';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/quicksand/quicksand-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Quicksand';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/quicksand/quicksand-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Quicksand';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/quicksand/quicksand-700.woff2') format('woff2');
+}
+
+/* Source Sans 3 - Professional, readable */
+@font-face {
+  font-family: 'Source Sans 3';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/source-sans-3/source-sans-3-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Source Sans 3';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/source-sans-3/source-sans-3-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Source Sans 3';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/source-sans-3/source-sans-3-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Source Sans 3';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/source-sans-3/source-sans-3-700.woff2') format('woff2');
+}
+
+/* Source Code Pro - Adobe's monospace */
+@font-face {
+  font-family: 'Source Code Pro';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/source-code-pro/source-code-pro-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Source Code Pro';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/source-code-pro/source-code-pro-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Source Code Pro';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/source-code-pro/source-code-pro-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Source Code Pro';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/source-code-pro/source-code-pro-700.woff2') format('woff2');
+}
+
+/* Raleway - Elegant display */
+@font-face {
+  font-family: 'Raleway';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/raleway/raleway-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Raleway';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/raleway/raleway-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Raleway';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/raleway/raleway-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Raleway';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/raleway/raleway-700.woff2') format('woff2');
+}
+
+/* Poppins - Geometric, warm */
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/poppins/poppins-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/poppins/poppins-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/poppins/poppins-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/poppins/poppins-700.woff2') format('woff2');
+}
+
+/* Playfair Display - Elegant serif */
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/playfair-display/playfair-display-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/playfair-display/playfair-display-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/playfair-display/playfair-display-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/playfair-display/playfair-display-700.woff2') format('woff2');
+}
+
+/* IBM Plex Sans - Professional IBM design */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-sans/ibm-plex-sans-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-sans/ibm-plex-sans-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-sans/ibm-plex-sans-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-sans/ibm-plex-sans-700.woff2') format('woff2');
+}
+
+/* IBM Plex Mono - Professional monospace */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-mono/ibm-plex-mono-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-mono/ibm-plex-mono-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-mono/ibm-plex-mono-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-mono/ibm-plex-mono-700.woff2') format('woff2');
+}
+
+/* DM Sans - Geometric modern */
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/dm-sans/dm-sans-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/dm-sans/dm-sans-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/dm-sans/dm-sans-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/dm-sans/dm-sans-700.woff2') format('woff2');
+}
+
+/* Exo 2 - Futuristic geometric */
+@font-face {
+  font-family: 'Exo 2';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/exo-2/exo-2-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Exo 2';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/exo-2/exo-2-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Exo 2';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/exo-2/exo-2-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Exo 2';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/exo-2/exo-2-700.woff2') format('woff2');
+}
+
+/* Press Start 2P - Retro pixel font */
+@font-face {
+  font-family: 'Press Start 2P';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/press-start-2p/press-start-2p-400.woff2') format('woff2');
+}
+
+/* Lora - Elegant editorial serif */
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/lora/lora-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/lora/lora-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/lora/lora-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/lora/lora-700.woff2') format('woff2');
+}
+
+/* Cormorant Garamond - Elegant display serif */
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/cormorant-garamond/cormorant-garamond-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/cormorant-garamond/cormorant-garamond-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/cormorant-garamond/cormorant-garamond-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/cormorant-garamond/cormorant-garamond-700.woff2') format('woff2');
+}
+
+/* ============================================
+   CSS VARIABLES - THEME SYSTEM
+   ============================================ */
+
+:root {
+  /* Font family CSS variables - controlled by theme store */
+  --font-body: 'Inter';
+  --font-heading: 'Inter';
+  --font-mono: 'JetBrains Mono';
+  
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.129 0.042 264.695);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.129 0.042 264.695);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.129 0.042 264.695);
+  --primary: oklch(0.208 0.042 265.755);
+  --primary-foreground: oklch(0.984 0.003 247.858);
+  --secondary: oklch(0.968 0.007 247.896);
+  --secondary-foreground: oklch(0.208 0.042 265.755);
+  --muted: oklch(0.968 0.007 247.896);
+  --muted-foreground: oklch(0.45 0.046 257.417);
+  --accent: oklch(0.968 0.007 247.896);
+  --accent-foreground: oklch(0.208 0.042 265.755);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.70 0.013 255.508);
+  --input: oklch(0.70 0.013 255.508);
+  --ring: oklch(0.50 0.04 256.788);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.984 0.003 247.858);
+  --sidebar-foreground: oklch(0.129 0.042 264.695);
+  --sidebar-primary: oklch(0.208 0.042 265.755);
+  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-accent: oklch(0.968 0.007 247.896);
+  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
+  --sidebar-border: oklch(0.70 0.013 255.508);
+  --sidebar-ring: oklch(0.50 0.04 256.788);
+}
+
+.dark {
+  --background: oklch(0.129 0.042 264.695);
+  --foreground: oklch(0.984 0.003 247.858);
+  --card: oklch(0.208 0.042 265.755);
+  --card-foreground: oklch(0.984 0.003 247.858);
+  --popover: oklch(0.208 0.042 265.755);
+  --popover-foreground: oklch(0.984 0.003 247.858);
+  --primary: oklch(0.929 0.013 255.508);
+  --primary-foreground: oklch(0.208 0.042 265.755);
+  --secondary: oklch(0.279 0.041 260.031);
+  --secondary-foreground: oklch(0.984 0.003 247.858);
+  --muted: oklch(0.279 0.041 260.031);
+  --muted-foreground: oklch(0.704 0.04 256.788);
+  --accent: oklch(0.279 0.041 260.031);
+  --accent-foreground: oklch(0.984 0.003 247.858);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.551 0.027 264.364);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.208 0.042 265.755);
+  --sidebar-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-accent: oklch(0.279 0.041 260.031);
+  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.551 0.027 264.364);
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body), system-ui, sans-serif;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading), system-ui, sans-serif;
+  }
+  code, pre, .font-mono {
+    font-family: var(--font-mono), ui-monospace, monospace;
+  }
+  /* Utility class for heading font on non-heading elements */
+  .font-heading {
+    font-family: var(--font-heading), system-ui, sans-serif;
+  }
+}
+
+/* ============================================
+   THEME TRANSITION
+   Smooth transitions when switching themes.
+   Only transitions large surfaces (backgrounds)
+   to reduce eye strain. Text changes instantly
+   for readability.
+   ============================================ */
+
+/* Large surfaces that should transition smoothly */
+body,
+main,
+aside,
+header,
+footer,
+nav,
+section,
+article,
+.cyber-card,
+.grid-bg,
+.mesh-gradient,
+[data-slot="content"],
+[data-slot="sidebar"],
+[role="dialog"],
+[role="menu"],
+[data-radix-popper-content-wrapper] {
+  transition: 
+    background-color 0.5s ease,
+    background 0.5s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+/* Noise overlay opacity transition */
+.noise-overlay {
+  transition: opacity 0.5s ease;
+}
+
+/* Scrollbars should also transition */
+::-webkit-scrollbar-track {
+  transition: background-color 0.5s ease;
+}
+::-webkit-scrollbar-thumb {
+  transition: background-color 0.5s ease;
+}
+
+/* Respect user preference for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  body,
+  main,
+  aside,
+  header,
+  footer,
+  nav,
+  section,
+  article,
+  .cyber-card,
+  .grid-bg,
+  .mesh-gradient,
+  .noise-overlay,
+  [data-slot="content"],
+  [data-slot="sidebar"],
+  [role="dialog"],
+  [role="menu"],
+  [data-radix-popper-content-wrapper],
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-thumb {
+    transition: none;
+  }
+}
+
+/* ============================================
+   TERMINAL/CYBERPUNK DESIGN SYSTEM
+   ============================================ */
+
+/* Custom color palette for cyberpunk theme
+   These are fallback values - the theme store will override them
+   with theme-specific colors when a preset is applied.
+   Light mode values are darkened for WCAG AA contrast (4.5:1) on white.
+   Foreground colors are set for proper contrast when used as backgrounds. */
+:root {
+  --cyber-cyan: oklch(0.30 0.18 192);
+  --cyber-cyan-dim: oklch(0.25 0.14 192);
+  --cyber-cyan-foreground: #ffffff;
+  --cyber-emerald: oklch(0.30 0.18 160);
+  --cyber-emerald-foreground: #ffffff;
+  --cyber-magenta: oklch(0.30 0.2 330);
+  --cyber-magenta-foreground: #ffffff;
+  --cyber-amber: oklch(0.30 0.18 85);
+  --cyber-amber-foreground: #ffffff;
+  --cyber-red: oklch(0.30 0.22 25);
+  --cyber-red-foreground: #ffffff;
+  --cyber-glow: 0 0 12px oklch(0.30 0.18 192 / 0.2);
+  --cyber-glow-emerald: 0 0 12px oklch(0.30 0.18 160 / 0.2);
+  --noise-opacity: 0.03;
+}
+
+/* Dark mode fallback values (theme store overrides these) */
+.dark {
+  --cyber-cyan: oklch(0.85 0.15 192);
+  --cyber-cyan-dim: oklch(0.65 0.12 192);
+  --cyber-cyan-foreground: #000000;
+  --cyber-emerald: oklch(0.75 0.18 160);
+  --cyber-emerald-foreground: #000000;
+  --cyber-magenta: oklch(0.7 0.2 330);
+  --cyber-magenta-foreground: #000000;
+  --cyber-amber: oklch(0.8 0.18 85);
+  --cyber-amber-foreground: #000000;
+  --cyber-red: oklch(0.65 0.22 25);
+  --cyber-red-foreground: #000000;
+  --cyber-glow: 0 0 20px oklch(0.85 0.15 192 / 0.3);
+  --cyber-glow-emerald: 0 0 20px oklch(0.75 0.18 160 / 0.3);
+  --noise-opacity: 0.05;
+}
+
+/* Noise texture overlay */
+.noise-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: var(--noise-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+}
+
+/* Grid background pattern */
+.grid-bg {
+  background-image: 
+    linear-gradient(to right, oklch(0.5 0 0 / 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(0.5 0 0 / 0.05) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.dark .grid-bg {
+  background-image: 
+    linear-gradient(to right, oklch(1 0 0 / 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(1 0 0 / 0.03) 1px, transparent 1px);
+}
+
+/* Gradient mesh background */
+.mesh-gradient {
+  background: 
+    radial-gradient(ellipse at 20% 20%, color-mix(in oklch, var(--cyber-cyan) 8%, transparent) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, color-mix(in oklch, var(--cyber-emerald) 6%, transparent) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, color-mix(in oklch, var(--cyber-magenta) 4%, transparent) 0%, transparent 60%);
+}
+
+.dark .mesh-gradient {
+  background: 
+    radial-gradient(ellipse at 20% 20%, color-mix(in oklch, var(--cyber-cyan) 12%, transparent) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, color-mix(in oklch, var(--cyber-emerald) 8%, transparent) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, color-mix(in oklch, var(--cyber-magenta) 5%, transparent) 0%, transparent 60%);
+}
+
+/* Scanline effect */
+.scanlines {
+  position: relative;
+}
+
+.scanlines::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    oklch(0 0 0 / 0.02) 2px,
+    oklch(0 0 0 / 0.02) 4px
+  );
+  pointer-events: none;
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+/* Staggered fade-in animation */
+@keyframes fade-in-up {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes slide-in-right {
+  0% {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s ease-out forwards;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out forwards;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.4s ease-out forwards;
+}
+
+/* Stagger delays */
+.stagger-1 { animation-delay: 0.05s; opacity: 0; }
+.stagger-2 { animation-delay: 0.1s; opacity: 0; }
+.stagger-3 { animation-delay: 0.15s; opacity: 0; }
+.stagger-4 { animation-delay: 0.2s; opacity: 0; }
+.stagger-5 { animation-delay: 0.25s; opacity: 0; }
+.stagger-6 { animation-delay: 0.3s; opacity: 0; }
+.stagger-7 { animation-delay: 0.35s; opacity: 0; }
+.stagger-8 { animation-delay: 0.4s; opacity: 0; }
+
+/* Pulse animation for status indicators */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 4px currentColor, 0 0 8px currentColor;
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 8px currentColor, 0 0 16px currentColor;
+    opacity: 0.8;
+  }
+}
+
+@keyframes pulse-dot {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.7;
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+/* Typing cursor animation */
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.typing-cursor::after {
+  content: '_';
+  animation: blink 1s step-end infinite;
+  color: var(--cyber-cyan);
+}
+
+/* Streaming text cursor (ChatGPT/Claude-style) */
+.streaming-cursor {
+  display: inline-block;
+  width: 0.5em;
+  margin-left: 1px;
+  animation: cursor-blink 0.75s step-end infinite;
+  color: var(--foreground);
+  font-weight: normal;
+}
+
+@keyframes cursor-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.streaming-text-container {
+  display: inline;
+}
+
+/* Glitch effect for headers */
+@keyframes glitch {
+  0%, 90%, 100% {
+    transform: translate(0);
+    text-shadow: none;
+  }
+  92% {
+    transform: translate(-2px, 1px);
+    text-shadow: 2px 0 var(--cyber-magenta);
+  }
+  94% {
+    transform: translate(2px, -1px);
+    text-shadow: -2px 0 var(--cyber-cyan);
+  }
+  96% {
+    transform: translate(-1px, 2px);
+    text-shadow: 1px 0 var(--cyber-emerald);
+  }
+  98% {
+    transform: translate(1px, -2px);
+    text-shadow: -1px 0 var(--cyber-magenta);
+  }
+}
+
+.glitch-hover:hover {
+  animation: glitch 0.5s ease-in-out;
+}
+
+/* Border glow animation */
+@keyframes border-glow {
+  0%, 100% {
+    border-color: color-mix(in oklch, var(--cyber-cyan) 30%, transparent);
+    box-shadow: 0 0 10px color-mix(in oklch, var(--cyber-cyan) 10%, transparent);
+  }
+  50% {
+    border-color: color-mix(in oklch, var(--cyber-cyan) 60%, transparent);
+    box-shadow: 0 0 20px color-mix(in oklch, var(--cyber-cyan) 20%, transparent);
+  }
+}
+
+.animate-border-glow {
+  animation: border-glow 3s ease-in-out infinite;
+}
+
+/* Collapsible animations for bits-ui Collapsible */
+@keyframes collapsible-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--bits-collapsible-content-height);
+  }
+}
+
+@keyframes collapsible-up {
+  from {
+    height: var(--bits-collapsible-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+.animate-collapsible-down {
+  animation: collapsible-down 0.2s ease-out;
+}
+
+.animate-collapsible-up {
+  animation: collapsible-up 0.2s ease-out;
+}
+
+/* Glow sweep animation for session status indicator */
+@keyframes glow-sweep {
+  0% {
+    background-position: -100% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-glow-sweep {
+  animation: glow-sweep 2s ease-in-out infinite alternate;
+}
+
+/* ============================================
+   CYBERPUNK CARD STYLES
+   ============================================ */
+
+.cyber-card {
+  background: hsl(var(--card) / 0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid hsl(var(--border) / 0.5);
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.dark .cyber-card {
+  background: hsl(var(--card) / 0.7);
+  border-color: hsl(var(--border) / 0.5);
+}
+
+.cyber-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--cyber-cyan) 20%,
+    var(--cyber-cyan) 80%,
+    transparent
+  );
+  opacity: 0.5;
+}
+
+.cyber-card:hover {
+  border-color: color-mix(in oklch, var(--cyber-cyan) 30%, transparent);
+  box-shadow: 
+    0 4px 24px hsl(var(--background) / 0.1),
+    0 0 30px color-mix(in oklch, var(--cyber-cyan) 5%, transparent);
+  transform: translateY(-2px);
+}
+
+.dark .cyber-card:hover {
+  border-color: color-mix(in oklch, var(--cyber-cyan) 40%, transparent);
+  box-shadow: 
+    0 4px 24px hsl(var(--background) / 0.3),
+    0 0 40px color-mix(in oklch, var(--cyber-cyan) 10%, transparent);
+}
+
+/* Corner accents for cards */
+.corner-accent {
+  position: relative;
+}
+
+.corner-accent::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 24px;
+  height: 24px;
+  border-right: 2px solid var(--cyber-cyan);
+  border-bottom: 2px solid var(--cyber-cyan);
+  opacity: 0.3;
+  transition: opacity 0.3s ease;
+}
+
+.corner-accent:hover::after {
+  opacity: 0.6;
+}
+
+/* ============================================
+   STATUS INDICATORS
+   ============================================ */
+
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+}
+
+.status-running {
+  color: var(--cyber-emerald);
+  background: color-mix(in oklch, var(--cyber-emerald) 10%, transparent);
+  border: 1px solid color-mix(in oklch, var(--cyber-emerald) 30%, transparent);
+}
+
+.status-running .status-dot {
+  background: var(--cyber-emerald);
+  box-shadow: 0 0 8px var(--cyber-emerald);
+}
+
+.status-stopped {
+  color: var(--muted-foreground);
+  background: color-mix(in oklch, var(--muted-foreground) 10%, transparent);
+  border: 1px solid color-mix(in oklch, var(--muted-foreground) 30%, transparent);
+}
+
+.status-stopped .status-dot {
+  background: var(--muted-foreground);
+}
+
+.dark .status-stopped {
+  color: var(--muted-foreground);
+}
+
+.status-starting, .status-stopping {
+  color: var(--cyber-amber);
+  background: color-mix(in oklch, var(--cyber-amber) 10%, transparent);
+  border: 1px solid color-mix(in oklch, var(--cyber-amber) 30%, transparent);
+}
+
+.status-starting .status-dot, .status-stopping .status-dot {
+  background: var(--cyber-amber);
+  box-shadow: 0 0 8px var(--cyber-amber);
+}
+
+.status-error {
+  color: var(--cyber-red);
+  background: color-mix(in oklch, var(--cyber-red) 10%, transparent);
+  border: 1px solid color-mix(in oklch, var(--cyber-red) 30%, transparent);
+}
+
+.status-error .status-dot {
+  background: var(--cyber-red);
+  box-shadow: 0 0 8px var(--cyber-red);
+}
+
+.status-sleeping {
+  color: var(--cyber-magenta);
+  background: color-mix(in oklch, var(--cyber-magenta) 10%, transparent);
+  border: 1px solid color-mix(in oklch, var(--cyber-magenta) 30%, transparent);
+}
+
+.status-sleeping .status-dot {
+  background: var(--cyber-magenta);
+  box-shadow: 0 0 8px var(--cyber-magenta);
+  animation: pulse-slow 3s ease-in-out infinite;
+}
+
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.95);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 4s ease-in-out infinite;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+/* ============================================
+   SESSION ACTIVITY INDICATORS
+   ============================================ */
+
+
+
+/* Session activity indicator badge with "working" label */
+.session-activity-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 2px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  color: var(--cyber-amber);
+  background: color-mix(in oklch, var(--cyber-amber) 10%, transparent);
+  border: 1px solid color-mix(in oklch, var(--cyber-amber) 30%, transparent);
+}
+
+.session-activity-indicator .activity-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cyber-amber);
+  box-shadow: 0 0 8px var(--cyber-amber);
+  animation: activity-pulse 1s ease-in-out infinite;
+}
+
+/* Small badge version for compact/list views */
+.session-activity-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: color-mix(in oklch, var(--cyber-amber) 15%, transparent);
+  border: 1px solid color-mix(in oklch, var(--cyber-amber) 40%, transparent);
+}
+
+.session-activity-badge .activity-dot-small {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cyber-amber);
+  box-shadow: 0 0 6px var(--cyber-amber);
+  animation: activity-pulse 1s ease-in-out infinite;
+}
+
+@keyframes activity-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.85);
+  }
+}
+
+/* ============================================
+   CYBER BUTTONS
+   ============================================ */
+
+.cyber-btn {
+  position: relative;
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid var(--cyber-cyan);
+  color: var(--cyber-cyan);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+}
+
+.cyber-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--cyber-cyan);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  clip-path: inherit;
+}
+
+.cyber-btn:hover {
+  color: hsl(var(--background));
+  text-shadow: none;
+}
+
+.cyber-btn:hover::before {
+  opacity: 1;
+}
+
+.cyber-btn span {
+  position: relative;
+  z-index: 1;
+}
+
+.cyber-btn-primary {
+  background: var(--cyber-cyan);
+  color: var(--cyber-cyan-foreground);
+  font-weight: 600;
+}
+
+.cyber-btn-primary:hover {
+  background: color-mix(in oklch, var(--cyber-cyan) 85%, white);
+  box-shadow: var(--cyber-glow);
+}
+
+.cyber-btn-danger {
+  border-color: var(--cyber-red);
+  color: var(--cyber-red);
+}
+
+.cyber-btn-danger::before {
+  background: var(--cyber-red);
+}
+
+/* ============================================
+   ASCII DECORATIONS
+   ============================================ */
+
+.ascii-border-top {
+  position: relative;
+}
+
+.ascii-border-top::before {
+  content: '[ ';
+  color: var(--cyber-cyan);
+  opacity: 0.5;
+}
+
+.ascii-border-top::after {
+  content: ' ]';
+  color: var(--cyber-cyan);
+  opacity: 0.5;
+}
+
+/* Terminal-style prefix */
+.terminal-prefix::before {
+  content: '>';
+  margin-right: 8px;
+  color: var(--cyber-cyan);
+  font-weight: bold;
+}
+
+/* ============================================
+   HEALTH INDICATOR
+   ============================================ */
+
+.health-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: hsl(var(--muted) / 0.3);
+  border: 1px solid hsl(var(--border) / 0.5);
+  border-radius: 2px;
+  font-size: 11px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dark .health-indicator {
+  background: hsl(var(--muted) / 0.3);
+  border-color: hsl(var(--border) / 0.5);
+}
+
+.health-indicator.healthy {
+  color: var(--cyber-emerald);
+  border-color: color-mix(in oklch, var(--cyber-emerald) 30%, transparent);
+}
+
+.health-indicator.unhealthy {
+  color: var(--cyber-red);
+  border-color: color-mix(in oklch, var(--cyber-red) 30%, transparent);
+}
+
+/* assistant-ui custom styles */
+@layer components {
+  /* Thread container */
+  .aui-thread-root {
+    --aui-thread-background: var(--background);
+    --aui-thread-foreground: var(--foreground);
+    height: 100%;
+  }
+
+  /* Messages */
+  .aui-assistant-message {
+    background: var(--muted);
+    border-radius: var(--radius);
+  }
+
+  .aui-user-message {
+    background: var(--primary);
+    color: var(--primary-foreground);
+    border-radius: var(--radius);
+  }
+
+  /* Composer (input area) */
+  .aui-composer-root {
+    border-top: 1px solid var(--border);
+    background: var(--background);
+  }
+
+  .aui-composer-input {
+    background: var(--input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .aui-composer-input:focus {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* Send button */
+  .aui-composer-send {
+    background: var(--primary);
+    color: var(--primary-foreground);
+    border-radius: var(--radius);
+  }
+
+  .aui-composer-send:hover {
+    opacity: 0.9;
+  }
+
+  .aui-composer-send:disabled {
+    opacity: 0.5;
+  }
+
+  /* Markdown content */
+  .aui-md {
+    color: var(--foreground);
+  }
+
+  .aui-md pre {
+    background: var(--muted);
+    border-radius: var(--radius);
+    overflow-x: auto;
+  }
+
+  .aui-md code {
+    background: var(--muted);
+    padding: 0.2em 0.4em;
+    border-radius: calc(var(--radius) - 2px);
+    font-size: 0.875em;
+  }
+
+  .aui-md pre code {
+    background: transparent;
+    padding: 0;
+  }
+
+  /* Tables */
+  .aui-md-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1em 0;
+    font-size: 0.875em;
+  }
+
+  .aui-md-thead {
+    background: var(--muted);
+  }
+
+  .aui-md-tr {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .aui-md-th {
+    padding: 0.75em 1em;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid var(--border);
+  }
+
+  .aui-md-td {
+    padding: 0.75em 1em;
+    text-align: left;
+  }
+
+  /* Task list checkboxes */
+  .aui-md-checkbox {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 1rem;
+    height: 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: 0.25rem;
+    background: var(--background);
+    vertical-align: middle;
+    cursor: default;
+    position: relative;
+  }
+
+  .aui-md-checkbox:checked {
+    background: var(--primary);
+    border-color: var(--primary);
+  }
+
+  .aui-md-checkbox:checked::after {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 1px;
+    width: 4px;
+    height: 8px;
+    border: solid var(--primary-foreground);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+
+  /* Task list items (with checkboxes) - remove bullet */
+  .aui-md-ul:has(.aui-md-checkbox) {
+    list-style: none;
+    padding-left: 0;
+  }
+
+  .aui-md-li:has(> .aui-md-checkbox) {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  /* Scroll area */
+  .aui-thread-viewport {
+    scrollbar-width: thin;
+    scrollbar-color: var(--muted-foreground) transparent;
+  }
+
+  .aui-thread-viewport::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .aui-thread-viewport::-webkit-scrollbar-thumb {
+    background: var(--muted-foreground);
+    border-radius: 4px;
+  }
+
+  .aui-thread-viewport::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /* Agent switch animation (triggered by keyboard shortcut) */
+  @keyframes agent-switch {
+    0% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 oklch(var(--primary) / 0.4);
+    }
+    50% {
+      transform: scale(1.03);
+      box-shadow: 0 0 0 4px oklch(var(--primary) / 0.2);
+    }
+    100% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 oklch(var(--primary) / 0);
+    }
+  }
+
+  .animate-agent-switch {
+    animation: agent-switch 0.3s ease-out;
+  }
+}
+
+/* ============================================
+   RESPONSIVE UTILITIES
+   Utilities for mobile-first responsive design
+   ============================================ */
+
+/* Safe area insets for iOS devices (notch, home indicator) */
+.safe-area-pt {
+  padding-top: env(safe-area-inset-top);
+}
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.safe-area-pl {
+  padding-left: env(safe-area-inset-left);
+}
+.safe-area-pr {
+  padding-right: env(safe-area-inset-right);
+}
+.safe-area-p {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Touch target minimum - ensures 44x44px minimum tap area */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Hide scrollbar but keep scroll functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Responsive container with consistent padding */
+.responsive-container {
+  @apply px-4 sm:px-6 lg:px-8;
+}
+
+/* Mobile-only visibility */
+.mobile-only {
+  @apply md:hidden;
+}
+
+/* Desktop-only visibility */
+.desktop-only {
+  @apply hidden md:block;
+}
+
+/* Prevent text selection on interactive elements (mobile UX) */
+.no-select {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Improve touch responsiveness */
+.touch-manipulation {
+  touch-action: manipulation;
+}
+
+/* Stack layout for mobile file browser and similar patterns */
+.mobile-stack {
+  @apply flex flex-col h-full;
+}
+
+.mobile-stack-header {
+  @apply flex-shrink-0 border-b border-border;
+}
+
+.mobile-stack-content {
+  @apply flex-1 overflow-auto;
+}
+
+/* Workflow node execution states */
+.node-running {
+  animation: node-pulse 2s ease-in-out infinite;
+}
+
+@keyframes node-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(245, 158, 11, 0);
+  }
+}

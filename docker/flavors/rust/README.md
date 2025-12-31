@@ -1,4 +1,4 @@
-# CodeOpen Rust Flavor
+# AgentPod Rust Flavor
 
 Rust development environment.
 
@@ -42,7 +42,7 @@ Rust development environment.
 ## Usage
 
 ```bash
-docker run -it codeopen-rust:latest
+docker run -it agentpod-rust:latest
 ```
 
 ### Creating a New Project
@@ -90,5 +90,5 @@ cargo fmt
 
 | Variable | Value | Description |
 |----------|-------|-------------|
-| `CARGO_HOME` | /home/developer/.cargo | Cargo home |
-| `RUSTUP_HOME` | /home/developer/.rustup | Rustup home |
+| `CARGO_HOME` | /home/.cargo | Cargo home |
+| `RUSTUP_HOME` | /home/.rustup | Rustup home |

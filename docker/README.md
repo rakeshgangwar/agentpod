@@ -1,331 +1,327 @@
-# OpenCode Container Images
+# AgentPod Container System
 
-This directory contains Docker images for OpenCode development environments, built and pushed automatically via Forgejo Actions.
+This directory contains the modular container system for AgentPod development environments. The system consists of a base image and language-specific flavors.
 
-## Container Images
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      AgentPod Architecture                       │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌──────────────┐    ┌──────────────┐                           │
+│  │   Mobile     │    │   Desktop    │                           │
+│  │   App        │    │   App        │                           │
+│  └──────┬───────┘    └──────┬───────┘                           │
+│         │                   │                                    │
+│         └───────────────────┤                                    │
+│                             │                                    │
+│                             ▼                                    │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │                    Traefik Proxy                          │   │
+│  │              (*.localhost / *.your-domain.com)            │   │
+│  └──────────────────────────┬───────────────────────────────┘   │
+│                             │                                    │
+│         ┌───────────────────┼───────────────────┐               │
+│         ▼                   ▼                   ▼               │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐        │
+│  │ Management  │    │  Sandbox 1  │    │  Sandbox 2  │        │
+│  │    API      │    │ (container) │    │ (container) │        │
+│  │  (Better    │    │             │    │             │        │
+│  │   Auth)     │    │ - OpenCode  │    │ - OpenCode  │        │
+│  └──────┬──────┘    │ - Homepage  │    │ - Homepage  │        │
+│         │           │ - ACP GW    │    │ - ACP GW    │        │
+│         │           └──────┬──────┘    └─────────────┘        │
+│         │                  │                                    │
+│         ▼                  ▼                                    │
+│  ┌─────────────┐    ┌─────────────┐                            │
+│  │  SQLite DB  │    │  Workspace  │  (mounted volume)          │
+│  │  (auth,     │    │  /workspace │                            │
+│  │   config)   │    │             │                            │
+│  └─────────────┘    └─────────────┘                            │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Key Changes (v0.4.0)
+
+The new architecture removes external dependencies:
+
+| Old (v0.3.x) | New (v0.4.0) | Reason |
+|--------------|--------------|--------|
+| Coolify | Direct Docker API | Simpler, faster, more control |
+| Forgejo | Filesystem Git | Workspaces mounted as volumes |
+| Keycloak | Better Auth | Lighter, easier to configure |
+
+## Image Hierarchy
+
+```
+agentpod-base
+    │
+    ├── agentpod-js (JavaScript/TypeScript)
+    ├── agentpod-python (Python + ML/AI)
+    ├── agentpod-go (Go)
+    ├── agentpod-rust (Rust)
+    ├── agentpod-fullstack (JS + Python) ← default
+    └── agentpod-polyglot (All languages)
+```
+
+## Quick Start (Local Development)
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/rakeshgangwar/agentpod.git
+cd agentpod
+
+# 2. Copy environment files
+cp .env.example .env
+
+# 3. Start the infrastructure
+docker compose up -d
+
+# 4. Check status
+docker compose ps
+docker compose logs -f api
+
+# 5. Access the services
+# - API: http://api.localhost
+# - Traefik Dashboard: http://localhost:8080
+```
+
+## Available Images
+
+### Base Image
 
 | Image | Description | Size |
 |-------|-------------|------|
-| `opencode-cli` | CLI-based development environment with Code Server | ~1.5 GB |
-| `opencode-desktop` | Desktop environment with VNC access and Code Server | ~1 GB |
+| `agentpod-base` | Foundation with Node.js 22, Bun, OpenCode CLI, ACP Gateway | ~500MB |
 
-### Registry
+### Flavors (Language Environments)
 
-Images are hosted on Forgejo Container Registry:
-```
-forgejo.superchotu.com/rakeshgangwar/opencode-cli:latest
-forgejo.superchotu.com/rakeshgangwar/opencode-desktop:latest
-```
+| Flavor | Languages | Size (approx) |
+|--------|-----------|---------------|
+| `agentpod-js` | JavaScript, TypeScript, Deno | ~800MB |
+| `agentpod-python` | Python 3.12, Jupyter, ML tools | ~1.2GB |
+| `agentpod-go` | Go 1.22, common Go tools | ~900MB |
+| `agentpod-rust` | Rust stable, cargo tools | ~1.1GB |
+| `agentpod-fullstack` | JavaScript + Python (default) | ~1.8GB |
+| `agentpod-polyglot` | All languages | ~3GB |
 
-## Container Tiers
+## Ports
 
-| Tier | CPU | RAM | Storage | Image | Ports |
-|------|-----|-----|---------|-------|-------|
-| Lite (default) | 1 | 2GB | 20GB | opencode-cli | 4096, 8080 |
-| Standard | 2 | 4GB | 30GB | opencode-cli | 4096, 8080 |
-| Pro | 4 | 8GB | 50GB | opencode-cli | 4096, 8080 |
-| Desktop | 8 | 16GB | 75GB | opencode-desktop | 4096, 8080, 6080 |
+| Port | Service | Description |
+|------|---------|-------------|
+| 80 | nginx | Main entry point (reverse proxy) |
+| 4096 | OpenCode | OpenCode server API |
+| 4097 | ACP Gateway | Multi-agent orchestration |
+| 3000 | Homepage | Project homepage/dashboard |
 
-## What's Included
+## Environment Variables
 
-### opencode-cli
-
-- **OS**: Ubuntu 24.04 LTS
-- **Node.js**: 22 LTS + pnpm
-- **Python**: 3.12
-- **Go**: 1.22.4
-- **Rust**: Latest stable (via rustup)
-- **CLI Tools**: ripgrep, fd, bat, fzf, yq, gh (GitHub CLI), httpie
-- **OpenCode**: Pre-installed globally
-- **Code Server**: VS Code in browser (port 8080)
-- **Ports**:
-  - 4096: OpenCode API
-  - 8080: Code Server (VS Code)
-
-### opencode-desktop
-
-- **Base**: Same as CLI (without Go/Rust to reduce size)
-- **Desktop**: Openbox window manager + tint2 panel
-- **VNC**: x11vnc + noVNC (web-based access)
-- **GUI Apps**: xterm, pcmanfm (file manager), gedit (text editor)
-- **Code Server**: VS Code in browser (port 8080)
-- **Ports**: 
-  - 4096: OpenCode API
-  - 8080: Code Server (VS Code)
-  - 6080: noVNC (web desktop)
-  - 5901: VNC direct access
-
-## Code Server
-
-Both container images include [code-server](https://github.com/coder/code-server), providing VS Code in your browser.
-
-### Access
-
-- **URL Pattern**: `https://code-{project-slug}.{wildcard-domain}`
-- **Port**: 8080
-
-### Environment Variables
+### Container Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CODE_SERVER_PORT` | `8080` | Port for code-server |
-| `CODE_SERVER_AUTH` | `none` | Authentication: `none` or `password` |
-| `CODE_SERVER_PASSWORD` | - | Password when `CODE_SERVER_AUTH=password` |
+| `SANDBOX_ID` | - | Unique sandbox identifier |
+| `PROJECT_NAME` | `AgentPod Project` | Project display name |
+| `PROJECT_SLUG` | `project` | URL slug for the project |
+| `USER_ID` | - | User identifier for config |
+| `OPENCODE_PORT` | `4096` | OpenCode server port |
+| `ACP_GATEWAY_PORT` | `4097` | ACP Gateway port |
+| `HOMEPAGE_PORT` | `3000` | Homepage service port |
+| `WILDCARD_DOMAIN` | `localhost` | Domain for URL generation |
 
-### Authentication (Future)
+### Workspace Configuration
 
-Currently, code-server runs with `--auth none` for development convenience. To enable password authentication:
+| Variable | Description |
+|----------|-------------|
+| `GIT_REPO_URL` | Git repository URL to clone (optional) |
+| `GIT_USERNAME` | Git authentication username |
+| `GIT_TOKEN` | Git authentication token |
+| `GIT_BRANCH` | Branch to checkout (default: main) |
+| `GIT_USER_NAME` | Git commit author name |
+| `GIT_USER_EMAIL` | Git commit author email |
 
-```bash
-# Set environment variables when starting container
-CODE_SERVER_AUTH=password
-CODE_SERVER_PASSWORD=your-secure-password
+### OpenCode Configuration
+
+| Variable | Description |
+|----------|-------------|
+| `OPENCODE_AUTH_JSON` | LLM provider credentials (JSON) |
+| `OPENCODE_CONFIG_JSON` | OpenCode configuration (JSON) |
+| `AGENT_MODEL` | Model for AgentPod agents (e.g., `copilot/gpt-4o`). If not set, agents use global/default model |
+
+### Legacy Variables (Deprecated)
+
+These are still supported for backward compatibility:
+
+| Variable | Replacement |
+|----------|-------------|
+| `FORGEJO_REPO_URL` | `GIT_REPO_URL` |
+| `FORGEJO_USER` | `GIT_USERNAME` |
+| `FORGEJO_TOKEN` | `GIT_TOKEN` |
+
+## Workspace Modes
+
+### Mode 1: Pre-mounted Workspace (Recommended)
+
+The workspace is mounted as a Docker volume. No cloning needed.
+
+```yaml
+# docker-compose.yml
+services:
+  sandbox:
+    image: agentpod-fullstack:latest
+    volumes:
+      - ./my-project:/home/workspace
 ```
 
-### Extensions
+### Mode 2: Clone from Remote
 
-Extensions can be installed directly in code-server. They are stored in `~/.local/share/code-server/extensions/`. Note that extensions are ephemeral - they will be lost when the container is recreated. Future versions will support persistent extension storage.
+Clone a repository on container startup.
 
----
-
-## CI/CD Pipeline
-
-### Forgejo Actions Workflow
-
-Located at: `.forgejo/workflows/build-containers.yml`
-
-**Triggers:**
-- Push to `main` branch (changes in `docker/` directory)
-- Tag push (`v*`)
-- Manual dispatch
-
-**Jobs:**
-- `build-cli`: Builds and pushes opencode-cli
-- `build-desktop`: Builds and pushes opencode-desktop
-- `summary`: Reports build status
-
-### Versioning
-
-Version is read from `docker/VERSION` file. Current: `0.0.1`
-
-To release a new version:
-```bash
-echo "0.0.2" > docker/VERSION
-git add docker/VERSION
-git commit -m "chore: bump container version to 0.0.2"
-git push forgejo main
+```yaml
+# docker-compose.yml
+services:
+  sandbox:
+    image: agentpod-fullstack:latest
+    environment:
+      - GIT_REPO_URL=https://github.com/user/repo.git
+      - GIT_USERNAME=myuser
+      - GIT_TOKEN=ghp_xxxxx
 ```
 
-## Local Development
+## Building Images
 
-### Build Locally
+### Prerequisites
+
+- Docker with Buildx
+- Access to container registry (for push)
+
+### Build Commands
 
 ```bash
 cd docker
-./scripts/build.sh cli      # Build CLI only
-./scripts/build.sh desktop  # Build Desktop only
-./scripts/build.sh all      # Build both
+
+# Build everything
+./scripts/build.sh
+
+# Build specific components
+./scripts/build-base.sh
+./scripts/build-flavor.sh fullstack
+
+# Build with options
+./scripts/build.sh --no-cache --push
+./scripts/build-flavor.sh python --push
+
+# Build specific flavors only
+./scripts/build.sh --flavors js,python
 ```
 
-Note: Building on ARM64 (Mac M1/M2) requires `--platform linux/amd64` which is slow. Prefer using CI.
+### Build Order
 
-### Push Manually
+1. Base image (always first)
+2. Flavors (depend on base)
+
+## Directory Structure
+
+```
+docker/
+├── base/                          # Base image
+│   ├── Dockerfile
+│   ├── entrypoint.sh
+│   ├── README.md
+│   ├── scripts/
+│   │   └── common-setup.sh
+│   ├── nginx/
+│   │   └── nginx.conf
+│   ├── acp-gateway/               # ACP Gateway service
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   └── src/
+│   └── homepage/                  # Homepage service
+│       ├── package.json
+│       └── src/
+├── flavors/                       # Language environments
+│   ├── js/
+│   ├── python/
+│   ├── go/
+│   ├── rust/
+│   ├── fullstack/
+│   └── polyglot/
+├── scripts/                       # Build scripts
+│   ├── config.sh
+│   ├── build.sh
+│   ├── build-base.sh
+│   ├── build-flavor.sh
+│   ├── push.sh
+│   └── login.sh
+├── README.md
+└── VERSION
+```
+
+## agentpod.toml Configuration
+
+Projects can include an `agentpod.toml` file to configure their sandbox:
+
+```toml
+[project]
+name = "my-project"
+description = "A cool project"
+
+[environment]
+base = "fullstack"  # js, python, go, rust, fullstack, polyglot
+
+[environment.languages]
+node = "22"
+python = "3.12"
+
+[resources]
+tier = "builder"  # starter, builder, creator, power
+
+[lifecycle]
+setup = "npm install"
+dev = "npm run dev"
+build = "npm run build"
+test = "npm test"
+
+[ports]
+3000 = { label = "Dev Server", public = true }
+```
+
+## Troubleshooting
+
+### Container Won't Start
+
+1. Check logs: `docker compose logs sandbox`
+2. Verify Docker socket is accessible
+3. Check if ports are already in use
+
+### Workspace Not Mounted
+
+1. Ensure the host path exists
+2. Check Docker volume permissions
+3. Verify SELinux/AppArmor settings (Linux)
+
+### Build Fails on ARM64 (Mac M1/M2)
+
+Use `--platform linux/amd64` or build via CI:
 
 ```bash
-./scripts/login.sh          # Login to registry
-./scripts/push.sh all       # Push images
+BUILD_PLATFORM=linux/amd64 ./scripts/build-base.sh
 ```
 
----
+## Migration from v0.3.x
 
-# Setup Guide
+### Breaking Changes
 
-## Forgejo Runner Setup
+1. **No more Forgejo**: Workspaces are now mounted volumes
+2. **No more Coolify**: Direct Docker API management
+3. **No more Keycloak**: Better Auth handles authentication
+4. **Environment variables renamed**: `FORGEJO_*` → `GIT_*`
 
-The Forgejo Runner executes CI jobs on the Coolify server.
+### Migration Steps
 
-### Installation
-
-```bash
-ssh root@162.55.48.175
-
-# Create runner directory
-mkdir -p /opt/forgejo-runner && cd /opt/forgejo-runner
-
-# Download runner
-curl -L -o forgejo-runner https://code.forgejo.org/forgejo/runner/releases/download/v3.5.1/forgejo-runner-3.5.1-linux-amd64
-chmod +x forgejo-runner
-```
-
-### Registration
-
-1. Get a registration token from: https://forgejo.superchotu.com/admin/actions/runners
-2. Register the runner:
-
-```bash
-./forgejo-runner register \
-  --instance https://forgejo.superchotu.com \
-  --token <REGISTRATION_TOKEN> \
-  --name coolify-runner \
-  --labels ubuntu-latest:host \
-  --no-interactive
-```
-
-**Important:** Use `ubuntu-latest:host` (not `docker://...`) to run jobs directly on the host where Docker is available.
-
-### Running as a Service
-
-```bash
-cat > /etc/systemd/system/forgejo-runner.service << 'EOF'
-[Unit]
-Description=Forgejo Actions Runner
-After=network.target
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=/opt/forgejo-runner
-ExecStart=/opt/forgejo-runner/forgejo-runner daemon
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-systemctl daemon-reload
-systemctl enable forgejo-runner
-systemctl start forgejo-runner
-systemctl status forgejo-runner
-```
-
-## Repository Secrets
-
-Configure in Forgejo: Repository Settings > Secrets and Variables > Actions
-
-| Secret | Value |
-|--------|-------|
-| `REGISTRY_USERNAME` | `rakeshgangwar` |
-| `REGISTRY_TOKEN` | Forgejo API token with `write:package` scope |
-
-### Creating API Token with Package Access
-
-1. Go to: https://forgejo.superchotu.com/user/settings/applications
-2. Create new token with scopes: `write:package`, `read:package`
-3. Add as `REGISTRY_TOKEN` secret
-
----
-
-# Issues Encountered & Resolutions
-
-## 1. Forgejo ROOT_URL Misconfiguration
-
-**Problem:** `docker login forgejo.superchotu.com` failed - Docker tried to connect to port 3000.
-
-**Cause:** Forgejo's `app.ini` had:
-```ini
-ROOT_URL = https://forgejo.superchotu.com:3000
-```
-
-**Resolution:**
-```bash
-docker exec forgejo-ukokcss4wwsoscsc8ggcss0s sed -i \
-  's|ROOT_URL = https://forgejo.superchotu.com:3000|ROOT_URL = https://forgejo.superchotu.com|' \
-  /data/gitea/conf/app.ini
-docker restart forgejo-ukokcss4wwsoscsc8ggcss0s
-```
-
-## 2. Architecture Mismatch (ARM64 vs AMD64)
-
-**Problem:** Building on Mac (ARM64) failed with:
-```
-package architecture (amd64) does not match system (arm64)
-```
-
-**Cause:** Dockerfile downloads amd64 `.deb` packages, but local Docker builds for host architecture.
-
-**Resolution:** Use CI (Forgejo Actions) to build on amd64 server, or use `--platform linux/amd64` locally (slow due to QEMU emulation).
-
-## 3. Workflow Not in Correct Location
-
-**Problem:** Workflow created in `docker/.forgejo/workflows/` wasn't detected.
-
-**Cause:** Forgejo expects workflows at repository root: `.forgejo/workflows/`
-
-**Resolution:** Moved workflow to `/.forgejo/workflows/build-containers.yml`
-
-## 4. Runner Label Mismatch
-
-**Problem:** Jobs stuck in "Waiting" state.
-
-**Cause:** Runner registered with `docker` label, but workflow used `runs-on: ubuntu-latest`.
-
-**Resolution:** Re-registered runner with `--labels ubuntu-latest:host`
-
-## 5. Node.js Not Found in Runner
-
-**Problem:** `actions/checkout@v4` failed with:
-```
-Cannot find: node in PATH
-```
-
-**Cause:** GitHub Actions like `actions/checkout` require Node.js, which wasn't installed on the host.
-
-**Resolution:** Rewrote workflow to use plain shell commands:
-```yaml
-- name: Checkout repository
-  run: |
-    git clone --depth 1 --branch ${{ github.ref_name }} https://forgejo.superchotu.com/${{ github.repository }}.git .
-```
-
-## 6. Registry Push Unauthorized
-
-**Problem:** `docker push` failed with:
-```
-unauthorized: reqPackageAccess
-```
-
-**Cause:** API token didn't have `write:package` scope.
-
-**Resolution:** Created new token with `read:package` and `write:package` scopes, updated `REGISTRY_TOKEN` secret.
-
-## 7. pip Upgrade Fails on Ubuntu 24.04
-
-**Problem:** Build failed with:
-```
-ERROR: Cannot uninstall pip 24.0, RECORD file not found. Hint: The package was installed by debian.
-```
-
-**Cause:** Ubuntu 24.04 manages pip via apt; can't upgrade system pip with pip itself.
-
-**Resolution:** Removed `RUN python -m pip install --upgrade pip --break-system-packages` from Dockerfile. System pip 24.0 is sufficient.
-
-## 8. Desktop Image Too Large (4GB+)
-
-**Problem:** Push timed out after 7+ minutes.
-
-**Cause:** Image included Rust (~1.5GB), Go (~500MB), Firefox (~300MB), extra fonts.
-
-**Resolution:** Optimized Dockerfile:
-- Removed Rust, Go, Firefox (users can install on-demand)
-- Used `--no-install-recommends`
-- Combined RUN statements
-- Cleaned up in same layer
-- Final size: ~1GB
-
----
-
-# Pulling Images
-
-On Coolify server (already authenticated):
-```bash
-docker pull forgejo.superchotu.com/rakeshgangwar/opencode-cli:latest
-docker pull forgejo.superchotu.com/rakeshgangwar/opencode-desktop:latest
-```
-
-For new servers, authenticate first:
-```bash
-docker login forgejo.superchotu.com
-# Username: rakeshgangwar
-# Password: <API token with read:package scope>
-```
+1. Update environment variables (see Legacy Variables section)
+2. Mount workspaces as volumes instead of cloning
+3. Configure Better Auth (GitHub OAuth optional)
+4. Remove Coolify/Forgejo/Keycloak from docker-compose

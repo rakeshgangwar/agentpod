@@ -1,15 +1,15 @@
 # UX Implementation Plan
 
-**Application:** CodeOpen  
+**Application:** AgentPod  
 **Date:** December 2024
 
-Comprehensive implementation plan for transforming CodeOpen into a true "Portable Command Center."
+Comprehensive implementation plan for transforming AgentPod into a true "Portable Command Center."
 
 ---
 
 ## Overview
 
-This plan transforms CodeOpen from a "projects list with chat" into a true **"Portable Command Center"** with:
+This plan transforms AgentPod from a "projects list with chat" into a true **"Portable Command Center"** with:
 
 - Dashboard-first approach (Needs Attention)
 - Mobile-optimized navigation (Bottom Nav - mobile only)

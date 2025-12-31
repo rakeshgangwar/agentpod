@@ -1,0 +1,27 @@
+{
+  "name": "@agentpod/types",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./project": "./src/project.ts",
+    "./container": "./src/container.ts",
+    "./provider": "./src/provider.ts",
+    "./settings": "./src/settings.ts",
+    "./opencode": "./src/opencode.ts",
+    "./api": "./src/api.ts",
+    "./workflow": "./src/workflow.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@opencode-ai/sdk": "^1.0.144"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

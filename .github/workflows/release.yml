@@ -1,0 +1,188 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v0.1.0)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  DO_NOT_TRACK: 1
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.create_release.outputs.id }}
+      release_upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: get_version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          name: AgentPod ${{ steps.get_version.outputs.version }}
+          draft: true
+          prerelease: ${{ contains(steps.get_version.outputs.version, '-') }}
+          generate_release_notes: true
+
+  build-tauri:
+    name: Build ${{ matrix.platform.name }}
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - name: macOS (Intel)
+            os: macos-15-intel
+            target: x86_64-apple-darwin
+            args: '--target x86_64-apple-darwin --features voice-metal'
+            rust_features: voice-metal
+            
+          - name: macOS (Apple Silicon)
+            os: macos-15
+            target: aarch64-apple-darwin
+            args: '--target aarch64-apple-darwin --features voice-metal'
+            rust_features: voice-metal
+            
+          - name: Windows
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            args: '--features voice'
+            rust_features: voice
+            
+          - name: Linux
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            args: '--features voice'
+            rust_features: voice
+
+    runs-on: ${{ matrix.platform.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform.target }}
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/frontend/src-tauri
+          cache-on-failure: true
+          key: ${{ matrix.platform.target }}-${{ matrix.platform.rust_features }}
+
+      # Linux dependencies
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libasound2-dev \
+            libssl-dev \
+            libgtk-3-dev \
+            libsoup-3.0-dev \
+            javascriptcoregtk-4.1 \
+            cmake \
+            clang \
+            libclang-dev
+
+      # macOS dependencies for whisper-rs Metal build
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: |
+          # Install cmake for whisper.cpp build
+          brew install cmake
+          # Ensure Xcode command line tools are available (provides Metal SDK)
+          xcode-select --print-path
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: 1
+
+      # Windows dependencies for whisper-rs build
+      - name: Install Windows dependencies
+        if: runner.os == 'Windows'
+        run: |
+          # Install cmake and LLVM (provides clang for whisper.cpp compilation)
+          choco install cmake llvm -y
+          # Add LLVM to PATH for the build
+          echo "C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        shell: pwsh
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build tauri-plugin-mcp
+        run: pnpm --filter tauri-plugin-mcp build
+
+      - name: Build Tauri App
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # macOS deployment target - whisper.cpp requires 10.15+ for std::filesystem
+          # This is ignored on non-macOS platforms
+          MACOSX_DEPLOYMENT_TARGET: '10.15'
+          # NOTE: macOS code signing is disabled until certificates are configured
+          # To enable, add the following secrets to GitHub:
+          # - APPLE_CERTIFICATE (base64 encoded .p12 file)
+          # - APPLE_CERTIFICATE_PASSWORD
+          # - APPLE_SIGNING_IDENTITY
+          # - APPLE_ID
+          # - APPLE_PASSWORD (app-specific password)
+          # - APPLE_TEAM_ID
+          # Windows signing (optional - requires secrets)
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: apps/frontend
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+          args: ${{ matrix.platform.args }}
+          tauriScript: pnpm tauri
+
+  publish-release:
+    name: Publish Release
+    needs: [create-release, build-tauri]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.create-release.outputs.version }}
+          draft: false

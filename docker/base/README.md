@@ -1,0 +1,108 @@
+# AgentPod Base Image
+
+Foundation layer for all AgentPod container flavors (agentpod-* images).
+
+## Contents
+
+- **Ubuntu 24.04 LTS** - Base OS
+- **Node.js 22 LTS** - JavaScript runtime
+- **Bun** - Fast JavaScript runtime for ACP Gateway
+- **OpenCode CLI** - Default AI coding agent
+- **ACP Gateway** - Multi-agent orchestration service
+- **Core CLI Tools** - git, ripgrep, fd, bat, fzf, jq, yq
+
+## Ports
+
+| Port | Service | Description |
+|------|---------|-------------|
+| 4096 | OpenCode | OpenCode server (when started) |
+| 4097 | ACP Gateway | Agent Client Protocol gateway |
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OPENCODE_PORT` | 4096 | OpenCode server port |
+| `ACP_GATEWAY_PORT` | 4097 | ACP Gateway port |
+| `OPENCODE_HOST` | 0.0.0.0 | Bind address |
+| `WORKSPACE` | /home/workspace | Project workspace |
+| `OPENCODE_AUTH_JSON` | - | LLM provider credentials |
+| `OPENCODE_CONFIG_JSON` | - | OpenCode configuration |
+| `AGENT_MODEL` | - | Model for AgentPod agents (e.g., `copilot/gpt-4o`, `anthropic/claude-sonnet-4-20250514`) |
+| `FORGEJO_REPO_URL` | - | Git repository to clone |
+| `FORGEJO_USER` | - | Git authentication username |
+| `FORGEJO_TOKEN` | - | Git authentication token |
+
+## Usage
+
+This image is not meant to be used directly. Use one of the flavor images instead:
+
+- `agentpod-js` - JavaScript/TypeScript development
+- `agentpod-python` - Python development
+- `agentpod-go` - Go development
+- `agentpod-rust` - Rust development
+- `agentpod-fullstack` - JavaScript + Python
+- `agentpod-polyglot` - All languages
+
+## Building
+
+```bash
+# From docker/ directory
+./scripts/build-base.sh
+
+# Or manually
+docker build -t agentpod-base:latest ./agentpod-base/
+```
+
+## Extending
+
+To create a new flavor:
+
+```dockerfile
+ARG BASE_IMAGE=agentpod-base:latest
+FROM ${BASE_IMAGE}
+
+# Add your language-specific packages
+USER root
+RUN apt-get update && apt-get install -y your-packages
+
+USER developer
+```
+
+## ACP Gateway
+
+The ACP Gateway runs on port 4097 and provides:
+
+- Multi-agent support (OpenCode, Claude Code, Gemini CLI, etc.)
+- HTTP API for agent management
+- SSE event streaming
+- File system operations
+
+### Health Check
+
+```bash
+curl http://localhost:4097/health
+```
+
+### List Agents
+
+```bash
+curl http://localhost:4097/agents
+```
+
+## Directory Structure
+
+```
+/home/
+├── workspace/              # Project files (git repo mount point)
+├── .config/
+│   └── opencode/          # OpenCode global configuration
+├── .local/share/opencode/ # OpenCode data (auth.json)
+└── .cache/opencode/       # OpenCode cache
+
+/home/developer/            # Developer user's actual home
+
+/opt/
+├── acp-gateway/           # ACP Gateway source
+└── agentpod/scripts/      # Shared scripts
+```

@@ -1,0 +1,46 @@
+{
+  "name": "@agentpod/ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "svelte": "./src/index.ts",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./avatar": "./src/components/avatar/index.ts",
+    "./badge": "./src/components/badge/index.ts",
+    "./button": "./src/components/button/index.ts",
+    "./card": "./src/components/card/index.ts",
+    "./code-block": "./src/components/code-block/index.ts",
+    "./dialog": "./src/components/dialog/index.ts",
+    "./dropdown-menu": "./src/components/dropdown-menu/index.ts",
+    "./input": "./src/components/input/index.ts",
+    "./label": "./src/components/label/index.ts",
+    "./markdown": "./src/components/markdown/index.ts",
+    "./scroll-area": "./src/components/scroll-area/index.ts",
+    "./select": "./src/components/select/index.ts",
+    "./separator": "./src/components/separator/index.ts",
+    "./skeleton": "./src/components/skeleton/index.ts",
+    "./sonner": "./src/components/sonner/index.ts",
+    "./switch": "./src/components/switch/index.ts",
+    "./tabs": "./src/components/tabs/index.ts",
+    "./styles": "./src/styles/tokens.css",
+    "./utils": "./src/utils/cn.ts"
+  },
+  "scripts": {
+  },
+  "peerDependencies": {
+    "svelte": "^5.0.0"
+  },
+  "dependencies": {
+    "bits-ui": "^2.14.4",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.4.0",
+    "tailwind-variants": "^3.2.2"
+  },
+  "devDependencies": {
+    "svelte": "^5.0.0",
+    "svelte-check": "^4.0.0",
+    "typescript": "^5.6.0"
+  }
+}

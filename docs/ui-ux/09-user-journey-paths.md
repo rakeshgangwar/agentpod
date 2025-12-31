@@ -1,6 +1,6 @@
 # Generative UI - User Journey Paths
 
-**Application:** CodeOpen  
+**Application:** AgentPod  
 **Date:** December 2024
 
 Comprehensive mapping of all possible user journey paths through the intent-based generative UI system.

@@ -1,6 +1,6 @@
 # UI Review Report
 
-**Application:** CodeOpen - Tauri v2 + SvelteKit App for Managing AI Coding Agents  
+**Application:** AgentPod - Tauri v2 + SvelteKit App for Managing AI Coding Agents  
 **Date:** December 2024  
 **Overall Score:** B+ (Good foundation, needs polish)
 
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-CodeOpen demonstrates a well-structured UI built on shadcn/ui components with a consistent design system using Tailwind CSS. The application follows good patterns for responsive design and component composition. However, there are several accessibility issues, mobile experience gaps, and consistency improvements that should be addressed.
+AgentPod demonstrates a well-structured UI built on shadcn/ui components with a consistent design system using Tailwind CSS. The application follows good patterns for responsive design and component composition. However, there are several accessibility issues, mobile experience gaps, and consistency improvements that should be addressed.
 
 ---
 
@@ -407,7 +407,7 @@ function getFileIcon(node: FileNode): string {
 **Suggestion:** Use `<svelte:head>` to set page titles:
 ```svelte
 <svelte:head>
-  <title>Projects | CodeOpen</title>
+  <title>Projects | AgentPod</title>
 </svelte:head>
 ```
 

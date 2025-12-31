@@ -1,15 +1,15 @@
 # =============================================================================
-# CodeOpen JavaScript Flavor
+# AgentPod JavaScript Flavor
 # Node.js and TypeScript development environment
 # =============================================================================
 # Size: ~800MB (on top of base)
 # Languages: JavaScript, TypeScript
 # =============================================================================
 
-ARG BASE_IMAGE=codeopen-base:latest
+ARG BASE_IMAGE=agentpod-base:latest
 FROM ${BASE_IMAGE}
 
-LABEL maintainer="CodeOpen Team"
+LABEL maintainer="AgentPod Team"
 LABEL description="JavaScript/TypeScript development environment"
 LABEL flavor="js"
 
@@ -51,7 +51,7 @@ RUN echo 'export PATH="/usr/local/bin:$PATH"' >> /home/developer/.bashrc
 # =============================================================================
 # Flavor metadata
 # =============================================================================
-ENV CODEOPEN_FLAVOR="js"
-ENV CODEOPEN_LANGUAGES="javascript,typescript"
+ENV AGENTPOD_FLAVOR="js"
+ENV AGENTPOD_LANGUAGES="javascript,typescript"
 
-WORKDIR /home/developer/workspace
+WORKDIR /home/workspace

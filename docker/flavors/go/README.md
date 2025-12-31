@@ -1,4 +1,4 @@
-# CodeOpen Go Flavor
+# AgentPod Go Flavor
 
 Go development environment.
 
@@ -34,7 +34,7 @@ Go development environment.
 ## Usage
 
 ```bash
-docker run -it codeopen-go:latest
+docker run -it agentpod-go:latest
 ```
 
 ### Creating a New Module
@@ -72,4 +72,4 @@ gotestsum ./...
 | Variable | Value | Description |
 |----------|-------|-------------|
 | `GOROOT` | /usr/local/go | Go installation |
-| `GOPATH` | /home/developer/go | Go workspace |
+| `GOPATH` | /home/go | Go workspace |

@@ -1,0 +1,31 @@
+# =============================================================================
+# AgentPod Central SSO Service - Docker Compose
+# =============================================================================
+# Deploy this to Coolify as a Docker Compose application.
+#
+# Domain: sso.superchotu.com
+# Port: 4180
+#
+# Required environment variables in Coolify:
+#   OAUTH2_PROXY_CLIENT_SECRET  - From Keycloak agentpod-container client
+#   OAUTH2_PROXY_COOKIE_SECRET  - Generate with: openssl rand -base64 24 | tr -d '\n'
+# =============================================================================
+
+version: '3.8'
+
+services:
+  oauth2-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "4180:4180"
+    environment:
+      # These must be set in Coolify's environment variables
+      - OAUTH2_PROXY_CLIENT_SECRET=${OAUTH2_PROXY_CLIENT_SECRET}
+      - OAUTH2_PROXY_COOKIE_SECRET=${OAUTH2_PROXY_COOKIE_SECRET}
+    restart: unless-stopped
+    # Note: No healthcheck here - oauth2-proxy image is distroless (no shell/wget)
+    # Coolify can use its HTTP healthcheck feature to check /ping endpoint
+    labels:
+      - "coolify.managed=true"

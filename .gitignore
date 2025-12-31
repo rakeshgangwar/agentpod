@@ -1,11 +1,49 @@
+# OS
 .DS_Store
+
+# Dependencies
 node_modules
+
+# Build outputs
 /build
+build/
+dist/
+.svelte-kit/
 /.svelte-kit
 /package
+
+# Turbo
+.turbo/
+
+# Rust/Cargo
+target/
+Cargo.lock
+
+# Environment
 .env
 .env.*
 !.env.example
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
-.idea/
+
+# Logs
+*.log
+data/
+
+# Database backups (contain sensitive data)
+backups/
+*.sql.gz
+do-not-commit/
+
+# Runtime-generated Traefik preview configs
+config/traefik/dynamic/preview-*.yml
+
+# Reference documentation (large, imported from external source)
+docs/reference/agentic-space/

@@ -1,6 +1,6 @@
 # State Architecture
 
-**Application:** CodeOpen  
+**Application:** AgentPod  
 **Date:** December 2024
 
 Complete state management architecture analysis.
@@ -9,7 +9,7 @@ Complete state management architecture analysis.
 
 ## Overview
 
-The CodeOpen project uses a hybrid state management approach:
+The AgentPod project uses a hybrid state management approach:
 
 - **Svelte 5 Runes** for global application state (Svelte stores)
 - **React Context + Hooks** for chat component state (embedded React within Svelte)

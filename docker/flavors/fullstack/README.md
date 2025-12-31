@@ -1,4 +1,4 @@
-# CodeOpen Full-Stack Flavor
+# AgentPod Full-Stack Flavor
 
 JavaScript, TypeScript, and Python development environment for full-stack web applications.
 
@@ -44,7 +44,7 @@ JavaScript, TypeScript, and Python development environment for full-stack web ap
 ## Usage
 
 ```bash
-docker run -it codeopen-fullstack:latest
+docker run -it agentpod-fullstack:latest
 ```
 
 ### Typical Project Structure

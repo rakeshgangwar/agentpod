@@ -1,0 +1,800 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================
+   CSS VARIABLES - TERMINAL DESIGN SYSTEM
+   Dark mode first for cyberpunk aesthetic
+   ============================================ */
+
+:root {
+  /* Fonts */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  
+  /* Border radius - minimal for terminal aesthetic */
+  --radius: 0.25rem;
+  
+  /* Dark mode colors (default) */
+  --background: oklch(0.13 0.02 260);
+  --foreground: oklch(0.95 0.01 260);
+  --card: oklch(0.18 0.02 260);
+  --card-foreground: oklch(0.95 0.01 260);
+  --primary: oklch(0.75 0.15 192);
+  --primary-foreground: oklch(0.13 0.02 260);
+  --muted: oklch(0.25 0.02 260);
+  --muted-foreground: oklch(0.65 0.02 260);
+  --border: oklch(0.3 0.02 260);
+  
+  /* Cyber colors - vibrant neon */
+  --cyber-cyan: oklch(0.8 0.15 192);
+  --cyber-cyan-dim: oklch(0.5 0.1 192);
+  --cyber-emerald: oklch(0.75 0.18 160);
+  --cyber-magenta: oklch(0.7 0.2 330);
+  --cyber-amber: oklch(0.8 0.18 85);
+  --cyber-red: oklch(0.65 0.22 25);
+  
+  /* Glows */
+  --cyber-glow: 0 0 20px oklch(0.8 0.15 192 / 0.4);
+  --cyber-glow-subtle: 0 0 10px oklch(0.8 0.15 192 / 0.2);
+  
+  /* Noise */
+  --noise-opacity: 0.03;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  
+  --color-cyber-cyan: var(--cyber-cyan);
+  --color-cyber-emerald: var(--cyber-emerald);
+  --color-cyber-magenta: var(--cyber-magenta);
+  --color-cyber-amber: var(--cyber-amber);
+  --color-cyber-red: var(--cyber-red);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-sans);
+  }
+  
+  code, pre, .font-mono {
+    font-family: var(--font-mono);
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  
+  /* Cyber colors */
+  --color-cyber-cyan: var(--cyber-cyan);
+  --color-cyber-emerald: var(--cyber-emerald);
+  --color-cyber-magenta: var(--cyber-magenta);
+  --color-cyber-amber: var(--cyber-amber);
+  --color-cyber-red: var(--cyber-red);
+}
+
+/* ============================================
+   BASE STYLES
+   ============================================ */
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-body);
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+  }
+  
+  code, pre {
+    font-family: var(--font-mono);
+  }
+}
+
+.noise-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: var(--noise-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+}
+
+.grid-bg {
+  background-image: 
+    linear-gradient(to right, oklch(1 0 0 / 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(1 0 0 / 0.03) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.scanlines::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    oklch(0 0 0 / 0.03) 2px,
+    oklch(0 0 0 / 0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 9998;
+}
+
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  92% { opacity: 1; }
+  93% { opacity: 0.8; }
+  94% { opacity: 1; }
+}
+
+.crt-flicker {
+  animation: flicker 5s infinite;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.cursor::after {
+  content: '█';
+  animation: blink 1s step-end infinite;
+  color: var(--cyber-cyan);
+}
+
+.terminal-window {
+  background: oklch(0.1 0.01 260);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  overflow: hidden;
+}
+
+.terminal-header {
+  background: oklch(0.15 0.01 260);
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.terminal-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.terminal-body {
+  padding: 1rem;
+  min-height: 200px;
+}
+
+.glow-text {
+  text-shadow: 0 0 10px currentColor;
+}
+
+.cyber-btn {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: 1px solid var(--cyber-cyan);
+  color: var(--cyber-cyan);
+  position: relative;
+  transition: all 0.2s;
+}
+
+.cyber-btn:hover {
+  background: var(--cyber-cyan);
+  color: var(--background);
+  box-shadow: var(--cyber-glow);
+}
+
+.cyber-btn-primary {
+  background: var(--cyber-cyan);
+  color: var(--background);
+}
+
+.cyber-btn-primary:hover {
+  box-shadow: var(--cyber-glow);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.1); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { 
+    box-shadow: 0 0 5px currentColor, 0 0 10px currentColor;
+  }
+  50% { 
+    box-shadow: 0 0 10px currentColor, 0 0 20px currentColor, 0 0 30px currentColor;
+  }
+}
+
+@keyframes slide-in-left {
+  0% {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-right {
+  0% {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes glitch {
+  0% {
+    text-shadow: 0 0 0 transparent;
+  }
+  2% {
+    text-shadow: 2px 0 0 var(--cyber-magenta), -2px 0 0 var(--cyber-cyan);
+    transform: translate(-1px, 1px);
+  }
+  4% {
+    text-shadow: 0 0 0 transparent;
+    transform: translate(0, 0);
+  }
+  100% {
+    text-shadow: 0 0 0 transparent;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes expand-underline {
+  0% {
+    width: 0;
+  }
+  100% {
+    width: 100%;
+  }
+}
+
+@keyframes card-lift {
+  0% {
+    transform: translateY(0);
+    box-shadow: 0 0 0 transparent;
+  }
+  100% {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 20px oklch(0 0 0 / 0.3), 0 0 20px currentColor;
+  }
+}
+
+@keyframes connector-pulse {
+  0%, 100% {
+    opacity: 0.5;
+    filter: brightness(1);
+  }
+  50% {
+    opacity: 1;
+    filter: brightness(1.5);
+  }
+}
+
+.status-running { 
+  background: var(--cyber-emerald); 
+  box-shadow: 0 0 8px var(--cyber-emerald); 
+}
+
+.status-warning { 
+  background: var(--cyber-amber); 
+  box-shadow: 0 0 8px var(--cyber-amber); 
+}
+
+.status-error { 
+  background: var(--cyber-red); 
+  box-shadow: 0 0 8px var(--cyber-red); 
+}
+
+@keyframes fade-in-up {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s ease-out forwards;
+}
+
+.stagger-1 { animation-delay: 0.05s; opacity: 0; }
+.stagger-2 { animation-delay: 0.1s; opacity: 0; }
+.stagger-3 { animation-delay: 0.15s; opacity: 0; }
+.stagger-4 { animation-delay: 0.2s; opacity: 0; }
+.stagger-5 { animation-delay: 0.25s; opacity: 0; }
+.stagger-6 { animation-delay: 0.3s; opacity: 0; }
+
+::selection {
+  background-color: color-mix(in oklch, var(--cyber-cyan) 30%, transparent);
+  color: var(--foreground);
+}
+
+:focus-visible {
+  outline: 2px solid var(--cyber-cyan);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--muted-foreground);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cyber-cyan);
+}
+
+/* ============================================
+   MICROANIMATIONS & INTERACTIONS
+   Terminal/Cyberpunk aesthetic enhancements
+   ============================================ */
+
+/* Button glow on hover */
+.cyber-btn {
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cyber-btn::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(45deg, var(--cyber-cyan), var(--cyber-magenta));
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 0.3s;
+  z-index: -1;
+  filter: blur(8px);
+}
+
+.cyber-btn:hover::before {
+  opacity: 0.5;
+  animation: glow-pulse 2s infinite;
+}
+
+.cyber-btn:hover {
+  transform: translateY(-2px);
+}
+
+.cyber-btn:active {
+  transform: translateY(0);
+}
+
+/* Terminal window hover effects */
+.terminal-window {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.terminal-window:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px oklch(0 0 0 / 0.3);
+}
+
+/* Card hover border glow */
+.card-glow {
+  position: relative;
+  transition: all 0.3s;
+}
+
+.card-glow::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  background: linear-gradient(45deg, transparent, currentColor, transparent);
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 0.3s;
+  z-index: -1;
+}
+
+.card-glow:hover::before {
+  opacity: 0.3;
+}
+
+/* Blog card hover - clean border glow without pseudo-element */
+.blog-card {
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.blog-card:hover {
+  border-color: var(--cyber-cyan);
+  box-shadow: 0 0 20px oklch(0.8 0.15 192 / 0.15);
+  transform: translateY(-2px);
+}
+
+/* Link underline animation */
+.link-underline {
+  position: relative;
+  text-decoration: none;
+}
+
+.link-underline::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: currentColor;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.link-underline:hover::after {
+  width: 100%;
+}
+
+/* Heading glitch effect on hover */
+.glitch-hover:hover {
+  animation: glitch 0.3s;
+}
+
+/* Scroll reveal animations */
+.reveal {
+  opacity: 0;
+  transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.reveal.revealed {
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+}
+
+.reveal-fade {
+  opacity: 0;
+  transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.reveal-fade.revealed {
+  opacity: 1 !important;
+}
+
+.reveal-slide-up {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.reveal-slide-up.revealed {
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+}
+
+.reveal-slide-left {
+  opacity: 0;
+  transform: translateX(-30px);
+  transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.reveal-slide-left.revealed {
+  opacity: 1 !important;
+  transform: translateX(0) !important;
+}
+
+.reveal-slide-right {
+  opacity: 0;
+  transform: translateX(30px);
+  transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.reveal-slide-right.revealed {
+  opacity: 1 !important;
+  transform: translateX(0) !important;
+}
+
+/* Architecture diagram animations */
+.arch-connector {
+  animation: connector-pulse 3s ease-in-out infinite;
+}
+
+.arch-line {
+  transition: all 0.3s;
+}
+
+.arch-box {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.arch-box:hover {
+  transform: scale(1.02);
+  box-shadow: 0 0 20px currentColor;
+}
+
+.arch-node {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.arch-node:hover {
+  transform: scale(1.05);
+  background: oklch(0.2 0.02 260);
+}
+
+.arch-inner-node {
+  transition: all 0.2s;
+}
+
+.arch-inner-node:hover {
+  background: oklch(0.15 0.02 260);
+  transform: scale(1.05);
+}
+
+/* Status dot enhanced pulse */
+.status-dot {
+  animation: pulse 2s ease-in-out infinite;
+  transition: all 0.3s;
+}
+
+.status-dot:hover {
+  animation: glow-pulse 1s infinite;
+  transform: scale(1.3);
+}
+
+/* Header transitions */
+header {
+  transition: all 0.3s;
+}
+
+header a {
+  transition: all 0.2s;
+}
+
+/* Footer link animations */
+footer a {
+  transition: all 0.2s;
+  position: relative;
+}
+
+footer a::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  opacity: 0;
+  transition: all 0.2s;
+}
+
+footer a:hover::before {
+  content: '>';
+  opacity: 1;
+  left: -15px;
+  color: var(--cyber-cyan);
+}
+
+/* Terminal dot hover */
+.terminal-dot {
+  transition: all 0.2s;
+}
+
+.terminal-dot:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 10px currentColor;
+}
+
+/* Floating animation utility */
+.float-animation {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Stagger delays for scroll reveals */
+.reveal-delay-1 { transition-delay: 0.1s; }
+.reveal-delay-2 { transition-delay: 0.2s; }
+.reveal-delay-3 { transition-delay: 0.3s; }
+.reveal-delay-4 { transition-delay: 0.4s; }
+.reveal-delay-5 { transition-delay: 0.5s; }
+.reveal-delay-6 { transition-delay: 0.6s; }
+
+/* Smooth color transitions */
+* {
+  transition-property: color, background-color, border-color;
+  transition-duration: 0.2s;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Override for elements with specific animations */
+.terminal-window,
+.cyber-btn,
+.arch-box,
+.arch-node,
+.status-dot,
+.terminal-dot {
+  transition-property: all;
+}
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+    
+    .reveal,
+    .reveal-fade,
+    .reveal-slide-up,
+    .reveal-slide-left,
+    .reveal-slide-right {
+      opacity: 1 !important;
+      transform: none !important;
+    }
+    
+    .arch-connector {
+      animation: none !important;
+    }
+  }
+
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+/* ============================================
+   ARCHITECTURE DIAGRAM
+   CSS-based diagram for reliable alignment
+   ============================================ */
+
+.arch-diagram {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.arch-box {
+  border: 1px solid;
+  padding: 1rem 1.5rem;
+  background: oklch(0.12 0.01 260);
+  text-align: center;
+}
+
+.arch-box.border-cyber-cyan {
+  border-color: var(--cyber-cyan);
+}
+
+.arch-box.border-cyber-emerald {
+  border-color: var(--cyber-emerald);
+}
+
+.arch-box.border-cyber-magenta {
+  border-color: var(--cyber-magenta);
+}
+
+.arch-box.border-cyber-amber {
+  border-color: var(--cyber-amber);
+}
+
+.arch-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+}
+
+.arch-node {
+  border: 1px solid var(--border);
+  padding: 0.5rem 1rem;
+  background: oklch(0.15 0.01 260);
+  min-width: 80px;
+}
+
+.arch-inner-node {
+  border: 1px solid var(--border);
+  padding: 0.375rem 0.5rem;
+  background: oklch(0.1 0.01 260);
+  font-size: 0.625rem;
+  line-height: 1.3;
+}
+
+.arch-connector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: var(--muted-foreground);
+}
+
+.arch-line {
+  width: 1px;
+  height: 1.5rem;
+  background: var(--muted-foreground);
+}
+
+.arch-arrow {
+  font-size: 0.75rem;
+  line-height: 1;
+}

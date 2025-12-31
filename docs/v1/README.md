@@ -1,8 +1,11 @@
-# Implementation Guide (v1 - Legacy)
+# Implementation Guide
 
-> **Note**: This is the v1 implementation guide. For the latest development plans including ACP multi-agent integration, see [**docs/v2**](../v2/README.md).
+> **Status:** ✅ All Phases Complete  
+> **Last Updated:** December 2025
 
-This folder contains detailed implementation plans for each phase of the Portable Command Center project.
+This folder contains detailed implementation plans for each phase of the AgentPod project.
+
+---
 
 ## Phases Overview
 
@@ -10,28 +13,14 @@ This folder contains detailed implementation plans for each phase of the Portabl
 |-------|------|----------|--------|
 | 1 | [Infrastructure Setup](./phase-1-infrastructure/) | 1-2 days | ✅ Complete |
 | 2 | [Management API](./phase-2-management-api/) | 3-5 days | ✅ Complete |
-| 3 | [Mobile App Foundation](./phase-3-mobile-foundation/) | 3-5 days | ✅ Complete |
-| 4 | [Mobile App Core Features](./phase-4-mobile-core/) | 5-7 days | ✅ ~90% Complete |
-| 5 | [Mobile App Advanced](./phase-5-mobile-advanced/) | 5-7 days | ⚡ ~60% Complete |
-| 6 | [Polish & Optimization](./phase-6-polish/) | 3-5 days | 🔲 Pending |
+| 3 | [Desktop App Foundation](./phase-3-mobile-foundation/) | 3-5 days | ✅ Complete |
+| 4 | [Core Features](./phase-4-mobile-core/) | 5-7 days | ✅ Complete |
+| 5 | [Advanced Features](./phase-5-mobile-advanced/) | 5-7 days | ✅ Complete |
+| 6 | [Production Readiness](./phase-6-polish/) | 3-5 days | ✅ Complete |
 
-**Total Estimated Duration:** 3-5 weeks
+**Total Duration:** ~4 weeks (December 2024)
 
-## Next Steps: v2
-
-The v2 implementation focuses on **ACP (Agent Client Protocol) integration** to support multiple AI agents:
-
-- **OpenCode** (current, default)
-- **Claude Code** (Anthropic)
-- **Gemini CLI** (Google)
-- **Qwen Code** (Alibaba)
-- **And more...**
-
-See [docs/v2](../v2/README.md) for details.
-
-## Deferred Tasks
-
-Tasks that were deferred or incomplete from v1 have been consolidated in [docs/v2/deferred-v1-tasks](../v2/deferred-v1-tasks/README.md).
+---
 
 ## Phase Dependency Graph
 
@@ -40,55 +29,115 @@ Phase 1: Infrastructure ✅
     │
     ├──────────────────┐
     ▼                  ▼
-Phase 2: API ✅    Phase 3: Mobile Foundation
+Phase 2: API ✅    Phase 3: Desktop Foundation ✅
     │                  │
     └────────┬─────────┘
              ▼
-      Phase 4: Mobile Core
+      Phase 4: Core Features ✅
              │
              ▼
-      Phase 5: Mobile Advanced
+      Phase 5: Advanced Features ✅
              │
              ▼
-      Phase 6: Polish
+      Phase 6: Production Readiness ✅
 ```
 
-## Getting Started
+---
 
-1. ✅ **Phase 1** - Server infrastructure complete
-2. ✅ **Phase 2** - Management API deployed at https://api.superchotu.com
-3. 🔲 **Phase 3** - Mobile app foundation (can start now)
-4. 🔲 **Phase 4** - Requires Phase 3
-5. 🔲 Continue sequentially through remaining phases
+## Current Status
+
+All 6 phases have been completed as of December 2025:
+
+- [x] **Phase 1:** Infrastructure Setup - Docker, Traefik, PostgreSQL
+- [x] **Phase 2:** Management API - Bun + Hono, 411 tests
+- [x] **Phase 3:** Desktop App Foundation - Tauri + SvelteKit
+- [x] **Phase 4:** Core Features - Chat, Files, Terminal
+- [x] **Phase 5:** Advanced Features - Themes, Onboarding, Agents
+- [x] **Phase 6:** Production Readiness - Observability, CI/CD, Backup
+
+---
+
+## Additional Implementations
+
+Beyond the original 6 phases, the following major features have been implemented:
+
+| Feature | Status | Documentation |
+|---------|--------|---------------|
+| Cloudflare Workflows | ✅ Complete | [archived/cloudflare-workflows-migration.md](./archived/cloudflare-workflows-migration.md) |
+| Visual Workflow Builder | ✅ Complete | [workflow-builder-plan.md](./workflow-builder-plan.md) |
+| AI Integration | ✅ Complete | [workflow-ai-integration.md](./workflow-ai-integration.md) |
+| Agent Management | 🔄 In Progress | [agent-management-redesign.md](./agent-management-redesign.md) |
+
+---
+
+## Folder Structure
+
+```
+implementation/
+├── README.md                    # This file
+├── phase-1-infrastructure/      # ✅ Complete
+├── phase-2-management-api/      # ✅ Complete
+├── phase-3-mobile-foundation/   # ✅ Complete
+├── phase-4-mobile-core/         # ✅ Complete
+├── phase-5-mobile-advanced/     # ✅ Complete (folder may not exist)
+├── phase-6-polish/              # ✅ Complete
+├── archived/                    # Completed migrations and features
+│   ├── cloudflare-workflows-migration.md
+│   ├── sqlite-to-postgresql-migration.md
+│   ├── modular-containers-merge-plan.md
+│   └── ...
+└── [active feature docs]        # Current/in-progress work
+```
+
+---
 
 ## Each Phase Contains
 
 - `README.md` - Overview and objectives
 - `tasks.md` - Detailed task breakdown with checkboxes
 - `technical-notes.md` - Implementation details, code snippets, gotchas
-- Additional files as needed (configs, scripts, etc.)
+- Additional files as needed
 
-## Progress Tracking
+---
 
-Use the checkboxes in each phase's `tasks.md` to track progress. When a phase is complete, update this README.
+## Active Development
 
-### Current Status
+Current focus areas (not phase-based):
 
-- [x] Phase 1: Infrastructure Setup
-- [x] Phase 2: Management API
-- [ ] Phase 3: Mobile App Foundation
-- [ ] Phase 4: Mobile App Core Features
-- [ ] Phase 5: Mobile App Advanced
-- [ ] Phase 6: Polish & Optimization
+| Document | Status | Description |
+|----------|--------|-------------|
+| [workflow-builder-plan.md](./workflow-builder-plan.md) | 🔄 Active | Visual workflow builder UI |
+| [workflow-nodes-catalog.md](./workflow-nodes-catalog.md) | ✅ Current | Node type specifications |
+| [agent-management-redesign.md](./agent-management-redesign.md) | 🔄 Active | Hierarchical agent system |
+| [browser-sse-migration.md](./browser-sse-migration.md) | 🔄 Active | SSE streaming improvements |
 
-## Key Infrastructure URLs
-
-| Service | URL |
-|---------|-----|
-| Coolify Dashboard | https://admin.superchotu.com |
-| Forgejo Git | https://forgejo.superchotu.com |
-| Management API | https://api.superchotu.com |
+---
 
 ## Architecture Documents
 
-- [OpenCode Configuration Architecture](./opencode-config-architecture.md) - Comprehensive guide for managing OpenCode configurations (permissions, agents, commands, tools, plugins)
+| Document | Description |
+|----------|-------------|
+| [opencode-config-architecture.md](./opencode-config-architecture.md) | OpenCode configuration management |
+| [opencode-sdk-analysis.md](./opencode-sdk-analysis.md) | SDK coverage and implementation roadmap |
+| [cloudflare-implementation-guide.md](./cloudflare-implementation-guide.md) | Cloudflare services integration |
+
+---
+
+## Archived Documents
+
+Completed migrations and analyses are in [archived/](./archived/):
+
+- Cloudflare Workflows migration (✅ Dec 2025)
+- SQLite to PostgreSQL migration (✅ Dec 2024)
+- Container system merge (✅ Dec 2025)
+- Coolify analysis (evaluated, not adopted)
+
+See [archived/README.md](./archived/README.md) for full list.
+
+---
+
+## Related Documentation
+
+- [Production Checklist](../production/PRODUCTION_CHECKLIST.md) - Pre-launch checklist
+- [Testing Guide](../testing/tdd-workflow.md) - TDD workflow
+- [Quick Start](../guides/quick-start.md) - Getting started guide

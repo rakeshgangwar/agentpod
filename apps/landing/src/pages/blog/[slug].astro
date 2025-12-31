@@ -1,0 +1,291 @@
+---
+import { getCollection } from "astro:content";
+import type { CollectionEntry } from "astro:content";
+import ModernLayout from "../../layouts/ModernLayout.astro";
+import Header from "../../components/modern/Header.astro";
+import Footer from "../../components/modern/Footer.astro";
+
+export async function getStaticPaths() {
+  const blogPosts = await getCollection("blog");
+  return blogPosts.map((post) => ({
+    params: { slug: post.id },
+    props: { post },
+  }));
+}
+
+interface Props {
+  post: CollectionEntry<"blog">;
+}
+
+const { post } = Astro.props;
+const { Content } = await post.render();
+
+function calculateReadTime(content: string): number {
+  const wordsPerMinute = 200;
+  const words = content.trim().split(/\s+/).length;
+  return Math.ceil(words / wordsPerMinute);
+}
+
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+const readTime = calculateReadTime(post.body);
+const formattedDate = formatDate(post.data.date);
+---
+
+<ModernLayout title={`${post.data.title} — AgentPod Blog`} description={post.data.excerpt}>
+  <Header slot="header" variant="solid" />
+  
+  <!-- Article Header -->
+  <article class="pt-32 pb-24 px-6">
+    <div class="container-narrow mx-auto">
+      <!-- Breadcrumb -->
+      <nav class="mb-12 animate-fade-in-up" aria-label="Breadcrumb">
+        <ol class="flex items-center gap-2 text-sm text-foreground-muted">
+          <li><a href="/" class="hover:text-foreground transition-colors">Home</a></li>
+          <li aria-hidden="true">/</li>
+          <li><a href="/blog" class="hover:text-foreground transition-colors">Blog</a></li>
+          <li aria-hidden="true">/</li>
+          <li class="text-foreground" aria-current="page">{post.data.title}</li>
+        </ol>
+      </nav>
+
+      <!-- Article Header -->
+      <header class="mb-12 animate-fade-in-up delay-100">
+        <div class="flex flex-wrap gap-2 mb-6">
+          {post.data.tags.map((tag: string) => (
+            <span class="badge badge-accent text-xs">
+              {tag}
+            </span>
+          ))}
+        </div>
+        
+        <h1 class="display-lg mb-6 text-balance">
+          {post.data.title}
+        </h1>
+        
+        <p class="subheadline mb-8 text-balance">
+          {post.data.excerpt}
+        </p>
+        
+        <div class="flex flex-wrap items-center gap-4 text-sm text-foreground-muted pb-8 border-b border-border">
+          <div class="flex items-center gap-2">
+            <span class="text-foreground font-medium">{post.data.author}</span>
+          </div>
+          <span aria-hidden="true">·</span>
+          <time datetime={post.data.date}>{formattedDate}</time>
+          <span aria-hidden="true">·</span>
+          <span>{readTime} min read</span>
+        </div>
+      </header>
+
+      <!-- Article Content -->
+      <div class="prose-modern animate-fade-in-up delay-200">
+        <Content />
+      </div>
+
+      <!-- Back to Blog -->
+      <div class="mt-16 pt-12 border-t border-border animate-fade-in-up delay-300">
+        <a href="/blog" class="btn btn-secondary inline-flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+          </svg>
+          Back to blog
+        </a>
+      </div>
+    </div>
+  </article>
+
+  <Footer slot="footer" />
+</ModernLayout>
+
+<style is:global>
+  /* Terminal-style prose styling for blog content */
+  .prose-terminal {
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    line-height: 1.7;
+  }
+
+  .prose-terminal h2 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--color-cyber-cyan);
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 1.25rem;
+  }
+
+  .prose-terminal h2::before {
+    content: "// ";
+    color: var(--color-cyber-cyan);
+    opacity: 0.6;
+  }
+
+  .prose-terminal h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--color-cyber-emerald);
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+    font-family: var(--font-mono);
+  }
+
+  .prose-terminal h3::before {
+    content: "$ ";
+    color: var(--color-cyber-emerald);
+  }
+
+  .prose-terminal p {
+    margin-bottom: 1.25rem;
+    color: var(--color-muted-foreground);
+  }
+
+  .prose-terminal strong {
+    color: var(--color-foreground);
+    font-weight: 600;
+  }
+
+  .prose-terminal a {
+    color: var(--color-cyber-cyan);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s;
+  }
+
+  .prose-terminal a:hover {
+    border-bottom-color: var(--color-cyber-cyan);
+  }
+
+  .prose-terminal ul,
+  .prose-terminal ol {
+    margin-bottom: 1.25rem;
+    padding-left: 1.5rem;
+    color: var(--color-muted-foreground);
+  }
+
+  .prose-terminal ul {
+    list-style: none;
+  }
+
+  .prose-terminal ul li::before {
+    content: "▸";
+    color: var(--color-cyber-cyan);
+    display: inline-block;
+    width: 1em;
+    margin-left: -1em;
+  }
+
+  .prose-terminal ol {
+    list-style: decimal;
+  }
+
+  .prose-terminal li {
+    margin-bottom: 0.5rem;
+  }
+
+  .prose-terminal code {
+    font-family: var(--font-mono);
+    font-size: 0.875em;
+    background: var(--color-card);
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    color: var(--color-cyber-amber);
+    border: 1px solid var(--color-border);
+  }
+
+  .prose-terminal pre {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: 0.25rem;
+    padding: 1rem;
+    margin-bottom: 1.25rem;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  .prose-terminal pre code {
+    background: transparent;
+    padding: 0;
+    border: none;
+    color: var(--color-foreground);
+  }
+
+  .prose-terminal blockquote {
+    border-left: 3px solid var(--color-cyber-magenta);
+    padding-left: 1rem;
+    margin: 1.5rem 0;
+    font-style: italic;
+    color: var(--color-muted-foreground);
+  }
+
+  .prose-terminal hr {
+    border: none;
+    border-top: 1px solid var(--color-border);
+    margin: 2rem 0;
+  }
+
+  .prose-terminal table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.5rem 0;
+    font-size: 0.875rem;
+  }
+
+  .prose-terminal th {
+    background: var(--color-card);
+    color: var(--color-cyber-cyan);
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.75rem;
+    padding: 0.75rem;
+    text-align: left;
+    border: 1px solid var(--color-border);
+  }
+
+  .prose-terminal td {
+    padding: 0.75rem;
+    border: 1px solid var(--color-border);
+    color: var(--color-muted-foreground);
+  }
+
+  .prose-terminal tbody tr:hover {
+    background: var(--color-card);
+  }
+
+  /* Images */
+  .prose-terminal img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.25rem;
+    border: 1px solid var(--color-border);
+    margin: 1.5rem 0;
+  }
+
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    .prose-terminal h2 {
+      font-size: 1.125rem;
+    }
+
+    .prose-terminal h3 {
+      font-size: 1rem;
+    }
+  }
+</style>
+
+<script>
+  import '../../scripts/main.ts';
+</script>

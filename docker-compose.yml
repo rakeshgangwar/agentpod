@@ -1,0 +1,403 @@
+# =============================================================================
+# AgentPod - Docker Compose for Local Development
+# =============================================================================
+#
+# This file sets up the complete local development environment:
+# - Traefik reverse proxy (handles *.localhost routing)
+# - PostgreSQL database with pgvector (vector similarity search)
+# - Management API (container orchestration, auth)
+#
+# Quick Start:
+#   1. Copy .env.example to .env and configure
+#   2. docker compose up -d
+#   3. Open http://api.localhost in browser
+#
+# Usage:
+#   docker compose up -d              # Start infrastructure
+#   docker compose up -d --build      # Rebuild and start
+#   docker compose logs -f            # Follow all logs
+#   docker compose logs -f api        # Follow API logs
+#   docker compose down               # Stop everything
+#   docker compose down -v            # Stop and remove volumes
+#
+# URLs (after startup):
+#   - API:            http://api.localhost
+#   - API Health:     http://api.localhost/health
+#   - Traefik UI:     http://localhost:8080
+#   - Sandboxes:      http://{project-slug}.localhost
+#
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # PostgreSQL Database with pgvector
+  # ===========================================================================
+  # PostgreSQL 16 with pgvector extension for vector similarity search
+  # Used for all persistent data including auth, sandboxes, and knowledge base
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: agentpod-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: agentpod
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agentpod-dev-password}
+      POSTGRES_DB: agentpod
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Init scripts run automatically on first startup (alphabetical order)
+      - ./apps/api/src/db/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - agentpod-net
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentpod -d agentpod"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    labels:
+      - "traefik.enable=false"
+      - "agentpod.managed=false"
+
+  # ===========================================================================
+  # Traefik Reverse Proxy
+  # ===========================================================================
+  # Handles routing for *.localhost domains (dev) and *.agentpod.dev (prod)
+  # Dashboard available at http://localhost:8080
+  traefik:
+    image: traefik:v3.6
+    container_name: agentpod-traefik
+    restart: unless-stopped
+    command:
+      # API and Dashboard
+      - "--api.insecure=true"
+      - "--api.dashboard=true"
+      # Docker provider
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=agentpod-net"
+      # File provider for dynamic preview routes
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+      # Entrypoints
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      # Let's Encrypt certificate resolver
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-admin@agentpod.dev}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      # Logging
+      - "--log.level=INFO"
+      - "--accesslog=true"
+    ports:
+      # HTTP
+      - "80:80"
+      # HTTPS
+      - "443:443"
+      # Traefik Dashboard
+      - "8080:8080"
+    volumes:
+      # Docker socket for container discovery
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Let's Encrypt certificates
+      - letsencrypt-data:/letsencrypt
+      # Dynamic configuration for preview routes
+      - ./config/traefik/dynamic:/etc/traefik/dynamic:ro
+    networks:
+      - agentpod-net
+    labels:
+      - "traefik.enable=true"
+      # Dashboard route (optional, also available on :8080)
+      - "traefik.http.routers.traefik.rule=Host(`traefik.localhost`)"
+      - "traefik.http.routers.traefik.service=api@internal"
+
+  # ===========================================================================
+  # Management API
+  # ===========================================================================
+  # Handles container orchestration, project management, and authentication
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: agentpod-api
+    restart: unless-stopped
+    environment:
+      # Server
+      - NODE_ENV=development
+      - PORT=3001
+
+      # =======================================================================
+      # Authentication (Better Auth)
+      # =======================================================================
+      # Session secret for cookie signing (generate with: openssl rand -base64 32)
+      - SESSION_SECRET=${SESSION_SECRET:-dev-session-secret-change-in-production}
+      # Better Auth secret (required in production)
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-dev-better-auth-secret-change-in-production}
+      
+      # GitHub OAuth (optional - create at https://github.com/settings/developers)
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
+
+      # =======================================================================
+      # API Security
+      # =======================================================================
+      # API token for authenticating mobile app requests
+      - API_TOKEN=${API_TOKEN:-dev-token-change-in-production}
+      
+      # Encryption key for storing provider credentials (32 bytes)
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-dev-encrypt-key-exactly-32chars!}
+
+      # =======================================================================
+      # Docker Orchestration (New Architecture)
+      # =======================================================================
+      - DOCKER_SOCKET=/var/run/docker.sock
+      - DOCKER_NETWORK=agentpod-net
+      - DOCKER_CONTAINER_PREFIX=agentpod
+
+      # =======================================================================
+      # Traefik Configuration
+      # =======================================================================
+      - TRAEFIK_ENABLED=true
+      - TRAEFIK_NETWORK=agentpod-net
+      - TRAEFIK_TLS=false
+      - TRAEFIK_CERT_RESOLVER=
+
+      # =======================================================================
+      # Domain Configuration
+      # =======================================================================
+      - BASE_DOMAIN=localhost
+      - DOMAIN_PROTOCOL=http
+
+      # =======================================================================
+      # Data Storage
+      # =======================================================================
+      - DATA_DIR=/data
+      - REPOS_DIR=/data/repos
+      - VOLUMES_DIR=/data/volumes
+      # Host path prefix for bind mounts (required when API runs in Docker)
+      # This translates container paths to host paths for sandbox bind mounts
+      # Set to the absolute path of this project on the host machine
+      - HOST_PATH_PREFIX=${HOST_PATH_PREFIX:-}
+
+      # =======================================================================
+      # PostgreSQL Database
+      # =======================================================================
+      - DATABASE_URL=postgres://agentpod:${POSTGRES_PASSWORD:-agentpod-dev-password}@postgres:5432/agentpod
+
+      # =======================================================================
+      # API URLs
+      # =======================================================================
+      # Public URL that containers can use to call back to the API
+      - MANAGEMENT_API_PUBLIC_URL=http://api.localhost
+
+      # =======================================================================
+      # OpenCode Configuration
+      # =======================================================================
+      - OPENCODE_SERVER_PORT=4096
+
+      # =======================================================================
+      # Container Registry (for production - leave empty for local builds)
+      # =======================================================================
+      - OPENCODE_REGISTRY_URL=${OPENCODE_REGISTRY_URL:-}
+      - OPENCODE_REGISTRY_OWNER=${OPENCODE_REGISTRY_OWNER:-}
+      - OPENCODE_CONTAINER_VERSION=${OPENCODE_CONTAINER_VERSION:-latest}
+
+      # =======================================================================
+      # Cloudflare Sandbox Integration
+      # =======================================================================
+      - ENABLE_CLOUDFLARE_SANDBOXES=${ENABLE_CLOUDFLARE_SANDBOXES:-false}
+      - CLOUDFLARE_WORKER_URL=${CLOUDFLARE_WORKER_URL:-}
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:-}
+      - DEFAULT_SANDBOX_PROVIDER=${DEFAULT_SANDBOX_PROVIDER:-docker}
+      - AUTO_SELECT_PROVIDER=${AUTO_SELECT_PROVIDER:-false}
+
+      # =======================================================================
+      # Preview Configuration
+      # =======================================================================
+      - TRAEFIK_DYNAMIC_DIR=/data/traefik/dynamic
+
+      # =======================================================================
+      # Legacy Configuration (deprecated, kept for migration)
+      # =======================================================================
+      - COOLIFY_URL=
+      - COOLIFY_TOKEN=
+      - FORGEJO_URL=
+      - FORGEJO_TOKEN=
+
+    volumes:
+      # Docker socket for container management
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Database (use named volume)
+      - agentpod-data:/data/db
+      # Repos directory (use host path so sandbox containers can mount it)
+      # This must be a host path, not a Docker volume, for bind mounts to work
+      - ./data/repos:/data/repos
+      # Volumes directory (use host path for same reason)
+      - ./data/volumes:/data/volumes
+      # Traefik dynamic config (shared with traefik for preview routes)
+      - ./config/traefik/dynamic:/data/traefik/dynamic
+      # Source code for hot reload (development only)
+      - ./apps/api/src:/app/apps/api/src:ro
+    networks:
+      - agentpod-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`api.localhost`) || Host(`api.${BASE_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.api.entrypoints=web"
+      - "traefik.http.routers.api-secure.rule=Host(`api.${BASE_DOMAIN:-agentpod.dev}`)"
+      - "traefik.http.routers.api-secure.entrypoints=websecure"
+      - "traefik.http.routers.api-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.services.api.loadbalancer.server.port=3001"
+      - "agentpod.managed=false"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      traefik:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+
+  # ===========================================================================
+  # Database Backup Service
+  # ===========================================================================
+  backup:
+    image: postgres:16-alpine
+    container_name: agentpod-backup
+    restart: unless-stopped
+    environment:
+      - PGHOST=postgres
+      - PGPORT=5432
+      - PGUSER=agentpod
+      - PGPASSWORD=${POSTGRES_PASSWORD:-agentpod-dev-password}
+      - PGDATABASE=agentpod
+      - BACKUP_DIR=/backups
+      - KEEP_DAILY=${KEEP_DAILY:-7}
+      - KEEP_WEEKLY=${KEEP_WEEKLY:-4}
+    volumes:
+      # Mount as executable (not read-only) so script can run
+      - ./scripts/backup-db.sh:/backup.sh
+      - ./backups:/backups
+    networks:
+      - agentpod-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: /bin/sh
+    command: >
+      -c "
+        echo '0 3 * * * /backup.sh backup >> /var/log/backup.log 2>&1' | crontab - &&
+        echo 'Backup cron job installed. Running initial backup...' &&
+        /backup.sh backup &&
+        echo 'Starting cron daemon...' &&
+        crond -f -l 2
+      "
+    labels:
+      - "traefik.enable=false"
+      -       "agentpod.managed=false"
+
+  # ===========================================================================
+  # Observability Stack: Loki + Fluent Bit + Grafana
+  # ===========================================================================
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: agentpod-loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./config/loki/local-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    networks:
+      - agentpod-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      - "traefik.enable=false"
+      - "agentpod.managed=false"
+
+  fluent-bit:
+    image: fluent/fluent-bit:3.1
+    container_name: agentpod-fluent-bit
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./config/fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+      - ./config/fluent-bit/parsers.conf:/fluent-bit/etc/parsers.conf:ro
+      - fluent-bit-db:/fluent-bit/db
+    networks:
+      - agentpod-net
+    depends_on:
+      loki:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=false"
+      - "agentpod.managed=false"
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: agentpod-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_SERVER_ENABLE_GZIP=true
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+      - GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES=false
+      - GF_ALERTING_ENABLED=true
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - agentpod-net
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      loki:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      - "traefik.enable=false"
+      - "agentpod.managed=false"
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgres-data:
+    driver: local
+  agentpod-data:
+    driver: local
+  loki-data:
+    driver: local
+  grafana-data:
+    driver: local
+  fluent-bit-db:
+    driver: local
+  letsencrypt-data:
+    driver: local
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  agentpod-net:
+    # Use existing network if it exists (created by sandbox manager)
+    # Otherwise create it
+    external: true
+    name: agentpod-net

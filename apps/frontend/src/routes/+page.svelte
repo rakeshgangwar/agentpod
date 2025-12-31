@@ -1,0 +1,975 @@
+<script lang="ts">
+  import { goto } from "$app/navigation";
+  import { onMount, onDestroy } from "svelte";
+  import { connection } from "$lib/stores/connection.svelte";
+  import { auth, logout } from "$lib/stores/auth.svelte";
+  import {
+    sandboxes,
+    fetchSandboxes,
+    startSandbox,
+    stopSandbox,
+    sleepSandbox,
+    wakeSandbox,
+    restartSandbox,
+    checkDockerHealth
+  } from "$lib/stores/sandboxes.svelte";
+  import { subscribeToActivityChanges, getBusySandboxIds } from "$lib/stores/session-activity.svelte";
+  import { 
+    markAsUnseen,
+    markAsSeen,
+    getUnseenCompletionIds,
+    subscribeToUnseenChanges 
+  } from "$lib/stores/unseen-completions.svelte";
+  import { projectIcons, parseIconId } from "$lib/stores/project-icons.svelte";
+  import { getProjectIcon } from "$lib/utils/project-icons";
+  import { getAnimatedIcon } from "$lib/utils/animated-icons";
+  import LottieIcon from "$lib/components/lottie-icon.svelte";
+  import PendingActions from "$lib/components/pending-actions.svelte";
+  import NewsTicker from "$lib/components/news-ticker.svelte";
+  import { Button } from "$lib/components/ui/button";
+  import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+  import { Avatar, AvatarFallback } from "$lib/components/ui/avatar";
+  import { getAllPendingPermissions, type PendingPermission } from "$lib/api/tauri";
+  import ThemeToggle from "$lib/components/theme-toggle.svelte";
+
+  // Icons
+  import PlusIcon from "@lucide/svelte/icons/plus";
+  import SettingsIcon from "@lucide/svelte/icons/settings";
+  import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
+  import PlayIcon from "@lucide/svelte/icons/play";
+  import SquareIcon from "@lucide/svelte/icons/square";
+  import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
+  import SparklesIcon from "@lucide/svelte/icons/sparkles";
+  import RocketIcon from "@lucide/svelte/icons/rocket";
+  import ZapIcon from "@lucide/svelte/icons/zap";
+  import CheckCircleIcon from "@lucide/svelte/icons/check-circle";
+  import SunriseIcon from "@lucide/svelte/icons/sunrise";
+  import RotateCcwIcon from "@lucide/svelte/icons/rotate-ccw";
+  import MoonIcon from "@lucide/svelte/icons/moon";
+
+  // =============================================================================
+  // Loading Screen State
+  // =============================================================================
+  
+  const MINIMUM_LOADING_TIME = 2500; // 2.5 seconds minimum
+  
+  let isInitialLoading = $state(true);
+  let minimumTimeElapsed = $state(false);
+  let apiCallsComplete = $state(false);
+  let loadingMessageIndex = $state(0);
+  
+  // Playful loading messages
+  const loadingMessages = [
+    { text: "Warming up the engines...", emoji: "🚀" },
+    { text: "Connecting to your sandboxes...", emoji: "🔌" },
+    { text: "Summoning the AI agents...", emoji: "🤖" },
+    { text: "Checking Docker vitals...", emoji: "🐳" },
+    { text: "Preparing your command center...", emoji: "⚡" },
+    { text: "Almost there...", emoji: "✨" },
+  ];
+  
+  // Cycle through messages
+  let messageInterval: ReturnType<typeof setInterval> | undefined;
+  
+  // Show loading screen while initial load is happening
+  let showLoadingScreen = $derived(isInitialLoading && (!minimumTimeElapsed || !apiCallsComplete));
+
+  // Track if we're on mobile (for FAB visibility)
+  let isMobile = $state(false);
+
+  $effect(() => {
+    if (typeof window === "undefined") return;
+    
+    function checkMobile() {
+      isMobile = window.innerWidth < 768; // md breakpoint
+    }
+    
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  });
+
+  // =============================================================================
+  // State
+  // =============================================================================
+  
+  let busySandboxIds = $state<Set<string>>(new Set());
+  let unseenIds = $state<Set<string>>(new Set());
+  let unsubscribeActivity: (() => void) | undefined;
+  let unsubscribeUnseen: (() => void) | undefined;
+  
+  // Pre-fetched pending permissions (loaded during splash screen)
+  let initialPendingPermissions = $state<PendingPermission[] | undefined>(undefined);
+  
+  // Track previous active sandbox IDs to detect completions
+  let previousActiveSandboxIds = $state<Set<string>>(new Set());
+
+  // Derived stats
+  let totalProjects = $derived(sandboxes.list.length);
+  let runningCount = $derived(sandboxes.list.filter(s => s.status === "running").length);
+  let activeSessionsCount = $derived(busySandboxIds.size);
+
+  // Check if user has any projects
+  let hasProjects = $derived(totalProjects > 0);
+
+  // Active AI sessions (needs attention - AI is working)
+  let activeSandboxes = $derived(
+    sandboxes.list.filter(s => busySandboxIds.has(s.id) && s.status === "running")
+  );
+
+  // Get IDs of active sandboxes for filtering
+  let activeSandboxIds = $derived(new Set(activeSandboxes.map(s => s.id)));
+
+  // Recent projects (sorted by lastAccessedAt or createdAt, limited to 5)
+  // Excludes sandboxes shown in "Needs Attention" section to avoid duplication
+  let recentProjects = $derived(
+    [...sandboxes.list]
+      .filter(s => !activeSandboxIds.has(s.id)) // exclude ones shown in active section
+      .sort((a, b) => {
+        const aDate = a.lastAccessedAt || a.createdAt;
+        const bDate = b.lastAccessedAt || b.createdAt;
+        return new Date(bDate).getTime() - new Date(aDate).getTime();
+      })
+      .slice(0, 5)
+  );
+
+  // Build ticker items - mix of tips and contextual info
+  let tickerItems = $derived(() => {
+    const items: string[] = [];
+    
+    // Static tips
+    const tips = [
+      "💡 Pro tip: Your AI assistant remembers context between sessions",
+      "⌨️ Shortcut: Use keyboard navigation to quickly switch between tabs",
+      "🤖 AI agents can read your AGENTS.md file for project context",
+      "📦 Tip: Use different container flavors for different tech stacks",
+      "🔄 Your changes are automatically saved to the Git repository",
+      "🎯 Define clear project descriptions to help AI understand your goals",
+      "⚡ Containers start in seconds with pre-built development environments",
+      "🔐 All your code stays on your machine - nothing leaves your Docker",
+      "🔀 Use the Sync tab to manage branches and view file changes",
+      "📝 Check the Logs tab to see container output and debug issues",
+    ];
+    
+    // Add contextual items based on user state
+    if (totalProjects === 0) {
+      items.push("🚀 Welcome! Create your first project to get started with AI-powered development");
+    } else if (totalProjects === 1) {
+      items.push(`📂 You have 1 project — ready to build something amazing?`);
+    } else {
+      items.push(`📂 Managing ${totalProjects} projects — you're on a roll!`);
+    }
+    
+    if (runningCount > 0) {
+      items.push(`🟢 ${runningCount} container${runningCount > 1 ? 's' : ''} running and ready for action`);
+    }
+    
+    if (activeSessionsCount > 0) {
+      items.push(`⚡ ${activeSessionsCount} AI session${activeSessionsCount > 1 ? 's' : ''} actively working on your code`);
+    }
+    
+    if (sandboxes.dockerHealthy) {
+      items.push("🐳 Docker is online and ready to spin up new sandboxes");
+    }
+    
+    // Add random tips
+    items.push(...tips);
+    
+    return items;
+  });
+
+  // Build inline stats text
+  let statsText = $derived(() => {
+    const parts: string[] = [];
+    
+    if (totalProjects === 1) {
+      parts.push("1 project");
+    } else {
+      parts.push(`${totalProjects} projects`);
+    }
+    
+    if (runningCount > 0) {
+      parts.push(`${runningCount} running`);
+    }
+    
+    if (activeSessionsCount > 0) {
+      parts.push(`${activeSessionsCount} active`);
+    }
+    
+    return parts.join(" · ");
+  });
+
+  // =============================================================================
+  // Lifecycle
+  // =============================================================================
+
+  let staleCheckInterval: ReturnType<typeof setInterval> | undefined;
+
+  function refreshBusyIds() {
+    const newBusyIds = getBusySandboxIds();
+    const newBusySet = new Set(newBusyIds);
+    
+    // Detect sessions that just completed (were busy, now not busy)
+    for (const id of previousActiveSandboxIds) {
+      if (!newBusySet.has(id)) {
+        // This session just completed - mark as unseen
+        markAsUnseen(id);
+      }
+    }
+    
+    // Update previous for next check
+    previousActiveSandboxIds = newBusySet;
+    
+    // Only update busySandboxIds if actually changed
+    const currentIds = Array.from(busySandboxIds).sort().join(',');
+    const newIds = newBusyIds.sort().join(',');
+    if (currentIds !== newIds) {
+      busySandboxIds = new Set(newBusyIds);
+    }
+  }
+  
+  function refreshUnseenIds() {
+    unseenIds = new Set(getUnseenCompletionIds());
+  }
+
+  onMount(async () => {
+    // Start minimum time timer
+    setTimeout(() => {
+      minimumTimeElapsed = true;
+    }, MINIMUM_LOADING_TIME);
+    
+    // Start cycling through loading messages
+    messageInterval = setInterval(() => {
+      loadingMessageIndex = (loadingMessageIndex + 1) % loadingMessages.length;
+    }, 800);
+    
+    // Subscribe to activity changes (for immediate updates from chat pages)
+    unsubscribeActivity = subscribeToActivityChanges(() => {
+      refreshBusyIds();
+    });
+    
+    // Subscribe to unseen completions changes
+    unsubscribeUnseen = subscribeToUnseenChanges(() => {
+      refreshUnseenIds();
+    });
+    
+    // Initial refresh
+    refreshBusyIds();
+    refreshUnseenIds();
+    
+    // Periodically check for stale sessions (every 3 seconds)
+    // This handles the case where AI completes while user is on homepage.
+    // The session-activity store has a 10s stale threshold, so sessions
+    // that haven't been updated will automatically be considered inactive.
+    // Combined: max ~13 seconds delay when AI finishes while on homepage.
+    staleCheckInterval = setInterval(() => {
+      refreshBusyIds();
+    }, 3000);
+    
+    // Perform initial data loading during splash screen
+    if (connection.isConnected) {
+      try {
+        const [, , permissions] = await Promise.all([
+          checkDockerHealth(),
+          fetchSandboxes(),
+          getAllPendingPermissions().catch(() => [] as PendingPermission[])
+        ]);
+        initialPendingPermissions = permissions;
+      } catch (e) {
+        console.error("Initial data loading error:", e);
+        initialPendingPermissions = [];
+      }
+    } else {
+      initialPendingPermissions = [];
+    }
+    
+    // Mark API calls as complete
+    apiCallsComplete = true;
+  });
+
+  onDestroy(() => {
+    unsubscribeActivity?.();
+    unsubscribeUnseen?.();
+    if (staleCheckInterval) {
+      clearInterval(staleCheckInterval);
+    }
+    if (messageInterval) {
+      clearInterval(messageInterval);
+    }
+  });
+  
+  // When loading screen is dismissed, mark initial loading as done
+  $effect(() => {
+    if (minimumTimeElapsed && apiCallsComplete && isInitialLoading) {
+      // Small delay for smooth transition
+      setTimeout(() => {
+        isInitialLoading = false;
+      }, 300);
+    }
+  });
+
+  // Redirect if not connected or not authenticated
+  $effect(() => {
+    if (!connection.isConnected) {
+      goto("/login");
+    }
+  });
+
+  // =============================================================================
+  // Handlers
+  // =============================================================================
+
+  async function handleLogout() {
+    goto("/login");
+    await logout();
+  }
+
+  async function handleStart(e: MouseEvent, sandboxId: string) {
+    e.stopPropagation();
+    e.preventDefault();
+    startSandbox(sandboxId);
+  }
+
+  async function handleStop(e: MouseEvent, sandboxId: string) {
+    e.stopPropagation();
+    e.preventDefault();
+    stopSandbox(sandboxId);
+  }
+
+  async function handleWake(e: MouseEvent, sandboxId: string) {
+    e.stopPropagation();
+    e.preventDefault();
+    wakeSandbox(sandboxId);
+  }
+
+  async function handleRetry(e: MouseEvent, sandboxId: string) {
+    e.stopPropagation();
+    e.preventDefault();
+    restartSandbox(sandboxId);
+  }
+
+  async function handleSleep(e: MouseEvent, sandboxId: string) {
+    e.stopPropagation();
+    e.preventDefault();
+    sleepSandbox(sandboxId);
+  }
+
+  function handleRefresh() {
+    fetchSandboxes();
+    checkDockerHealth();
+  }
+
+  // =============================================================================
+  // Helpers
+  // =============================================================================
+
+  function getStatusClass(status: string): string {
+    switch (status) {
+      case "running": return "status-running";
+      case "starting":
+      case "stopping": return "status-starting";
+      case "created":
+      case "stopped": return "status-stopped";
+      case "sleeping": return "status-sleeping";
+      case "error":
+      case "unknown": return "status-error";
+      default: return "status-stopped";
+    }
+  }
+
+  function formatRelativeTime(dateStr?: string): string {
+    if (!dateStr) return "---";
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date);
+  }
+
+  function getSandboxIconData(sandbox: { id: string; name: string }) {
+    const iconId = projectIcons.getIconId(sandbox.id, sandbox.name);
+    const { isAnimated, id } = parseIconId(iconId);
+
+    if (isAnimated) {
+      const animatedIcon = getAnimatedIcon(id);
+      if (animatedIcon) {
+        return { type: "animated" as const, path: animatedIcon.path };
+      }
+    }
+
+    const staticIcon = getProjectIcon(isAnimated ? "code" : id);
+    if (staticIcon) {
+      return { type: "static" as const, component: staticIcon.component };
+    }
+
+    return null;
+  }
+
+  function checkSandboxBusy(sandboxId: string): boolean {
+    return busySandboxIds.has(sandboxId);
+  }
+  
+  function checkHasUnseenCompletion(sandboxId: string): boolean {
+    return unseenIds.has(sandboxId);
+  }
+</script>
+
+<!-- Noise overlay for atmosphere -->
+<div class="noise-overlay"></div>
+
+<!-- Loading Screen -->
+{#if showLoadingScreen}
+  <div class="fixed inset-0 z-50 grid-bg mesh-gradient flex items-center justify-center">
+    <div class="text-center animate-fade-in-up max-w-md px-6">
+      <!-- Animated Logo/Icon -->
+      <div class="relative mb-8">
+        <div class="w-24 h-24 mx-auto relative">
+          <!-- Outer spinning ring -->
+          <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
+          <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] border-r-[var(--cyber-cyan)]/50 animate-spin" style="animation-duration: 1.5s;"></div>
+          
+          <!-- Inner pulsing core -->
+          <div class="absolute inset-4 rounded-full bg-gradient-to-br from-[var(--cyber-cyan)]/20 to-[var(--cyber-magenta)]/20 
+                      flex items-center justify-center border border-[var(--cyber-cyan)]/30">
+            <RocketIcon class="w-8 h-8 text-[var(--cyber-cyan)] animate-pulse" />
+          </div>
+          
+          <!-- Orbiting dots -->
+          <div class="absolute inset-0 animate-spin" style="animation-duration: 3s;">
+            <div class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1 w-2 h-2 rounded-full bg-[var(--cyber-amber)]"></div>
+          </div>
+          <div class="absolute inset-0 animate-spin" style="animation-duration: 4s; animation-direction: reverse;">
+            <div class="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1 w-2 h-2 rounded-full bg-[var(--cyber-magenta)]"></div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- App Name -->
+      <h1 class="text-3xl font-bold mb-2">
+        AgentPod<span class="typing-cursor"></span>
+      </h1>
+      
+      <!-- Loading Message -->
+      <div class="h-8 flex items-center justify-center">
+        {#key loadingMessageIndex}
+          <p class="text-sm font-mono text-muted-foreground animate-fade-in">
+            <span class="mr-2">{loadingMessages[loadingMessageIndex].emoji}</span>
+            {loadingMessages[loadingMessageIndex].text}
+          </p>
+        {/key}
+      </div>
+      
+      <!-- Progress bar -->
+      <div class="mt-6 w-48 mx-auto h-1 bg-border/30 rounded-full overflow-hidden">
+        <div class="h-full bg-gradient-to-r from-[var(--cyber-cyan)] to-[var(--cyber-magenta)] rounded-full animate-loading-progress"></div>
+      </div>
+      
+      <!-- Subtle hint -->
+      <p class="mt-8 text-xs font-mono text-muted-foreground/50">
+        // initializing command center
+      </p>
+    </div>
+  </div>
+  
+  <style>
+    @keyframes loading-progress {
+      0% { width: 0%; }
+      50% { width: 70%; }
+      100% { width: 100%; }
+    }
+    .animate-loading-progress {
+      animation: loading-progress 2.5s ease-in-out;
+    }
+  </style>
+{:else}
+<main class="flex flex-col grid-bg mesh-gradient overflow-hidden h-full md:h-screen -mb-16 md:mb-0">
+  <!-- Fixed Header Section -->
+  <div class="shrink-0 px-4 sm:px-6 pt-6 sm:pt-8 pb-4 sm:pb-6 max-w-7xl mx-auto w-full">
+    <header class="animate-fade-in-up relative">
+      <!-- Mobile Top-Right Actions (visible only on mobile) -->
+      <div class="absolute top-0 right-0 flex items-center gap-2 md:hidden">
+        <Button
+          variant="ghost"
+          size="icon"
+          onclick={handleRefresh}
+          disabled={sandboxes.isLoading}
+          class="h-9 w-9"
+          title="Refresh"
+        >
+          <RefreshCwIcon class="h-4 w-4 {sandboxes.isLoading ? 'animate-spin' : ''}" />
+        </Button>
+
+        <ThemeToggle />
+
+        <!-- User Menu (Mobile) -->
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger>
+            <Button variant="ghost" size="icon" class="rounded-sm h-9 w-9 border border-border/50">
+              <Avatar class="h-6 w-6">
+                <AvatarFallback class="text-xs font-mono bg-[var(--cyber-cyan)]/10 text-[var(--cyber-cyan)]">
+                  {auth.initials}
+                </AvatarFallback>
+              </Avatar>
+            </Button>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Content align="end" class="w-56 font-mono">
+            <DropdownMenu.Label>
+              <div class="flex flex-col space-y-1">
+                <p class="text-sm font-medium leading-none">{auth.displayName}</p>
+                {#if auth.user?.email}
+                  <p class="text-xs leading-none text-muted-foreground">{auth.user.email}</p>
+                {/if}
+              </div>
+            </DropdownMenu.Label>
+            <DropdownMenu.Separator />
+            <DropdownMenu.Item onclick={() => goto("/projects")}>
+              <span class="text-[var(--cyber-cyan)] mr-2">&gt;</span> All Projects
+            </DropdownMenu.Item>
+            <DropdownMenu.Item onclick={() => goto("/workflows")}>
+              <span class="text-[var(--cyber-cyan)] mr-2">&gt;</span> Workflows
+            </DropdownMenu.Item>
+            <DropdownMenu.Item onclick={() => goto("/settings")}>
+              <span class="text-[var(--cyber-cyan)] mr-2">&gt;</span> Settings
+            </DropdownMenu.Item>
+            <DropdownMenu.Separator />
+            <DropdownMenu.Item onclick={handleLogout} class="text-destructive focus:text-destructive">
+              <span class="mr-2">&gt;</span> Disconnect
+            </DropdownMenu.Item>
+          </DropdownMenu.Content>
+        </DropdownMenu.Root>
+      </div>
+
+      <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 sm:gap-6">
+
+        <!-- Title Area -->
+        <div class="space-y-3 sm:space-y-4 pr-24 md:pr-0">
+          <div class="flex items-center gap-3">
+            <span class="text-xs font-mono text-muted-foreground tracking-widest uppercase">
+              // command_center
+            </span>
+          </div>
+
+          <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight glitch-hover">
+            <span class="text-foreground">AgentPod</span>
+            <span class="typing-cursor"></span>
+          </h1>
+
+          <div class="flex flex-wrap items-center gap-3 sm:gap-4 text-sm font-mono">
+            <div class="flex items-center gap-2 text-muted-foreground min-w-0 flex-1 md:flex-none">
+              <span class="text-[var(--cyber-cyan)] flex-shrink-0">@</span>
+              <span class="truncate md:max-w-[200px] lg:max-w-[300px]">{connection.apiUrl?.replace(/^https?:\/\//, '')}</span>
+            </div>
+
+            {#if sandboxes.dockerHealthy !== null}
+              <div class="health-indicator {sandboxes.dockerHealthy ? 'healthy' : 'unhealthy'} flex-shrink-0">
+                <span class="status-dot {sandboxes.dockerHealthy ? 'animate-pulse-dot' : ''}"
+                      style="background: currentColor;"></span>
+                <span>docker: {sandboxes.dockerHealthy ? "online" : "offline"}</span>
+              </div>
+            {/if}
+          </div>
+        </div>
+
+        <!-- Desktop Actions Area (hidden on mobile) -->
+        <div class="hidden md:flex items-center gap-2 sm:gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onclick={handleRefresh}
+            disabled={sandboxes.isLoading}
+            class="h-10 w-10"
+            title="Refresh"
+          >
+            <RefreshCwIcon class="h-4 w-4 {sandboxes.isLoading ? 'animate-spin' : ''}" />
+          </Button>
+
+          <ThemeToggle />
+
+          <Button
+            onclick={() => goto("/projects/new")}
+            class="cyber-btn-primary px-4 sm:px-6 h-10 font-mono text-xs uppercase tracking-wider"
+          >
+            <PlusIcon class="h-4 w-4 mr-2" /> New Project
+          </Button>
+
+          <!-- User Menu (Desktop) -->
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger>
+              <Button variant="ghost" size="icon" class="rounded-sm h-10 w-10 border border-border/50">
+                <Avatar class="h-7 w-7">
+                  <AvatarFallback class="text-xs font-mono bg-[var(--cyber-cyan)]/10 text-[var(--cyber-cyan)]">
+                    {auth.initials}
+                  </AvatarFallback>
+                </Avatar>
+              </Button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Content align="end" class="w-56 font-mono">
+              <DropdownMenu.Label>
+                <div class="flex flex-col space-y-1">
+                  <p class="text-sm font-medium leading-none">{auth.displayName}</p>
+                  {#if auth.user?.email}
+                    <p class="text-xs leading-none text-muted-foreground">{auth.user.email}</p>
+                  {/if}
+                </div>
+              </DropdownMenu.Label>
+              <DropdownMenu.Separator />
+              <DropdownMenu.Item onclick={() => goto("/projects")}>
+                <span class="text-[var(--cyber-cyan)] mr-2">&gt;</span> All Projects
+              </DropdownMenu.Item>
+              <DropdownMenu.Item onclick={() => goto("/workflows")}>
+                <span class="text-[var(--cyber-cyan)] mr-2">&gt;</span> Workflows
+              </DropdownMenu.Item>
+              <DropdownMenu.Item onclick={() => goto("/settings")}>
+                <span class="text-[var(--cyber-cyan)] mr-2">&gt;</span> Settings
+              </DropdownMenu.Item>
+              <DropdownMenu.Separator />
+              <DropdownMenu.Item onclick={handleLogout} class="text-destructive focus:text-destructive">
+                <span class="mr-2">&gt;</span> Disconnect
+              </DropdownMenu.Item>
+            </DropdownMenu.Content>
+          </DropdownMenu.Root>
+        </div>
+      </div>
+    </header>
+  </div>
+  
+  <!-- News Ticker - matches header width -->
+  <div class="shrink-0 px-4 sm:px-6 pb-4">
+    <div class="max-w-7xl mx-auto">
+      <NewsTicker items={tickerItems()} />
+    </div>
+  </div>
+
+  <!-- Scrollable Content Area -->
+  <div class="flex-1 overflow-y-auto px-4 sm:px-6 pb-6">
+    <div class="max-w-3xl mx-auto space-y-6">
+      
+      <!-- Error/Warning Display -->
+      {#if sandboxes.error}
+        <div class="animate-fade-in-up cyber-card p-4 border-[var(--cyber-red)]/50">
+          <div class="flex items-center gap-3 text-[var(--cyber-red)]">
+            <span class="font-mono text-xs uppercase tracking-wider">[error]</span>
+            <span class="text-sm">{sandboxes.error}</span>
+          </div>
+        </div>
+      {/if}
+
+      {#if sandboxes.dockerHealthy === false}
+        <div class="animate-fade-in-up cyber-card p-4 border-[var(--cyber-amber)]/50">
+          <div class="flex items-center gap-3 text-[var(--cyber-amber)]">
+            <span class="font-mono text-xs uppercase tracking-wider">[warning]</span>
+            <span class="text-sm">Docker daemon is not accessible. Please ensure Docker is running.</span>
+          </div>
+        </div>
+      {/if}
+
+      <!-- Pending Actions Section (shows permission requests needing user attention) -->
+      <PendingActions initialPermissions={initialPendingPermissions} />
+
+      <!-- Content - Skip skeleton since data was loaded during splash screen -->
+      {#if !hasProjects}
+        <!-- Empty State - Playful Welcome -->
+        <div class="animate-fade-in-up py-8 sm:py-12">
+          <div class="cyber-card p-8 sm:p-12 text-center relative overflow-hidden">
+            <!-- Decorative background elements -->
+            <div class="absolute inset-0 opacity-5">
+              <div class="absolute top-4 left-8 text-6xl">🚀</div>
+              <div class="absolute bottom-8 right-12 text-5xl">✨</div>
+              <div class="absolute top-1/2 left-4 text-4xl">🤖</div>
+            </div>
+            
+            <div class="relative z-10">
+              <!-- Fun animated icon -->
+              <div class="mb-6 flex justify-center">
+                <div class="relative">
+                  <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-[var(--cyber-cyan)]/20 to-[var(--cyber-magenta)]/20 
+                              flex items-center justify-center border border-[var(--cyber-cyan)]/30
+                              shadow-[0_0_30px_var(--cyber-cyan)/20]">
+                    <RocketIcon class="w-10 h-10 text-[var(--cyber-cyan)]" />
+                  </div>
+                  <div class="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-[var(--cyber-amber)] 
+                              flex items-center justify-center animate-bounce">
+                    <SparklesIcon class="w-3 h-3 text-black" />
+                  </div>
+                </div>
+              </div>
+              
+              <h2 class="text-2xl sm:text-3xl font-bold mb-3">
+                Ready for liftoff! 
+              </h2>
+              
+              <p class="text-muted-foreground mb-2 max-w-md mx-auto">
+                Create your first AI sandbox and let the magic begin.
+              </p>
+              <p class="text-sm text-muted-foreground/70 font-mono mb-8">
+                // isolated environments + AI coding agents = 🔥
+              </p>
+              
+              <Button
+                onclick={() => goto("/projects/new")}
+                class="cyber-btn-primary px-8 h-12 font-mono text-sm uppercase tracking-wider"
+              >
+                <PlusIcon class="h-5 w-5 mr-2" /> Create First Project
+              </Button>
+              
+              <!-- Feature hints -->
+              <div class="mt-10 pt-8 border-t border-border/30">
+                <p class="text-xs font-mono text-muted-foreground/60 mb-4 uppercase tracking-wider">What you'll get</p>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                  <div class="flex items-center gap-2 justify-center text-muted-foreground">
+                    <ZapIcon class="w-4 h-4 text-[var(--cyber-amber)]" />
+                    <span>AI-powered coding</span>
+                  </div>
+                  <div class="flex items-center gap-2 justify-center text-muted-foreground">
+                    <SquareIcon class="w-4 h-4 text-[var(--cyber-emerald)]" />
+                    <span>Isolated containers</span>
+                  </div>
+                  <div class="flex items-center gap-2 justify-center text-muted-foreground">
+                    <SparklesIcon class="w-4 h-4 text-[var(--cyber-magenta)]" />
+                    <span>Git integration</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      {:else}
+        <!-- Has Projects - Show Content -->
+        <div class="space-y-6 animate-fade-in-up">
+          
+          <!-- Inline Stats -->
+          <div class="flex items-center justify-between">
+            <p class="text-sm font-mono text-muted-foreground">
+              {statsText()}
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onclick={() => goto("/projects")}
+              class="font-mono text-xs text-muted-foreground hover:text-foreground"
+            >
+              View All <ChevronRightIcon class="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+          
+          <!-- Active Sessions (AI is working) - Only shown if there are active sessions -->
+          {#if activeSandboxes.length > 0}
+            <div class="space-y-3">
+              <h2 class="text-sm font-mono uppercase tracking-wider text-[var(--cyber-amber)] flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-[var(--cyber-amber)] animate-pulse"></span>
+                Needs Attention
+              </h2>
+              
+              <div class="cyber-card divide-y divide-border/30 border-[var(--cyber-amber)]/30">
+                {#each activeSandboxes as sandbox (sandbox.id)}
+                  {@const iconData = getSandboxIconData(sandbox)}
+                  <button
+                    onclick={() => goto(`/projects/${sandbox.id}/chat`)}
+                    class="w-full p-4 flex items-center gap-4 hover:bg-[var(--cyber-amber)]/5 transition-colors text-left"
+                  >
+                    <!-- Icon -->
+                    <div class="relative">
+                      {#if iconData}
+                        {#if iconData.type === "animated"}
+                          <LottieIcon src={iconData.path} size={24} loop autoplay />
+                        {:else}
+                          {@const IconComponent = iconData.component}
+                          <div class="text-[var(--cyber-cyan)]">
+                            <IconComponent class="w-6 h-6" />
+                          </div>
+                        {/if}
+                      {/if}
+                      <span class="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[var(--cyber-amber)] animate-pulse"></span>
+                    </div>
+
+                    <!-- Info -->
+                    <div class="flex-1 min-w-0">
+                      <p class="font-medium truncate">{sandbox.name}</p>
+                      <p class="text-xs font-mono text-[var(--cyber-amber)]">AI is working...</p>
+                    </div>
+
+                    <!-- Arrow -->
+                    <ChevronRightIcon class="h-5 w-5 text-muted-foreground" />
+                  </button>
+                {/each}
+              </div>
+            </div>
+          {/if}
+          
+          <!-- Your Projects - Combined list -->
+          <div class="space-y-3">
+            <h2 class="text-sm font-mono uppercase tracking-wider text-muted-foreground">
+              {activeSandboxes.length > 0 ? 'Other Projects' : 'Your Projects'}
+            </h2>
+            
+            <div class="cyber-card divide-y divide-border/30">
+              {#each recentProjects as sandbox (sandbox.id)}
+                {@const iconData = getSandboxIconData(sandbox)}
+                {@const isBusy = checkSandboxBusy(sandbox.id)}
+                {@const isRunning = sandbox.status === "running"}
+                {@const hasUnseen = checkHasUnseenCompletion(sandbox.id)}
+                <button
+                  onclick={() => goto(`/projects/${sandbox.id}`)}
+                  class="w-full p-4 flex items-center gap-4 hover:bg-muted/30 transition-colors text-left group
+                         {hasUnseen ? 'bg-[var(--cyber-emerald)]/5' : ''}"
+                >
+                  <!-- Icon with unseen indicator -->
+                  <div class="relative">
+                    {#if iconData}
+                      {#if iconData.type === "animated"}
+                        <LottieIcon src={iconData.path} size={20} loop autoplay />
+                      {:else}
+                        {@const IconComponent = iconData.component}
+                        <div class="text-[var(--cyber-cyan)]">
+                          <IconComponent class="w-5 h-5" />
+                        </div>
+                      {/if}
+                    {/if}
+                    {#if hasUnseen}
+                      <span class="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[var(--cyber-emerald)] 
+                                   flex items-center justify-center">
+                        <CheckCircleIcon class="w-2 h-2 text-black" />
+                      </span>
+                    {/if}
+                  </div>
+
+                  <!-- Info -->
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                      <p class="font-medium truncate group-hover:text-[var(--cyber-cyan)] transition-colors">
+                        {sandbox.name}
+                      </p>
+                      {#if hasUnseen}
+                        <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--cyber-emerald)]/20 
+                                     text-[var(--cyber-emerald)] font-mono uppercase tracking-wider">
+                          Done
+                        </span>
+                      {:else if isBusy}
+                        <span class="session-activity-badge">
+                          <span class="activity-dot-small"></span>
+                        </span>
+                      {/if}
+                    </div>
+                    <p class="text-xs font-mono text-muted-foreground">
+                      {hasUnseen ? 'AI task completed' : formatRelativeTime(sandbox.lastAccessedAt || sandbox.createdAt)}
+                    </p>
+                  </div>
+
+                  <!-- Status & Actions -->
+                  <div class="flex items-center gap-2">
+                    <div class="status-indicator {getStatusClass(sandbox.status)} text-xs py-0.5 px-2">
+                      <span class="status-dot {isRunning ? 'animate-pulse-dot' : ''}" style="width: 6px; height: 6px;"></span>
+                      <span class="hidden sm:inline">{sandbox.status === 'created' ? 'ready' : sandbox.status}</span>
+                    </div>
+                    
+                    {#if sandbox.status === "stopped" || sandbox.status === "created"}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onclick={(e: MouseEvent) => handleStart(e, sandbox.id)}
+                        disabled={sandboxes.isLoading}
+                        class="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Start"
+                      >
+                        <PlayIcon class="h-4 w-4 text-[var(--cyber-emerald)]" />
+                      </Button>
+                    {:else if isRunning && sandbox.provider !== "cloudflare"}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onclick={(e: MouseEvent) => handleStop(e, sandbox.id)}
+                        disabled={sandboxes.isLoading}
+                        class="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Stop"
+                      >
+                        <SquareIcon class="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    {:else if isRunning && sandbox.provider === "cloudflare"}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onclick={(e: MouseEvent) => handleSleep(e, sandbox.id)}
+                        disabled={sandboxes.isLoading}
+                        class="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Sleep"
+                      >
+                        <MoonIcon class="h-4 w-4 text-[var(--cyber-purple)]" />
+                      </Button>
+                    {:else if sandbox.status === "sleeping"}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onclick={(e: MouseEvent) => handleWake(e, sandbox.id)}
+                        disabled={sandboxes.isLoading}
+                        class="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Wake"
+                      >
+                        <SunriseIcon class="h-4 w-4 text-[var(--cyber-amber)]" />
+                      </Button>
+                    {:else if sandbox.status === "error"}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onclick={(e: MouseEvent) => handleRetry(e, sandbox.id)}
+                        disabled={sandboxes.isLoading}
+                        class="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Retry"
+                      >
+                        <RotateCcwIcon class="h-4 w-4 text-[var(--cyber-red)]" />
+                      </Button>
+                    {/if}
+                  </div>
+                </button>
+              {/each}
+              
+              {#if recentProjects.length === 0 && activeSandboxes.length > 0}
+                <div class="p-6 text-center text-muted-foreground text-sm font-mono">
+                  All your projects are currently active above ↑
+                </div>
+              {/if}
+            </div>
+          </div>
+        </div>
+      {/if}
+
+    </div>
+  </div>
+  
+  <!-- Sticky Footer (hidden on mobile where bottom nav is shown) -->
+  <div class="hidden md:block shrink-0 px-4 sm:px-6 py-3 border-t border-border/30 bg-background/80 backdrop-blur-sm">
+    <div class="max-w-7xl mx-auto">
+      <div class="flex flex-wrap items-center justify-between gap-4 text-xs font-mono text-muted-foreground">
+        <div class="flex items-center gap-4">
+          <span>AgentPod v0.1.0</span>
+          <span class="text-border">|</span>
+          <span>AI Sandbox Environment</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-[var(--cyber-emerald)] animate-pulse-dot"></span>
+          <span>System operational</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile FAB (Floating Action Button) for New Project -->
+  {#if isMobile}
+    <button
+      onclick={() => goto("/projects/new")}
+      class="fixed right-4 bottom-20 z-50 flex items-center justify-center w-14 h-14 
+             rounded-full shadow-lg cyber-btn-primary touch-manipulation
+             active:scale-95 transition-transform safe-area-mb"
+      aria-label="New Project"
+    >
+      <PlusIcon class="h-6 w-6" />
+    </button>
+  {/if}
+</main>
+{/if}

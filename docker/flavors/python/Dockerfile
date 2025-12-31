@@ -1,15 +1,15 @@
 # =============================================================================
-# CodeOpen Python Flavor
+# AgentPod Python Flavor
 # Python development environment with ML/AI support
 # =============================================================================
 # Size: ~1.2GB (on top of base)
 # Languages: Python
 # =============================================================================
 
-ARG BASE_IMAGE=codeopen-base:latest
+ARG BASE_IMAGE=agentpod-base:latest
 FROM ${BASE_IMAGE}
 
-LABEL maintainer="CodeOpen Team"
+LABEL maintainer="AgentPod Team"
 LABEL description="Python development environment with ML/AI support"
 LABEL flavor="python"
 
@@ -18,33 +18,40 @@ USER root
 # =============================================================================
 # Python Build Dependencies
 # =============================================================================
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    software-properties-common \
-    zlib1g-dev \
-    libbz2-dev \
-    libreadline-dev \
-    libsqlite3-dev \
-    libncursesw5-dev \
-    libxml2-dev \
-    libxmlsec1-dev \
-    liblzma-dev \
-    libffi-dev \
-    tk-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Use retry logic and --fix-missing to handle transient mirror issues
+RUN for i in 1 2 3; do \
+        apt-get update && \
+        apt-get install -y --no-install-recommends --fix-missing \
+            software-properties-common \
+            zlib1g-dev \
+            libbz2-dev \
+            libreadline-dev \
+            libsqlite3-dev \
+            libncursesw5-dev \
+            libxml2-dev \
+            libxmlsec1-dev \
+            liblzma-dev \
+            libffi-dev \
+            tk-dev \
+        && break || sleep 5; \
+    done && rm -rf /var/lib/apt/lists/*
 
 # =============================================================================
 # Python 3.12 (using deadsnakes PPA)
 # =============================================================================
 RUN add-apt-repository ppa:deadsnakes/ppa -y && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-        python3.12 \
-        python3.12-venv \
-        python3.12-dev \
-        python3-pip \
-    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 \
-    && update-alternatives --install /usr/bin/python python /usr/bin/python3.12 1 \
-    && rm -rf /var/lib/apt/lists/*
+    for i in 1 2 3; do \
+        apt-get update && \
+        apt-get install -y --no-install-recommends --fix-missing \
+            python3.12 \
+            python3.12-venv \
+            python3.12-dev \
+            python3-pip \
+        && break || sleep 5; \
+    done && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 && \
+    update-alternatives --install /usr/bin/python python /usr/bin/python3.12 1 && \
+    rm -rf /var/lib/apt/lists/*
 
 # =============================================================================
 # uv - Fast Python package installer
@@ -52,9 +59,10 @@ RUN add-apt-repository ppa:deadsnakes/ppa -y && \
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:${PATH}"
 
-# Make uv available to developer user
-RUN cp -r /root/.local /home/developer/.local 2>/dev/null || true && \
-    chown -R developer:developer /home/developer/.local
+# Make uv available to developer user (in /home/.local for HOME=/home)
+RUN mkdir -p /home/.local/bin && \
+    cp -r /root/.local/bin/* /home/.local/bin/ 2>/dev/null || true && \
+    chown -R developer:developer /home/.local
 
 # =============================================================================
 # Poetry - Dependency management
@@ -89,15 +97,15 @@ RUN pip install --break-system-packages \
 USER developer
 
 # Update PATH for developer user
-ENV PATH="/home/developer/.local/bin:${PATH}"
+ENV PATH="/home/.local/bin:${PATH}"
 
 # Update shell configuration
-RUN echo 'export PATH="/home/developer/.local/bin:$PATH"' >> /home/developer/.bashrc
+RUN echo 'export PATH="/home/.local/bin:$PATH"' >> /home/developer/.bashrc
 
 # =============================================================================
 # Flavor metadata
 # =============================================================================
-ENV CODEOPEN_FLAVOR="python"
-ENV CODEOPEN_LANGUAGES="python"
+ENV AGENTPOD_FLAVOR="python"
+ENV AGENTPOD_LANGUAGES="python"
 
-WORKDIR /home/developer/workspace
+WORKDIR /home/workspace

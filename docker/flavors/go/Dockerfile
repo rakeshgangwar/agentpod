@@ -1,15 +1,15 @@
 # =============================================================================
-# CodeOpen Go Flavor
+# AgentPod Go Flavor
 # Go development environment
 # =============================================================================
 # Size: ~900MB (on top of base)
 # Languages: Go
 # =============================================================================
 
-ARG BASE_IMAGE=codeopen-base:latest
+ARG BASE_IMAGE=agentpod-base:latest
 FROM ${BASE_IMAGE}
 
-LABEL maintainer="CodeOpen Team"
+LABEL maintainer="AgentPod Team"
 LABEL description="Go development environment"
 LABEL flavor="go"
 
@@ -23,7 +23,7 @@ RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-$(dpkg --print-architect
 
 # Set up Go environment
 ENV GOROOT=/usr/local/go
-ENV GOPATH=/home/developer/go
+ENV GOPATH=/home/go
 ENV PATH="${GOROOT}/bin:${GOPATH}/bin:${PATH}"
 
 # =============================================================================
@@ -32,7 +32,7 @@ ENV PATH="${GOROOT}/bin:${GOPATH}/bin:${PATH}"
 USER developer
 
 # Create Go directories
-RUN mkdir -p /home/developer/go/{bin,src,pkg}
+RUN mkdir -p /home/go/{bin,src,pkg}
 
 # Install common Go tools
 RUN go install golang.org/x/tools/gopls@latest && \
@@ -47,13 +47,13 @@ RUN go install golang.org/x/tools/gopls@latest && \
 # Update shell configuration
 # =============================================================================
 RUN echo 'export GOROOT=/usr/local/go' >> /home/developer/.bashrc && \
-    echo 'export GOPATH=/home/developer/go' >> /home/developer/.bashrc && \
+    echo 'export GOPATH=/home/go' >> /home/developer/.bashrc && \
     echo 'export PATH="${GOROOT}/bin:${GOPATH}/bin:${PATH}"' >> /home/developer/.bashrc
 
 # =============================================================================
 # Flavor metadata
 # =============================================================================
-ENV CODEOPEN_FLAVOR="go"
-ENV CODEOPEN_LANGUAGES="go"
+ENV AGENTPOD_FLAVOR="go"
+ENV AGENTPOD_LANGUAGES="go"
 
-WORKDIR /home/developer/workspace
+WORKDIR /home/workspace

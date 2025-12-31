@@ -1,6 +1,6 @@
 # Generative UI Architecture
 
-**Application:** CodeOpen  
+**Application:** AgentPod  
 **Date:** December 2024  
 **Status:** Design Phase
 
@@ -10,7 +10,7 @@ A complete architecture for intent-based generative UI where the interface dynam
 
 ## Vision
 
-Transform CodeOpen from a traditional "pages with navigation" app into a **fluid, intent-driven interface** where:
+Transform AgentPod from a traditional "pages with navigation" app into a **fluid, intent-driven interface** where:
 
 1. **User opens app** → Sees "What's on your mind?" (not a dashboard)
 2. **User states intent** → AI determines what to show

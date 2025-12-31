@@ -1,4 +1,4 @@
-# CodeOpen Polyglot Flavor
+# AgentPod Polyglot Flavor
 
 Multi-language development environment with JavaScript, TypeScript, Python, Go, and Rust.
 
@@ -70,7 +70,7 @@ Multi-language development environment with JavaScript, TypeScript, Python, Go, 
 ## Usage
 
 ```bash
-docker run -it codeopen-polyglot:latest
+docker run -it agentpod-polyglot:latest
 ```
 
 ### Typical Multi-Language Project

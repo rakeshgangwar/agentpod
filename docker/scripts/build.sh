@@ -1,14 +1,13 @@
 #!/bin/bash
 # =============================================================================
-# Build All CodeOpen Container Images
+# Build All AgentPod Container Images
 # =============================================================================
-# Usage: ./build.sh [--no-cache] [--push] [--flavors <f1,f2>] [--addons <a1,a2>]
+# Usage: ./build.sh [--no-cache] [--push] [--flavors <f1,f2>]
 #
 # Arguments:
 #   --no-cache  - Build without Docker cache
 #   --push      - Push to registry after build
 #   --flavors   - Comma-separated list of flavors to build (default: all)
-#   --addons    - Comma-separated list of addons to build (default: all)
 #   --skip-base - Skip building base image
 # =============================================================================
 
@@ -21,7 +20,6 @@ source "$SCRIPT_DIR/config.sh"
 NO_CACHE=""
 PUSH=""
 BUILD_FLAVORS=""
-BUILD_ADDONS=""
 SKIP_BASE=""
 
 while [[ $# -gt 0 ]]; do
@@ -36,10 +34,6 @@ while [[ $# -gt 0 ]]; do
             ;;
         --flavors)
             BUILD_FLAVORS="$2"
-            shift 2
-            ;;
-        --addons)
-            BUILD_ADDONS="$2"
             shift 2
             ;;
         --skip-base)
@@ -59,14 +53,8 @@ else
     SELECTED_FLAVORS=("${FLAVORS[@]}")
 fi
 
-if [ -n "$BUILD_ADDONS" ]; then
-    IFS=',' read -ra SELECTED_ADDONS <<< "$BUILD_ADDONS"
-else
-    SELECTED_ADDONS=("${ADDONS[@]}")
-fi
-
 echo "=============================================="
-echo "  CodeOpen Container Build System"
+echo "  AgentPod Container Build System"
 echo "=============================================="
 echo "  Version:  $CONTAINER_VERSION"
 echo "  Registry: $REGISTRY_URL"
@@ -76,7 +64,6 @@ echo ""
 echo "  Build Targets:"
 echo "    Base:    ${SKIP_BASE:-yes}"
 echo "    Flavors: ${SELECTED_FLAVORS[*]}"
-echo "    Addons:  ${SELECTED_ADDONS[*]}"
 echo "=============================================="
 echo ""
 
@@ -108,19 +95,6 @@ for flavor in "${SELECTED_FLAVORS[@]}"; do
     else
         ((BUILD_FAILED++))
         echo "WARNING: Flavor '$flavor' build failed!"
-    fi
-done
-
-# Build addons (using fullstack as base by default)
-for addon in "${SELECTED_ADDONS[@]}"; do
-    echo "----------------------------------------"
-    echo "  Building Add-on: $addon"
-    echo "----------------------------------------"
-    if "$SCRIPT_DIR/build-addon.sh" "$addon" $NO_CACHE $PUSH; then
-        ((BUILD_SUCCESS++))
-    else
-        ((BUILD_FAILED++))
-        echo "WARNING: Add-on '$addon' build failed!"
     fi
 done
 

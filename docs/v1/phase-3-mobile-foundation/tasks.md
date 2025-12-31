@@ -82,7 +82,7 @@
 ### 2.2 Secure Storage Service
 - [x] Create `src/services/storage.rs`
 - [x] Implement primary storage using file-based config:
-  - `save_config(config)` - Save to ~/.config/codeopen/config.json
+  - `save_config(config)` - Save to ~/.config/agentpod/config.json
   - `load_config()` - Retrieve from config file
   - `clear_config()` - Remove config
 - [x] Implement keyring as optional enhancement (not fallback):

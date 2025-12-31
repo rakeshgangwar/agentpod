@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# CodeOpen Container Test Suite
+# AgentPod Container Test Suite
 # =============================================================================
 # Tests all container flavor and addon combinations to verify they:
 # 1. Build successfully
@@ -62,7 +62,7 @@
 #     ./test-containers.sh
 #
 # =============================================================================
-# Available Flavors: js, python, go, rust, fullstack, polyglot
+# Available Flavors: bare, js, python, go, rust, fullstack, polyglot
 # Available Addons:  gui, code-server, databases, cloud, gpu
 #
 # Note: GPU addon is automatically skipped if no NVIDIA GPU is detected.
@@ -204,7 +204,7 @@ check_docker() {
 }
 
 check_base_image() {
-    local base_image="${REGISTRY_URL}/codeopen-base:latest"
+    local base_image="${REGISTRY_URL}/agentpod-base:latest"
     
     if docker image inspect "$base_image" &> /dev/null; then
         log_info "Base image exists: $base_image"
@@ -241,7 +241,7 @@ build_flavor() {
 build_addon() {
     local flavor="$1"
     local addon="$2"
-    local base_image="${REGISTRY_URL}/codeopen-${flavor}:latest"
+    local base_image="${REGISTRY_URL}/agentpod-${flavor}:latest"
     
     log_info "Building addon: $addon on flavor: $flavor"
     if ! "$SCRIPT_DIR/build-addon.sh" "$addon" --base "$base_image"; then
@@ -260,9 +260,9 @@ generate_container_name() {
     local addon="$2"
     
     if [ -n "$addon" ]; then
-        echo "codeopen-test-${flavor}-${addon}-$$"
+        echo "agentpod-test-${flavor}-${addon}-$$"
     else
-        echo "codeopen-test-${flavor}-$$"
+        echo "agentpod-test-${flavor}-$$"
     fi
 }
 
@@ -366,17 +366,17 @@ check_environment() {
     log_verbose "Checking environment variables..."
     
     # Check flavor environment variable
-    local flavor_env=$(docker exec "$container_name" printenv CODEOPEN_FLAVOR 2>/dev/null)
+    local flavor_env=$(docker exec "$container_name" printenv AGENTPOD_FLAVOR 2>/dev/null)
     if [ "$flavor_env" != "$expected_flavor" ]; then
-        log_verbose "CODEOPEN_FLAVOR mismatch: expected '$expected_flavor', got '$flavor_env'"
+        log_verbose "AGENTPOD_FLAVOR mismatch: expected '$expected_flavor', got '$flavor_env'"
         # This is a warning, not a failure
     fi
     
     # Check if addon-specific env vars exist
     if [ -n "$expected_addon" ]; then
         local addon_upper=$(echo "$expected_addon" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
-        local addon_env=$(docker exec "$container_name" printenv "CODEOPEN_ADDON_${addon_upper}" 2>/dev/null)
-        log_verbose "CODEOPEN_ADDON_${addon_upper}=$addon_env"
+        local addon_env=$(docker exec "$container_name" printenv "AGENTPOD_ADDON_${addon_upper}" 2>/dev/null)
+        log_verbose "AGENTPOD_ADDON_${addon_upper}=$addon_env"
     fi
     
     # Check basic tools exist
@@ -542,7 +542,7 @@ fi
 
 echo ""
 echo "╔═══════════════════════════════════════════════════════════════╗"
-echo "║           CodeOpen Container Test Suite                       ║"
+echo "║           AgentPod Container Test Suite                       ║"
 echo "╠═══════════════════════════════════════════════════════════════╣"
 echo "║  Flavors:    ${TEST_FLAVORS[*]}"
 echo "║  Addons:     ${ADDONS_DISPLAY}"
@@ -586,7 +586,7 @@ cleanup_addon_image() {
 
 # Test base flavors
 for flavor in "${TEST_FLAVORS[@]}"; do
-    image="${REGISTRY_URL}/codeopen-${flavor}:latest"
+    image="${REGISTRY_URL}/agentpod-${flavor}:latest"
     test_image "$image" "$flavor" "" ""
 done
 
@@ -601,7 +601,7 @@ if [ "$SKIP_ADDONS" = false ]; then
                 continue
             fi
             
-            image="${REGISTRY_URL}/codeopen-${flavor}-${addon}:latest"
+            image="${REGISTRY_URL}/agentpod-${flavor}-${addon}:latest"
             
             # Build addon image on-demand (unless skip-build or image already exists)
             if [ "$SKIP_BUILD" = false ]; then

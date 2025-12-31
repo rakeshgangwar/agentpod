@@ -1,6 +1,6 @@
 # API Capabilities Matrix
 
-**Application:** CodeOpen  
+**Application:** AgentPod  
 **Date:** December 2024
 
 Comprehensive documentation of all API capabilities available in the system.
@@ -9,7 +9,7 @@ Comprehensive documentation of all API capabilities available in the system.
 
 ## Architecture Overview
 
-CodeOpen has a **3-layer API architecture**:
+AgentPod has a **3-layer API architecture**:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -24,7 +24,7 @@ CodeOpen has a **3-layer API architecture**:
 │                     Tauri Backend (Rust)                         │
 │  - Commands in src-tauri/src/commands/                          │
 │  - ApiClient in src-tauri/src/services/api.rs                   │
-│  - Local storage: keyring + ~/.config/codeopen/                 │
+│  - Local storage: keyring + ~/.config/agentpod/                 │
 └───────────────────────────┬─────────────────────────────────────┘
                             │ HTTP/REST
                             ▼
