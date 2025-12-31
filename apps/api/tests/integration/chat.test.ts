@@ -15,7 +15,8 @@
 import '../setup.ts';
 
 import { describe, test, expect, beforeAll, afterAll, beforeEach } from 'bun:test';
-import { db } from '../../src/db/index.ts';
+import { rawSql } from '../../src/db/drizzle';
+import { createTestUser as createTestUserHelper } from '../helpers/database';
 import * as SandboxModel from '../../src/models/sandbox.ts';
 import * as ChatSessionModel from '../../src/models/chat-session.ts';
 import * as ChatMessageModel from '../../src/models/chat-message.ts';
@@ -34,27 +35,19 @@ const TEST_USER_ID = 'test-user-chat-001';
 // Test Helpers
 // =============================================================================
 
-function createTestUser(id: string): void {
-  const now = new Date().toISOString();
-  db.run(`
-    INSERT OR IGNORE INTO user (id, name, email, emailVerified, createdAt, updatedAt)
-    VALUES (?, ?, ?, 0, ?, ?)
-  `, [id, `Test User ${id}`, `${id}@test.com`, now, now]);
-}
-
-function deleteTestUser(id: string): void {
-  db.run('DELETE FROM user WHERE id = ?', [id]);
-}
-
-function cleanupTestData(): void {
+async function cleanupTestData(): Promise<void> {
   // Clean up in reverse order of dependencies
-  db.run('DELETE FROM chat_messages WHERE session_id IN (SELECT id FROM chat_sessions WHERE sandbox_id LIKE "test-chat-%")');
-  db.run('DELETE FROM chat_sessions WHERE sandbox_id LIKE "test-chat-%"');
-  db.run('DELETE FROM sandboxes WHERE id LIKE "test-chat-%"');
+  await rawSql`DELETE FROM chat_messages WHERE session_id IN (SELECT id FROM chat_sessions WHERE sandbox_id LIKE 'test-chat-%')`;
+  await rawSql`DELETE FROM chat_sessions WHERE sandbox_id LIKE 'test-chat-%'`;
+  await rawSql`DELETE FROM sandboxes WHERE id LIKE 'test-chat-%'`;
 }
 
-function createTestSandbox(id: string, userId: string, status: SandboxModel.SandboxStatus = 'running'): SandboxModel.Sandbox {
-  const sandbox = SandboxModel.createSandbox({
+async function deleteTestUser(id: string): Promise<void> {
+  await rawSql`DELETE FROM "user" WHERE id = ${id}`;
+}
+
+async function createTestSandbox(id: string, userId: string, status: SandboxModel.SandboxStatus = 'running'): Promise<SandboxModel.Sandbox> {
+  const sandbox = await SandboxModel.createSandbox({
     id,
     userId,
     name: `Test Sandbox ${id}`,
@@ -66,13 +59,13 @@ function createTestSandbox(id: string, userId: string, status: SandboxModel.Sand
   
   // Update status if not the default 'created'
   if (status !== 'created') {
-    return SandboxModel.updateSandbox(id, { status })!;
+    return (await SandboxModel.updateSandbox(id, { status }))!;
   }
   return sandbox;
 }
 
-function createTestSession(sandboxId: string, userId: string, title?: string): ChatSessionModel.ChatSession {
-  return ChatSessionModel.createChatSession({
+async function createTestSession(sandboxId: string, userId: string, title?: string): Promise<ChatSessionModel.ChatSession> {
+  return await ChatSessionModel.createChatSession({
     sandboxId,
     userId,
     source: 'opencode',
@@ -80,13 +73,13 @@ function createTestSession(sandboxId: string, userId: string, title?: string): C
   });
 }
 
-function createTestMessage(
+async function createTestMessage(
   sessionId: string, 
   role: ChatMessageModel.MessageRole, 
   content: string,
   _index: number = 0
-): ChatMessageModel.ChatMessage {
-  return ChatMessageModel.createChatMessage({
+): Promise<ChatMessageModel.ChatMessage> {
+  return await ChatMessageModel.createChatMessage({
     sessionId,
     role,
     content,  // content is stored as JSON, so string is fine
@@ -98,17 +91,21 @@ function createTestMessage(
 // =============================================================================
 
 describe('Chat Routes Integration Tests', () => {
-  beforeAll(() => {
-    createTestUser(TEST_USER_ID);
+  beforeAll(async () => {
+    await createTestUserHelper({
+      id: TEST_USER_ID,
+      email: 'chat-test@example.com',
+      name: 'Chat Test User',
+    });
   });
 
-  afterAll(() => {
-    cleanupTestData();
-    deleteTestUser(TEST_USER_ID);
+  afterAll(async () => {
+    await cleanupTestData();
+    await deleteTestUser(TEST_USER_ID);
   });
 
-  beforeEach(() => {
-    cleanupTestData();
+  beforeEach(async () => {
+    await cleanupTestData();
   });
 
   // ===========================================================================
@@ -117,14 +114,14 @@ describe('Chat Routes Integration Tests', () => {
 
   describe('Authentication', () => {
     test('should return 401 without auth header', async () => {
-      const sandbox = createTestSandbox('test-chat-auth-001', TEST_USER_ID);
+      const sandbox = await createTestSandbox('test-chat-auth-001', TEST_USER_ID);
       
       const res = await app.request(`/api/v2/sandboxes/${sandbox.id}/chat/sessions`);
       expect(res.status).toBe(401);
     });
 
     test('should return 401 with invalid token', async () => {
-      const sandbox = createTestSandbox('test-chat-auth-002', TEST_USER_ID);
+      const sandbox = await createTestSandbox('test-chat-auth-002', TEST_USER_ID);
       
       const res = await app.request(`/api/v2/sandboxes/${sandbox.id}/chat/sessions`, {
         headers: { 'Authorization': 'Bearer invalid-token' },
@@ -133,7 +130,7 @@ describe('Chat Routes Integration Tests', () => {
     });
 
     test('should succeed with valid auth token', async () => {
-      const sandbox = createTestSandbox('test-chat-auth-003', TEST_USER_ID);
+      const sandbox = await createTestSandbox('test-chat-auth-003', TEST_USER_ID);
       
       const res = await app.request(`/api/v2/sandboxes/${sandbox.id}/chat/sessions`, {
         headers: AUTH_HEADER,
@@ -156,7 +153,7 @@ describe('Chat Routes Integration Tests', () => {
     });
 
     test('should return empty sessions list for new sandbox', async () => {
-      const sandbox = createTestSandbox('test-chat-list-001', TEST_USER_ID);
+      const sandbox = await createTestSandbox('test-chat-list-001', TEST_USER_ID);
       
       const res = await app.request(`/api/v2/sandboxes/${sandbox.id}/chat/sessions`, {
         headers: AUTH_HEADER,
@@ -171,9 +168,9 @@ describe('Chat Routes Integration Tests', () => {
     });
 
     test('should return sessions for sandbox', async () => {
-      const sandbox = createTestSandbox('test-chat-list-002', TEST_USER_ID);
-      const session1 = createTestSession(sandbox.id, TEST_USER_ID, 'Session 1');
-      const session2 = createTestSession(sandbox.id, TEST_USER_ID, 'Session 2');
+      const sandbox = await createTestSandbox('test-chat-list-002', TEST_USER_ID);
+      const session1 = await createTestSession(sandbox.id, TEST_USER_ID, 'Session 1');
+      const session2 = await createTestSession(sandbox.id, TEST_USER_ID, 'Session 2');
       
       const res = await app.request(`/api/v2/sandboxes/${sandbox.id}/chat/sessions`, {
         headers: AUTH_HEADER,
@@ -187,12 +184,12 @@ describe('Chat Routes Integration Tests', () => {
     });
 
     test('should filter sessions by status', async () => {
-      const sandbox = createTestSandbox('test-chat-list-003', TEST_USER_ID);
-      const activeSession = createTestSession(sandbox.id, TEST_USER_ID, 'Active Session');
-      const archivedSession = createTestSession(sandbox.id, TEST_USER_ID, 'Archived Session');
+      const sandbox = await createTestSandbox('test-chat-list-003', TEST_USER_ID);
+      const activeSession = await createTestSession(sandbox.id, TEST_USER_ID, 'Active Session');
+      const archivedSession = await createTestSession(sandbox.id, TEST_USER_ID, 'Archived Session');
       
       // Archive one session
-      ChatSessionModel.archiveChatSession(archivedSession.id);
+      await ChatSessionModel.archiveChatSession(archivedSession.id);
       
       // Get only active sessions
       const res = await app.request(`/api/v2/sandboxes/${sandbox.id}/chat/sessions?status=active`, {
@@ -207,11 +204,11 @@ describe('Chat Routes Integration Tests', () => {
     });
 
     test('should paginate sessions', async () => {
-      const sandbox = createTestSandbox('test-chat-list-004', TEST_USER_ID);
+      const sandbox = await createTestSandbox('test-chat-list-004', TEST_USER_ID);
       
       // Create 5 sessions
       for (let i = 0; i < 5; i++) {
-        createTestSession(sandbox.id, TEST_USER_ID, `Session ${i + 1}`);
+        await createTestSession(sandbox.id, TEST_USER_ID, `Session ${i + 1}`);
       }
       
       // Get first 2 sessions
@@ -229,9 +226,9 @@ describe('Chat Routes Integration Tests', () => {
     });
 
     test('should include session statistics', async () => {
-      const sandbox = createTestSandbox('test-chat-list-005', TEST_USER_ID);
-      createTestSession(sandbox.id, TEST_USER_ID, 'Session 1');
-      createTestSession(sandbox.id, TEST_USER_ID, 'Session 2');
+      const sandbox = await createTestSandbox('test-chat-list-005', TEST_USER_ID);
+      await createTestSession(sandbox.id, TEST_USER_ID, 'Session 1');
+      await createTestSession(sandbox.id, TEST_USER_ID, 'Session 2');
       
       const res = await app.request(`/api/v2/sandboxes/${sandbox.id}/chat/sessions`, {
         headers: AUTH_HEADER,
@@ -260,7 +257,7 @@ describe('Chat Routes Integration Tests', () => {
     });
 
     test('should return 404 for non-existent session', async () => {
-      const sandbox = createTestSandbox('test-chat-get-001', TEST_USER_ID);
+      const sandbox = await createTestSandbox('test-chat-get-001', TEST_USER_ID);
       
       const res = await app.request(`/api/v2/sandboxes/${sandbox.id}/chat/sessions/non-existent-session`, {
         headers: AUTH_HEADER,
@@ -270,9 +267,9 @@ describe('Chat Routes Integration Tests', () => {
     });
 
     test('should return 404 for session belonging to different sandbox', async () => {
-      const sandbox1 = createTestSandbox('test-chat-get-002a', TEST_USER_ID);
-      const sandbox2 = createTestSandbox('test-chat-get-002b', TEST_USER_ID);
-      const session = createTestSession(sandbox1.id, TEST_USER_ID);
+      const sandbox1 = await createTestSandbox('test-chat-get-002a', TEST_USER_ID);
+      const sandbox2 = await createTestSandbox('test-chat-get-002b', TEST_USER_ID);
+      const session = await createTestSession(sandbox1.id, TEST_USER_ID);
       
       // Try to access session via different sandbox
       const res = await app.request(`/api/v2/sandboxes/${sandbox2.id}/chat/sessions/${session.id}`, {
@@ -283,12 +280,12 @@ describe('Chat Routes Integration Tests', () => {
     });
 
     test('should return session with messages', async () => {
-      const sandbox = createTestSandbox('test-chat-get-003', TEST_USER_ID);
-      const session = createTestSession(sandbox.id, TEST_USER_ID, 'My Session');
+      const sandbox = await createTestSandbox('test-chat-get-003', TEST_USER_ID);
+      const session = await createTestSession(sandbox.id, TEST_USER_ID, 'My Session');
       
       // Add messages
-      createTestMessage(session.id, 'user', 'Hello!', 0);
-      createTestMessage(session.id, 'assistant', 'Hi there!', 1);
+      await createTestMessage(session.id, 'user', 'Hello!', 0);
+      await createTestMessage(session.id, 'assistant', 'Hi there!', 1);
       
       const res = await app.request(`/api/v2/sandboxes/${sandbox.id}/chat/sessions/${session.id}`, {
         headers: AUTH_HEADER,
@@ -305,8 +302,8 @@ describe('Chat Routes Integration Tests', () => {
     });
 
     test('should return session metadata correctly', async () => {
-      const sandbox = createTestSandbox('test-chat-get-004', TEST_USER_ID);
-      const session = createTestSession(sandbox.id, TEST_USER_ID, 'Metadata Test');
+      const sandbox = await createTestSandbox('test-chat-get-004', TEST_USER_ID);
+      const session = await createTestSession(sandbox.id, TEST_USER_ID, 'Metadata Test');
       
       const res = await app.request(`/api/v2/sandboxes/${sandbox.id}/chat/sessions/${session.id}`, {
         headers: AUTH_HEADER,
@@ -337,7 +334,7 @@ describe('Chat Routes Integration Tests', () => {
     });
 
     test('should return 404 for non-existent session', async () => {
-      const sandbox = createTestSandbox('test-chat-msg-001', TEST_USER_ID);
+      const sandbox = await createTestSandbox('test-chat-msg-001', TEST_USER_ID);
       
       const res = await app.request(`/api/v2/sandboxes/${sandbox.id}/chat/sessions/non-existent/messages`, {
         headers: AUTH_HEADER,
@@ -347,13 +344,13 @@ describe('Chat Routes Integration Tests', () => {
     });
 
     test('should return paginated messages', async () => {
-      const sandbox = createTestSandbox('test-chat-msg-002', TEST_USER_ID);
-      const session = createTestSession(sandbox.id, TEST_USER_ID);
+      const sandbox = await createTestSandbox('test-chat-msg-002', TEST_USER_ID);
+      const session = await createTestSession(sandbox.id, TEST_USER_ID);
       
       // Add 10 messages
       for (let i = 0; i < 10; i++) {
         const role = i % 2 === 0 ? 'user' : 'assistant';
-        createTestMessage(session.id, role as ChatMessageModel.MessageRole, `Message ${i + 1}`, i);
+        await createTestMessage(session.id, role as ChatMessageModel.MessageRole, `Message ${i + 1}`, i);
       }
       
       // Get first 5 messages
@@ -371,12 +368,12 @@ describe('Chat Routes Integration Tests', () => {
     });
 
     test('should respect order parameter', async () => {
-      const sandbox = createTestSandbox('test-chat-msg-003', TEST_USER_ID);
-      const session = createTestSession(sandbox.id, TEST_USER_ID);
+      const sandbox = await createTestSandbox('test-chat-msg-003', TEST_USER_ID);
+      const session = await createTestSession(sandbox.id, TEST_USER_ID);
       
-      createTestMessage(session.id, 'user', 'First message', 0);
-      createTestMessage(session.id, 'assistant', 'Second message', 1);
-      createTestMessage(session.id, 'user', 'Third message', 2);
+      await createTestMessage(session.id, 'user', 'First message', 0);
+      await createTestMessage(session.id, 'assistant', 'Second message', 1);
+      await createTestMessage(session.id, 'user', 'Third message', 2);
       
       // Get messages in descending order
       const resDesc = await app.request(`/api/v2/sandboxes/${sandbox.id}/chat/sessions/${session.id}/messages?order=desc`, {
@@ -409,8 +406,8 @@ describe('Chat Routes Integration Tests', () => {
     });
 
     test('should return empty array for session with no messages', async () => {
-      const sandbox = createTestSandbox('test-chat-msg-004', TEST_USER_ID);
-      const session = createTestSession(sandbox.id, TEST_USER_ID);
+      const sandbox = await createTestSandbox('test-chat-msg-004', TEST_USER_ID);
+      const session = await createTestSession(sandbox.id, TEST_USER_ID);
       
       const res = await app.request(`/api/v2/sandboxes/${sandbox.id}/chat/sessions/${session.id}/messages`, {
         headers: AUTH_HEADER,
@@ -439,7 +436,7 @@ describe('Chat Routes Integration Tests', () => {
     });
 
     test('should return 404 for non-existent session', async () => {
-      const sandbox = createTestSandbox('test-chat-del-001', TEST_USER_ID);
+      const sandbox = await createTestSandbox('test-chat-del-001', TEST_USER_ID);
       
       const res = await app.request(`/api/v2/sandboxes/${sandbox.id}/chat/sessions/non-existent`, {
         method: 'DELETE',
@@ -450,8 +447,8 @@ describe('Chat Routes Integration Tests', () => {
     });
 
     test('should archive session successfully', async () => {
-      const sandbox = createTestSandbox('test-chat-del-002', TEST_USER_ID);
-      const session = createTestSession(sandbox.id, TEST_USER_ID);
+      const sandbox = await createTestSandbox('test-chat-del-002', TEST_USER_ID);
+      const session = await createTestSession(sandbox.id, TEST_USER_ID);
       
       const res = await app.request(`/api/v2/sandboxes/${sandbox.id}/chat/sessions/${session.id}`, {
         method: 'DELETE',
@@ -466,8 +463,8 @@ describe('Chat Routes Integration Tests', () => {
     });
 
     test('should change session status to archived', async () => {
-      const sandbox = createTestSandbox('test-chat-del-003', TEST_USER_ID);
-      const session = createTestSession(sandbox.id, TEST_USER_ID);
+      const sandbox = await createTestSandbox('test-chat-del-003', TEST_USER_ID);
+      const session = await createTestSession(sandbox.id, TEST_USER_ID);
       
       await app.request(`/api/v2/sandboxes/${sandbox.id}/chat/sessions/${session.id}`, {
         method: 'DELETE',
@@ -475,14 +472,14 @@ describe('Chat Routes Integration Tests', () => {
       });
       
       // Verify session is archived
-      const updatedSession = ChatSessionModel.getChatSessionById(session.id);
+      const updatedSession = await ChatSessionModel.getChatSessionById(session.id);
       expect(updatedSession?.status).toBe('archived');
     });
 
     test('should not delete session data (soft delete)', async () => {
-      const sandbox = createTestSandbox('test-chat-del-004', TEST_USER_ID);
-      const session = createTestSession(sandbox.id, TEST_USER_ID);
-      createTestMessage(session.id, 'user', 'Test message', 0);
+      const sandbox = await createTestSandbox('test-chat-del-004', TEST_USER_ID);
+      const session = await createTestSession(sandbox.id, TEST_USER_ID);
+      await createTestMessage(session.id, 'user', 'Test message', 0);
       
       await app.request(`/api/v2/sandboxes/${sandbox.id}/chat/sessions/${session.id}`, {
         method: 'DELETE',
@@ -490,18 +487,18 @@ describe('Chat Routes Integration Tests', () => {
       });
       
       // Session should still exist
-      const archivedSession = ChatSessionModel.getChatSessionById(session.id);
+      const archivedSession = await ChatSessionModel.getChatSessionById(session.id);
       expect(archivedSession).toBeDefined();
       
       // Messages should still exist
-      const messages = ChatMessageModel.listChatMessagesBySessionId(session.id, {});
+      const messages = await ChatMessageModel.listChatMessagesBySessionId(session.id, {});
       expect(messages.length).toBe(1);
     });
 
     test('archived session should not appear in active list', async () => {
-      const sandbox = createTestSandbox('test-chat-del-005', TEST_USER_ID);
-      const session1 = createTestSession(sandbox.id, TEST_USER_ID, 'Active');
-      const session2 = createTestSession(sandbox.id, TEST_USER_ID, 'To Archive');
+      const sandbox = await createTestSandbox('test-chat-del-005', TEST_USER_ID);
+      const session1 = await createTestSession(sandbox.id, TEST_USER_ID, 'Active');
+      const session2 = await createTestSession(sandbox.id, TEST_USER_ID, 'To Archive');
       
       // Archive second session
       await app.request(`/api/v2/sandboxes/${sandbox.id}/chat/sessions/${session2.id}`, {
@@ -534,7 +531,7 @@ describe('Chat Routes Integration Tests', () => {
     });
 
     test('should return sync status for sandbox', async () => {
-      const sandbox = createTestSandbox('test-chat-sync-001', TEST_USER_ID);
+      const sandbox = await createTestSandbox('test-chat-sync-001', TEST_USER_ID);
       
       const res = await app.request(`/api/v2/sandboxes/${sandbox.id}/chat/sync/status`, {
         headers: AUTH_HEADER,
@@ -548,9 +545,9 @@ describe('Chat Routes Integration Tests', () => {
     });
 
     test('should include session stats in sync status', async () => {
-      const sandbox = createTestSandbox('test-chat-sync-002', TEST_USER_ID);
-      createTestSession(sandbox.id, TEST_USER_ID, 'Session 1');
-      createTestSession(sandbox.id, TEST_USER_ID, 'Session 2');
+      const sandbox = await createTestSandbox('test-chat-sync-002', TEST_USER_ID);
+      await createTestSession(sandbox.id, TEST_USER_ID, 'Session 1');
+      await createTestSession(sandbox.id, TEST_USER_ID, 'Session 2');
       
       const res = await app.request(`/api/v2/sandboxes/${sandbox.id}/chat/sync/status`, {
         headers: AUTH_HEADER,
@@ -578,7 +575,7 @@ describe('Chat Routes Integration Tests', () => {
     });
 
     test('should return 400 for non-running sandbox', async () => {
-      const sandbox = createTestSandbox('test-chat-fullsync-001', TEST_USER_ID, 'stopped');
+      const sandbox = await createTestSandbox('test-chat-fullsync-001', TEST_USER_ID, 'stopped');
       
       const res = await app.request(`/api/v2/sandboxes/${sandbox.id}/chat/sync`, {
         method: 'POST',
@@ -609,7 +606,7 @@ describe('Chat Routes Integration Tests', () => {
     });
 
     test('should return 404 for non-existent session', async () => {
-      const sandbox = createTestSandbox('test-chat-sessionsync-001', TEST_USER_ID);
+      const sandbox = await createTestSandbox('test-chat-sessionsync-001', TEST_USER_ID);
       
       const res = await app.request(`/api/v2/sandboxes/${sandbox.id}/chat/sessions/non-existent/sync`, {
         method: 'POST',
@@ -628,11 +625,11 @@ describe('Chat Routes Integration Tests', () => {
 
   describe('Edge Cases', () => {
     test('should handle sandbox with many sessions', async () => {
-      const sandbox = createTestSandbox('test-chat-edge-001', TEST_USER_ID);
+      const sandbox = await createTestSandbox('test-chat-edge-001', TEST_USER_ID);
       
       // Create 25 sessions
       for (let i = 0; i < 25; i++) {
-        createTestSession(sandbox.id, TEST_USER_ID, `Session ${i + 1}`);
+        await createTestSession(sandbox.id, TEST_USER_ID, `Session ${i + 1}`);
       }
       
       const res = await app.request(`/api/v2/sandboxes/${sandbox.id}/chat/sessions`, {
@@ -647,13 +644,13 @@ describe('Chat Routes Integration Tests', () => {
     });
 
     test('should handle session with many messages', async () => {
-      const sandbox = createTestSandbox('test-chat-edge-002', TEST_USER_ID);
-      const session = createTestSession(sandbox.id, TEST_USER_ID);
+      const sandbox = await createTestSandbox('test-chat-edge-002', TEST_USER_ID);
+      const session = await createTestSession(sandbox.id, TEST_USER_ID);
       
       // Create 100 messages
       for (let i = 0; i < 100; i++) {
         const role = i % 2 === 0 ? 'user' : 'assistant';
-        createTestMessage(session.id, role as ChatMessageModel.MessageRole, `Message ${i + 1}`, i);
+        await createTestMessage(session.id, role as ChatMessageModel.MessageRole, `Message ${i + 1}`, i);
       }
       
       // Get first page
@@ -670,8 +667,8 @@ describe('Chat Routes Integration Tests', () => {
     });
 
     test('should handle empty session title', async () => {
-      const sandbox = createTestSandbox('test-chat-edge-003', TEST_USER_ID);
-      const session = ChatSessionModel.createChatSession({
+      const sandbox = await createTestSandbox('test-chat-edge-003', TEST_USER_ID);
+      const session = await ChatSessionModel.createChatSession({
         sandboxId: sandbox.id,
         userId: TEST_USER_ID,
         source: 'opencode',
@@ -690,11 +687,11 @@ describe('Chat Routes Integration Tests', () => {
     });
 
     test('should handle special characters in message content', async () => {
-      const sandbox = createTestSandbox('test-chat-edge-004', TEST_USER_ID);
-      const session = createTestSession(sandbox.id, TEST_USER_ID);
+      const sandbox = await createTestSandbox('test-chat-edge-004', TEST_USER_ID);
+      const session = await createTestSession(sandbox.id, TEST_USER_ID);
       
       const specialContent = 'Hello 👋 <script>alert("xss")</script> SELECT * FROM users; -- comment';
-      createTestMessage(session.id, 'user', specialContent, 0);
+      await createTestMessage(session.id, 'user', specialContent, 0);
       
       const res = await app.request(
         `/api/v2/sandboxes/${sandbox.id}/chat/sessions/${session.id}/messages`,

@@ -1,18 +1,19 @@
 import "../setup.ts";
 
 import { describe, test, expect, beforeAll, afterAll, beforeEach } from "bun:test";
-import { db } from "../../src/db/index.ts";
+import { rawSql } from "../../src/db/drizzle";
+import { createTestUser } from "../helpers/database";
 import { app } from "../../src/index.ts";
 
 const AUTH_HEADER = { Authorization: "Bearer test-token" };
 const JSON_HEADERS = { ...AUTH_HEADER, "Content-Type": "application/json" };
-const TEST_USER_ID = "test-user-id";
+const TEST_USER_ID = "test-user-workflow-001";
 
-function cleanupTestData() {
-  db.run("DELETE FROM workflow_step_logs");
-  db.run("DELETE FROM workflow_executions");
-  db.run("DELETE FROM workflow_webhooks");
-  db.run("DELETE FROM workflows");
+async function cleanupTestData() {
+  await rawSql`DELETE FROM workflow_step_logs`;
+  await rawSql`DELETE FROM workflow_executions`;
+  await rawSql`DELETE FROM workflow_webhooks`;
+  await rawSql`DELETE FROM workflows`;
 }
 
 function createTestWorkflow(overrides: Record<string, unknown> = {}) {
@@ -45,19 +46,20 @@ function createTestWorkflow(overrides: Record<string, unknown> = {}) {
 }
 
 describe("Workflow Routes Integration Tests", () => {
-  beforeAll(() => {
-    db.run(`
-      INSERT OR IGNORE INTO user (id, name, email, email_verified, role, banned, created_at, updated_at)
-      VALUES (?, 'Test User', 'test@example.com', 1, 'user', 0, datetime('now'), datetime('now'))
-    `, [TEST_USER_ID]);
+  beforeAll(async () => {
+    await createTestUser({
+      id: TEST_USER_ID,
+      email: "workflow-test@example.com",
+      name: "Workflow Test User",
+    });
   });
 
-  afterAll(() => {
-    cleanupTestData();
+  afterAll(async () => {
+    await cleanupTestData();
   });
 
-  beforeEach(() => {
-    cleanupTestData();
+  beforeEach(async () => {
+    await cleanupTestData();
   });
 
   describe("Authentication", () => {
