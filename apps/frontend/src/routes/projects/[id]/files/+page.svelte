@@ -5,15 +5,17 @@
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { ScrollArea } from "$lib/components/ui/scroll-area";
   import { CodeBlock } from "$lib/components/ui/code-block";
+  import { MonacoEditor } from "$lib/components/ui/monaco-editor";
   import { MarkdownViewer } from "$lib/components/ui/markdown";
   import { toast } from "svelte-sonner";
   import { sandboxes, startSandbox } from "$lib/stores/sandboxes.svelte";
   import SandboxNotRunning from "$lib/components/sandbox-not-running.svelte";
   import FileIcon from "$lib/components/file-icon.svelte";
-  import { RefreshCw, Download, ChevronRight, ChevronDown, File, Folder, Loader2, ArrowLeft } from "@lucide/svelte";
+  import { RefreshCw, Download, ChevronRight, ChevronDown, File, Folder, Loader2, ArrowLeft, Pencil, Save, X } from "@lucide/svelte";
   import {
     sandboxOpencodeListFiles,
     sandboxOpencodeGetFileContent,
+    writeFileToSandbox,
     type FileNode,
     type FileContent,
   } from "$lib/api/tauri";
@@ -106,6 +108,12 @@
 
   // View mode for markdown files: "preview" or "raw"
   let markdownViewMode = $state<"preview" | "raw">("raw");
+
+  // Edit mode state
+  let isEditing = $state(false);
+  let editedContent = $state<string>("");
+  let isDirty = $state(false);
+  let isSaving = $state(false);
 
   /**
    * Decode base64 content to plain text
@@ -225,13 +233,21 @@
       return;
     }
 
+    if (isEditing && isDirty) {
+      const confirmed = confirm("You have unsaved changes. Discard them?");
+      if (!confirmed) return;
+    }
+
+    isEditing = false;
+    isDirty = false;
+    editedContent = "";
+    
     selectedFile = node;
     isLoadingContent = true;
     contentError = null;
     fileContent = null;
     rawBase64Content = null;
 
-    // Switch to content view on mobile when a file is selected
     mobileView = "content";
 
     try {
@@ -313,6 +329,88 @@
       return a.name.localeCompare(b.name);
     });
   }
+
+  function canEditFile(filename: string): boolean {
+    return !isBinaryFile(filename);
+  }
+
+  function startEditing() {
+    if (!selectedFile || !fileContent) return;
+    editedContent = fileContent.content;
+    isDirty = false;
+    isEditing = true;
+  }
+
+  function cancelEditing() {
+    if (isDirty) {
+      const confirmed = confirm("You have unsaved changes. Discard them?");
+      if (!confirmed) return;
+    }
+    isEditing = false;
+    isDirty = false;
+    editedContent = "";
+  }
+
+  async function saveFile() {
+    if (!selectedFile || !projectId) return;
+    
+    isSaving = true;
+    try {
+      await writeFileToSandbox(projectId, selectedFile.path, editedContent);
+      
+      if (fileContent) {
+        fileContent = { ...fileContent, content: editedContent };
+      }
+      
+      isDirty = false;
+      isEditing = false;
+      toast.success(`Saved ${selectedFile.name}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to save file";
+      toast.error(message);
+    } finally {
+      isSaving = false;
+    }
+  }
+
+  function handleEditorChange(value: string) {
+    editedContent = value;
+    isDirty = editedContent !== (fileContent?.content ?? "");
+  }
+
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key === "Escape" && isEditing) {
+      event.preventDefault();
+      cancelEditing();
+    }
+  }
+
+  $effect(() => {
+    if (typeof window === "undefined") return;
+    
+    window.addEventListener("keydown", handleKeydown);
+    
+    return () => {
+      window.removeEventListener("keydown", handleKeydown);
+    };
+  });
+
+  $effect(() => {
+    if (typeof window === "undefined") return;
+    
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
+      if (isDirty) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    }
+    
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  });
 </script>
 
 {#if !sandbox}
@@ -448,7 +546,7 @@
             <div class="min-w-0 flex-1">
               <h3 class="font-mono text-sm truncate text-foreground flex items-center gap-2">
                 <FileIcon filename={selectedFile.name} size="sm" class="hidden sm:block" />
-                {selectedFile.name}
+                {selectedFile.name}{#if isDirty}<span class="text-primary ml-1">●</span>{/if}
               </h3>
               <p class="text-xs font-mono truncate text-muted-foreground mt-0.5 hidden sm:block">
                 {selectedFile.path}
@@ -456,84 +554,127 @@
             </div>
           </div>
           <div class="flex gap-1.5 md:gap-2 flex-wrap justify-end">
-            {#if isMarkdownFile(selectedFile.name)}
-              <div class="flex border border-border/50 rounded overflow-hidden">
-                <button
-                  class="px-2 py-1 text-xs font-mono uppercase tracking-wider transition-colors
-                         {markdownViewMode === 'raw'
-                           ? 'bg-primary/20 text-primary'
-                           : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'}"
-                  onclick={() => markdownViewMode = "raw"}
+            {#if isEditing}
+              <Button
+                size="sm"
+                variant="outline"
+                onclick={cancelEditing}
+                disabled={isSaving}
+                title="Cancel editing (Esc)"
+                class="h-7 px-2 font-mono text-xs border-border/50 hover:border-destructive/50
+                       hover:text-destructive"
+              >
+                <X class="h-3.5 w-3.5 mr-1" />
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                variant="default"
+                onclick={saveFile}
+                disabled={isSaving || !isDirty}
+                title="Save file (Cmd/Ctrl+S)"
+                class="h-7 px-2 font-mono text-xs"
+              >
+                {#if isSaving}
+                  <Loader2 class="h-3.5 w-3.5 mr-1 animate-spin" />
+                {:else}
+                  <Save class="h-3.5 w-3.5 mr-1" />
+                {/if}
+                Save{#if isDirty}*{/if}
+              </Button>
+            {:else}
+              {#if isMarkdownFile(selectedFile.name)}
+                <div class="flex border border-border/50 rounded overflow-hidden">
+                  <button
+                    class="px-2 py-1 text-xs font-mono uppercase tracking-wider transition-colors
+                           {markdownViewMode === 'raw'
+                             ? 'bg-primary/20 text-primary'
+                             : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'}"
+                    onclick={() => markdownViewMode = "raw"}
+                  >
+                    Raw
+                  </button>
+                  <button
+                    class="px-2 py-1 text-xs font-mono uppercase tracking-wider transition-colors
+                           {markdownViewMode === 'preview'
+                             ? 'bg-primary/20 text-primary'
+                             : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'}"
+                    onclick={() => markdownViewMode = "preview"}
+                  >
+                    Preview
+                  </button>
+                </div>
+              {/if}
+              {#if canEditFile(selectedFile.name)}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onclick={startEditing}
+                  disabled={!fileContent?.content}
+                  title="Edit file"
+                  class="h-7 px-2 font-mono text-xs border-border/50 hover:border-primary/50
+                         hover:text-primary disabled:opacity-30"
                 >
-                  Raw
-                </button>
-                <button
-                  class="px-2 py-1 text-xs font-mono uppercase tracking-wider transition-colors
-                         {markdownViewMode === 'preview'
-                           ? 'bg-primary/20 text-primary'
-                           : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'}"
-                  onclick={() => markdownViewMode = "preview"}
-                >
-                  Preview
-                </button>
-              </div>
+                  <Pencil class="h-3.5 w-3.5 mr-1" />
+                  Edit
+                </Button>
+              {/if}
+              <!-- Path button - hidden on mobile -->
+              <Button
+                size="sm"
+                variant="outline"
+                onclick={copyPath}
+                title="Copy file path to clipboard"
+                class="hidden sm:flex h-7 px-2 font-mono text-xs border-border/50 hover:border-primary/50
+                       hover:text-primary"
+              >
+                Path
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onclick={useInChat}
+                title="Reference this file in chat"
+                class="h-7 px-2 font-mono text-xs border-border/50 hover:border-primary/50
+                       hover:text-primary"
+              >
+                Chat
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onclick={() => {
+                  if (fileContent?.content) {
+                    navigator.clipboard.writeText(fileContent.content);
+                    toast.success("Content copied to clipboard");
+                  }
+                }}
+                disabled={!fileContent?.content}
+                title="Copy file content to clipboard"
+                class="h-7 px-2 font-mono text-xs border-border/50 hover:border-primary/50
+                       hover:text-primary disabled:opacity-30"
+              >
+                Copy
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onclick={downloadFile}
+                disabled={!fileContent?.content}
+                title="Download file"
+                class="h-7 w-7 p-0 font-mono text-xs border-border/50 hover:border-primary/50
+                       hover:text-primary disabled:opacity-30"
+              >
+                <Download class="h-3.5 w-3.5" />
+              </Button>
             {/if}
-            <!-- Path button - hidden on mobile -->
-            <Button
-              size="sm"
-              variant="outline"
-              onclick={copyPath}
-              title="Copy file path to clipboard"
-              class="hidden sm:flex h-7 px-2 font-mono text-xs border-border/50 hover:border-primary/50
-                     hover:text-primary"
-            >
-              Path
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onclick={useInChat}
-              title="Reference this file in chat"
-              class="h-7 px-2 font-mono text-xs border-border/50 hover:border-primary/50
-                     hover:text-primary"
-            >
-              Chat
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onclick={() => {
-                if (fileContent?.content) {
-                  navigator.clipboard.writeText(fileContent.content);
-                  toast.success("Content copied to clipboard");
-                }
-              }}
-              disabled={!fileContent?.content}
-              title="Copy file content to clipboard"
-              class="h-7 px-2 font-mono text-xs border-border/50 hover:border-primary/50
-                     hover:text-primary disabled:opacity-30"
-            >
-              Copy
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onclick={downloadFile}
-              disabled={!fileContent?.content}
-              title="Download file"
-              class="h-7 w-7 p-0 font-mono text-xs border-border/50 hover:border-primary/50
-                     hover:text-primary disabled:opacity-30"
-            >
-              <Download class="h-3.5 w-3.5" />
-            </Button>
           </div>
         </div>
       </div>
 
-      <!-- File Content -->
       <div class="flex-1 overflow-hidden bg-background">
-        <ScrollArea class="h-full" orientation="both">
-          {#if isLoadingContent}
+        {#if isLoadingContent}
+          <ScrollArea class="h-full" orientation="both">
             <div class="p-4 space-y-2">
               {#each [1, 2, 3, 4, 5, 6, 7, 8] as i}
                 <div class="animate-fade-in-up stagger-{i}">
@@ -541,28 +682,42 @@
                 </div>
               {/each}
             </div>
-          {:else if contentError}
+          </ScrollArea>
+        {:else if contentError}
+          <ScrollArea class="h-full" orientation="both">
             <div class="p-4">
               <div class="p-4 rounded border border-destructive/50 bg-destructive/5">
                 <span class="font-mono text-xs uppercase tracking-wider text-destructive">[error]</span>
                 <p class="text-sm text-destructive mt-2">{contentError}</p>
               </div>
             </div>
-          {:else if fileContent}
-            {#if isMarkdownFile(selectedFile.name) && markdownViewMode === "preview"}
+          </ScrollArea>
+        {:else if fileContent}
+          {#if isEditing}
+            <MonacoEditor
+              code={editedContent}
+              language={getLanguage(selectedFile.name)}
+              onchange={handleEditorChange}
+              onsave={saveFile}
+              class="h-full"
+            />
+          {:else if isMarkdownFile(selectedFile.name) && markdownViewMode === "preview"}
+            <ScrollArea class="h-full" orientation="both">
               <MarkdownViewer
                 content={fileContent.content}
                 class="h-full"
               />
-            {:else}
+            </ScrollArea>
+          {:else}
+            <ScrollArea class="h-full" orientation="both">
               <CodeBlock
                 code={fileContent.content}
                 language={getLanguage(selectedFile.name)}
                 class="h-full"
               />
-            {/if}
+            </ScrollArea>
           {/if}
-        </ScrollArea>
+        {/if}
       </div>
     {:else}
       <!-- No File Selected State (shown on desktop, mobile shows file tree instead) -->

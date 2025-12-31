@@ -37,3 +37,6 @@ export * from "./admin";
 
 // Agent catalog types
 export * from "./agents";
+
+// Workflow builder types
+export * from "./workflow";

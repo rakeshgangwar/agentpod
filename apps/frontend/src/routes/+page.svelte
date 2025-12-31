@@ -532,6 +532,9 @@
             <DropdownMenu.Item onclick={() => goto("/projects")}>
               <span class="text-[var(--cyber-cyan)] mr-2">&gt;</span> All Projects
             </DropdownMenu.Item>
+            <DropdownMenu.Item onclick={() => goto("/workflows")}>
+              <span class="text-[var(--cyber-cyan)] mr-2">&gt;</span> Workflows
+            </DropdownMenu.Item>
             <DropdownMenu.Item onclick={() => goto("/settings")}>
               <span class="text-[var(--cyber-cyan)] mr-2">&gt;</span> Settings
             </DropdownMenu.Item>
@@ -619,6 +622,9 @@
               <DropdownMenu.Separator />
               <DropdownMenu.Item onclick={() => goto("/projects")}>
                 <span class="text-[var(--cyber-cyan)] mr-2">&gt;</span> All Projects
+              </DropdownMenu.Item>
+              <DropdownMenu.Item onclick={() => goto("/workflows")}>
+                <span class="text-[var(--cyber-cyan)] mr-2">&gt;</span> Workflows
               </DropdownMenu.Item>
               <DropdownMenu.Item onclick={() => goto("/settings")}>
                 <span class="text-[var(--cyber-cyan)] mr-2">&gt;</span> Settings

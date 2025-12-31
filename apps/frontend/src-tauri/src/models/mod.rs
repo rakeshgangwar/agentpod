@@ -349,6 +349,8 @@ pub struct ExecCommandInput {
     pub command: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub working_dir: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user: Option<String>,
 }
 
 /// Exec result

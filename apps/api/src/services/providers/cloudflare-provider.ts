@@ -114,6 +114,15 @@ export class CloudflareSandboxProvider implements SandboxProvider {
     });
   }
 
+  async startSandboxWithConfig(id: string, config?: Record<string, unknown>): Promise<void> {
+    log.info("Starting/waking Cloudflare sandbox with config", { sandboxId: id, hasConfig: !!config });
+
+    await this.workerFetch(`/sandbox/${id}/wake`, {
+      method: "POST",
+      body: JSON.stringify({ config }),
+    });
+  }
+
   async stopSandbox(id: string): Promise<void> {
     log.info("Stopping Cloudflare sandbox (no-op, auto-hibernates)", { sandboxId: id });
   }
@@ -307,6 +316,168 @@ export class CloudflareSandboxProvider implements SandboxProvider {
       skippedFiles: result.skippedFiles ?? 0,
       totalSize: result.totalSize ?? 0,
     };
+  }
+
+  /**
+   * Starts workflow execution asynchronously.
+   * Returns immediately with execution ID and "queued" status.
+   * Use getWorkflowStatus() to poll for completion.
+   */
+  async executeWorkflow(options: {
+    executionId: string;
+    workflowId: string;
+    workflow: {
+      id: string;
+      name: string;
+      nodes: Array<{
+        id: string;
+        name: string;
+        type: string;
+        position: [number, number];
+        parameters: Record<string, unknown>;
+        disabled?: boolean;
+      }>;
+      connections: Record<string, { main: Array<Array<{ node: string; type: string; index: number }>> }>;
+      settings?: Record<string, unknown>;
+    };
+    triggerType: "manual" | "webhook" | "schedule" | "event";
+    triggerData?: Record<string, unknown>;
+    userId?: string;
+  }): Promise<{
+    executionId: string;
+    instanceId: string;
+    status: "queued";
+  }> {
+    log.info("Starting workflow execution via Cloudflare Worker", {
+      executionId: options.executionId,
+      workflowId: options.workflowId,
+    });
+
+    const result = await this.workerFetch("/workflow/execute", {
+      method: "POST",
+      body: JSON.stringify({
+        executionId: options.executionId,
+        workflowId: options.workflowId,
+        workflow: options.workflow,
+        triggerType: options.triggerType,
+        triggerData: options.triggerData ?? {},
+        userId: options.userId,
+      }),
+    }) as {
+      executionId: string;
+      instanceId: string;
+      status: "queued";
+    };
+
+    log.info("Workflow execution queued", {
+      executionId: result.executionId,
+      instanceId: result.instanceId,
+    });
+
+    return result;
+  }
+
+  /**
+   * Gets the current status of a workflow execution from Cloudflare.
+   */
+  async getWorkflowStatus(executionId: string): Promise<{
+    executionId: string;
+    status: "queued" | "running" | "paused" | "complete" | "errored" | "terminated" | "unknown";
+    output?: Record<string, unknown>;
+    error?: string;
+  }> {
+    log.debug("Getting workflow status", { executionId });
+
+    const result = await this.workerFetch(`/workflow/${executionId}/status`, {
+      method: "GET",
+    }) as {
+      executionId: string;
+      status: string;
+      output?: Record<string, unknown>;
+      error?: string;
+    };
+
+    const statusMap: Record<string, "queued" | "running" | "paused" | "complete" | "errored" | "terminated" | "unknown"> = {
+      queued: "queued",
+      running: "running",
+      paused: "paused",
+      complete: "complete",
+      errored: "errored",
+      terminated: "terminated",
+    };
+
+    return {
+      executionId: result.executionId,
+      status: statusMap[result.status] ?? "unknown",
+      output: result.output,
+      error: result.error,
+    };
+  }
+
+  /**
+   * Pauses a running workflow execution.
+   */
+  async pauseWorkflow(executionId: string): Promise<{ executionId: string; status: "paused" }> {
+    log.info("Pausing workflow execution", { executionId });
+
+    const result = await this.workerFetch(`/workflow/${executionId}/pause`, {
+      method: "POST",
+    }) as { executionId: string; status: string };
+
+    return {
+      executionId: result.executionId,
+      status: "paused",
+    };
+  }
+
+  /**
+   * Resumes a paused workflow execution.
+   */
+  async resumeWorkflow(executionId: string): Promise<{ executionId: string; status: "running" }> {
+    log.info("Resuming workflow execution", { executionId });
+
+    const result = await this.workerFetch(`/workflow/${executionId}/resume`, {
+      method: "POST",
+    }) as { executionId: string; status: string };
+
+    return {
+      executionId: result.executionId,
+      status: "running",
+    };
+  }
+
+  /**
+   * Terminates a workflow execution.
+   */
+  async terminateWorkflow(executionId: string): Promise<{ executionId: string; status: "terminated" }> {
+    log.info("Terminating workflow execution", { executionId });
+
+    const result = await this.workerFetch(`/workflow/${executionId}/terminate`, {
+      method: "POST",
+    }) as { executionId: string; status: string };
+
+    return {
+      executionId: result.executionId,
+      status: "terminated",
+    };
+  }
+
+  async validateWorkflow(workflow: {
+    nodes: Array<{
+      id: string;
+      name: string;
+      type: string;
+      position: [number, number];
+      parameters: Record<string, unknown>;
+    }>;
+    connections: Record<string, { main: Array<Array<{ node: string; type: string; index: number }>> }>;
+  }): Promise<{ valid: boolean; errors: string[] }> {
+    const result = await this.workerFetch("/workflow/validate", {
+      method: "POST",
+      body: JSON.stringify({ workflow }),
+    }) as { valid: boolean; errors: string[] };
+
+    return result;
   }
 }
 

@@ -5,18 +5,30 @@
   "private": true,
   "scripts": {
     "dev": "wrangler dev",
+    "dev:remote": "wrangler dev --remote",
     "deploy": "wrangler deploy",
+    "deploy:dev": "wrangler deploy --env dev",
+    "tail": "wrangler tail",
+    "tail:dev": "wrangler tail --env dev",
     "types": "wrangler types",
-    "tail": "wrangler tail"
+    "secret:set": "wrangler secret put",
+    "secret:list": "wrangler secret list",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@opencode-ai/sdk": "^1.0.137"
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@cloudflare/sandbox": "^0.6.7",
+    "@opencode-ai/sdk": "^1.0.207",
+    "openai": "^4.77.0"
   },
   "devDependencies": {
-    "@cloudflare/sandbox": "^0.6.7",
     "@cloudflare/workers-types": "^4.20241218.0",
     "@types/node": "^22.10.1",
+    "@vitest/coverage-v8": "^4.0.16",
     "typescript": "^5.7.2",
+    "vitest": "^4.0.16",
     "wrangler": "^4.56.0"
   }
 }

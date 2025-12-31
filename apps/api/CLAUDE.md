@@ -13,7 +13,7 @@ Backend service for Portable Command Center that orchestrates:
 - **Runtime**: Bun
 - **Framework**: Hono (SST team's choice)
 - **Validation**: Zod with @hono/zod-validator
-- **Database**: SQLite via Bun's native `bun:sqlite`
+- **Database**: PostgreSQL via Drizzle ORM
 
 ## Development Commands
 

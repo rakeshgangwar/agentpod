@@ -1,0 +1,14 @@
+# Development secrets (contains API tokens)
+.dev.vars
+
+# Wrangler local state
+.wrangler/
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+
+# Coverage reports
+coverage/

@@ -5,7 +5,7 @@
  * Replaces Docker labels as source of truth for sandbox data.
  */
 
-import { pgTable, text, timestamp, index, unique, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, index, unique, pgEnum, bigint } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 import { sandboxProviderEnum } from "./cloudflare";
 
@@ -20,6 +20,12 @@ export const sandboxStatusEnum = pgEnum("sandbox_status", [
   "stopped",
   "sleeping",
   "error",
+]);
+
+export const permissionStatusEnum = pgEnum("permission_status", [
+  "pending",
+  "resolved",
+  "expired",
 ]);
 
 // =============================================================================
@@ -71,5 +77,35 @@ export const sandboxes = pgTable(
     index("sandboxes_status_idx").on(table.status),
     index("sandboxes_container_id_idx").on(table.containerId),
     unique("sandboxes_user_slug_unique").on(table.userId, table.slug),
+  ]
+);
+
+// =============================================================================
+// Sandbox Permissions Table
+// =============================================================================
+// Persists OpenCode permission requests so they survive reconnects/restarts
+export const sandboxPermissions = pgTable(
+  "sandbox_permissions",
+  {
+    id: text("id").primaryKey(),
+    sandboxId: text("sandbox_id")
+      .notNull()
+      .references(() => sandboxes.id, { onDelete: "cascade" }),
+    sessionId: text("session_id").notNull(),
+    permissionId: text("permission_id").notNull(),
+    
+    type: text("type").notNull(),
+    title: text("title").notNull(),
+    message: text("message"),
+    
+    status: permissionStatusEnum("status").default("pending").notNull(),
+    
+    createdAt: bigint("created_at", { mode: "number" }).notNull(),
+    resolvedAt: bigint("resolved_at", { mode: "number" }),
+  },
+  (table) => [
+    index("sandbox_permissions_sandbox_id_idx").on(table.sandboxId),
+    index("sandbox_permissions_status_idx").on(table.sandboxId, table.status),
+    unique("sandbox_permissions_unique").on(table.sandboxId, table.permissionId),
   ]
 );

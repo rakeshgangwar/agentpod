@@ -225,11 +225,13 @@ pub async fn exec_in_sandbox(
     id: String,
     command: Vec<String>,
     working_dir: Option<String>,
+    user: Option<String>,
 ) -> Result<ExecResult, AppError> {
     let client = get_client()?;
     let input = ExecCommandInput {
         command,
         working_dir,
+        user,
     };
     client
         .post(&format!("/api/v2/sandboxes/{}/exec", id), &input)

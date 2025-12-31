@@ -18,16 +18,38 @@ interface AgentPodUserConfig {
     name: string;
     extension: string;
     content: string;
+    isSystem?: boolean;
   }>;
+}
+
+interface CloudflareConfigFile {
+  type: string;
+  name: string;
+  extension: string;
+  content: string;
+  isSystem?: boolean;
+}
+
+interface CloudflareProviderOptions {
+  apiKey?: string;
+  baseUrl?: string;
+}
+
+interface CloudflareAuthEntry {
+  type: "api" | "oauth";
+  key?: string;
+  refresh?: string;
+  access?: string;
+  expires?: number;
 }
 
 interface CloudflareConfig {
   provider?: Record<string, {
-    options?: {
-      apiKey?: string;
-      baseUrl?: string;
-    };
+    options?: CloudflareProviderOptions;
   }>;
+  auth?: Record<string, CloudflareAuthEntry>;
+  files?: CloudflareConfigFile[];
+  agents_md?: string;
   [key: string]: unknown;
 }
 
@@ -38,24 +60,53 @@ export function agentPodToCloudflareConfig(
   const config: CloudflareConfig = {};
 
   if (auth) {
-    // Build provider config, only adding entries with valid API keys
-    const providerConfig: Record<string, { options?: { apiKey?: string } }> = {};
+    const providerConfig: Record<string, { options?: CloudflareProviderOptions }> = {};
+    const authConfig: Record<string, CloudflareAuthEntry> = {};
+    
     for (const [providerId, credentials] of Object.entries(auth)) {
       if (credentials.type === "api" && credentials.key) {
         providerConfig[providerId] = {
           options: { apiKey: credentials.key },
         };
+        authConfig[providerId] = {
+          type: "api",
+          key: credentials.key,
+        };
+      } else if (credentials.type === "oauth" && (credentials.refresh || credentials.access)) {
+        providerConfig[providerId] = { options: {} };
+        authConfig[providerId] = {
+          type: "oauth",
+          refresh: credentials.refresh,
+          access: credentials.access,
+          expires: credentials.expires,
+        };
       }
     }
-    // Only set provider if we have at least one valid entry
-    // Empty provider object breaks OpenCode SDK's default provider discovery
+    
     if (Object.keys(providerConfig).length > 0) {
       config.provider = providerConfig;
+    }
+    if (Object.keys(authConfig).length > 0) {
+      config.auth = authConfig;
     }
   }
 
   if (userConfig?.settings) {
     Object.assign(config, userConfig.settings);
+  }
+
+  if (userConfig?.files && userConfig.files.length > 0) {
+    config.files = userConfig.files.map(f => ({
+      type: f.type,
+      name: f.name,
+      extension: f.extension,
+      content: f.content,
+      isSystem: f.isSystem,
+    }));
+  }
+
+  if (userConfig?.agents_md) {
+    config.agents_md = userConfig.agents_md;
   }
 
   return config;

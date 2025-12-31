@@ -1,3 +1,10 @@
+/**
+ * @deprecated This SQLite database module is DEPRECATED.
+ * Production uses PostgreSQL via Drizzle ORM (see drizzle.ts).
+ * This file is only kept for legacy test compatibility.
+ * TODO: Migrate tests to use PostgreSQL test database.
+ */
+
 import { Database } from 'bun:sqlite';
 import { config } from '../config.ts';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';

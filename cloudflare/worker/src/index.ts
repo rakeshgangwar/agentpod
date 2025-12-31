@@ -1,4 +1,4 @@
-import { getSandbox, type Sandbox as SandboxInstance } from "@cloudflare/sandbox";
+import { getSandbox } from "@cloudflare/sandbox";
 import {
   createOpencode,
   createOpencodeServer,
@@ -6,8 +6,13 @@ import {
 } from "@cloudflare/sandbox/opencode";
 import type { Config, OpencodeClient } from "@opencode-ai/sdk";
 import { WorkspaceStorage } from "./storage";
+import { validateWorkflowForExecution } from "./workflows/executor";
+import type { WorkflowDefinition } from "./workflows/utils/context";
+import { normalizeWorkflow, type FrontendWorkflow } from "./workflows/utils/format-transformer";
+import type { WorkflowParams } from "./workflows/sdk/types";
 
 export { Sandbox } from "@cloudflare/sandbox";
+export { AgentPodWorkflow } from "./workflows/sdk/workflow";
 
 const DEFAULT_WORKSPACE_DIR = "/home/user/workspace";
 
@@ -25,18 +30,37 @@ const SYNC_EXCLUDED_PATHS = [
   ".DS_Store",
 ];
 
+
+
 interface Env {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   Sandbox: DurableObjectNamespace<any>;
+  WORKFLOW: Workflow;
   WORKSPACE_BUCKET: R2Bucket;
   AGENTPOD_API_URL: string;
   AGENTPOD_API_TOKEN: string;
+  OPENAI_API_KEY?: string;
+  ANTHROPIC_API_KEY?: string;
+  OLLAMA_BASE_URL?: string;
+  AI?: Ai;
+}
+
+interface ConfigFile {
+  type: "agent" | "command" | "tool" | "plugin";
+  name: string;
+  extension: "md" | "ts" | "js";
+  content: string;
+  isSystem?: boolean;
 }
 
 interface CreateSandboxBody {
   id: string;
   userId: string;
-  config?: Config;
+  config?: Config & {
+    files?: ConfigFile[];
+    agents_md?: string;
+    auth?: Record<string, AuthEntry>;
+  };
   directory?: string;
   gitUrl?: string;
   gitBranch?: string;
@@ -46,6 +70,7 @@ interface SendMessageBody {
   sessionId?: string;
   message: string;
   model?: { providerID: string; modelID: string };
+  agent?: string;
   config?: Config;
 }
 
@@ -87,6 +112,30 @@ export default {
         return handleSyncWorkspace(env, pathParts[1]);
       }
 
+      if (request.method === "POST" && pathParts[0] === "workflow" && pathParts[1] === "execute") {
+        return handleWorkflowExecute(request, env);
+      }
+
+      if (request.method === "POST" && pathParts[0] === "workflow" && pathParts[1] === "validate") {
+        return handleWorkflowValidate(request);
+      }
+
+      if (request.method === "GET" && pathParts[0] === "workflow" && pathParts[1] && pathParts[2] === "status") {
+        return handleWorkflowStatus(env, pathParts[1]);
+      }
+
+      if (request.method === "POST" && pathParts[0] === "workflow" && pathParts[1] && pathParts[2] === "pause") {
+        return handleWorkflowPause(env, pathParts[1]);
+      }
+
+      if (request.method === "POST" && pathParts[0] === "workflow" && pathParts[1] && pathParts[2] === "resume") {
+        return handleWorkflowResume(env, pathParts[1]);
+      }
+
+      if (request.method === "POST" && pathParts[0] === "workflow" && pathParts[1] && pathParts[2] === "terminate") {
+        return handleWorkflowTerminate(env, pathParts[1]);
+      }
+
       return new Response("Not Found", { status: 404 });
     } catch (error) {
       console.error("Worker error:", error);
@@ -97,6 +146,125 @@ export default {
     }
   },
 };
+
+type SandboxInstance = ReturnType<typeof getSandbox>;
+
+interface AuthEntry {
+  type: "api" | "oauth";
+  key?: string;
+  refresh?: string;
+  access?: string;
+  expires?: number;
+}
+
+async function writeConfigFiles(
+  sandbox: SandboxInstance,
+  workspaceDir: string,
+  config?: { files?: ConfigFile[]; agents_md?: string },
+  opencodeConfig?: Config,
+  authConfig?: Record<string, AuthEntry>
+): Promise<number> {
+  if (!config && !opencodeConfig && !authConfig) return 0;
+  
+  let filesWritten = 0;
+  const opencodeDir = `${workspaceDir}/.opencode`;
+  
+  if (config?.agents_md) {
+    const agentsMdPath = `${workspaceDir}/AGENTS.md`;
+    await sandbox.writeFile(agentsMdPath, config.agents_md);
+    filesWritten++;
+    console.log(`[CONFIG] Wrote AGENTS.md to ${agentsMdPath}`);
+  }
+  
+  const needsOpencodeDir = opencodeConfig || authConfig || config?.files?.length;
+  if (needsOpencodeDir) {
+    await sandbox.mkdir(opencodeDir, { recursive: true });
+  }
+  
+  if (opencodeConfig && Object.keys(opencodeConfig).length > 0) {
+    const opencodeJsonPath = `${opencodeDir}/opencode.json`;
+    await sandbox.writeFile(opencodeJsonPath, JSON.stringify(opencodeConfig, null, 2));
+    filesWritten++;
+    console.log(`[CONFIG] Wrote opencode.json to ${opencodeJsonPath}`);
+  }
+  
+  if (authConfig && Object.keys(authConfig).length > 0) {
+    const authJsonPath = `${opencodeDir}/auth.json`;
+    await sandbox.writeFile(authJsonPath, JSON.stringify(authConfig, null, 2));
+    filesWritten++;
+    console.log(`[CONFIG] Wrote auth.json to ${authJsonPath}`);
+  }
+  
+  if (!config?.files || config.files.length === 0) {
+    return filesWritten;
+  }
+  
+  const typeToDir: Record<string, string> = {
+    plugin: `${opencodeDir}/plugin`,
+    agent: `${opencodeDir}/agent`,
+    command: `${opencodeDir}/command`,
+    tool: `${opencodeDir}/tool`,
+  };
+  
+  const dirsToCreate = new Set<string>();
+  for (const file of config.files) {
+    const dir = typeToDir[file.type];
+    if (dir) dirsToCreate.add(dir);
+  }
+  
+  for (const dir of dirsToCreate) {
+    await sandbox.mkdir(dir, { recursive: true });
+    console.log(`[CONFIG] Created directory ${dir}`);
+  }
+  
+  for (const file of config.files) {
+    const dir = typeToDir[file.type];
+    if (!dir) {
+      console.warn(`[CONFIG] Unknown file type: ${file.type}`);
+      continue;
+    }
+    
+    const filePath = `${dir}/${file.name}.${file.extension}`;
+    await sandbox.writeFile(filePath, file.content);
+    filesWritten++;
+    console.log(`[CONFIG] Wrote ${file.type} file: ${filePath}`);
+  }
+  
+  return filesWritten;
+}
+
+async function setAuthCredentials(
+  sandbox: SandboxInstance,
+  directory: string,
+  authConfig: Record<string, AuthEntry>
+): Promise<void> {
+  const { client } = await createOpencode<OpencodeClient>(sandbox, { directory });
+  
+  for (const [providerId, credentials] of Object.entries(authConfig)) {
+    try {
+      if (credentials.type === "api" && credentials.key) {
+        await client.auth.set({
+          path: { id: providerId },
+          body: { type: "api", key: credentials.key },
+        });
+        console.log(`[AUTH] Set API key for provider: ${providerId}`);
+      } else if (credentials.type === "oauth" && (credentials.refresh || credentials.access)) {
+        await client.auth.set({
+          path: { id: providerId },
+          body: {
+            type: "oauth",
+            refresh: credentials.refresh || "",
+            access: credentials.access || "",
+            expires: credentials.expires || 0,
+          },
+        });
+        console.log(`[AUTH] Set OAuth credentials for provider: ${providerId}`);
+      }
+    } catch (error) {
+      console.error(`[AUTH] Failed to set credentials for ${providerId}:`, error);
+    }
+  }
+}
 
 async function handleCreateSandbox(request: Request, env: Env): Promise<Response> {
   const body = (await request.json()) as CreateSandboxBody;
@@ -112,15 +280,31 @@ async function handleCreateSandbox(request: Request, env: Env): Promise<Response
     });
   }
 
+  const { files, agents_md, auth, ...openCodeConfig } = body.config ?? {};
+  const hasOpenCodeConfig = Object.keys(openCodeConfig).length > 0;
+  
+  const filesWritten = await writeConfigFiles(
+    sandbox, 
+    directory, 
+    { files, agents_md },
+    hasOpenCodeConfig ? openCodeConfig as Config : undefined,
+    auth as Record<string, AuthEntry> | undefined
+  );
+  console.log(`[CREATE] Wrote ${filesWritten} config files for sandbox ${sandboxId}`);
+  
   const server = await createOpencodeServer(sandbox, {
     directory,
-    config: body.config,
   });
+
+  if (auth && Object.keys(auth).length > 0) {
+    await setAuthCredentials(sandbox, directory, auth as Record<string, AuthEntry>);
+  }
 
   await notifyAgentPodAPI(env, "sandbox.created", {
     sandboxId,
     userId: body.userId,
     provider: "cloudflare",
+    filesWritten,
   });
 
   return Response.json({
@@ -129,6 +313,7 @@ async function handleCreateSandbox(request: Request, env: Env): Promise<Response
     status: "running",
     opencodeUrl: `/sandbox/${sandboxId}/opencode`,
     serverPort: server.port,
+    filesWritten,
   });
 }
 
@@ -166,7 +351,9 @@ async function handleWakeSandbox(
   env: Env,
   sandboxId: string
 ): Promise<Response> {
-  const body = (await request.json()) as { config?: Config };
+  const body = (await request.json()) as { 
+    config?: Config & { files?: ConfigFile[]; agents_md?: string; auth?: Record<string, AuthEntry> } 
+  };
 
   const sandbox = getSandbox(env.Sandbox, sandboxId);
   const storage = new WorkspaceStorage(env.WORKSPACE_BUCKET, sandboxId);
@@ -174,14 +361,30 @@ async function handleWakeSandbox(
   const restoreResult = await restoreR2ToSandbox(sandbox, storage, DEFAULT_WORKSPACE_DIR);
   console.log(`[WAKE] Restored ${restoreResult.restoredFiles} files from R2 for sandbox ${sandboxId}`);
 
+  const { files, agents_md, auth, ...openCodeConfig } = body.config ?? {};
+  const hasOpenCodeConfig = Object.keys(openCodeConfig).length > 0;
+
+  const filesWritten = await writeConfigFiles(
+    sandbox, 
+    DEFAULT_WORKSPACE_DIR, 
+    { files, agents_md },
+    hasOpenCodeConfig ? openCodeConfig as Config : undefined,
+    auth
+  );
+  console.log(`[WAKE] Wrote ${filesWritten} config files for sandbox ${sandboxId}`);
+
   const server = await createOpencodeServer(sandbox, {
     directory: DEFAULT_WORKSPACE_DIR,
-    config: body.config,
   });
+
+  if (auth && Object.keys(auth).length > 0) {
+    await setAuthCredentials(sandbox, DEFAULT_WORKSPACE_DIR, auth);
+  }
 
   await notifyAgentPodAPI(env, "sandbox.woken", {
     sandboxId,
     restoredFiles: restoreResult.restoredFiles,
+    filesWritten,
     provider: "cloudflare",
   });
 
@@ -190,6 +393,7 @@ async function handleWakeSandbox(
     status: "running",
     serverPort: server.port,
     restoredFiles: restoreResult.restoredFiles,
+    filesWritten,
   });
 }
 
@@ -294,6 +498,8 @@ async function handleSendMessage(
     sessionId,
     message: body.message?.slice(0, 50),
     hasModel: !!body.model,
+    hasAgent: !!body.agent,
+    agent: body.agent,
   });
   
   const response = await client.session.prompt({
@@ -301,6 +507,7 @@ async function handleSendMessage(
     body: {
       parts: [{ type: "text", text: body.message }],
       model: body.model,
+      agent: body.agent,
     },
   });
 
@@ -532,5 +739,132 @@ async function notifyAgentPodAPI(
     });
   } catch (error) {
     console.error("Failed to notify AgentPod API:", error);
+  }
+}
+
+interface WorkflowExecuteBody {
+  executionId: string;
+  workflowId: string;
+  workflow: WorkflowDefinition | FrontendWorkflow;
+  triggerType: "manual" | "webhook" | "schedule" | "event";
+  triggerData?: Record<string, unknown>;
+  userId?: string;
+}
+
+async function handleWorkflowExecute(request: Request, env: Env): Promise<Response> {
+  const body = (await request.json()) as WorkflowExecuteBody;
+  
+  const normalizedWorkflow = normalizeWorkflow(body.workflow, body.workflowId);
+  
+  const validationErrors = validateWorkflowForExecution(normalizedWorkflow);
+  if (validationErrors.length > 0) {
+    return Response.json(
+      { error: "Invalid workflow", errors: validationErrors },
+      { status: 400 }
+    );
+  }
+
+  console.log(`[Workflow] Starting execution ${body.executionId} for workflow ${body.workflowId}`);
+  console.log("[Workflow] ENV DEBUG: AGENTPOD_API_URL=" + (env.AGENTPOD_API_URL || "NOT SET"));
+  console.log("[Workflow] ENV DEBUG: AGENTPOD_API_TOKEN=" + (env.AGENTPOD_API_TOKEN ? "SET (" + env.AGENTPOD_API_TOKEN.length + " chars)" : "NOT SET"));
+
+  const instance = await env.WORKFLOW.create({
+    id: body.executionId,
+    params: {
+      executionId: body.executionId,
+      workflowId: body.workflowId,
+      definition: normalizedWorkflow,
+      triggerType: body.triggerType,
+      triggerData: body.triggerData || {},
+      userId: body.userId,
+    } as WorkflowParams,
+  });
+
+  return Response.json({
+    executionId: body.executionId,
+    instanceId: instance.id,
+    status: "queued",
+  }, { status: 202 });
+}
+
+async function handleWorkflowValidate(request: Request): Promise<Response> {
+  const body = (await request.json()) as { workflow: WorkflowDefinition | FrontendWorkflow };
+  
+  const normalizedWorkflow = normalizeWorkflow(body.workflow, "validation");
+  const errors = validateWorkflowForExecution(normalizedWorkflow);
+  
+  return Response.json({
+    valid: errors.length === 0,
+    errors,
+  });
+}
+
+async function handleWorkflowStatus(env: Env, executionId: string): Promise<Response> {
+  try {
+    const instance = await env.WORKFLOW.get(executionId);
+    const status = await instance.status();
+    
+    return Response.json({
+      executionId,
+      status: status.status,
+      output: status.output,
+      error: status.error,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("not found")) {
+      return Response.json({ error: "Workflow instance not found" }, { status: 404 });
+    }
+    throw error;
+  }
+}
+
+async function handleWorkflowPause(env: Env, executionId: string): Promise<Response> {
+  try {
+    const instance = await env.WORKFLOW.get(executionId);
+    await instance.pause();
+    
+    return Response.json({
+      executionId,
+      status: "paused",
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("not found")) {
+      return Response.json({ error: "Workflow instance not found" }, { status: 404 });
+    }
+    throw error;
+  }
+}
+
+async function handleWorkflowResume(env: Env, executionId: string): Promise<Response> {
+  try {
+    const instance = await env.WORKFLOW.get(executionId);
+    await instance.resume();
+    
+    return Response.json({
+      executionId,
+      status: "running",
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("not found")) {
+      return Response.json({ error: "Workflow instance not found" }, { status: 404 });
+    }
+    throw error;
+  }
+}
+
+async function handleWorkflowTerminate(env: Env, executionId: string): Promise<Response> {
+  try {
+    const instance = await env.WORKFLOW.get(executionId);
+    await instance.terminate();
+    
+    return Response.json({
+      executionId,
+      status: "terminated",
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("not found")) {
+      return Response.json({ error: "Workflow instance not found" }, { status: 404 });
+    }
+    throw error;
   }
 }

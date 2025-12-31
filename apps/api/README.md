@@ -15,7 +15,7 @@ Backend service for the Portable Command Center that orchestrates project lifecy
 - **Runtime**: [Bun](https://bun.sh)
 - **Framework**: [Hono](https://hono.dev) (SST team's choice)
 - **Validation**: [Zod](https://zod.dev) with @hono/zod-validator
-- **Database**: SQLite via better-sqlite3
+- **Database**: PostgreSQL via Drizzle ORM
 
 ## Quick Start
 

@@ -87,6 +87,10 @@ export const userOpencodeFiles = pgTable(
     // File content
     content: text("content").notNull(),
 
+    // System flag - system files are managed by AgentPod, not user-editable
+    // System plugins are injected at runtime from code, not stored per-user
+    isSystem: boolean("is_system").default(false).notNull(),
+
     // Timestamps
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
