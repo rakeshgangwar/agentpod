@@ -29,7 +29,7 @@ import { app } from '../../src/index.ts';
 // =============================================================================
 
 const AUTH_HEADER = { 'Authorization': 'Bearer test-token' };
-const TEST_USER_ID = 'test-user-chat-001';
+const TEST_USER_ID = 'default-user';
 
 // =============================================================================
 // Test Helpers
