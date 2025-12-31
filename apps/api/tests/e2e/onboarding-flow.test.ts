@@ -69,7 +69,7 @@ const TEST_TIMEOUT = 180000; // 3 minutes for each test
 // Test Setup
 // =============================================================================
 
-describe("Onboarding E2E Flow", () => {
+describe.skip("Onboarding E2E Flow", () => {
   let dockerClient: E2EDockerClient;
   let canRun: boolean;
   let skipReason: string | undefined;

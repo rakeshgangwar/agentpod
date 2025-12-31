@@ -55,12 +55,12 @@
   let advancedOptionsOpen = $state(false);
   
   // Watch provider changes to clear Docker-specific state when switching to Cloudflare
+  // Note: Agent selection is preserved as it applies to both providers
   $effect(() => {
     if (selectedProvider === "cloudflare") {
       selectedFlavorId = "";
       selectedResourceTierId = "";
       selectedAddonIds = [];
-      selectedAgentSlugs = [];
     }
   });
   
@@ -657,15 +657,13 @@
                   />
                 </div>
                 
-                <!-- Docker-specific: Agent team selector -->
-                {#if selectedProvider === "docker"}
-                  <div class="space-y-2 border-t border-border/30 pt-4">
-                    <AgentTeamSelector
-                      bind:selectedAgentSlugs
-                      disabled={isSubmitting}
-                    />
-                  </div>
-                {/if}
+                <!-- Agent team selector (available for all providers) -->
+                <div class="space-y-2 border-t border-border/30 pt-4">
+                  <AgentTeamSelector
+                    bind:selectedAgentSlugs
+                    disabled={isSubmitting}
+                  />
+                </div>
                 
                 <!-- Docker-specific options -->
                 {#if selectedProvider === "docker"}
@@ -843,15 +841,13 @@
                   </div>
                 {/if}
                 
-                <!-- Docker-specific: Agent team selector -->
-                {#if selectedProvider === "docker"}
-                  <div class="space-y-2 border-t border-border/30 pt-4">
-                    <AgentTeamSelector
-                      bind:selectedAgentSlugs
-                      disabled={isSubmitting}
-                    />
-                  </div>
-                {/if}
+                <!-- Agent team selector (available for all providers) -->
+                <div class="space-y-2 border-t border-border/30 pt-4">
+                  <AgentTeamSelector
+                    bind:selectedAgentSlugs
+                    disabled={isSubmitting}
+                  />
+                </div>
                 
                 <!-- Docker-specific options -->
                 {#if selectedProvider === "docker"}

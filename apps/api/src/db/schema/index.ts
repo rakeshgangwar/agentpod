@@ -35,3 +35,6 @@ export * from "./cloudflare";
 
 // Quick task templates
 export * from "./quick-tasks";
+
+// Workflow builder
+export * from "./workflows";

@@ -12,7 +12,8 @@
     "./provider": "./src/provider.ts",
     "./settings": "./src/settings.ts",
     "./opencode": "./src/opencode.ts",
-    "./api": "./src/api.ts"
+    "./api": "./src/api.ts",
+    "./workflow": "./src/workflow.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

@@ -1,16 +1,8 @@
 /**
- * Better Auth Configuration (SQLite - Development Only)
- *
- * Replaces Keycloak with Better Auth - a simpler, embedded authentication solution.
- * Uses SQLite for development. For production, use drizzle-auth.ts with PostgreSQL.
- *
- * Features:
- * - GitHub OAuth (primary authentication method)
- * - Session management with secure cookies
- * - Admin plugin for user management
- * - First user becomes admin automatically
- * 
- * NOTE: For development only. Production uses PostgreSQL via drizzle-auth.ts
+ * @deprecated This SQLite auth module is DEPRECATED.
+ * Use drizzle-auth.ts with PostgreSQL for all environments.
+ * This file is only kept for legacy test compatibility.
+ * TODO: Migrate tests to use PostgreSQL auth configuration.
  */
 
 import { betterAuth } from "better-auth";

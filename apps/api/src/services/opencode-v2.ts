@@ -577,6 +577,7 @@ export const opencodeV2 = {
         sessionId?: string; 
         message: string; 
         model?: { providerID: string; modelID: string };
+        agent?: string;
         config?: Record<string, unknown>;
       } = {
         message: textPart?.text ?? '',
@@ -586,6 +587,9 @@ export const opencodeV2 = {
       }
       if (input.model) {
         requestBody.model = input.model;
+      }
+      if (input.agent) {
+        requestBody.agent = input.agent;
       }
       const hasValidConfig = input.opencodeConfig && 
         input.opencodeConfig.provider && 

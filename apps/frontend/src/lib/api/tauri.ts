@@ -1234,9 +1234,10 @@ export async function getSandboxStatus(id: string): Promise<string> {
 export async function execInSandbox(
   id: string,
   command: string[],
-  workingDir?: string
+  workingDir?: string,
+  user?: string
 ): Promise<ExecResult> {
-  return invoke<ExecResult>("exec_in_sandbox", { id, command, workingDir });
+  return invoke<ExecResult>("exec_in_sandbox", { id, command, workingDir, user });
 }
 
 /**
@@ -1595,6 +1596,33 @@ export async function sandboxOpencodeGetFileContent(sandboxId: string, path: str
 export async function sandboxOpencodeFindFiles(sandboxId: string, query: string): Promise<string[]> {
   return invoke<string[]>("sandbox_opencode_find_files", { sandboxId, query });
 }
+
+/**
+ * Write file content to a sandbox via shell command using heredoc
+ */
+export async function writeFileToSandbox(
+  sandboxId: string,
+  path: string,
+  content: string
+): Promise<void> {
+  let absolutePath = path;
+  if (!path.startsWith("/")) {
+    absolutePath = `/home/workspace/${path}`;
+  } else if (path.startsWith("/workspace/")) {
+    absolutePath = path.replace("/workspace/", "/home/workspace/");
+  }
+  
+  const escapedContent = content.replace(/'/g, "'\\''");
+  const command = `cat > '${absolutePath}' << 'EOFAGENTPOD'\n${escapedContent}\nEOFAGENTPOD`;
+  
+  const result = await execInSandbox(sandboxId, ["sh", "-c", command], undefined, "developer");
+  
+  if (result.exitCode !== 0) {
+    throw new Error(`Failed to write file: ${result.stderr || result.stdout || "Unknown error"}`);
+  }
+}
+
+
 
 
 

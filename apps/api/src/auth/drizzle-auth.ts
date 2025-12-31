@@ -226,9 +226,13 @@ export const auth = betterAuth({
           }
           
           try {
-            const { created } = await ensureDefaultAgents(createdUser.id);
-            if (created > 0) {
-              log.info("Created default agents for user", { userId: createdUser.id, count: created });
+            const { created: agentsCreated } = await ensureDefaultAgents(createdUser.id);
+            
+            if (agentsCreated > 0) {
+              log.info("Created default agents for user", { 
+                userId: createdUser.id, 
+                agents: agentsCreated,
+              });
             }
           } catch (error) {
             log.error("Failed to create default agents", { 

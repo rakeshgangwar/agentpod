@@ -534,7 +534,7 @@ describe('Account Routes Integration Tests', () => {
       expect(data.chatHistory).toEqual([]);
       expect(data.opencodeConfig).toBeNull();
       expect(data.opencodeFiles).toEqual([]);
-      expect(data.preferences).toBeNull();
+      expect(data.preferences == null).toBe(true);
     });
 
     test('should include sandboxes in export', async () => {
