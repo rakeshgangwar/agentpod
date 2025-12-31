@@ -10,20 +10,20 @@
  * These tests use mocks for external dependencies (Docker, Git, Database)
  */
 
+import '../../setup.ts';
+
 import { describe, test, expect, beforeAll, beforeEach, afterEach } from 'bun:test';
+
+process.env.DATABASE_URL =
+  process.env.DATABASE_URL ||
+  "postgres://agentpod:agentpod-dev-password@localhost:5432/agentpod";
+
 import { SandboxManager, getSandboxManager } from '../../../src/services/sandbox-manager.ts';
 import { resetDockerMock, addMockSandbox, mockCalls as dockerMockCalls, MockDockerOrchestrator } from '../../mocks/docker.ts';
 import { resetGitMock, addMockRepo, mockCalls as gitMockCalls, MockGitBackend } from '../../mocks/git.ts';
 import * as SandboxModel from '../../../src/models/sandbox.ts';
-import { rawSql, initDatabase } from '../../../src/db/drizzle.ts';
-
-// Import test setup to ensure environment variables are set
-import '../../setup.ts';
-
-// Initialize PostgreSQL database before all tests
-beforeAll(async () => {
-  await initDatabase();
-});
+import { rawSql } from '../../../src/db/drizzle.ts';
+import { app } from '../../../src/index.ts';
 
 // Helper to create a test user in the database using Drizzle
 async function createTestUser(id: string): Promise<void> {
