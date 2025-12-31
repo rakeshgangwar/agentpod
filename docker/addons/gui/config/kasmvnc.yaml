@@ -1,0 +1,89 @@
+# KasmVNC Configuration for OpenCode Desktop Container
+# Documentation: https://www.kasmweb.com/kasmvnc/docs/latest/configuration.html
+
+desktop:
+  resolution:
+    width: 1280
+    height: 800
+  allow_resize: true
+  pixel_depth: 24
+
+network:
+  protocol: http
+  interface: 0.0.0.0
+  websocket_port: 6080
+  use_ipv4: true
+  use_ipv6: false
+  ssl:
+    # SSL disabled - reverse proxy (Coolify/Traefik) handles TLS termination
+    require_ssl: false
+
+user_session:
+  # Don't disconnect existing sessions when a new one connects
+  new_session_disconnects_existing_exclusive_session: false
+  # Don't prompt for concurrent connections (allow multiple viewers)
+  concurrent_connections_prompt: false
+  concurrent_connections_prompt_timeout: 10
+  # No idle timeout (container manages its own lifecycle)
+  idle_timeout: never
+
+keyboard:
+  ignore_numlock: false
+  raw_keyboard: false
+
+pointer:
+  enabled: true
+
+runtime_configuration:
+  allow_client_to_override_kasm_server_settings: true
+  allow_override_standard_vnc_server_settings: true
+
+logging:
+  log_writer_name: all
+  log_dest: logfile
+  level: 30
+
+security:
+  brute_force_protection:
+    blacklist_threshold: 5
+    blacklist_timeout: 10
+
+data_loss_prevention:
+  clipboard:
+    delay_between_operations: none
+    server_to_client:
+      enabled: true
+      size: unlimited
+    client_to_server:
+      enabled: true
+      size: unlimited
+  keyboard:
+    enabled: true
+    rate_limit: unlimited
+
+encoding:
+  max_frame_rate: 60
+  rect_encoding_mode:
+    min_quality: 7
+    max_quality: 8
+    consider_lossless_quality: 10
+    rectangle_compress_threads: auto
+  video_encoding_mode:
+    jpeg_quality: -1
+    webp_quality: -1
+    scaling_algorithm: progressive_bilinear
+  compare_framebuffer: auto
+  zrle_zlib_level: auto
+  hextile_improved_compression: true
+
+server:
+  advanced:
+    kasm_password_file: ${HOME}/.kasmpasswd
+  auto_shutdown:
+    no_user_session_timeout: never
+    active_user_session_timeout: never
+    inactive_user_session_timeout: never
+
+command_line:
+  # Non-interactive mode for container usage
+  prompt: false
