@@ -24,7 +24,7 @@ import '../../setup.ts';
 async function createTestUser(id: string): Promise<void> {
   const now = new Date();
   await rawSql`
-    INSERT INTO "user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
+    INSERT INTO "user" (id, name, email, email_verified, created_at, updated_at)
     VALUES (${id}, ${`Test User ${id}`}, ${`${id}@test.com`}, false, ${now}, ${now})
     ON CONFLICT (id) DO NOTHING
   `;
