@@ -13,12 +13,12 @@
 import '../setup.ts';
 
 import { describe, test, expect, beforeAll, afterAll, beforeEach } from 'bun:test';
-import { db } from '../../src/db/index.ts';
+import { rawSql } from '../../src/db/drizzle';
 import * as ProviderCredentials from '../../src/models/provider-credentials.ts';
 import * as ProviderModel from '../../src/models/provider.ts';
 import { modelsDev } from '../../src/services/models-dev.ts';
+import { setupTestUsers, clearProviderData, DEFAULT_USER_ID } from '../helpers/database';
 
-// Import the full app after environment is set up
 import { app } from '../../src/index.ts';
 
 // =============================================================================
@@ -88,11 +88,8 @@ const mockProviders = [
 // Test Helpers
 // =============================================================================
 
-function cleanupTestCredentials() {
-  // Clean up test credentials
-  db.run('DELETE FROM provider_credentials');
-  db.run('DELETE FROM oauth_state');
-  db.run("DELETE FROM settings WHERE key = 'default_provider'");
+async function cleanupTestCredentials() {
+  await clearProviderData();
 }
 
 // Store original methods for restoration
@@ -104,7 +101,9 @@ let originalGetProvider: typeof modelsDev.getProvider;
 // =============================================================================
 
 describe('Provider Routes Integration Tests', () => {
-  beforeAll(() => {
+  beforeAll(async () => {
+    await setupTestUsers();
+    
     // Store original methods
     originalFetchProviders = modelsDev.fetchProviders.bind(modelsDev);
     originalGetProvider = modelsDev.getProvider.bind(modelsDev);
@@ -117,18 +116,18 @@ describe('Provider Routes Integration Tests', () => {
     modelsDev.clearCache();
   });
 
-  afterAll(() => {
+  afterAll(async () => {
     // Restore original methods
     modelsDev.fetchProviders = originalFetchProviders;
     modelsDev.getProvider = originalGetProvider;
     
     // Cleanup
-    cleanupTestCredentials();
+    await cleanupTestCredentials();
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     // Clean up before each test
-    cleanupTestCredentials();
+    await cleanupTestCredentials();
     modelsDev.clearCache();
   });
 
@@ -208,6 +207,7 @@ describe('Provider Routes Integration Tests', () => {
     test('should mark configured providers correctly', async () => {
       // Configure a provider first
       await ProviderCredentials.saveApiKey({
+        userId: DEFAULT_USER_ID,
         providerId: 'anthropic',
         apiKey: 'test-api-key-123',
       });
@@ -226,6 +226,7 @@ describe('Provider Routes Integration Tests', () => {
     test('should mark default provider correctly', async () => {
       // Configure and set default provider
       await ProviderCredentials.saveApiKey({
+        userId: DEFAULT_USER_ID,
         providerId: 'anthropic',
         apiKey: 'test-api-key-123',
       });
@@ -280,10 +281,12 @@ describe('Provider Routes Integration Tests', () => {
     test('should return only configured providers', async () => {
       // Configure some providers
       await ProviderCredentials.saveApiKey({
+        userId: DEFAULT_USER_ID,
         providerId: 'anthropic',
         apiKey: 'test-anthropic-key',
       });
       await ProviderCredentials.saveApiKey({
+        userId: DEFAULT_USER_ID,
         providerId: 'openai',
         apiKey: 'test-openai-key',
       });
@@ -301,6 +304,7 @@ describe('Provider Routes Integration Tests', () => {
 
     test('should include provider models in response', async () => {
       await ProviderCredentials.saveApiKey({
+        userId: DEFAULT_USER_ID,
         providerId: 'anthropic',
         apiKey: 'test-api-key',
       });
@@ -352,6 +356,7 @@ describe('Provider Routes Integration Tests', () => {
     test('should return default provider when configured', async () => {
       // Configure and set default
       await ProviderCredentials.saveApiKey({
+        userId: DEFAULT_USER_ID,
         providerId: 'anthropic',
         apiKey: 'test-api-key',
       });
@@ -434,6 +439,7 @@ describe('Provider Routes Integration Tests', () => {
       
       // Configure provider
       await ProviderCredentials.saveApiKey({
+        userId: DEFAULT_USER_ID,
         providerId: 'anthropic',
         apiKey: 'test-key',
       });
@@ -534,10 +540,10 @@ describe('Provider Routes Integration Tests', () => {
         body: JSON.stringify({ apiKey: 'sk-ant-test-secret-key' }),
       });
       
-      // Check database - key should be encrypted (not plaintext)
-      const row = db.query(`
+      const rows = await rawSql`
         SELECT api_key_encrypted FROM provider_credentials WHERE provider_id = 'anthropic'
-      `).get() as { api_key_encrypted: string } | null;
+      `;
+      const row = rows[0] as { api_key_encrypted: string } | undefined;
       
       expect(row).toBeDefined();
       expect(row!.api_key_encrypted).toBeDefined();
@@ -568,15 +574,14 @@ describe('Provider Routes Integration Tests', () => {
       
       expect(res.status).toBe(200);
       
-      // Verify only one credential exists
-      const count = db.query(`
+      const countRows = await rawSql`
         SELECT COUNT(*) as count FROM provider_credentials WHERE provider_id = 'anthropic'
-      `).get() as { count: number };
+      `;
+      const count = countRows[0] as { count: string };
       
-      expect(count.count).toBe(1);
+      expect(Number(count.count)).toBe(1);
       
-      // Verify new key is stored (by decrypting)
-      const credential = await ProviderCredentials.getCredential('anthropic');
+      const credential = await ProviderCredentials.getCredential(DEFAULT_USER_ID, 'anthropic');
       expect(credential?.apiKey).toBe('second-key');
     });
   });
@@ -600,6 +605,7 @@ describe('Provider Routes Integration Tests', () => {
     test('should set default provider successfully', async () => {
       // Configure provider first
       await ProviderCredentials.saveApiKey({
+        userId: DEFAULT_USER_ID,
         providerId: 'anthropic',
         apiKey: 'test-key',
       });
@@ -618,6 +624,7 @@ describe('Provider Routes Integration Tests', () => {
 
     test('should update default setting in database', async () => {
       await ProviderCredentials.saveApiKey({
+        userId: DEFAULT_USER_ID,
         providerId: 'anthropic',
         apiKey: 'test-key',
       });
@@ -627,17 +634,19 @@ describe('Provider Routes Integration Tests', () => {
         headers: AUTH_HEADER,
       });
       
-      const defaultProvider = ProviderModel.getSetting('default_provider');
+      const defaultProvider = await ProviderModel.getSetting('default_provider');
       expect(defaultProvider).toBe('anthropic');
     });
 
     test('should change default when setting new default', async () => {
       // Configure two providers
       await ProviderCredentials.saveApiKey({
+        userId: DEFAULT_USER_ID,
         providerId: 'anthropic',
         apiKey: 'test-key-1',
       });
       await ProviderCredentials.saveApiKey({
+        userId: DEFAULT_USER_ID,
         providerId: 'openai',
         apiKey: 'test-key-2',
       });
@@ -654,7 +663,7 @@ describe('Provider Routes Integration Tests', () => {
         headers: AUTH_HEADER,
       });
       
-      const defaultProvider = ProviderModel.getSetting('default_provider');
+      const defaultProvider = await ProviderModel.getSetting('default_provider');
       expect(defaultProvider).toBe('openai');
     });
   });
@@ -678,6 +687,7 @@ describe('Provider Routes Integration Tests', () => {
     test('should delete provider credentials successfully', async () => {
       // Configure provider first
       await ProviderCredentials.saveApiKey({
+        userId: DEFAULT_USER_ID,
         providerId: 'anthropic',
         apiKey: 'test-key',
       });
@@ -695,6 +705,7 @@ describe('Provider Routes Integration Tests', () => {
 
     test('should remove credential from database', async () => {
       await ProviderCredentials.saveApiKey({
+        userId: DEFAULT_USER_ID,
         providerId: 'anthropic',
         apiKey: 'test-key',
       });
@@ -704,17 +715,18 @@ describe('Provider Routes Integration Tests', () => {
         headers: AUTH_HEADER,
       });
       
-      const exists = ProviderCredentials.isProviderConfigured('anthropic');
+      const exists = await ProviderCredentials.isProviderConfigured(DEFAULT_USER_ID, 'anthropic');
       expect(exists).toBe(false);
     });
 
     test('should clear default if deleting default provider', async () => {
       // Configure and set as default
       await ProviderCredentials.saveApiKey({
+        userId: DEFAULT_USER_ID,
         providerId: 'anthropic',
         apiKey: 'test-key',
       });
-      ProviderModel.setSetting('default_provider', 'anthropic');
+      await ProviderModel.setSetting('default_provider', 'anthropic');
       
       // Delete the provider
       await app.request('/api/providers/anthropic', {
@@ -722,24 +734,25 @@ describe('Provider Routes Integration Tests', () => {
         headers: AUTH_HEADER,
       });
       
-      // Default should be cleared (null or empty string both mean no default)
-      const defaultProvider = ProviderModel.getSetting('default_provider');
+      const defaultProvider = await ProviderModel.getSetting('default_provider');
       expect(defaultProvider === null || defaultProvider === '').toBe(true);
     });
 
     test('should not clear default if deleting non-default provider', async () => {
       // Configure two providers
       await ProviderCredentials.saveApiKey({
+        userId: DEFAULT_USER_ID,
         providerId: 'anthropic',
         apiKey: 'test-key-1',
       });
       await ProviderCredentials.saveApiKey({
+        userId: DEFAULT_USER_ID,
         providerId: 'openai',
         apiKey: 'test-key-2',
       });
       
       // Set anthropic as default
-      ProviderModel.setSetting('default_provider', 'anthropic');
+      await ProviderModel.setSetting('default_provider', 'anthropic');
       
       // Delete openai (not the default)
       await app.request('/api/providers/openai', {
@@ -748,7 +761,7 @@ describe('Provider Routes Integration Tests', () => {
       });
       
       // Default should remain unchanged
-      const defaultProvider = ProviderModel.getSetting('default_provider');
+      const defaultProvider = await ProviderModel.getSetting('default_provider');
       expect(defaultProvider).toBe('anthropic');
     });
   });
@@ -839,14 +852,13 @@ describe('Provider Routes Integration Tests', () => {
     });
 
     test('should return status for existing OAuth flow', async () => {
-      // Create a test OAuth state in the database
       const stateId = 'test-oauth-state-id';
-      const expiresAt = new Date(Date.now() + 900000).toISOString(); // 15 min from now
+      const expiresAt = new Date(Date.now() + 900000).toISOString();
       
-      db.run(`
-        INSERT INTO oauth_state (id, provider_id, device_code, user_code, verification_uri, interval_seconds, expires_at, status)
-        VALUES (?, 'github-copilot', 'test-device-code', 'TEST-1234', 'https://github.com/login/device', 5, ?, 'pending')
-      `, [stateId, expiresAt]);
+      await rawSql`
+        INSERT INTO oauth_state (id, user_id, provider_id, device_code, user_code, verification_uri, interval_seconds, expires_at, status)
+        VALUES (${stateId}, ${DEFAULT_USER_ID}, 'github-copilot', 'test-device-code', 'TEST-1234', 'https://github.com/login/device', 5, ${expiresAt}::timestamp, 'pending')
+      `;
       
       const res = await app.request(`/api/providers/github-copilot/oauth/status/${stateId}`, {
         headers: AUTH_HEADER,
@@ -874,12 +886,12 @@ describe('Provider Routes Integration Tests', () => {
     });
 
     test('should cancel OAuth flow successfully', async () => {
-      // Create a test OAuth state
       const stateId = 'test-cancel-state';
-      db.run(`
-        INSERT INTO oauth_state (id, provider_id, device_code, user_code, verification_uri, interval_seconds, expires_at, status)
-        VALUES (?, 'github-copilot', 'test-device-code', 'TEST-1234', 'https://github.com/login/device', 5, datetime('now', '+15 minutes'), 'pending')
-      `, [stateId]);
+      const expiresAt = new Date(Date.now() + 900000).toISOString();
+      await rawSql`
+        INSERT INTO oauth_state (id, user_id, provider_id, device_code, user_code, verification_uri, interval_seconds, expires_at, status)
+        VALUES (${stateId}, ${DEFAULT_USER_ID}, 'github-copilot', 'test-device-code', 'TEST-1234', 'https://github.com/login/device', 5, ${expiresAt}::timestamp, 'pending')
+      `;
       
       const res = await app.request(`/api/providers/github-copilot/oauth/${stateId}`, {
         method: 'DELETE',
@@ -895,19 +907,19 @@ describe('Provider Routes Integration Tests', () => {
 
     test('should remove OAuth state from database', async () => {
       const stateId = 'test-remove-state';
-      db.run(`
-        INSERT INTO oauth_state (id, provider_id, device_code, user_code, verification_uri, interval_seconds, expires_at, status)
-        VALUES (?, 'github-copilot', 'test-device-code', 'TEST-1234', 'https://github.com/login/device', 5, datetime('now', '+15 minutes'), 'pending')
-      `, [stateId]);
+      const expiresAt = new Date(Date.now() + 900000).toISOString();
+      await rawSql`
+        INSERT INTO oauth_state (id, user_id, provider_id, device_code, user_code, verification_uri, interval_seconds, expires_at, status)
+        VALUES (${stateId}, ${DEFAULT_USER_ID}, 'github-copilot', 'test-device-code', 'TEST-1234', 'https://github.com/login/device', 5, ${expiresAt}::timestamp, 'pending')
+      `;
       
       await app.request(`/api/providers/github-copilot/oauth/${stateId}`, {
         method: 'DELETE',
         headers: AUTH_HEADER,
       });
       
-      // Verify state is deleted
-      const row = db.query('SELECT * FROM oauth_state WHERE id = ?').get(stateId);
-      expect(row).toBeNull();
+      const rows = await rawSql`SELECT * FROM oauth_state WHERE id = ${stateId}`;
+      expect(rows.length).toBe(0);
     });
   });
 
@@ -950,14 +962,17 @@ describe('Provider Routes Integration Tests', () => {
     test('should handle multiple providers configuration', async () => {
       // Configure multiple providers
       await ProviderCredentials.saveApiKey({
+        userId: DEFAULT_USER_ID,
         providerId: 'anthropic',
         apiKey: 'key-1',
       });
       await ProviderCredentials.saveApiKey({
+        userId: DEFAULT_USER_ID,
         providerId: 'openai',
         apiKey: 'key-2',
       });
       await ProviderCredentials.saveApiKey({
+        userId: DEFAULT_USER_ID,
         providerId: 'groq',
         apiKey: 'key-3',
       });

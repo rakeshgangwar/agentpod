@@ -9,42 +9,18 @@
  * - Reset to defaults
  */
 
-// IMPORTANT: Import setup first to set environment variables
 import '../setup.ts';
 
 import { describe, test, expect, beforeAll, afterAll, beforeEach } from 'bun:test';
-import { db } from '../../src/db/index.ts';
+import { rawSql } from '../../src/db/drizzle';
+import { setupTestUsers, DEFAULT_USER_ID } from '../helpers/database';
 
-// Import the full app after environment is set up
 import { app } from '../../src/index.ts';
 
-// =============================================================================
-// Constants
-// =============================================================================
-
 const AUTH_HEADER = { 'Authorization': 'Bearer test-token' };
-// The default user ID when using API key auth (from config.defaultUserId)
-const DEFAULT_USER_ID = 'default-user';
 
-// =============================================================================
-// Test Helpers
-// =============================================================================
-
-function createTestUser(): void {
-  const now = new Date().toISOString();
-  // Create the default-user that the API key auth uses
-  db.run(`
-    INSERT OR IGNORE INTO user (id, name, email, emailVerified, createdAt, updatedAt)
-    VALUES (?, ?, ?, 0, ?, ?)
-  `, [DEFAULT_USER_ID, 'Default Test User', 'default@test.com', now, now]);
-}
-
-function deleteTestUser(): void {
-  db.run('DELETE FROM user WHERE id = ?', [DEFAULT_USER_ID]);
-}
-
-function cleanupPreferences(): void {
-  db.run('DELETE FROM user_preferences WHERE user_id = ?', [DEFAULT_USER_ID]);
+async function cleanupPreferences(): Promise<void> {
+  await rawSql`DELETE FROM user_preferences WHERE user_id = ${DEFAULT_USER_ID}`;
 }
 
 // =============================================================================
@@ -52,20 +28,17 @@ function cleanupPreferences(): void {
 // =============================================================================
 
 describe('Preferences Routes Integration Tests', () => {
-  beforeAll(() => {
-    // Create the test user (foreign key constraint)
-    createTestUser();
-    // Clean up any existing preferences for the test user
-    cleanupPreferences();
+  beforeAll(async () => {
+    await setupTestUsers();
+    await cleanupPreferences();
   });
 
-  afterAll(() => {
-    cleanupPreferences();
-    deleteTestUser();
+  afterAll(async () => {
+    await cleanupPreferences();
   });
 
-  beforeEach(() => {
-    cleanupPreferences();
+  beforeEach(async () => {
+    await cleanupPreferences();
   });
 
   // ===========================================================================
@@ -114,7 +87,7 @@ describe('Preferences Routes Integration Tests', () => {
       expect(data.preferences.inAppNotifications).toBe(true);
       expect(data.preferences.systemNotifications).toBe(true);
       expect(data.preferences.defaultResourceTierId).toBe('starter');
-      expect(data.preferences.defaultFlavorId).toBe('fullstack');
+      expect(data.preferences.defaultFlavorId).toBe('js');
       expect(data.preferences.defaultAddonIds).toEqual(['code-server']);
       expect(data.preferences.defaultAgentId).toBe('opencode');
       expect(data.preferences.settingsVersion).toBe(1);
