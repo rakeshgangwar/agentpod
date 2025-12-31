@@ -7,7 +7,7 @@ import { app } from "../../src/index.ts";
 
 const AUTH_HEADER = { Authorization: "Bearer test-token" };
 const JSON_HEADERS = { ...AUTH_HEADER, "Content-Type": "application/json" };
-const TEST_USER_ID = "test-user-workflow-001";
+const TEST_USER_ID = "default-user"; // Must match what auth middleware resolves test-token to
 
 async function cleanupTestData() {
   await rawSql`DELETE FROM workflow_step_logs`;
