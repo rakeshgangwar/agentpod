@@ -37,8 +37,8 @@ function createTestWorkflow(overrides: Record<string, unknown> = {}) {
       },
     ],
     connections: {
-      "Start Trigger": {
-        main: [[{ node: "API Call", type: "main", index: 0 }]],
+      "trigger-1": {
+        main: [[{ node: "http-1", type: "main", index: 0 }]],
       },
     },
     ...overrides,

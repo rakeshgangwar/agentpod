@@ -25,7 +25,7 @@ describe("Workflow Validation Utilities", () => {
         createNode({ id: "2", type: "http-request", name: "API Call" }),
       ];
       const connections: IConnections = {
-        Start: { main: [[{ node: "API Call", type: "main", index: 0 }]] },
+        "1": { main: [[{ node: "2", type: "main", index: 0 }]] },
       };
 
       const result = validateWorkflow("Test Workflow", nodes, connections);
@@ -48,7 +48,7 @@ describe("Workflow Validation Utilities", () => {
     test("should fail if no trigger node exists", () => {
       const nodes: INode[] = [
         createNode({ id: "1", type: "http-request" }),
-        createNode({ id: "2", type: "ai-agent" }),
+        createNode({ id: "2", type: "ai-chat" }),
       ];
 
       const result = validateWorkflow("No Trigger", nodes, {});
@@ -100,7 +100,7 @@ describe("Workflow Validation Utilities", () => {
         createNode({ id: "1", type: "http-request", name: "Duplicate ID" }),
       ];
       const connections: IConnections = {
-        Trigger: { main: [[{ node: "NonExistent", type: "main", index: 0 }]] },
+        "1": { main: [[{ node: "non-existent", type: "main", index: 0 }]] },
       };
 
       const result = validateWorkflow("Aggregated Errors", nodes, connections);
@@ -134,7 +134,7 @@ describe("Workflow Validation Utilities", () => {
       expect(result.errors.some((e) => e.nodeId === "same-id")).toBe(true);
     });
 
-    test("should fail for duplicate node names", () => {
+    test("should allow duplicate node names (connections use IDs not names)", () => {
       const nodes: INode[] = [
         createNode({ id: "1", type: "manual-trigger", name: "Same Name" }),
         createNode({ id: "2", type: "http-request", name: "Same Name" }),
@@ -142,7 +142,7 @@ describe("Workflow Validation Utilities", () => {
 
       const result = validateNodes(nodes);
 
-      expect(result.errors.some((e) => e.message.includes("name"))).toBe(true);
+      expect(result.errors).toHaveLength(0);
     });
 
     test("should fail for empty node name", () => {
@@ -183,7 +183,7 @@ describe("Workflow Validation Utilities", () => {
         createNode({ id: "2", type: "http-request", name: "Request" }),
       ];
       const connections: IConnections = {
-        Trigger: { main: [[{ node: "Request", type: "main", index: 0 }]] },
+        "1": { main: [[{ node: "2", type: "main", index: 0 }]] },
       };
 
       const result = validateConnections(nodes, connections);
@@ -196,12 +196,12 @@ describe("Workflow Validation Utilities", () => {
         createNode({ id: "1", type: "http-request", name: "Request" }),
       ];
       const connections: IConnections = {
-        NonExistent: { main: [[{ node: "Request", type: "main", index: 0 }]] },
+        "non-existent": { main: [[{ node: "1", type: "main", index: 0 }]] },
       };
 
       const result = validateConnections(nodes, connections);
 
-      expect(result.errors.some((e) => e.message.includes("NonExistent"))).toBe(true);
+      expect(result.errors.some((e) => e.message.includes("non-existent"))).toBe(true);
     });
 
     test("should fail for connection to non-existent target", () => {
@@ -209,12 +209,12 @@ describe("Workflow Validation Utilities", () => {
         createNode({ id: "1", type: "manual-trigger", name: "Trigger" }),
       ];
       const connections: IConnections = {
-        Trigger: { main: [[{ node: "NonExistent", type: "main", index: 0 }]] },
+        "1": { main: [[{ node: "non-existent", type: "main", index: 0 }]] },
       };
 
       const result = validateConnections(nodes, connections);
 
-      expect(result.errors.some((e) => e.message.includes("NonExistent"))).toBe(true);
+      expect(result.errors.some((e) => e.message.includes("non-existent"))).toBe(true);
     });
 
     test("should fail for self-referencing connection", () => {
@@ -222,7 +222,7 @@ describe("Workflow Validation Utilities", () => {
         createNode({ id: "1", type: "loop", name: "Loop" }),
       ];
       const connections: IConnections = {
-        Loop: { main: [[{ node: "Loop", type: "main", index: 0 }]] },
+        "1": { main: [[{ node: "1", type: "main", index: 0 }]] },
       };
 
       const result = validateConnections(nodes, connections);
@@ -249,8 +249,8 @@ describe("Workflow Validation Utilities", () => {
         createNode({ id: "3", type: "notification", name: "Notify" }),
       ];
       const connections: IConnections = {
-        Trigger: { main: [[{ node: "Request", type: "main", index: 0 }]] },
-        Request: { main: [[{ node: "Notify", type: "main", index: 0 }]] },
+        "1": { main: [[{ node: "2", type: "main", index: 0 }]] },
+        "2": { main: [[{ node: "3", type: "main", index: 0 }]] },
       };
 
       const unreachable = findUnreachableNodes(nodes, connections);
@@ -265,7 +265,7 @@ describe("Workflow Validation Utilities", () => {
         createNode({ id: "3", type: "notification", name: "Orphan" }),
       ];
       const connections: IConnections = {
-        Trigger: { main: [[{ node: "Connected", type: "main", index: 0 }]] },
+        "1": { main: [[{ node: "2", type: "main", index: 0 }]] },
       };
 
       const unreachable = findUnreachableNodes(nodes, connections);
@@ -292,8 +292,8 @@ describe("Workflow Validation Utilities", () => {
         createNode({ id: "3", type: "http-request", name: "Request" }),
       ];
       const connections: IConnections = {
-        Manual: { main: [[{ node: "Request", type: "main", index: 0 }]] },
-        Webhook: { main: [[{ node: "Request", type: "main", index: 0 }]] },
+        "1": { main: [[{ node: "3", type: "main", index: 0 }]] },
+        "2": { main: [[{ node: "3", type: "main", index: 0 }]] },
       };
 
       const unreachable = findUnreachableNodes(nodes, connections);
@@ -309,8 +309,8 @@ describe("Workflow Validation Utilities", () => {
         createNode({ id: "4", type: "http-request", name: "C" }),
       ];
       const connections: IConnections = {
-        Trigger: { main: [[{ node: "A", type: "main", index: 0 }]] },
-        B: { main: [[{ node: "C", type: "main", index: 0 }]] },
+        "1": { main: [[{ node: "2", type: "main", index: 0 }]] },
+        "3": { main: [[{ node: "4", type: "main", index: 0 }]] },
       };
 
       const unreachable = findUnreachableNodes(nodes, connections);
@@ -328,8 +328,8 @@ describe("Workflow Validation Utilities", () => {
         createNode({ id: "3", type: "http-request", name: "B" }),
       ];
       const connections: IConnections = {
-        Trigger: { main: [[{ node: "A", type: "main", index: 0 }]] },
-        A: { main: [[{ node: "B", type: "main", index: 0 }]] },
+        "1": { main: [[{ node: "2", type: "main", index: 0 }]] },
+        "2": { main: [[{ node: "3", type: "main", index: 0 }]] },
       };
 
       const cycles = detectCycles(nodes, connections);
@@ -344,9 +344,9 @@ describe("Workflow Validation Utilities", () => {
         createNode({ id: "3", type: "http-request", name: "B" }),
       ];
       const connections: IConnections = {
-        Trigger: { main: [[{ node: "A", type: "main", index: 0 }]] },
-        A: { main: [[{ node: "B", type: "main", index: 0 }]] },
-        B: { main: [[{ node: "A", type: "main", index: 0 }]] },
+        "1": { main: [[{ node: "2", type: "main", index: 0 }]] },
+        "2": { main: [[{ node: "3", type: "main", index: 0 }]] },
+        "3": { main: [[{ node: "2", type: "main", index: 0 }]] },
       };
 
       const cycles = detectCycles(nodes, connections);
@@ -360,8 +360,8 @@ describe("Workflow Validation Utilities", () => {
         createNode({ id: "2", type: "http-request", name: "A" }),
       ];
       const connections: IConnections = {
-        Trigger: { main: [[{ node: "A", type: "main", index: 0 }]] },
-        A: { main: [[{ node: "Trigger", type: "main", index: 0 }]] },
+        "1": { main: [[{ node: "2", type: "main", index: 0 }]] },
+        "2": { main: [[{ node: "1", type: "main", index: 0 }]] },
       };
 
       const cycles = detectCycles(nodes, connections);
@@ -384,17 +384,17 @@ describe("Workflow Validation Utilities", () => {
         createNode({ id: "5", type: "merge", name: "Merge" }),
       ];
       const connections: IConnections = {
-        Trigger: { main: [[{ node: "Condition", type: "main", index: 0 }]] },
-        Condition: {
+        "1": { main: [[{ node: "2", type: "main", index: 0 }]] },
+        "2": {
           main: [
             [
-              { node: "A", type: "main", index: 0 },
-              { node: "B", type: "main", index: 0 },
+              { node: "3", type: "main", index: 0 },
+              { node: "4", type: "main", index: 0 },
             ],
           ],
         },
-        A: { main: [[{ node: "Merge", type: "main", index: 0 }]] },
-        B: { main: [[{ node: "Merge", type: "main", index: 0 }]] },
+        "3": { main: [[{ node: "5", type: "main", index: 0 }]] },
+        "4": { main: [[{ node: "5", type: "main", index: 0 }]] },
       };
 
       const cycles = detectCycles(nodes, connections);
