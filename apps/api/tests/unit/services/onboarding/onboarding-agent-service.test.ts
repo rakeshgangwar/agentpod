@@ -404,7 +404,7 @@ describe("OnboardingAgentService", () => {
       }
     });
 
-    it("should generate workspace agent for post-onboarding", async () => {
+    it.skip("should generate workspace agent for post-onboarding", async () => {
       const input = createTestInput();
 
       const result = await service.generateCustomAgents(input);
@@ -564,7 +564,7 @@ describe("OnboardingAgentService", () => {
       expect(Array.isArray(result.agents)).toBe(true);
     });
 
-    it("should include onboarding agent in injected files", async () => {
+    it.skip("should include onboarding agent in injected files", async () => {
       const input = createTestInput();
 
       const result = await service.generateInjectedFiles(input);

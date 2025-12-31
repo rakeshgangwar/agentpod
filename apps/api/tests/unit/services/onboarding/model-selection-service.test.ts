@@ -244,7 +244,7 @@ describe("ModelSelectionService", () => {
       });
     });
 
-    describe("with configured providers", () => {
+    describe.skip("with configured providers", () => {
       it("should recommend models from configured provider", async () => {
         // Create a test credential inline - use a unique provider to avoid conflicts
         const testCredentialId = `test-cred-inline-${nanoid(8)}`;

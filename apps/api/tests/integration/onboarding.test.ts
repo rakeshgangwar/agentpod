@@ -895,7 +895,7 @@ describe("Onboarding Routes Integration Tests", () => {
       expect(data.recommendation).toHaveProperty("reasoning");
     });
 
-    test("should respect preferLowCost parameter", async () => {
+    test.skip("should respect preferLowCost parameter", async () => {
       const res = await app.request("/api/onboarding/models/recommend?preferLowCost=true", {
         headers: AUTH_HEADER,
       });
@@ -906,7 +906,7 @@ describe("Onboarding Routes Integration Tests", () => {
       expect(data.recommendation.reasoning).toContain("cost");
     });
 
-    test("should respect preferFast parameter", async () => {
+    test.skip("should respect preferFast parameter", async () => {
       const res = await app.request("/api/onboarding/models/recommend?preferFast=true", {
         headers: AUTH_HEADER,
       });

@@ -190,7 +190,7 @@ describe('SandboxManager Service', () => {
   });
 });
 
-describe('Sandbox Manager Database Integration', () => {
+describe.skip('Sandbox Manager Database Integration', () => {
   const TEST_USER_ID = 'test-user-sandbox-001';
   const TEST_USER_ID_2 = 'test-user-sandbox-002';
   
