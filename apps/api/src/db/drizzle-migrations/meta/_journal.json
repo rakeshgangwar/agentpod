@@ -99,6 +99,13 @@
       "when": 1767256835924,
       "tag": "0013_dizzy_jack_flag",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1767288722545,
+      "tag": "0014_yummy_wendigo",
+      "breakpoints": true
     }
   ]
 }

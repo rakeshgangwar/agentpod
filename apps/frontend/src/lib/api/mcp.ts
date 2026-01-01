@@ -212,27 +212,67 @@ export async function revokeMcpApiKey(id: string): Promise<void> {
   });
 }
 
-export interface OAuth2InitResponse {
-  authorizationUrl: string;
-  state: string;
-  codeVerifier: string;
-  redirectUri: string;
+export type McpOAuthStatus = "pending" | "authorized" | "expired" | "error";
+
+export interface McpOAuthDiscoveryResult {
+  requiresOAuth: boolean;
+  resourceMetadata?: {
+    resource?: string;
+    authorization_servers?: string[];
+  };
+  authServerMetadata?: {
+    issuer: string;
+    authorization_endpoint: string;
+    token_endpoint: string;
+    registration_endpoint?: string;
+    scopes_supported?: string[];
+  };
+  error?: string;
 }
 
-export async function initOAuth2Flow(serverId: string): Promise<OAuth2InitResponse> {
-  return apiRequest<OAuth2InitResponse>(`/api/mcp/servers/${serverId}/oauth/init`, {
+export interface McpOAuthSession {
+  id: string;
+  mcpServerId: string;
+  status: McpOAuthStatus;
+  resourceUrl?: string;
+  authorizationServerUrl?: string;
+  clientId?: string;
+  tokenType?: string;
+  expiresAt?: string;
+  scope?: string;
+  errorMessage?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface McpOAuthInitiateResponse {
+  authorizationUrl: string;
+  state: string;
+  session: McpOAuthSession;
+}
+
+export interface McpOAuthStatusResponse {
+  hasSession: boolean;
+  session?: McpOAuthSession;
+  discovery?: McpOAuthDiscoveryResult;
+}
+
+export async function discoverMcpOAuth(serverId: string): Promise<McpOAuthDiscoveryResult> {
+  return apiRequest<McpOAuthDiscoveryResult>(`/api/mcp/oauth/discover/${serverId}`);
+}
+
+export async function initiateMcpOAuth(serverId: string): Promise<McpOAuthInitiateResponse> {
+  return apiRequest<McpOAuthInitiateResponse>(`/api/mcp/oauth/initiate/${serverId}`, {
     method: "POST",
   });
 }
 
-export async function completeOAuth2Flow(
-  serverId: string,
-  code: string,
-  state: string,
-  codeVerifier?: string
-): Promise<void> {
-  await apiRequest<{ success: boolean }>(`/api/mcp/servers/${serverId}/oauth/callback`, {
-    method: "POST",
-    body: JSON.stringify({ code, state, codeVerifier }),
+export async function getMcpOAuthStatus(serverId: string): Promise<McpOAuthStatusResponse> {
+  return apiRequest<McpOAuthStatusResponse>(`/api/mcp/oauth/status/${serverId}`);
+}
+
+export async function revokeMcpOAuth(serverId: string): Promise<void> {
+  await apiRequest<{ success: boolean }>(`/api/mcp/oauth/revoke/${serverId}`, {
+    method: "DELETE",
   });
 }

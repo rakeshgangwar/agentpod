@@ -43,6 +43,7 @@ import { workflowRoutes, workflowExecutionRoutes } from './routes/workflows.ts';
 import { sessionForkRoutes } from './routes/session-forks.ts';
 // MetaMCP integration
 import { mcpServerRoutes, mcpNamespaceRoutes, mcpEndpointRoutes, mcpStatusRoutes, mcpApiKeyRoutes, mcpPublicStatusRoutes } from './routes/mcp-servers.ts';
+import { mcpOauthRoutes } from './routes/mcp-oauth.ts';
 // Middleware
 import { activityLoggerMiddleware } from './middleware/activity-logger.ts';
 // Sync services
@@ -139,7 +140,8 @@ origin: (origin) => {
   .route('/api/mcp/namespaces', mcpNamespaceRoutes)
   .route('/api/mcp/endpoints', mcpEndpointRoutes)
   .route('/api/mcp/status', mcpStatusRoutes)
-  .route('/api/mcp/keys', mcpApiKeyRoutes);
+  .route('/api/mcp/keys', mcpApiKeyRoutes)
+  .route('/api/mcp/oauth', mcpOauthRoutes);
 
 app.onError((err, c) => {
   const requestId = c.req.header('x-request-id') || crypto.randomUUID();

@@ -247,6 +247,70 @@ export const mcpApiKeys = pgTable(
 );
 
 // =============================================================================
+// MCP OAuth Sessions Table
+// =============================================================================
+
+/**
+ * OAuth session status
+ */
+export const mcpOauthStatusEnum = pgEnum("mcp_oauth_status", [
+  "pending",      // OAuth flow initiated but not completed
+  "authorized",   // OAuth flow completed, tokens valid
+  "expired",      // Tokens expired, needs refresh or re-auth
+  "error",        // OAuth flow failed
+]);
+
+/**
+ * Stores OAuth sessions for MCP servers that require OAuth authentication.
+ * Mirrors MetaMCP's oauth_sessions table for sync.
+ */
+export const mcpOauthSessions = pgTable(
+  "mcp_oauth_sessions",
+  {
+    id: text("id").primaryKey(),
+    mcpServerId: text("mcp_server_id")
+      .notNull()
+      .references(() => mcpServers.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+
+    // OAuth Discovery (RFC 9728)
+    resourceUrl: text("resource_url"),             // e.g., https://mcp.groww.in/
+    authorizationServerUrl: text("authorization_server_url"), // e.g., https://api.groww.in/
+
+    // Client Registration (Dynamic)
+    clientId: text("client_id"),
+    clientSecret: text("client_secret"),
+
+    // Tokens (encrypted)
+    accessToken: text("access_token"),
+    refreshToken: text("refresh_token"),
+    tokenType: text("token_type").default("Bearer"),
+    expiresAt: timestamp("expires_at"),
+    scope: text("scope"),
+
+    // PKCE
+    codeVerifier: text("code_verifier"),
+    state: text("state"),
+
+    // Status
+    status: mcpOauthStatusEnum("status").default("pending").notNull(),
+    errorMessage: text("error_message"),
+
+    // Timestamps
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("mcp_oauth_sessions_server_idx").on(table.mcpServerId),
+    index("mcp_oauth_sessions_user_idx").on(table.userId),
+    index("mcp_oauth_sessions_status_idx").on(table.status),
+    unique("mcp_oauth_sessions_server_user_unique").on(table.mcpServerId, table.userId),
+  ]
+);
+
+// =============================================================================
 // MCP Connection Logs Table (for debugging)
 // =============================================================================
 

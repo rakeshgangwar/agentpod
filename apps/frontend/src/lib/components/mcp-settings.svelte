@@ -1,5 +1,6 @@
 <script lang="ts">
   import { toast } from "svelte-sonner";
+  import { openUrl } from "@tauri-apps/plugin-opener";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
@@ -13,10 +14,16 @@
     deleteMcpServer,
     testMcpServer,
     getMcpStatus,
+    discoverMcpOAuth,
+    initiateMcpOAuth,
+    getMcpOAuthStatus,
+    revokeMcpOAuth,
     type McpServer,
     type McpServerType,
     type McpAuthType,
     type CreateMcpServerInput,
+    type McpOAuthStatusResponse,
+    type McpOAuthStatus,
   } from "$lib/api/mcp";
 
   import ServerIcon from "@lucide/svelte/icons/server";
@@ -28,6 +35,10 @@
   import XCircleIcon from "@lucide/svelte/icons/x-circle";
   import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
   import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
+  import KeyIcon from "@lucide/svelte/icons/key";
+  import ShieldCheckIcon from "@lucide/svelte/icons/shield-check";
+  import ShieldAlertIcon from "@lucide/svelte/icons/shield-alert";
+  import LogOutIcon from "@lucide/svelte/icons/log-out";
 
   let servers = $state<McpServer[]>([]);
   let loading = $state(true);
@@ -40,6 +51,10 @@
   let editingServer = $state<McpServer | null>(null);
   let saving = $state(false);
   let testing = $state<string | null>(null);
+
+  let oauthStatuses = $state<Record<string, McpOAuthStatusResponse>>({});
+  let oauthLoading = $state<Record<string, boolean>>({});
+  let oauthPolling = $state<Record<string, number>>({});
 
   let formName = $state("");
   let formDescription = $state("");
@@ -66,12 +81,125 @@
       ]);
       servers = serversData;
       mcpStatus = statusData;
+
+      for (const server of serversData) {
+        if (server.type !== "STDIO" && server.url) {
+          loadOAuthStatus(server.id);
+        }
+      }
     } catch (e) {
       const err = e as Error;
       error = err.message;
       console.error("Failed to load MCP data:", e);
     } finally {
       loading = false;
+    }
+  }
+
+  async function loadOAuthStatus(serverId: string) {
+    oauthLoading[serverId] = true;
+    try {
+      const status = await getMcpOAuthStatus(serverId);
+      oauthStatuses[serverId] = status;
+    } catch (e) {
+      console.error(`Failed to load OAuth status for ${serverId}:`, e);
+    } finally {
+      oauthLoading[serverId] = false;
+    }
+  }
+
+  async function handleOAuthAuthorize(server: McpServer) {
+    oauthLoading[server.id] = true;
+    try {
+      const result = await initiateMcpOAuth(server.id);
+      
+      await openUrl(result.authorizationUrl);
+      
+      toast.info("Authorization started", {
+        description: "Complete the authorization in your browser, then return here.",
+      });
+
+      startOAuthPolling(server.id);
+
+    } catch (e) {
+      const err = e as Error;
+      toast.error("Failed to start authorization", { description: err.message });
+      oauthLoading[server.id] = false;
+    }
+  }
+
+  function startOAuthPolling(serverId: string) {
+    if (oauthPolling[serverId]) return;
+    
+    oauthPolling[serverId] = window.setInterval(async () => {
+      try {
+        const status = await getMcpOAuthStatus(serverId);
+        oauthStatuses[serverId] = status;
+        
+        if (status.session?.status === "authorized") {
+          stopOAuthPolling(serverId);
+          oauthLoading[serverId] = false;
+          toast.success("Authorization complete");
+        } else if (status.session?.status === "error") {
+          stopOAuthPolling(serverId);
+          oauthLoading[serverId] = false;
+          toast.error("Authorization failed", { 
+            description: status.session.errorMessage 
+          });
+        }
+      } catch {
+        // Ignore polling errors
+      }
+    }, 2000);
+  }
+
+  function stopOAuthPolling(serverId: string) {
+    if (oauthPolling[serverId]) {
+      clearInterval(oauthPolling[serverId]);
+      delete oauthPolling[serverId];
+    }
+  }
+
+  async function handleOAuthRevoke(server: McpServer) {
+    oauthLoading[server.id] = true;
+    try {
+      await revokeMcpOAuth(server.id);
+      toast.success("Authorization revoked");
+      await loadOAuthStatus(server.id);
+    } catch (e) {
+      const err = e as Error;
+      toast.error("Failed to revoke authorization", { description: err.message });
+    } finally {
+      oauthLoading[server.id] = false;
+    }
+  }
+
+  function getOAuthStatusColor(status?: McpOAuthStatus): string {
+    switch (status) {
+      case "authorized":
+        return "text-[var(--cyber-emerald)]";
+      case "pending":
+        return "text-[var(--cyber-yellow)]";
+      case "expired":
+      case "error":
+        return "text-[var(--cyber-red)]";
+      default:
+        return "text-muted-foreground";
+    }
+  }
+
+  function getOAuthStatusLabel(status?: McpOAuthStatus): string {
+    switch (status) {
+      case "authorized":
+        return "Authorized";
+      case "pending":
+        return "Pending";
+      case "expired":
+        return "Expired";
+      case "error":
+        return "Error";
+      default:
+        return "Not connected";
     }
   }
 
@@ -318,6 +446,10 @@
   {:else}
     <div class="space-y-2">
       {#each servers as server}
+        {@const oauthStatus = oauthStatuses[server.id]}
+        {@const isOAuthLoading = oauthLoading[server.id]}
+        {@const requiresOAuth = oauthStatus?.discovery?.requiresOAuth}
+        {@const sessionStatus = oauthStatus?.session?.status}
         <div class="flex items-center justify-between p-3 border border-border/30 rounded bg-background/50 hover:border-[var(--cyber-cyan)]/30 transition-colors">
           <div class="flex items-center gap-3 min-w-0 flex-1">
             <div class="shrink-0">
@@ -328,7 +460,21 @@
               {/if}
             </div>
             <div class="min-w-0">
-              <p class="font-mono text-sm truncate">{server.name}</p>
+              <div class="flex items-center gap-2">
+                <p class="font-mono text-sm truncate">{server.name}</p>
+                {#if requiresOAuth}
+                  <span class="flex items-center gap-1 text-xs font-mono px-1.5 py-0.5 rounded {getOAuthStatusColor(sessionStatus)} bg-current/10">
+                    {#if sessionStatus === "authorized"}
+                      <ShieldCheckIcon class="h-3 w-3" />
+                    {:else if sessionStatus === "error" || sessionStatus === "expired"}
+                      <ShieldAlertIcon class="h-3 w-3" />
+                    {:else}
+                      <KeyIcon class="h-3 w-3" />
+                    {/if}
+                    {getOAuthStatusLabel(sessionStatus)}
+                  </span>
+                {/if}
+              </div>
               <p class="text-xs text-muted-foreground font-mono">
                 {server.type} · {server.authType}
                 {#if server.type === "STDIO" && server.command}
@@ -340,6 +486,38 @@
             </div>
           </div>
           <div class="flex items-center gap-1 shrink-0">
+            {#if requiresOAuth && sessionStatus !== "authorized"}
+              <Button 
+                variant="outline" 
+                size="sm"
+                onclick={() => handleOAuthAuthorize(server)}
+                disabled={isOAuthLoading}
+                class="h-7 px-2 font-mono text-xs text-[var(--cyber-cyan)] border-[var(--cyber-cyan)]/30 hover:bg-[var(--cyber-cyan)]/10"
+                title="Authorize with OAuth"
+              >
+                {#if isOAuthLoading}
+                  <RefreshCwIcon class="h-3 w-3 animate-spin mr-1" />
+                {:else}
+                  <KeyIcon class="h-3 w-3 mr-1" />
+                {/if}
+                Authorize
+              </Button>
+            {:else if sessionStatus === "authorized"}
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onclick={() => handleOAuthRevoke(server)}
+                disabled={isOAuthLoading}
+                class="h-7 w-7 p-0 text-muted-foreground hover:text-[var(--cyber-red)]"
+                title="Revoke authorization"
+              >
+                {#if isOAuthLoading}
+                  <RefreshCwIcon class="h-3 w-3 animate-spin" />
+                {:else}
+                  <LogOutIcon class="h-3 w-3" />
+                {/if}
+              </Button>
+            {/if}
             <Button 
               variant="ghost" 
               size="sm"

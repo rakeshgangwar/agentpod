@@ -55,12 +55,17 @@ async function checkMetaMcpTables(client: postgres.Sql): Promise<boolean> {
       EXISTS (
         SELECT FROM information_schema.tables 
         WHERE table_schema = 'public' AND table_name = 'sessions'
-      ) as sessions_exists
+      ) as sessions_exists,
+      EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name = 'oauth_sessions'
+      ) as oauth_sessions_exists
     `;
     const usersExist = Boolean(result[0]?.users_exists);
     const sessionsExist = Boolean(result[0]?.sessions_exists);
-    log.info("MetaMCP table check", { usersExist, sessionsExist, raw: result[0] });
-    return usersExist && sessionsExist;
+    const oauthSessionsExist = Boolean(result[0]?.oauth_sessions_exists);
+    log.info("MetaMCP table check", { usersExist, sessionsExist, oauthSessionsExist, raw: result[0] });
+    return usersExist && sessionsExist && oauthSessionsExist;
   } catch (error) {
     log.error("Failed to check MetaMCP tables", { error });
     return false;
@@ -335,6 +340,117 @@ async function createSyncFunctions(client: postgres.Sql): Promise<void> {
       RETURN OLD;
     END;
     $$ LANGUAGE plpgsql;
+
+    -- OAuth Session Sync Functions (AgentPod → MetaMCP)
+    -- Only sync when status is 'authorized' (has valid tokens)
+    CREATE OR REPLACE FUNCTION sync_oauth_session_to_metamcp_insert()
+    RETURNS TRIGGER AS $$
+    DECLARE
+      client_info jsonb;
+      tokens_jsonb jsonb;
+    BEGIN
+      -- Only sync authorized sessions with tokens
+      IF NEW.status != 'authorized' OR NEW.access_token IS NULL THEN
+        RETURN NEW;
+      END IF;
+
+      -- Build client_information jsonb
+      client_info := jsonb_build_object(
+        'client_id', COALESCE(NEW.client_id, ''),
+        'client_secret', COALESCE(NEW.client_secret, '')
+      );
+
+      -- Build tokens jsonb
+      tokens_jsonb := jsonb_build_object(
+        'access_token', NEW.access_token,
+        'refresh_token', COALESCE(NEW.refresh_token, ''),
+        'token_type', COALESCE(NEW.token_type, 'Bearer'),
+        'expires_at', CASE WHEN NEW.expires_at IS NOT NULL 
+                          THEN extract(epoch from NEW.expires_at)::bigint 
+                          ELSE NULL END,
+        'scope', COALESCE(NEW.scope, '')
+      );
+
+      PERFORM dblink_exec('${connStr}',
+        format('INSERT INTO oauth_sessions (uuid, mcp_server_uuid, client_information, tokens, code_verifier, created_at, updated_at) 
+                VALUES (%L::uuid, %L::uuid, %L::jsonb, %L::jsonb, %L, %L, %L)
+                ON CONFLICT (mcp_server_uuid) DO UPDATE SET
+                    client_information = EXCLUDED.client_information,
+                    tokens = EXCLUDED.tokens,
+                    code_verifier = EXCLUDED.code_verifier,
+                    updated_at = EXCLUDED.updated_at',
+            NEW.id, NEW.mcp_server_id, client_info, tokens_jsonb,
+            NEW.code_verifier, NEW.created_at, NEW.updated_at)
+      );
+      RETURN NEW;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'OAuth session sync to MetaMCP failed for session %: %', NEW.id, SQLERRM;
+      RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+
+    CREATE OR REPLACE FUNCTION sync_oauth_session_to_metamcp_update()
+    RETURNS TRIGGER AS $$
+    DECLARE
+      client_info jsonb;
+      tokens_jsonb jsonb;
+    BEGIN
+      -- If status changed FROM authorized, delete from MetaMCP
+      IF OLD.status = 'authorized' AND NEW.status != 'authorized' THEN
+        PERFORM dblink_exec('${connStr}', format('DELETE FROM oauth_sessions WHERE uuid = %L::uuid', OLD.id));
+        RETURN NEW;
+      END IF;
+
+      -- Only sync authorized sessions with tokens
+      IF NEW.status != 'authorized' OR NEW.access_token IS NULL THEN
+        RETURN NEW;
+      END IF;
+
+      -- Build client_information jsonb
+      client_info := jsonb_build_object(
+        'client_id', COALESCE(NEW.client_id, ''),
+        'client_secret', COALESCE(NEW.client_secret, '')
+      );
+
+      -- Build tokens jsonb
+      tokens_jsonb := jsonb_build_object(
+        'access_token', NEW.access_token,
+        'refresh_token', COALESCE(NEW.refresh_token, ''),
+        'token_type', COALESCE(NEW.token_type, 'Bearer'),
+        'expires_at', CASE WHEN NEW.expires_at IS NOT NULL 
+                          THEN extract(epoch from NEW.expires_at)::bigint 
+                          ELSE NULL END,
+        'scope', COALESCE(NEW.scope, '')
+      );
+
+      PERFORM dblink_exec('${connStr}',
+        format('INSERT INTO oauth_sessions (uuid, mcp_server_uuid, client_information, tokens, code_verifier, created_at, updated_at) 
+                VALUES (%L::uuid, %L::uuid, %L::jsonb, %L::jsonb, %L, %L, %L)
+                ON CONFLICT (mcp_server_uuid) DO UPDATE SET
+                    client_information = EXCLUDED.client_information,
+                    tokens = EXCLUDED.tokens,
+                    code_verifier = EXCLUDED.code_verifier,
+                    updated_at = EXCLUDED.updated_at',
+            NEW.id, NEW.mcp_server_id, client_info, tokens_jsonb,
+            NEW.code_verifier, NEW.created_at, NEW.updated_at)
+      );
+      RETURN NEW;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'OAuth session sync to MetaMCP failed for update %: %', NEW.id, SQLERRM;
+      RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+
+    CREATE OR REPLACE FUNCTION sync_oauth_session_to_metamcp_delete()
+    RETURNS TRIGGER AS $$
+    BEGIN
+      PERFORM dblink_exec('${connStr}', format('DELETE FROM oauth_sessions WHERE uuid = %L::uuid', OLD.id));
+      RETURN OLD;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'OAuth session sync to MetaMCP failed for delete %: %', OLD.id, SQLERRM;
+      RETURN OLD;
+    END;
+    $$ LANGUAGE plpgsql;
   `);
 
   log.info("SSO sync functions created");
@@ -383,6 +499,18 @@ async function createSyncTriggers(client: postgres.Sql): Promise<void> {
       FOR EACH ROW EXECUTE FUNCTION sync_mcp_server_to_metamcp_update();
     CREATE TRIGGER sync_mcp_server_delete AFTER DELETE ON mcp_servers
       FOR EACH ROW EXECUTE FUNCTION sync_mcp_server_to_metamcp_delete();
+
+    -- OAuth Session Sync Triggers
+    DROP TRIGGER IF EXISTS sync_oauth_session_insert ON mcp_oauth_sessions;
+    DROP TRIGGER IF EXISTS sync_oauth_session_update ON mcp_oauth_sessions;
+    DROP TRIGGER IF EXISTS sync_oauth_session_delete ON mcp_oauth_sessions;
+
+    CREATE TRIGGER sync_oauth_session_insert AFTER INSERT ON mcp_oauth_sessions
+      FOR EACH ROW EXECUTE FUNCTION sync_oauth_session_to_metamcp_insert();
+    CREATE TRIGGER sync_oauth_session_update AFTER UPDATE ON mcp_oauth_sessions
+      FOR EACH ROW EXECUTE FUNCTION sync_oauth_session_to_metamcp_update();
+    CREATE TRIGGER sync_oauth_session_delete AFTER DELETE ON mcp_oauth_sessions
+      FOR EACH ROW EXECUTE FUNCTION sync_oauth_session_to_metamcp_delete();
   `);
 
   log.info("SSO sync triggers created");
@@ -467,6 +595,49 @@ async function initialSync(agentpodClient: postgres.Sql, metamcpClient: postgres
     }
   }
   log.info(`Synced ${mcpServers.length} MCP servers to MetaMCP`);
+
+  // Sync OAuth sessions (only authorized ones with tokens)
+  const oauthSessions = await agentpodClient`
+    SELECT id, mcp_server_id, client_id, client_secret, access_token, refresh_token, 
+           token_type, expires_at, scope, code_verifier, status, created_at, updated_at 
+    FROM mcp_oauth_sessions WHERE status = 'authorized' AND access_token IS NOT NULL
+  `;
+  for (const session of oauthSessions) {
+    try {
+      const clientInfo = JSON.stringify({
+        client_id: session.client_id || "",
+        client_secret: session.client_secret || ""
+      });
+      const tokens = JSON.stringify({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token || "",
+        token_type: session.token_type || "Bearer",
+        expires_at: session.expires_at ? Math.floor(new Date(session.expires_at).getTime() / 1000) : null,
+        scope: session.scope || ""
+      });
+
+      await metamcpClient`
+        INSERT INTO oauth_sessions (uuid, mcp_server_uuid, client_information, tokens, code_verifier, created_at, updated_at)
+        VALUES (
+          ${session.id}::uuid, 
+          ${session.mcp_server_id}::uuid, 
+          ${clientInfo}::jsonb, 
+          ${tokens}::jsonb, 
+          ${session.code_verifier}, 
+          ${session.created_at}, 
+          ${session.updated_at}
+        )
+        ON CONFLICT (mcp_server_uuid) DO UPDATE SET
+          client_information = EXCLUDED.client_information,
+          tokens = EXCLUDED.tokens,
+          code_verifier = EXCLUDED.code_verifier,
+          updated_at = EXCLUDED.updated_at
+      `;
+    } catch (err) {
+      log.warn("Failed to sync OAuth session", { sessionId: session.id, error: err });
+    }
+  }
+  log.info(`Synced ${oauthSessions.length} OAuth sessions to MetaMCP`);
 
   log.info("Initial SSO sync completed");
 }

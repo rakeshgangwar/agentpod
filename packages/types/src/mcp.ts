@@ -387,3 +387,80 @@ export interface GenerateOpenCodeMcpConfigRequest {
 export interface GenerateOpenCodeMcpConfigResponse {
   mcp: Record<string, OpenCodeMcpServerConfig>;
 }
+
+// =============================================================================
+// MCP OAuth Types
+// =============================================================================
+
+export type McpOAuthStatus = "pending" | "authorized" | "expired" | "error";
+
+export interface OAuthProtectedResourceMetadata {
+  resource: string;
+  authorization_servers?: string[];
+  bearer_methods_supported?: string[];
+  scopes_supported?: string[];
+}
+
+export interface OAuthAuthorizationServerMetadata {
+  issuer: string;
+  authorization_endpoint: string;
+  token_endpoint: string;
+  registration_endpoint?: string;
+  jwks_uri?: string | null;
+  response_types_supported?: string[];
+  grant_types_supported?: string[];
+  code_challenge_methods_supported?: string[];
+  token_endpoint_auth_methods_supported?: string[];
+  scopes_supported?: string[];
+}
+
+export interface McpOAuthDiscoveryResult {
+  requiresOAuth: boolean;
+  resourceMetadata?: OAuthProtectedResourceMetadata;
+  authServerMetadata?: OAuthAuthorizationServerMetadata;
+  error?: string;
+}
+
+export interface McpOAuthSession {
+  id: string;
+  mcpServerId: string;
+  userId: string;
+  resourceUrl?: string;
+  authorizationServerUrl?: string;
+  clientId?: string;
+  tokenType?: string;
+  expiresAt?: string;
+  scope?: string;
+  status: McpOAuthStatus;
+  errorMessage?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface McpOAuthInitiateRequest {
+  mcpServerId: string;
+  redirectUri?: string;
+}
+
+export interface McpOAuthInitiateResponse {
+  authorizationUrl: string;
+  state: string;
+}
+
+export interface McpOAuthCallbackRequest {
+  code: string;
+  state: string;
+}
+
+export interface McpOAuthCallbackResponse {
+  success: boolean;
+  mcpServerId?: string;
+  error?: string;
+}
+
+export interface McpOAuthStatusResponse {
+  status: McpOAuthStatus;
+  expiresAt?: string;
+  scope?: string;
+  errorMessage?: string;
+}
