@@ -40,3 +40,6 @@ export * from "./agents";
 
 // Workflow builder types
 export * from "./workflow";
+
+// Session forking types
+export * from "./session-fork";

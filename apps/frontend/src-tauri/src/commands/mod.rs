@@ -5,6 +5,7 @@ pub mod connection;
 pub mod docker;
 pub mod onboarding;
 pub mod sandboxes;
+pub mod session_forks;
 pub mod settings;
 pub mod terminal;
 
@@ -16,6 +17,7 @@ pub use connection::*;
 pub use docker::*;
 pub use onboarding::*;
 pub use sandboxes::*;
+pub use session_forks::*;
 pub use settings::*;
 pub use terminal::*;
 

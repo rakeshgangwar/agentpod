@@ -36,6 +36,7 @@
   import PlusIcon from "@lucide/svelte/icons/plus";
   import SettingsIcon from "@lucide/svelte/icons/settings";
   import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
+  import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
   import PlayIcon from "@lucide/svelte/icons/play";
   import SquareIcon from "@lucide/svelte/icons/square";
   import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
@@ -46,6 +47,8 @@
   import SunriseIcon from "@lucide/svelte/icons/sunrise";
   import RotateCcwIcon from "@lucide/svelte/icons/rotate-ccw";
   import MoonIcon from "@lucide/svelte/icons/moon";
+  import BoxIcon from "@lucide/svelte/icons/box";
+  import WorkflowIcon from "@lucide/svelte/icons/workflow";
 
   // =============================================================================
   // Loading Screen State
@@ -592,12 +595,24 @@
 
           <ThemeToggle />
 
-          <Button
-            onclick={() => goto("/projects/new")}
-            class="cyber-btn-primary px-4 sm:px-6 h-10 font-mono text-xs uppercase tracking-wider"
-          >
-            <PlusIcon class="h-4 w-4 mr-2" /> New Project
-          </Button>
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger>
+              <Button class="cyber-btn-primary px-4 sm:px-6 h-10 font-mono text-xs uppercase tracking-wider">
+                <PlusIcon class="h-4 w-4 mr-2" /> New
+                <ChevronDownIcon class="h-4 w-4 ml-2" />
+              </Button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Content align="end" class="w-48 font-mono">
+              <DropdownMenu.Item onclick={() => goto("/projects/new")} class="cursor-pointer">
+                <BoxIcon class="h-4 w-4 mr-2 text-[var(--cyber-cyan)]" />
+                Sandbox
+              </DropdownMenu.Item>
+              <DropdownMenu.Item onclick={() => goto("/workflows/new")} class="cursor-pointer">
+                <WorkflowIcon class="h-4 w-4 mr-2 text-[var(--cyber-magenta)]" />
+                Workflow
+              </DropdownMenu.Item>
+            </DropdownMenu.Content>
+          </DropdownMenu.Root>
 
           <!-- User Menu (Desktop) -->
           <DropdownMenu.Root>
@@ -959,17 +974,30 @@
     </div>
   </div>
 
-  <!-- Mobile FAB (Floating Action Button) for New Project -->
+  <!-- Mobile FAB (Floating Action Button) for New -->
   {#if isMobile}
-    <button
-      onclick={() => goto("/projects/new")}
-      class="fixed right-4 bottom-20 z-50 flex items-center justify-center w-14 h-14 
-             rounded-full shadow-lg cyber-btn-primary touch-manipulation
-             active:scale-95 transition-transform safe-area-mb"
-      aria-label="New Project"
-    >
-      <PlusIcon class="h-6 w-6" />
-    </button>
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger>
+        <button
+          class="fixed right-4 bottom-20 z-50 flex items-center justify-center w-14 h-14 
+                 rounded-full shadow-lg cyber-btn-primary touch-manipulation
+                 active:scale-95 transition-transform safe-area-mb"
+          aria-label="Create New"
+        >
+          <PlusIcon class="h-6 w-6" />
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Content align="end" side="top" class="w-48 font-mono mb-2">
+        <DropdownMenu.Item onclick={() => goto("/projects/new")} class="cursor-pointer">
+          <BoxIcon class="h-4 w-4 mr-2 text-[var(--cyber-cyan)]" />
+          Sandbox
+        </DropdownMenu.Item>
+        <DropdownMenu.Item onclick={() => goto("/workflows/new")} class="cursor-pointer">
+          <WorkflowIcon class="h-4 w-4 mr-2 text-[var(--cyber-magenta)]" />
+          Workflow
+        </DropdownMenu.Item>
+      </DropdownMenu.Content>
+    </DropdownMenu.Root>
   {/if}
 </main>
 {/if}

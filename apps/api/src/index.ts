@@ -39,6 +39,7 @@ import { previewRoutes, publicPreviewRoutes } from './routes/preview.ts';
 import { agentRoutes } from './routes/agents.ts';
 import { cloudflareWebhookRoutes } from './routes/cloudflare-webhook.ts';
 import { workflowRoutes, workflowExecutionRoutes } from './routes/workflows.ts';
+import { sessionForkRoutes } from './routes/session-forks.ts';
 // Middleware
 import { activityLoggerMiddleware } from './middleware/activity-logger.ts';
 // Sync services
@@ -125,7 +126,8 @@ origin: (origin) => {
   .route('/api/v2/agents', agentRoutes)
   .route('/api/v2/cloudflare', cloudflareWebhookRoutes)
   .route('/api/v2/workflow-executions', workflowExecutionRoutes)
-  .route('/api/workflows', workflowRoutes);
+  .route('/api/workflows', workflowRoutes)
+  .route('/api/v2/sandboxes', sessionForkRoutes);
 
 app.onError((err, c) => {
   const requestId = c.req.header('x-request-id') || crypto.randomUUID();
