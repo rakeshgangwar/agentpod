@@ -46,6 +46,7 @@
   import LlmProvidersSettings from "$lib/components/llm-providers-settings.svelte";
   import ThemeSettings from "$lib/components/theme-settings.svelte";
   import VoiceSettings from "$lib/components/voice-settings.svelte";
+  import McpSettings from "$lib/components/mcp-settings.svelte";
   import PageHeader from "$lib/components/page-header.svelte";
   import type { Tab } from "$lib/components/page-header.svelte";
   import ThemeToggle from "$lib/components/theme-toggle.svelte";
@@ -60,6 +61,7 @@
   import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
   import SettingsIcon from "@lucide/svelte/icons/settings";
   import ShieldIcon from "@lucide/svelte/icons/shield";
+  import ServerIcon from "@lucide/svelte/icons/server";
 
   // Back navigation helper - uses browser history for proper back behavior
   function goBack() {
@@ -518,6 +520,7 @@ export default {
     { id: "ai-models", label: "AI Models", icon: BrainIcon },
     { id: "voice", label: "Voice", icon: MicIcon },
     { id: "opencode", label: "OpenCode", icon: TerminalIcon },
+    { id: "mcp", label: "MCP Servers", icon: ServerIcon },
     { id: "about", label: "About", icon: InfoIcon },
   ];
 </script>
@@ -1046,6 +1049,17 @@ export default {
               {/if}
             </div>
           {/if}
+        </div>
+      </div>
+    {:else if activeTab === "mcp"}
+      <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-1">
+        <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
+          <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+            [mcp_configuration]
+          </h3>
+        </div>
+        <div class="p-4">
+          <McpSettings />
         </div>
       </div>
     {:else if activeTab === "about"}

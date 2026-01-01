@@ -4,6 +4,7 @@ import { logger } from 'hono/logger';
 import { config } from './config.ts';
 import { validateConfig } from './utils/validate-config.ts';
 import { initDatabase } from './db/drizzle.ts';
+import { ensureSsoViews } from './db/sso-views.ts';
 import { auth } from './auth/drizzle-auth.ts';
 import { authMiddleware } from './auth/middleware.ts';
 import { securityHeadersMiddleware } from './middleware/security-headers.ts';
@@ -40,6 +41,8 @@ import { agentRoutes } from './routes/agents.ts';
 import { cloudflareWebhookRoutes } from './routes/cloudflare-webhook.ts';
 import { workflowRoutes, workflowExecutionRoutes } from './routes/workflows.ts';
 import { sessionForkRoutes } from './routes/session-forks.ts';
+// MetaMCP integration
+import { mcpServerRoutes, mcpNamespaceRoutes, mcpEndpointRoutes, mcpStatusRoutes, mcpApiKeyRoutes, mcpPublicStatusRoutes } from './routes/mcp-servers.ts';
 // Middleware
 import { activityLoggerMiddleware } from './middleware/activity-logger.ts';
 // Sync services
@@ -50,6 +53,9 @@ validateConfig();
 
 console.log('Initializing database...');
 await initDatabase();
+
+console.log('Setting up SSO views for MetaMCP integration...');
+await ensureSsoViews();
 
 const errorLogger = createLogger('error-handler');
 
@@ -85,6 +91,7 @@ origin: (origin) => {
   .use('*', securityHeadersMiddleware)
   .use('*', rateLimitMiddleware)
   .route('/', healthRoutes)
+  .route('/mcp/status', mcpPublicStatusRoutes)
   // Signup check middleware - block signup if disabled (runs before auth handler)
   .use('/api/auth/*', signupCheckMiddleware)
   // Better Auth routes - handle authentication (public, no auth middleware)
@@ -127,7 +134,12 @@ origin: (origin) => {
   .route('/api/v2/cloudflare', cloudflareWebhookRoutes)
   .route('/api/v2/workflow-executions', workflowExecutionRoutes)
   .route('/api/workflows', workflowRoutes)
-  .route('/api/v2/sandboxes', sessionForkRoutes);
+  .route('/api/v2/sandboxes', sessionForkRoutes)
+  .route('/api/mcp/servers', mcpServerRoutes)
+  .route('/api/mcp/namespaces', mcpNamespaceRoutes)
+  .route('/api/mcp/endpoints', mcpEndpointRoutes)
+  .route('/api/mcp/status', mcpStatusRoutes)
+  .route('/api/mcp/keys', mcpApiKeyRoutes);
 
 app.onError((err, c) => {
   const requestId = c.req.header('x-request-id') || crypto.randomUUID();
