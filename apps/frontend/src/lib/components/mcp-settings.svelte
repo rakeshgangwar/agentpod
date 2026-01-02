@@ -92,7 +92,7 @@
       mcpStatus = statusData;
 
       for (const server of serversData) {
-        if (server.type !== "STDIO" && server.url) {
+        if (server.type !== "STDIO" && server.url && server.authType !== "provider_link") {
           loadOAuthStatus(server.id);
         }
       }
@@ -571,7 +571,7 @@
             <div class="min-w-0">
               <div class="flex items-center gap-2">
                 <p class="font-mono text-sm truncate">{server.name}</p>
-                {#if requiresOAuth}
+                {#if requiresOAuth && !isProviderLinked(server)}
                   <span class="flex items-center gap-1 text-xs font-mono px-1.5 py-0.5 rounded {getOAuthStatusColor(sessionStatus)} bg-current/10">
                     {#if sessionStatus === "authorized"}
                       <ShieldCheckIcon class="h-3 w-3" />
@@ -603,37 +603,39 @@
             </div>
           </div>
           <div class="flex items-center gap-1 shrink-0">
-            {#if requiresOAuth && sessionStatus !== "authorized"}
-              <Button 
-                variant="outline" 
-                size="sm"
-                onclick={() => handleOAuthAuthorize(server)}
-                disabled={isOAuthLoading}
-                class="h-7 px-2 font-mono text-xs text-[var(--cyber-cyan)] border-[var(--cyber-cyan)]/30 hover:bg-[var(--cyber-cyan)]/10"
-                title="Authorize with OAuth"
-              >
-                {#if isOAuthLoading}
-                  <RefreshCwIcon class="h-3 w-3 animate-spin mr-1" />
-                {:else}
-                  <KeyIcon class="h-3 w-3 mr-1" />
-                {/if}
-                Authorize
-              </Button>
-            {:else if sessionStatus === "authorized"}
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onclick={() => handleOAuthRevoke(server)}
-                disabled={isOAuthLoading}
-                class="h-7 w-7 p-0 text-muted-foreground hover:text-[var(--cyber-red)]"
-                title="Revoke authorization"
-              >
-                {#if isOAuthLoading}
-                  <RefreshCwIcon class="h-3 w-3 animate-spin" />
-                {:else}
-                  <LogOutIcon class="h-3 w-3" />
-                {/if}
-              </Button>
+            {#if !isProviderLinked(server)}
+              {#if requiresOAuth && sessionStatus !== "authorized"}
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onclick={() => handleOAuthAuthorize(server)}
+                  disabled={isOAuthLoading}
+                  class="h-7 px-2 font-mono text-xs text-[var(--cyber-cyan)] border-[var(--cyber-cyan)]/30 hover:bg-[var(--cyber-cyan)]/10"
+                  title="Authorize with OAuth"
+                >
+                  {#if isOAuthLoading}
+                    <RefreshCwIcon class="h-3 w-3 animate-spin mr-1" />
+                  {:else}
+                    <KeyIcon class="h-3 w-3 mr-1" />
+                  {/if}
+                  Authorize
+                </Button>
+              {:else if sessionStatus === "authorized"}
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onclick={() => handleOAuthRevoke(server)}
+                  disabled={isOAuthLoading}
+                  class="h-7 w-7 p-0 text-muted-foreground hover:text-[var(--cyber-red)]"
+                  title="Revoke authorization"
+                >
+                  {#if isOAuthLoading}
+                    <RefreshCwIcon class="h-3 w-3 animate-spin" />
+                  {:else}
+                    <LogOutIcon class="h-3 w-3" />
+                  {/if}
+                </Button>
+              {/if}
             {/if}
             <Button 
               variant="ghost" 
