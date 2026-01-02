@@ -313,9 +313,71 @@ export interface CreateMcpServerResponse {
   };
 }
 
+export interface DeviceFlowInfo {
+  stateId: string;
+  userCode: string;
+  verificationUri: string;
+  expiresAt: string;
+  interval: number;
+}
+
+export interface AuthRequiredResponse {
+  error: string;
+  code: "AUTH_REQUIRED";
+  message: string;
+  providerRequired: string;
+  providerName: string;
+  deviceFlow: DeviceFlowInfo;
+}
+
 export async function createMcpServerWithProviderDetection(input: CreateMcpServerInput): Promise<CreateMcpServerResponse> {
   return apiRequest<CreateMcpServerResponse>("/api/mcp/servers", {
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export type CreateMcpServerResult = 
+  | { success: true; data: CreateMcpServerResponse }
+  | { success: false; authRequired: true; authResponse: AuthRequiredResponse }
+  | { success: false; authRequired: false; error: string };
+
+export async function createMcpServerWithAuth(input: CreateMcpServerInput): Promise<CreateMcpServerResult> {
+  const baseUrl = await getApiBaseUrl();
+  const token = await authGetToken();
+  
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${baseUrl}/api/mcp/servers`, {
+    method: "POST",
+    headers,
+    credentials: "include",
+    body: JSON.stringify(input),
+  });
+
+  const data = await response.json();
+
+  if (response.ok) {
+    return { success: true, data: data as CreateMcpServerResponse };
+  }
+
+  if (response.status === 401 && data.code === "AUTH_REQUIRED" && data.deviceFlow) {
+    return { 
+      success: false, 
+      authRequired: true, 
+      authResponse: data as AuthRequiredResponse 
+    };
+  }
+
+  return { 
+    success: false, 
+    authRequired: false, 
+    error: data.message || data.error || `API Error: ${response.status}` 
+  };
 }

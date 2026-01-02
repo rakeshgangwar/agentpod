@@ -37,6 +37,7 @@ import {
   getProviderLinkDisplayInfo,
 } from '../services/mcp-provider-servers.ts';
 import { isProviderConfigured } from '../models/provider-credentials.ts';
+import { githubCopilotOAuth } from '../services/oauth/github-copilot.ts';
 
 const log = createLogger('mcp-servers-routes');
 
@@ -195,10 +196,42 @@ export const mcpServerRoutes = new Hono()
               providerId,
               providerName: detectedServer.providerLink.providerName 
             });
+          } else if (providerId === 'github-copilot') {
+            try {
+              const deviceFlow = await githubCopilotOAuth.initDeviceFlow(user.id);
+              log.info('Auto-initiated device flow for MCP server', { 
+                url: data.url, 
+                providerId,
+                stateId: deviceFlow.id 
+              });
+              
+              return c.json({ 
+                error: 'Authentication required',
+                code: 'AUTH_REQUIRED',
+                message: `This MCP server requires ${detectedServer.providerLink.providerName} authentication.`,
+                providerRequired: providerId,
+                providerName: detectedServer.providerLink.providerName,
+                deviceFlow: {
+                  stateId: deviceFlow.id,
+                  userCode: deviceFlow.userCode,
+                  verificationUri: deviceFlow.verificationUri,
+                  expiresAt: deviceFlow.expiresAt.toISOString(),
+                  interval: deviceFlow.interval,
+                },
+              }, 401);
+            } catch (flowError) {
+              log.error('Failed to initiate device flow', { error: flowError });
+              return c.json({ 
+                error: 'Provider not configured',
+                message: `This MCP server requires ${detectedServer.providerLink.providerName} authentication. Please configure it in your provider settings first.`,
+                providerRequired: providerId,
+                providerName: detectedServer.providerLink.providerName,
+              }, 400);
+            }
           } else {
             return c.json({ 
               error: 'Provider not configured',
-              message: `This MCP server requires ${detectedServer.providerLink.providerName} authentication. Please configure ${detectedServer.providerLink.providerName} in your provider settings first.`,
+              message: `This MCP server requires ${detectedServer.providerLink.providerName} authentication. Please configure it in your provider settings first.`,
               providerRequired: providerId,
               providerName: detectedServer.providerLink.providerName,
             }, 400);

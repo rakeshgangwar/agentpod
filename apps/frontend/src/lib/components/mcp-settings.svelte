@@ -18,13 +18,16 @@
     initiateMcpOAuth,
     getMcpOAuthStatus,
     revokeMcpOAuth,
+    createMcpServerWithAuth,
     type McpServer,
     type McpServerType,
     type McpAuthType,
     type CreateMcpServerInput,
     type McpOAuthStatusResponse,
     type McpOAuthStatus,
+    type DeviceFlowInfo,
   } from "$lib/api/mcp";
+  import { pollOAuthFlow } from "$lib/api/tauri";
 
   import ServerIcon from "@lucide/svelte/icons/server";
   import PlusIcon from "@lucide/svelte/icons/plus";
@@ -67,6 +70,11 @@
   let formApiKey = $state("");
   let formBearerToken = $state("");
   let formEnvVars = $state("");
+
+  let deviceFlow = $state<DeviceFlowInfo | null>(null);
+  let deviceFlowPolling = $state(false);
+  let deviceFlowInterval: ReturnType<typeof setInterval> | null = null;
+  let pendingServerInput = $state<CreateMcpServerInput | null>(null);
 
   $effect(() => {
     loadData();
@@ -216,6 +224,9 @@
     formBearerToken = "";
     formEnvVars = "";
     editingServer = null;
+    stopDeviceFlowPolling();
+    deviceFlow = null;
+    pendingServerInput = null;
   }
 
   function openAddDialog() {
@@ -264,14 +275,28 @@
       if (editingServer) {
         await updateMcpServer(editingServer.id, input);
         toast.success("Server updated");
+        showAddDialog = false;
+        resetForm();
+        await loadData();
       } else {
-        await createMcpServer(input);
-        toast.success("Server created");
+        const result = await createMcpServerWithAuth(input);
+        
+        if (result.success) {
+          toast.success("Server created");
+          showAddDialog = false;
+          resetForm();
+          await loadData();
+        } else if (result.authRequired) {
+          pendingServerInput = input;
+          deviceFlow = result.authResponse.deviceFlow;
+          startDeviceFlowPolling(result.authResponse.providerRequired);
+          toast.info(`${result.authResponse.providerName} authentication required`, {
+            description: "Complete the authorization in your browser.",
+          });
+        } else {
+          toast.error("Failed to create server", { description: result.error });
+        }
       }
-
-      showAddDialog = false;
-      resetForm();
-      await loadData();
     } catch (e) {
       const err = e as Error;
       toast.error(editingServer ? "Failed to update server" : "Failed to create server", {
@@ -280,6 +305,74 @@
     } finally {
       saving = false;
     }
+  }
+
+  function startDeviceFlowPolling(providerId: string) {
+    if (!deviceFlow) return;
+    
+    deviceFlowPolling = true;
+    const interval = (deviceFlow.interval + 1) * 1000;
+    
+    deviceFlowInterval = setInterval(async () => {
+      if (!deviceFlow) {
+        stopDeviceFlowPolling();
+        return;
+      }
+      
+      try {
+        const status = await pollOAuthFlow(providerId, deviceFlow.stateId);
+        
+        if (status.status === "completed") {
+          stopDeviceFlowPolling();
+          toast.success("Authentication complete");
+          
+          if (pendingServerInput) {
+            saving = true;
+            try {
+              await createMcpServer(pendingServerInput);
+              toast.success("Server created");
+              showAddDialog = false;
+              resetForm();
+              await loadData();
+            } catch (e) {
+              const err = e as Error;
+              toast.error("Failed to create server", { description: err.message });
+            } finally {
+              saving = false;
+            }
+          }
+          
+          deviceFlow = null;
+          pendingServerInput = null;
+        } else if (status.status === "expired" || status.status === "error") {
+          stopDeviceFlowPolling();
+          toast.error("Authentication failed", { description: status.error });
+          deviceFlow = null;
+          pendingServerInput = null;
+        }
+      } catch {
+        // Ignore polling errors
+      }
+    }, interval);
+  }
+
+  function stopDeviceFlowPolling() {
+    deviceFlowPolling = false;
+    if (deviceFlowInterval) {
+      clearInterval(deviceFlowInterval);
+      deviceFlowInterval = null;
+    }
+  }
+
+  function cancelDeviceFlow() {
+    stopDeviceFlowPolling();
+    deviceFlow = null;
+    pendingServerInput = null;
+  }
+
+  function copyToClipboard(text: string) {
+    navigator.clipboard.writeText(text);
+    toast.success("Copied to clipboard");
   }
 
   function buildAuthConfig() {
@@ -591,142 +684,195 @@
         Configure an MCP server for AI tool access.
       </Dialog.Description>
     </Dialog.Header>
-    <div class="space-y-4 py-4">
-      <div class="space-y-2">
-        <Label class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">Name *</Label>
-        <Input 
-          bind:value={formName}
-          placeholder="my-mcp-server"
-          class="font-mono bg-background/50 border-border/50"
-        />
-      </div>
-
-      <div class="space-y-2">
-        <Label class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">Description</Label>
-        <Input 
-          bind:value={formDescription}
-          placeholder="What this server does..."
-          class="font-mono bg-background/50 border-border/50"
-        />
-      </div>
-
-      <div class="space-y-2">
-        <Label class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">Type</Label>
-        <Select.Root 
-          type="single"
-          value={formType}
-          onValueChange={(v) => { if (v) formType = v as McpServerType; }}
-        >
-          <Select.Trigger class="font-mono text-sm bg-background/50 border-border/50">
-            {serverTypes.find(t => t.value === formType)?.label}
-          </Select.Trigger>
-          <Select.Content>
-            {#each serverTypes as type}
-              <Select.Item value={type.value} label={type.label} />
-            {/each}
-          </Select.Content>
-        </Select.Root>
-      </div>
-
-      {#if formType === "STDIO"}
-        <div class="space-y-2">
-          <Label class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">Command</Label>
-          <Input 
-            bind:value={formCommand}
-            placeholder="npx, uvx, node, etc."
-            class="font-mono bg-background/50 border-border/50"
-          />
+    
+    {#if deviceFlow}
+      <div class="space-y-4 py-4 text-center">
+        <div class="p-4 bg-muted/50 rounded-lg border border-border/50">
+          <p class="text-sm text-muted-foreground font-mono mb-2">Enter this code:</p>
+          <div class="flex items-center justify-center gap-2">
+            <code class="text-2xl font-mono font-bold tracking-widest text-[var(--cyber-cyan)]">
+              {deviceFlow.userCode}
+            </code>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onclick={() => copyToClipboard(deviceFlow!.userCode)}
+              class="h-8 w-8 p-0"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+              </svg>
+            </Button>
+          </div>
         </div>
-        <div class="space-y-2">
-          <Label class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">Arguments</Label>
-          <Input 
-            bind:value={formArgs}
-            placeholder="-y @anthropic/mcp-server-exa"
-            class="font-mono bg-background/50 border-border/50"
-          />
-          <p class="text-xs text-muted-foreground font-mono">Space-separated arguments</p>
+        
+        <div>
+          <p class="text-sm text-muted-foreground font-mono mb-2">at</p>
+          <a 
+            href={deviceFlow.verificationUri} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            class="text-[var(--cyber-cyan)] underline font-mono text-sm"
+          >
+            {deviceFlow.verificationUri}
+          </a>
         </div>
-      {:else}
-        <div class="space-y-2">
-          <Label class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">URL</Label>
-          <Input 
-            bind:value={formUrl}
-            placeholder="https://api.example.com/mcp"
-            class="font-mono bg-background/50 border-border/50"
-          />
-        </div>
-      {/if}
-
-      <div class="space-y-2">
-        <Label class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">Authentication</Label>
-        <Select.Root 
-          type="single"
-          value={formAuthType}
-          onValueChange={(v) => { if (v) formAuthType = v as McpAuthType; }}
-        >
-          <Select.Trigger class="font-mono text-sm bg-background/50 border-border/50">
-            {authTypes.find(t => t.value === formAuthType)?.label}
-          </Select.Trigger>
-          <Select.Content>
-            {#each authTypes as type}
-              <Select.Item value={type.value} label={type.label} />
-            {/each}
-          </Select.Content>
-        </Select.Root>
-      </div>
-
-      {#if formAuthType === "api_key"}
-        <div class="space-y-2">
-          <Label class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">API Key</Label>
-          <Input 
-            type="password"
-            bind:value={formApiKey}
-            placeholder="sk-..."
-            class="font-mono bg-background/50 border-border/50"
-          />
-        </div>
-      {:else if formAuthType === "bearer_token"}
-        <div class="space-y-2">
-          <Label class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">Bearer Token</Label>
-          <Input 
-            type="password"
-            bind:value={formBearerToken}
-            placeholder="your-token"
-            class="font-mono bg-background/50 border-border/50"
-          />
-        </div>
-      {/if}
-
-      <div class="space-y-2">
-        <Label class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">Environment Variables</Label>
-        <textarea 
-          bind:value={formEnvVars}
-          placeholder="KEY=value&#10;ANOTHER_KEY=another_value"
-          class="w-full h-24 p-3 text-sm font-mono border border-border/50 rounded bg-background/50 resize-y
-                 focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)] focus:outline-none"
-        ></textarea>
-        <p class="text-xs text-muted-foreground font-mono">One per line: KEY=value</p>
-      </div>
-    </div>
-    <Dialog.Footer>
-      <Button 
-        variant="outline" 
-        onclick={() => { showAddDialog = false; resetForm(); }}
-        class="font-mono text-xs uppercase tracking-wider border-border/50"
-      >
-        Cancel
-      </Button>
-      <Button 
-        onclick={handleSave}
-        disabled={saving || !formName.trim()}
-        class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)] disabled:opacity-50"
-      >
-        {#if saving}
-          <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>
+        
+        {#if deviceFlowPolling}
+          <div class="flex items-center justify-center gap-2 text-sm text-muted-foreground font-mono">
+            <div class="w-4 h-4 border-2 border-[var(--cyber-cyan)] border-t-transparent rounded-full animate-spin"></div>
+            Waiting for authorization...
+          </div>
         {/if}
-        {saving ? "Saving..." : editingServer ? "Update" : "Create"}
-      </Button>
-    </Dialog.Footer>
+      </div>
+      <Dialog.Footer>
+        <Button 
+          variant="outline" 
+          onclick={cancelDeviceFlow}
+          class="font-mono text-xs uppercase tracking-wider border-border/50"
+        >
+          Cancel
+        </Button>
+      </Dialog.Footer>
+    {:else}
+      <div class="space-y-4 py-4">
+        <div class="space-y-2">
+          <Label class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">Name *</Label>
+          <Input 
+            bind:value={formName}
+            placeholder="my-mcp-server"
+            class="font-mono bg-background/50 border-border/50"
+          />
+        </div>
+
+        <div class="space-y-2">
+          <Label class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">Description</Label>
+          <Input 
+            bind:value={formDescription}
+            placeholder="What this server does..."
+            class="font-mono bg-background/50 border-border/50"
+          />
+        </div>
+
+        <div class="space-y-2">
+          <Label class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">Type</Label>
+          <Select.Root 
+            type="single"
+            value={formType}
+            onValueChange={(v) => { if (v) formType = v as McpServerType; }}
+          >
+            <Select.Trigger class="font-mono text-sm bg-background/50 border-border/50">
+              {serverTypes.find(t => t.value === formType)?.label}
+            </Select.Trigger>
+            <Select.Content>
+              {#each serverTypes as type}
+                <Select.Item value={type.value} label={type.label} />
+              {/each}
+            </Select.Content>
+          </Select.Root>
+        </div>
+
+        {#if formType === "STDIO"}
+          <div class="space-y-2">
+            <Label class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">Command</Label>
+            <Input 
+              bind:value={formCommand}
+              placeholder="npx, uvx, node, etc."
+              class="font-mono bg-background/50 border-border/50"
+            />
+          </div>
+          <div class="space-y-2">
+            <Label class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">Arguments</Label>
+            <Input 
+              bind:value={formArgs}
+              placeholder="-y @anthropic/mcp-server-exa"
+              class="font-mono bg-background/50 border-border/50"
+            />
+            <p class="text-xs text-muted-foreground font-mono">Space-separated arguments</p>
+          </div>
+        {:else}
+          <div class="space-y-2">
+            <Label class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">URL</Label>
+            <Input 
+              bind:value={formUrl}
+              placeholder="https://api.example.com/mcp"
+              class="font-mono bg-background/50 border-border/50"
+            />
+          </div>
+        {/if}
+
+        <div class="space-y-2">
+          <Label class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">Authentication</Label>
+          <Select.Root 
+            type="single"
+            value={formAuthType}
+            onValueChange={(v) => { if (v) formAuthType = v as McpAuthType; }}
+          >
+            <Select.Trigger class="font-mono text-sm bg-background/50 border-border/50">
+              {authTypes.find(t => t.value === formAuthType)?.label}
+            </Select.Trigger>
+            <Select.Content>
+              {#each authTypes as type}
+                <Select.Item value={type.value} label={type.label} />
+              {/each}
+            </Select.Content>
+          </Select.Root>
+        </div>
+
+        {#if formAuthType === "api_key"}
+          <div class="space-y-2">
+            <Label class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">API Key</Label>
+            <Input 
+              type="password"
+              bind:value={formApiKey}
+              placeholder="sk-..."
+              class="font-mono bg-background/50 border-border/50"
+            />
+          </div>
+        {:else if formAuthType === "bearer_token"}
+          <div class="space-y-2">
+            <Label class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">Bearer Token</Label>
+            <Input 
+              type="password"
+              bind:value={formBearerToken}
+              placeholder="your-token"
+              class="font-mono bg-background/50 border-border/50"
+            />
+          </div>
+        {/if}
+
+        <div class="space-y-2">
+          <Label class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">Environment Variables</Label>
+          <textarea 
+            bind:value={formEnvVars}
+            placeholder="KEY=value&#10;ANOTHER_KEY=another_value"
+            class="w-full h-24 p-3 text-sm font-mono border border-border/50 rounded bg-background/50 resize-y
+                   focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)] focus:outline-none"
+          ></textarea>
+          <p class="text-xs text-muted-foreground font-mono">One per line: KEY=value</p>
+        </div>
+      </div>
+      <Dialog.Footer>
+        <Button 
+          variant="outline" 
+          onclick={() => { showAddDialog = false; resetForm(); }}
+          class="font-mono text-xs uppercase tracking-wider border-border/50"
+        >
+          Cancel
+        </Button>
+        <Button 
+          onclick={handleSave}
+          disabled={saving || !formName.trim()}
+          class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)] disabled:opacity-50"
+        >
+          {#if saving}
+            <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>
+          {/if}
+          {saving ? "Saving..." : editingServer ? "Update" : "Create"}
+        </Button>
+      </Dialog.Footer>
+    {/if}
   </Dialog.Content>
 </Dialog.Root>
 
