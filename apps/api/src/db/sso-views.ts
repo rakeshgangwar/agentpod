@@ -353,7 +353,7 @@ async function createSyncFunctions(client: postgres.Sql): Promise<void> {
       IF current_setting('application_name', true) = 'metamcp_sync' THEN
         RETURN OLD;
       END IF;
-      PERFORM dblink_exec('${connStr}', format('DELETE FROM mcp_servers WHERE uuid = %L::uuid', OLD.id));
+      PERFORM dblink_exec('${connStr}', format('DELETE FROM mcp_servers WHERE uuid = %L::uuid', OLD.metamcp_server_id));
       RETURN OLD;
     EXCEPTION WHEN OTHERS THEN
       RAISE WARNING 'MCP server sync to MetaMCP failed for delete %: %', OLD.id, SQLERRM;

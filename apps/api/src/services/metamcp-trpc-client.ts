@@ -10,6 +10,9 @@ type McpServerType = "STDIO" | "SSE" | "STREAMABLE_HTTP";
  * Better Auth uses HMAC-signed cookies (token.signature format).
  * Synced sessions from AgentPod only have raw tokens, so they won't validate.
  * We use a dedicated service account that logs into MetaMCP to get valid signed cookies.
+ * 
+ * IMPORTANT: When creating/updating MCP servers, we pass the actual user_id
+ * to ensure proper ownership in MetaMCP, even though authentication uses the service account.
  */
 interface ServiceAccountSession {
   signedCookie: string;
@@ -70,7 +73,7 @@ interface TrpcResponse<T> {
 }
 
 const METAMCP_COOKIE_NAME = "better-auth.session_token";
-const SERVICE_ACCOUNT_SESSION_BUFFER_MS = 5 * 60 * 1000; // Refresh 5 min before expiry
+const SERVICE_ACCOUNT_SESSION_BUFFER_MS = 5 * 60 * 1000;
 
 export function formatMetaMcpCookie(sessionToken: string): string {
   return `${METAMCP_COOKIE_NAME}=${sessionToken}`;
@@ -122,7 +125,7 @@ async function loginServiceAccount(): Promise<ServiceAccountSession> {
   }
 
   const signedCookie = decodeURIComponent(cookieMatch[1]);
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days default
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
   log.info("Service account session obtained");
   return { signedCookie, expiresAt };
@@ -248,12 +251,13 @@ class MetaMcpTrpcClient {
         input,
         "mutate"
       );
-      log.info("Created MetaMCP server", { uuid: result.uuid, name: input.name });
+      log.info("Created MetaMCP server", { uuid: result.uuid, name: input.name, user_id: input.user_id });
       return result;
     } catch (error) {
       const err = error as Error;
       log.error("Failed to create MetaMCP server", { 
         name: input.name, 
+        user_id: input.user_id,
         errorMessage: err.message,
         errorName: err.name,
         errorStack: err.stack,
@@ -290,8 +294,14 @@ class MetaMcpTrpcClient {
       );
       log.info("Deleted MetaMCP server", { uuid });
     } catch (error) {
-      log.error("Failed to delete MetaMCP server", { uuid, error });
-      throw error;
+      const err = error as Error;
+      log.error("Failed to delete MetaMCP server", { 
+        uuid, 
+        errorMessage: err.message,
+        errorName: err.name,
+        errorStack: err.stack,
+      });
+      throw new Error(`Failed to delete MetaMCP server ${uuid}: ${err.message}`);
     }
   }
 

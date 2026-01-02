@@ -266,7 +266,7 @@ export const mcpServerRoutes = new Hono()
           // MetaMCP may use headers field for HTTP transports
           const headers: Record<string, string> = { ...(data.auth?.headers || {}) };
           if (bearerToken) {
-            headers['Authorization'] = `Bearer ${bearerToken}`;
+            headers['authorization'] = `Bearer ${bearerToken}`;
           }
 
           const metamcpInput: CreateMcpServerInput = {
@@ -419,18 +419,6 @@ export const mcpServerRoutes = new Hono()
 
       if (!existing) {
         return c.json({ error: 'Server not found' }, 404);
-      }
-
-      if (config.metamcp.enabled && existing.metamcpServerId) {
-        try {
-          await metamcpTrpcClient.deleteServer(existing.metamcpServerId);
-          log.info('Deleted MCP server from MetaMCP', { metamcpServerId: existing.metamcpServerId });
-        } catch (syncError) {
-          log.warn('Failed to delete MCP server from MetaMCP', { 
-            error: syncError, 
-            metamcpServerId: existing.metamcpServerId 
-          });
-        }
       }
 
       await db.delete(mcpServers).where(eq(mcpServers.id, id));
