@@ -5,6 +5,19 @@ const log = createLogger("metamcp-trpc");
 
 type McpServerType = "STDIO" | "SSE" | "STREAMABLE_HTTP";
 
+/**
+ * Service account session cache for server-to-server MetaMCP calls.
+ * Better Auth uses HMAC-signed cookies (token.signature format).
+ * Synced sessions from AgentPod only have raw tokens, so they won't validate.
+ * We use a dedicated service account that logs into MetaMCP to get valid signed cookies.
+ */
+interface ServiceAccountSession {
+  signedCookie: string;
+  expiresAt: Date;
+}
+
+let serviceAccountSession: ServiceAccountSession | null = null;
+
 export interface MetaMcpServer {
   uuid: string;
   name: string;
@@ -31,6 +44,7 @@ export interface CreateMcpServerInput {
   url?: string;
   bearerToken?: string;
   headers?: Record<string, string>;
+  user_id?: string;
 }
 
 export interface UpdateMcpServerInput extends CreateMcpServerInput {
@@ -56,9 +70,77 @@ interface TrpcResponse<T> {
 }
 
 const METAMCP_COOKIE_NAME = "better-auth.session_token";
+const SERVICE_ACCOUNT_SESSION_BUFFER_MS = 5 * 60 * 1000; // Refresh 5 min before expiry
 
 export function formatMetaMcpCookie(sessionToken: string): string {
   return `${METAMCP_COOKIE_NAME}=${sessionToken}`;
+}
+
+async function ensureServiceAccount(): Promise<void> {
+  const baseUrl = config.metamcp.url;
+  const { email, password } = config.metamcp.serviceAccount;
+
+  const signupResponse = await fetch(`${baseUrl}/api/auth/sign-up/email`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, name: "AgentPod Service" }),
+  });
+
+  if (!signupResponse.ok) {
+    const text = await signupResponse.text();
+    if (!text.includes("already exists") && !text.includes("User already exists")) {
+      log.debug("Service account signup response", { status: signupResponse.status, text: text.slice(0, 200) });
+    }
+  }
+}
+
+async function loginServiceAccount(): Promise<ServiceAccountSession> {
+  const baseUrl = config.metamcp.url;
+  const { email, password } = config.metamcp.serviceAccount;
+
+  await ensureServiceAccount();
+
+  const response = await fetch(`${baseUrl}/api/auth/sign-in/email`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Service account login failed: ${response.status} - ${text.slice(0, 200)}`);
+  }
+
+  const setCookie = response.headers.get("set-cookie");
+  if (!setCookie) {
+    throw new Error("No session cookie returned from service account login");
+  }
+
+  const cookieMatch = setCookie.match(/better-auth\.session_token=([^;]+)/);
+  if (!cookieMatch || !cookieMatch[1]) {
+    throw new Error("Could not parse session cookie from response");
+  }
+
+  const signedCookie = decodeURIComponent(cookieMatch[1]);
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days default
+
+  log.info("Service account session obtained");
+  return { signedCookie, expiresAt };
+}
+
+async function getServiceAccountCookie(): Promise<string> {
+  const now = new Date();
+  
+  if (
+    serviceAccountSession &&
+    serviceAccountSession.expiresAt.getTime() - SERVICE_ACCOUNT_SESSION_BUFFER_MS > now.getTime()
+  ) {
+    return serviceAccountSession.signedCookie;
+  }
+
+  log.info("Refreshing service account session");
+  serviceAccountSession = await loginServiceAccount();
+  return serviceAccountSession.signedCookie;
 }
 
 class MetaMcpTrpcClient {
@@ -68,12 +150,12 @@ class MetaMcpTrpcClient {
 
   private async trpcCall<T>(
     procedure: string, 
-    sessionToken: string,
+    signedCookie: string,
     input?: unknown, 
     method: "query" | "mutate" = "query"
   ): Promise<T> {
     const baseUrl = this.getBaseUrl();
-    const metamcpCookie = formatMetaMcpCookie(sessionToken);
+    const metamcpCookie = formatMetaMcpCookie(signedCookie);
     
     const url = new URL(`${baseUrl}/trpc/${procedure}`);
     
@@ -95,9 +177,27 @@ class MetaMcpTrpcClient {
     }
 
     const response = await fetch(url.toString(), fetchOptions);
+    
+    if (!response.ok) {
+      const text = await response.text();
+      log.error("MetaMCP HTTP error", { 
+        procedure, 
+        status: response.status, 
+        statusText: response.statusText,
+        body: text.slice(0, 500),
+      });
+      throw new Error(`MetaMCP HTTP error: ${response.status} ${response.statusText}`);
+    }
+    
     const data = await response.json() as TrpcResponse<T>;
 
     if (data.error) {
+      log.error("MetaMCP tRPC error", { 
+        procedure, 
+        errorCode: data.error.code,
+        errorMessage: data.error.message,
+        httpStatus: data.error.data?.httpStatus,
+      });
       if (data.error.data?.code === "UNAUTHORIZED") {
         throw new Error("Session expired or invalid - user must re-authenticate");
       }
@@ -111,11 +211,12 @@ class MetaMcpTrpcClient {
     return data.result.data.data as T;
   }
 
-  async listServers(sessionToken: string): Promise<MetaMcpServer[]> {
+  async listServers(): Promise<MetaMcpServer[]> {
     try {
+      const cookie = await getServiceAccountCookie();
       const result = await this.trpcCall<MetaMcpServer[]>(
         "frontend.mcpServers.list",
-        sessionToken
+        cookie
       );
       return result || [];
     } catch (error) {
@@ -124,11 +225,12 @@ class MetaMcpTrpcClient {
     }
   }
 
-  async getServer(sessionToken: string, uuid: string): Promise<MetaMcpServer | null> {
+  async getServer(uuid: string): Promise<MetaMcpServer | null> {
     try {
+      const cookie = await getServiceAccountCookie();
       return await this.trpcCall<MetaMcpServer>(
         "frontend.mcpServers.get",
-        sessionToken,
+        cookie,
         { uuid }
       );
     } catch (error) {
@@ -137,27 +239,35 @@ class MetaMcpTrpcClient {
     }
   }
 
-  async createServer(sessionToken: string, input: CreateMcpServerInput): Promise<MetaMcpServer> {
+  async createServer(input: CreateMcpServerInput): Promise<MetaMcpServer> {
     try {
+      const cookie = await getServiceAccountCookie();
       const result = await this.trpcCall<MetaMcpServer>(
         "frontend.mcpServers.create",
-        sessionToken,
+        cookie,
         input,
         "mutate"
       );
       log.info("Created MetaMCP server", { uuid: result.uuid, name: input.name });
       return result;
     } catch (error) {
-      log.error("Failed to create MetaMCP server", { name: input.name, error });
+      const err = error as Error;
+      log.error("Failed to create MetaMCP server", { 
+        name: input.name, 
+        errorMessage: err.message,
+        errorName: err.name,
+        errorStack: err.stack,
+      });
       throw error;
     }
   }
 
-  async updateServer(sessionToken: string, input: UpdateMcpServerInput): Promise<MetaMcpServer> {
+  async updateServer(input: UpdateMcpServerInput): Promise<MetaMcpServer> {
     try {
+      const cookie = await getServiceAccountCookie();
       const result = await this.trpcCall<MetaMcpServer>(
         "frontend.mcpServers.update",
-        sessionToken,
+        cookie,
         input,
         "mutate"
       );
@@ -169,11 +279,12 @@ class MetaMcpTrpcClient {
     }
   }
 
-  async deleteServer(sessionToken: string, uuid: string): Promise<void> {
+  async deleteServer(uuid: string): Promise<void> {
     try {
+      const cookie = await getServiceAccountCookie();
       await this.trpcCall<void>(
         "frontend.mcpServers.delete",
-        sessionToken,
+        cookie,
         { uuid },
         "mutate"
       );

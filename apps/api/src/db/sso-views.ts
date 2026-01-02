@@ -302,6 +302,26 @@ async function createSyncFunctions(client: postgres.Sql): Promise<void> {
         RETURN NEW;
       END IF;
 
+      IF NEW.metamcp_server_id IS NULL THEN
+        RETURN NEW;
+      END IF;
+
+      IF OLD.metamcp_server_id IS NULL AND NEW.metamcp_server_id IS NOT NULL THEN
+        RETURN NEW;
+      END IF;
+
+      IF OLD.name = NEW.name 
+         AND OLD.description IS NOT DISTINCT FROM NEW.description
+         AND OLD.type = NEW.type 
+         AND OLD.command IS NOT DISTINCT FROM NEW.command
+         AND OLD.args IS NOT DISTINCT FROM NEW.args
+         AND OLD.url IS NOT DISTINCT FROM NEW.url
+         AND OLD.environment IS NOT DISTINCT FROM NEW.environment
+         AND OLD.auth_config IS NOT DISTINCT FROM NEW.auth_config
+      THEN
+        RETURN NEW;
+      END IF;
+
       args_array := jsonb_array_to_text_array(NEW.args);
       type_val := CASE NEW.type::text
         WHEN 'STREAMABLE_HTTP' THEN 'STREAMABLE_HTTP'
@@ -318,7 +338,7 @@ async function createSyncFunctions(client: postgres.Sql): Promise<void> {
             args_array, NEW.url, COALESCE(NEW.environment, '{}'),
             NEW.auth_config->>'bearer_token',
             COALESCE(NEW.auth_config->'headers', '{}'),
-            NEW.id)
+            NEW.metamcp_server_id)
       );
       RETURN NEW;
     EXCEPTION WHEN OTHERS THEN
@@ -493,8 +513,6 @@ async function createSyncTriggers(client: postgres.Sql): Promise<void> {
     DROP TRIGGER IF EXISTS sync_mcp_server_update ON mcp_servers;
     DROP TRIGGER IF EXISTS sync_mcp_server_delete ON mcp_servers;
 
-    CREATE TRIGGER sync_mcp_server_insert AFTER INSERT ON mcp_servers
-      FOR EACH ROW EXECUTE FUNCTION sync_mcp_server_to_metamcp_insert();
     CREATE TRIGGER sync_mcp_server_update AFTER UPDATE ON mcp_servers
       FOR EACH ROW EXECUTE FUNCTION sync_mcp_server_to_metamcp_update();
     CREATE TRIGGER sync_mcp_server_delete AFTER DELETE ON mcp_servers

@@ -49,28 +49,6 @@ function getUser(c: { get: (key: string) => unknown }): { id: string } | null {
   return { id: user.id };
 }
 
-interface SessionContext {
-  get: (key: string) => unknown;
-  req: { header: (name: string) => string | undefined };
-}
-
-function getSessionToken(c: SessionContext): string | null {
-  const session = c.get("session") as { token?: string } | null;
-  if (session?.token) {
-    return session.token;
-  }
-  
-  const cookie = c.req.header("cookie");
-  if (cookie) {
-    const match = cookie.match(/agentpod\.session_token=([^;]+)/);
-    if (match?.[1]) {
-      return match[1];
-    }
-  }
-  
-  return null;
-}
-
 function generateId(): string {
   return crypto.randomUUID();
 }
@@ -247,47 +225,8 @@ export const mcpServerRoutes = new Hono()
         ? await encryptEnvironment(data.environment)
         : {};
 
-      let metamcpServerId: string | null = null;
-
-      if (config.metamcp.enabled) {
-        const sessionCookie = getSessionToken(c);
-        if (sessionCookie) {
-          try {
-            let bearerToken = data.auth?.bearerToken;
-            
-            if (authConfig?.type === 'provider_link' && authConfig.providerLink?.providerId) {
-              const resolved = await resolveProviderLinkToken(user.id, authConfig.providerLink.providerId);
-              if (resolved) {
-                bearerToken = resolved.accessToken;
-              }
-            }
-
-            const metamcpInput: CreateMcpServerInput = {
-              name: data.name.replace(/[^a-zA-Z0-9_-]/g, '_'),
-              description: data.description,
-              type: data.type,
-              command: data.command,
-              args: data.args,
-              url: data.url,
-              env: data.environment,
-              bearerToken,
-              headers: data.auth?.headers,
-            };
-            const metamcpServer = await metamcpTrpcClient.createServer(sessionCookie, metamcpInput);
-            metamcpServerId = metamcpServer.uuid;
-            log.info('Synced MCP server to MetaMCP', { metamcpServerId, name: data.name });
-          } catch (syncError) {
-            log.warn('Failed to sync MCP server to MetaMCP, continuing without sync', { 
-              error: syncError, 
-              name: data.name 
-            });
-          }
-        } else {
-          log.warn('No session cookie found, skipping MetaMCP sync');
-        }
-      }
-
-      const [server] = await db
+      // Step 1: Insert into AgentPod first (prevents orphaned MetaMCP records if this fails)
+      let [server] = await db
         .insert(mcpServers)
         .values({
           id,
@@ -301,13 +240,68 @@ export const mcpServerRoutes = new Hono()
           authType: authConfig?.type || 'none',
           authConfig: encryptedAuthConfig as unknown as Record<string, unknown>,
           environment: encryptedEnv,
-          metamcpServerId,
+          metamcpServerId: null, // Will be updated after MetaMCP sync
           enabled: true,
           isPublic: data.isPublic || false,
         })
         .returning();
 
-      log.info('MCP server created', { userId: user.id, serverId: id, name: data.name, metamcpServerId });
+      log.info('MCP server created in AgentPod', { userId: user.id, serverId: id, name: data.name });
+
+      // Step 2: Sync to MetaMCP (if enabled)
+      let metamcpServerId: string | null = null;
+
+      if (config.metamcp.enabled) {
+        try {
+          let bearerToken = data.auth?.bearerToken;
+          
+          if (authConfig?.type === 'provider_link' && authConfig.providerLink?.providerId) {
+            const resolved = await resolveProviderLinkToken(user.id, authConfig.providerLink.providerId);
+            if (resolved) {
+              bearerToken = resolved.accessToken;
+            }
+          }
+
+          // Build headers - include Authorization header if we have a bearer token
+          // MetaMCP may use headers field for HTTP transports
+          const headers: Record<string, string> = { ...(data.auth?.headers || {}) };
+          if (bearerToken) {
+            headers['Authorization'] = `Bearer ${bearerToken}`;
+          }
+
+          const metamcpInput: CreateMcpServerInput = {
+            name: data.name.replace(/[^a-zA-Z0-9_-]/g, '_'),
+            description: data.description,
+            type: data.type,
+            command: data.command,
+            args: data.args,
+            url: data.url,
+            env: data.environment,
+            bearerToken,
+            headers: Object.keys(headers).length > 0 ? headers : undefined,
+            user_id: user.id,
+          };
+          const metamcpServer = await metamcpTrpcClient.createServer(metamcpInput);
+          metamcpServerId = metamcpServer.uuid;
+          log.info('Synced MCP server to MetaMCP', { metamcpServerId, name: data.name });
+
+          // Step 3: Update AgentPod record with MetaMCP server ID
+          const [updatedServer] = await db
+            .update(mcpServers)
+            .set({ metamcpServerId })
+            .where(eq(mcpServers.id, id))
+            .returning();
+          
+          server = updatedServer;
+          log.info('Updated AgentPod record with MetaMCP server ID', { serverId: id, metamcpServerId });
+        } catch (syncError) {
+          log.warn('Failed to sync MCP server to MetaMCP, continuing without sync', { 
+            error: syncError, 
+            name: data.name 
+          });
+          // Server exists in AgentPod but not synced to MetaMCP - this is acceptable
+        }
+      }
 
       const providerLinkInfo = authConfig?.type === 'provider_link' && authConfig.providerLink
         ? getProviderLinkDisplayInfo(authConfig.providerLink.providerId)
@@ -357,29 +351,26 @@ export const mcpServerRoutes = new Hono()
       let metamcpServerId = existing.metamcpServerId;
 
       if (config.metamcp.enabled && metamcpServerId) {
-        const sessionCookie = getSessionToken(c);
-        if (sessionCookie) {
-          try {
-            const updatedName = (data.name ?? existing.name).replace(/[^a-zA-Z0-9_-]/g, '_');
-            await metamcpTrpcClient.updateServer(sessionCookie, {
-              uuid: metamcpServerId,
-              name: updatedName,
-              description: data.description ?? existing.description ?? undefined,
-              type: data.type ?? existing.type,
-              command: data.command ?? existing.command ?? undefined,
-              args: data.args ?? existing.args ?? undefined,
-              url: data.url ?? existing.url ?? undefined,
-              env: (encryptedEnv ?? existing.environment) as Record<string, string> | undefined,
-              bearerToken: data.auth?.bearerToken,
-              headers: data.auth?.headers,
-            });
-            log.info('Synced MCP server update to MetaMCP', { metamcpServerId });
-          } catch (syncError) {
-            log.warn('Failed to sync MCP server update to MetaMCP', { 
-              error: syncError, 
-              metamcpServerId 
-            });
-          }
+        try {
+          const updatedName = (data.name ?? existing.name).replace(/[^a-zA-Z0-9_-]/g, '_');
+          await metamcpTrpcClient.updateServer({
+            uuid: metamcpServerId,
+            name: updatedName,
+            description: data.description ?? existing.description ?? undefined,
+            type: data.type ?? existing.type,
+            command: data.command ?? existing.command ?? undefined,
+            args: data.args ?? existing.args ?? undefined,
+            url: data.url ?? existing.url ?? undefined,
+            env: (encryptedEnv ?? existing.environment) as Record<string, string> | undefined,
+            bearerToken: data.auth?.bearerToken,
+            headers: data.auth?.headers,
+          });
+          log.info('Synced MCP server update to MetaMCP', { metamcpServerId });
+        } catch (syncError) {
+          log.warn('Failed to sync MCP server update to MetaMCP', { 
+            error: syncError, 
+            metamcpServerId 
+          });
         }
       }
 
@@ -431,17 +422,14 @@ export const mcpServerRoutes = new Hono()
       }
 
       if (config.metamcp.enabled && existing.metamcpServerId) {
-        const sessionCookie = getSessionToken(c);
-        if (sessionCookie) {
-          try {
-            await metamcpTrpcClient.deleteServer(sessionCookie, existing.metamcpServerId);
-            log.info('Deleted MCP server from MetaMCP', { metamcpServerId: existing.metamcpServerId });
-          } catch (syncError) {
-            log.warn('Failed to delete MCP server from MetaMCP', { 
-              error: syncError, 
-              metamcpServerId: existing.metamcpServerId 
-            });
-          }
+        try {
+          await metamcpTrpcClient.deleteServer(existing.metamcpServerId);
+          log.info('Deleted MCP server from MetaMCP', { metamcpServerId: existing.metamcpServerId });
+        } catch (syncError) {
+          log.warn('Failed to delete MCP server from MetaMCP', { 
+            error: syncError, 
+            metamcpServerId: existing.metamcpServerId 
+          });
         }
       }
 

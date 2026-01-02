@@ -56,6 +56,8 @@ export interface EncryptedAuthConfig {
   };
   envVarsEncrypted?: Record<string, string>;
   headersEncrypted?: Record<string, string>;
+  /** Provider link config (stored unencrypted - just references provider ID) */
+  providerLink?: ProviderLinkConfig;
 }
 
 export async function encryptAuthConfig(config: McpAuthConfig): Promise<EncryptedAuthConfig> {
@@ -100,6 +102,10 @@ export async function encryptAuthConfig(config: McpAuthConfig): Promise<Encrypte
     for (const [key, value] of Object.entries(config.headers)) {
       encrypted.headersEncrypted[key] = await encrypt(value);
     }
+  }
+
+  if (config.providerLink) {
+    encrypted.providerLink = config.providerLink;
   }
 
   return encrypted;
@@ -147,6 +153,10 @@ export async function decryptAuthConfig(encrypted: EncryptedAuthConfig): Promise
     for (const [key, value] of Object.entries(encrypted.headersEncrypted)) {
       config.headers[key] = await decrypt(value);
     }
+  }
+
+  if (encrypted.providerLink) {
+    config.providerLink = encrypted.providerLink;
   }
 
   return config;
