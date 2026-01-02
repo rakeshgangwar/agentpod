@@ -33,6 +33,7 @@ export const mcpAuthTypeEnum = pgEnum("mcp_auth_type", [
   "bearer_token",
   "oauth2",
   "env_vars",
+  "provider_link",
 ]);
 
 export const mcpEndpointAuthTypeEnum = pgEnum("mcp_endpoint_auth_type", [

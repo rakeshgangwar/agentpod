@@ -1,6 +1,7 @@
 import { createLogger } from '../utils/logger.ts';
 import { config } from '../config.ts';
 import type { McpAuthConfig } from './mcp-credentials.ts';
+import { getCredential } from '../models/provider-credentials.ts';
 
 const log = createLogger('mcp-auth-handlers');
 
@@ -15,6 +16,37 @@ export interface AuthEnvironment {
 export interface PreparedAuth {
   headers: AuthHeaders;
   environment: AuthEnvironment;
+}
+
+export interface ResolvedProviderToken {
+  accessToken: string;
+  providerId: string;
+  providerName?: string;
+}
+
+export async function resolveProviderLinkToken(
+  userId: string,
+  providerId: string
+): Promise<ResolvedProviderToken | null> {
+  const credential = await getCredential(userId, providerId);
+  
+  if (!credential) {
+    log.warn('Provider credential not found for provider link', { userId, providerId });
+    return null;
+  }
+
+  const accessToken = credential.accessToken || credential.apiKey;
+  
+  if (!accessToken) {
+    log.warn('No token found in provider credential', { userId, providerId });
+    return null;
+  }
+
+  return {
+    accessToken,
+    providerId,
+    providerName: credential.oauthProvider,
+  };
 }
 
 export function prepareAuthForConnection(authConfig: McpAuthConfig): PreparedAuth {
@@ -46,6 +78,61 @@ export function prepareAuthForConnection(authConfig: McpAuthConfig): PreparedAut
     case 'env_vars':
       if (authConfig.envVars) {
         Object.assign(environment, authConfig.envVars);
+      }
+      break;
+
+    case 'provider_link':
+      break;
+  }
+
+  if (authConfig.headers) {
+    Object.assign(headers, authConfig.headers);
+  }
+
+  return { headers, environment };
+}
+
+export async function prepareAuthForConnectionAsync(
+  authConfig: McpAuthConfig,
+  userId?: string
+): Promise<PreparedAuth> {
+  const headers: AuthHeaders = {};
+  const environment: AuthEnvironment = {};
+
+  switch (authConfig.type) {
+    case 'none':
+      break;
+
+    case 'api_key':
+      if (authConfig.apiKey) {
+        headers['X-API-Key'] = authConfig.apiKey;
+      }
+      break;
+
+    case 'bearer_token':
+      if (authConfig.bearerToken) {
+        headers['Authorization'] = `Bearer ${authConfig.bearerToken}`;
+      }
+      break;
+
+    case 'oauth2':
+      if (authConfig.oauth2?.accessToken) {
+        headers['Authorization'] = `Bearer ${authConfig.oauth2.accessToken}`;
+      }
+      break;
+
+    case 'env_vars':
+      if (authConfig.envVars) {
+        Object.assign(environment, authConfig.envVars);
+      }
+      break;
+
+    case 'provider_link':
+      if (authConfig.providerLink?.providerId && userId) {
+        const resolved = await resolveProviderLinkToken(userId, authConfig.providerLink.providerId);
+        if (resolved) {
+          headers['Authorization'] = `Bearer ${resolved.accessToken}`;
+        }
       }
       break;
   }

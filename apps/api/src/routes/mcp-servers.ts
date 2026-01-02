@@ -29,7 +29,14 @@ import {
   exchangeOAuth2Code,
   getOAuthCallbackUrl,
   getOAuth2ProviderConfig,
+  resolveProviderLinkToken,
 } from '../services/mcp-auth-handlers.ts';
+import {
+  detectProviderMcpServer,
+  getAuthConfigForProviderMcp,
+  getProviderLinkDisplayInfo,
+} from '../services/mcp-provider-servers.ts';
+import { isProviderConfigured } from '../models/provider-credentials.ts';
 
 const log = createLogger('mcp-servers-routes');
 
@@ -75,7 +82,7 @@ const createServerSchema = z.object({
   args: z.array(z.string()).optional(),
   url: z.string().url().optional(),
   auth: z.object({
-    type: z.enum(['none', 'api_key', 'bearer_token', 'oauth2', 'env_vars']),
+    type: z.enum(['none', 'api_key', 'bearer_token', 'oauth2', 'env_vars', 'provider_link']),
     apiKey: z.string().optional(),
     bearerToken: z.string().optional(),
     oauth2: z.object({
@@ -87,6 +94,10 @@ const createServerSchema = z.object({
     }).optional(),
     envVars: z.record(z.string()).optional(),
     headers: z.record(z.string()).optional(),
+    providerLink: z.object({
+      providerId: z.string(),
+      providerName: z.string().optional(),
+    }).optional(),
   }).optional(),
   environment: z.record(z.string()).optional(),
   isPublic: z.boolean().optional(),
@@ -166,8 +177,37 @@ export const mcpServerRoutes = new Hono()
     const id = generateId();
 
     try {
-      const encryptedAuthConfig = data.auth 
-        ? await encryptAuthConfig(data.auth as McpAuthConfig)
+      let authConfig = data.auth as McpAuthConfig | undefined;
+      let providerMcpDetected = false;
+      let providerConfigured = false;
+
+      if (data.url && (data.type === 'SSE' || data.type === 'STREAMABLE_HTTP')) {
+        const detectedServer = detectProviderMcpServer(data.url);
+        if (detectedServer) {
+          providerMcpDetected = true;
+          const providerId = detectedServer.providerLink.providerId;
+          providerConfigured = await isProviderConfigured(user.id, providerId);
+          
+          if (providerConfigured) {
+            authConfig = getAuthConfigForProviderMcp(detectedServer);
+            log.info('Auto-detected provider MCP server', { 
+              url: data.url, 
+              providerId,
+              providerName: detectedServer.providerLink.providerName 
+            });
+          } else {
+            return c.json({ 
+              error: 'Provider not configured',
+              message: `This MCP server requires ${detectedServer.providerLink.providerName} authentication. Please configure ${detectedServer.providerLink.providerName} in your provider settings first.`,
+              providerRequired: providerId,
+              providerName: detectedServer.providerLink.providerName,
+            }, 400);
+          }
+        }
+      }
+
+      const encryptedAuthConfig = authConfig 
+        ? await encryptAuthConfig(authConfig)
         : { type: 'none' as const };
       
       const encryptedEnv = data.environment 
@@ -180,6 +220,15 @@ export const mcpServerRoutes = new Hono()
         const sessionCookie = getSessionToken(c);
         if (sessionCookie) {
           try {
+            let bearerToken = data.auth?.bearerToken;
+            
+            if (authConfig?.type === 'provider_link' && authConfig.providerLink?.providerId) {
+              const resolved = await resolveProviderLinkToken(user.id, authConfig.providerLink.providerId);
+              if (resolved) {
+                bearerToken = resolved.accessToken;
+              }
+            }
+
             const metamcpInput: CreateMcpServerInput = {
               name: data.name.replace(/[^a-zA-Z0-9_-]/g, '_'),
               description: data.description,
@@ -188,7 +237,7 @@ export const mcpServerRoutes = new Hono()
               args: data.args,
               url: data.url,
               env: data.environment,
-              bearerToken: data.auth?.bearerToken,
+              bearerToken,
               headers: data.auth?.headers,
             };
             const metamcpServer = await metamcpTrpcClient.createServer(sessionCookie, metamcpInput);
@@ -216,7 +265,7 @@ export const mcpServerRoutes = new Hono()
           command: data.command,
           args: data.args || [],
           url: data.url,
-          authType: data.auth?.type || 'none',
+          authType: authConfig?.type || 'none',
           authConfig: encryptedAuthConfig as unknown as Record<string, unknown>,
           environment: encryptedEnv,
           metamcpServerId,
@@ -227,7 +276,18 @@ export const mcpServerRoutes = new Hono()
 
       log.info('MCP server created', { userId: user.id, serverId: id, name: data.name, metamcpServerId });
 
-      return c.json({ server }, 201);
+      const providerLinkInfo = authConfig?.type === 'provider_link' && authConfig.providerLink
+        ? getProviderLinkDisplayInfo(authConfig.providerLink.providerId)
+        : null;
+
+      return c.json({ 
+        server,
+        providerLink: providerLinkInfo ? {
+          detected: providerMcpDetected,
+          providerId: authConfig?.providerLink?.providerId,
+          ...providerLinkInfo,
+        } : undefined,
+      }, 201);
     } catch (error) {
       log.error('Failed to create MCP server', { error });
       return c.json({ error: 'Failed to create server' }, 500);
@@ -913,6 +973,37 @@ export const mcpStatusRoutes = new Hono()
   .get('/health', async (c) => {
     const result = await checkMetaMcpHealth();
     return c.json(result);
+  })
+  
+  .post('/detect-provider', zValidator('json', z.object({
+    url: z.string().url(),
+  })), async (c) => {
+    const user = getUser(c);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const { url } = c.req.valid('json');
+    const detected = detectProviderMcpServer(url);
+    
+    if (!detected) {
+      return c.json({ 
+        isProviderMcp: false,
+      });
+    }
+
+    const providerConfigured = await isProviderConfigured(user.id, detected.providerLink.providerId);
+    const displayInfo = getProviderLinkDisplayInfo(detected.providerLink.providerId);
+
+    return c.json({
+      isProviderMcp: true,
+      providerId: detected.providerLink.providerId,
+      providerName: detected.providerLink.providerName,
+      providerConfigured,
+      displayInfo,
+      suggestedName: detected.name,
+      suggestedDescription: detected.description,
+    });
   });
 
 export const mcpPublicStatusRoutes = new Hono()

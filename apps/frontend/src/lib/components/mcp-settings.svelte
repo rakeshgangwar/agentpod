@@ -39,6 +39,7 @@
   import ShieldCheckIcon from "@lucide/svelte/icons/shield-check";
   import ShieldAlertIcon from "@lucide/svelte/icons/shield-alert";
   import LogOutIcon from "@lucide/svelte/icons/log-out";
+  import LinkIcon from "@lucide/svelte/icons/link";
 
   let servers = $state<McpServer[]>([]);
   let loading = $state(true);
@@ -351,6 +352,21 @@
     { value: "bearer_token", label: "Bearer Token" },
     { value: "env_vars", label: "Environment Variables" },
   ];
+
+  function getAuthTypeDisplay(server: McpServer): string {
+    if (server.authType === "provider_link") {
+      const providerLink = server.authConfig?.providerLink;
+      if (providerLink?.providerName) {
+        return `Linked: ${providerLink.providerName}`;
+      }
+      return "Provider Linked";
+    }
+    return server.authType;
+  }
+
+  function isProviderLinked(server: McpServer): boolean {
+    return server.authType === "provider_link";
+  }
 </script>
 
 <div class="space-y-4">
@@ -475,8 +491,16 @@
                   </span>
                 {/if}
               </div>
-              <p class="text-xs text-muted-foreground font-mono">
-                {server.type} · {server.authType}
+              <p class="text-xs text-muted-foreground font-mono flex items-center gap-1">
+                {server.type} · 
+                {#if isProviderLinked(server)}
+                  <span class="inline-flex items-center gap-0.5 text-[var(--cyber-cyan)]">
+                    <LinkIcon class="h-3 w-3" />
+                    {getAuthTypeDisplay(server)}
+                  </span>
+                {:else}
+                  {server.authType}
+                {/if}
                 {#if server.type === "STDIO" && server.command}
                   · {server.command}
                 {:else if server.url}

@@ -6,7 +6,19 @@ import { createLogger } from '../utils/logger.ts';
 
 const log = createLogger('mcp-credentials');
 
-export type McpAuthType = 'none' | 'api_key' | 'bearer_token' | 'oauth2' | 'env_vars';
+export type McpAuthType = 'none' | 'api_key' | 'bearer_token' | 'oauth2' | 'env_vars' | 'provider_link';
+
+/**
+ * Provider link configuration for MCP servers that use tokens from existing LLM providers.
+ * This allows MCP servers (like GitHub Copilot MCP) to use the same authentication
+ * as their corresponding LLM provider.
+ */
+export interface ProviderLinkConfig {
+  /** The provider ID to link to (e.g., 'github-copilot') */
+  providerId: string;
+  /** Display name for the linked provider */
+  providerName?: string;
+}
 
 export interface McpAuthConfig {
   type: McpAuthType;
@@ -24,6 +36,8 @@ export interface McpAuthConfig {
   };
   envVars?: Record<string, string>;
   headers?: Record<string, string>;
+  /** Link to an existing provider's credentials for authentication */
+  providerLink?: ProviderLinkConfig;
 }
 
 export interface EncryptedAuthConfig {

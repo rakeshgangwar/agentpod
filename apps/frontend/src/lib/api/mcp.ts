@@ -53,7 +53,12 @@ async function apiRequest<T>(
 }
 
 export type McpServerType = "STDIO" | "SSE" | "STREAMABLE_HTTP";
-export type McpAuthType = "none" | "api_key" | "bearer_token" | "oauth2" | "env_vars";
+export type McpAuthType = "none" | "api_key" | "bearer_token" | "oauth2" | "env_vars" | "provider_link";
+
+export interface ProviderLinkConfig {
+  providerId: string;
+  providerName?: string;
+}
 
 export interface McpAuthConfig {
   type: McpAuthType;
@@ -68,6 +73,7 @@ export interface McpAuthConfig {
   };
   envVars?: Record<string, string>;
   headers?: Record<string, string>;
+  providerLink?: ProviderLinkConfig;
 }
 
 export interface McpServer {
@@ -274,5 +280,42 @@ export async function getMcpOAuthStatus(serverId: string): Promise<McpOAuthStatu
 export async function revokeMcpOAuth(serverId: string): Promise<void> {
   await apiRequest<{ success: boolean }>(`/api/mcp/oauth/revoke/${serverId}`, {
     method: "DELETE",
+  });
+}
+
+export interface ProviderMcpDetectionResult {
+  isProviderMcp: boolean;
+  providerId?: string;
+  providerName?: string;
+  providerConfigured?: boolean;
+  displayInfo?: {
+    name: string;
+    authDescription: string;
+  };
+  suggestedName?: string;
+  suggestedDescription?: string;
+}
+
+export async function detectProviderMcp(url: string): Promise<ProviderMcpDetectionResult> {
+  return apiRequest<ProviderMcpDetectionResult>("/api/mcp/status/detect-provider", {
+    method: "POST",
+    body: JSON.stringify({ url }),
+  });
+}
+
+export interface CreateMcpServerResponse {
+  server: McpServer;
+  providerLink?: {
+    detected: boolean;
+    providerId?: string;
+    name: string;
+    authDescription: string;
+  };
+}
+
+export async function createMcpServerWithProviderDetection(input: CreateMcpServerInput): Promise<CreateMcpServerResponse> {
+  return apiRequest<CreateMcpServerResponse>("/api/mcp/servers", {
+    method: "POST",
+    body: JSON.stringify(input),
   });
 }
