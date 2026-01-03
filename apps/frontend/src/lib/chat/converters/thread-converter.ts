@@ -282,6 +282,7 @@ function mergeAssistantMessages(messages: InternalMessage[]): ThreadMessageLike 
   allOrderedParts.sort((a, b) => a.id.localeCompare(b.id));
   
   const seenIds = new Set<string>();
+  const seenTextContent = new Set<string>();
   for (const part of allOrderedParts) {
     if (seenIds.has(part.id)) continue;
     seenIds.add(part.id);
@@ -291,6 +292,9 @@ function mergeAssistantMessages(messages: InternalMessage[]): ThreadMessageLike 
         content.push({ type: "reasoning", text: part.text });
         break;
       case "text":
+        // Skip duplicate text content
+        if (seenTextContent.has(part.text)) continue;
+        seenTextContent.add(part.text);
         content.push({ type: "text", text: part.text });
         break;
       case "tool-call":

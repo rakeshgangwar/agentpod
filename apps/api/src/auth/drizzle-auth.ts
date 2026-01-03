@@ -267,8 +267,8 @@ export const auth = betterAuth({
   advanced: {
     // Use secure cookies in production
     useSecureCookies: config.nodeEnv === "production",
-    // Cookie prefix
-    cookiePrefix: "agentpod",
+    // Cookie prefix - use 'better-auth' to match MetaMCP for SSO compatibility
+    cookiePrefix: "better-auth",
     // Generate unique session IDs
     generateId: () => crypto.randomUUID(),
   },

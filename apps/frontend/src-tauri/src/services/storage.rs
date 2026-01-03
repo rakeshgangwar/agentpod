@@ -5,10 +5,10 @@
 //! with a fallback to file storage if keyring is unavailable.
 
 use crate::models::{AppError, ConnectionConfig};
+use crate::services::environment;
 use std::fs;
 use std::path::PathBuf;
 
-const SERVICE_NAME: &str = "agentpod";
 const CONFIG_KEY: &str = "connection_config";
 
 /// Storage service for managing connection configuration
@@ -20,7 +20,7 @@ impl StorageService {
         let config_dir = dirs::config_dir()
             .ok_or_else(|| AppError::StorageError("Could not find config directory".to_string()))?;
 
-        let app_config_dir = config_dir.join("agentpod");
+        let app_config_dir = config_dir.join(environment::get_app_name());
         if !app_config_dir.exists() {
             fs::create_dir_all(&app_config_dir).map_err(|e| {
                 AppError::StorageError(format!("Failed to create config dir: {}", e))
@@ -40,7 +40,7 @@ impl StorageService {
             .map_err(|e| AppError::StorageError(format!("Failed to write config file: {}", e)))?;
 
         // Also try to save to keyring (for better security on supported systems)
-        if let Ok(entry) = keyring::Entry::new(SERVICE_NAME, CONFIG_KEY) {
+        if let Ok(entry) = keyring::Entry::new(environment::get_service_name(), CONFIG_KEY) {
             let _ = entry.set_password(&json);
         }
 
@@ -61,7 +61,7 @@ impl StorageService {
         }
 
         // Fallback to keyring
-        if let Ok(entry) = keyring::Entry::new(SERVICE_NAME, CONFIG_KEY) {
+        if let Ok(entry) = keyring::Entry::new(environment::get_service_name(), CONFIG_KEY) {
             if let Ok(json) = entry.get_password() {
                 let config: ConnectionConfig = serde_json::from_str(&json)?;
                 return Ok(Some(config));
@@ -74,7 +74,7 @@ impl StorageService {
     /// Delete connection config from both keyring and file storage
     pub fn delete_config() -> Result<(), AppError> {
         // Try to delete from keyring
-        if let Ok(entry) = keyring::Entry::new(SERVICE_NAME, CONFIG_KEY) {
+        if let Ok(entry) = keyring::Entry::new(environment::get_service_name(), CONFIG_KEY) {
             let _ = entry.delete_credential();
         }
 
@@ -96,7 +96,7 @@ impl StorageService {
         }
 
         // Check keyring
-        if let Ok(entry) = keyring::Entry::new(SERVICE_NAME, CONFIG_KEY) {
+        if let Ok(entry) = keyring::Entry::new(environment::get_service_name(), CONFIG_KEY) {
             if entry.get_password().is_ok() {
                 return true;
             }

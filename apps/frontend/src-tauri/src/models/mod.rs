@@ -4,12 +4,14 @@
 pub mod error;
 pub mod onboarding;
 pub mod opencode;
+pub mod session_fork;
 pub mod settings;
 
 pub use error::AppError;
 pub use onboarding::*;
 pub use opencode::*;
 use serde::{Deserialize, Serialize};
+pub use session_fork::*;
 pub use settings::*;
 
 /// Connection configuration stored securely

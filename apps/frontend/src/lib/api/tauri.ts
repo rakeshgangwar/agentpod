@@ -1853,3 +1853,157 @@ export async function onTerminalStatus(
     callback(event.payload);
   });
 }
+
+// =============================================================================
+// Session Fork Types
+// =============================================================================
+
+export type ForkType = "explicit" | "auto-edit" | "auto-regenerate";
+export type ForkCreator = "user" | "system";
+
+export interface SessionForkMetadata {
+  reason?: string;
+  agentConfig?: Record<string, unknown>;
+  mergedInto?: string;
+  originalTitle?: string;
+}
+
+export interface SessionFork {
+  id: string;
+  parentSessionId?: string;
+  forkedAtMessageId?: string;
+  forkType: ForkType;
+  createdAt: string;
+  createdBy: ForkCreator;
+  tags: string[];
+  metadata?: SessionForkMetadata;
+}
+
+export interface SessionBranch {
+  sessionId: string;
+  branchId: string;
+  messageId: string;
+  branchNumber: number;
+  parentBranchId?: string;
+  isCurrent: boolean;
+  createdAt: string;
+}
+
+export interface ListForksResponse {
+  forks: SessionFork[];
+  rootSessions: string[];
+}
+
+export interface ForkTypeStats {
+  explicit: number;
+  autoEdit: number;
+  autoRegenerate: number;
+}
+
+export interface TagCount {
+  tag: string;
+  count: number;
+}
+
+export interface ForkStatistics {
+  totalSessions: number;
+  rootSessions: number;
+  forkedSessions: number;
+  maxDepth: number;
+  byType: ForkTypeStats;
+  topTags: TagCount[];
+}
+
+export interface BranchesResponse {
+  branches: SessionBranch[];
+  currentBranch?: SessionBranch;
+}
+
+export interface ForkInfoResponse {
+  fork: SessionFork;
+  ancestry: string[];
+  childCount: number;
+  depth: number;
+}
+
+// =============================================================================
+// Session Fork Commands
+// =============================================================================
+
+export async function listSessionForks(sandboxId: string): Promise<ListForksResponse> {
+  return invoke<ListForksResponse>("list_session_forks", { sandboxId });
+}
+
+export async function getForkStatistics(sandboxId: string): Promise<ForkStatistics> {
+  return invoke<ForkStatistics>("get_fork_statistics", { sandboxId });
+}
+
+export async function createSessionFork(
+  sandboxId: string,
+  sessionId: string,
+  messageId?: string,
+  messageRole?: 'user' | 'assistant',
+  reason?: string,
+  tags?: string[]
+): Promise<SessionFork> {
+  return invoke<SessionFork>("create_session_fork", {
+    sandboxId,
+    sessionId,
+    messageId,
+    messageRole,
+    reason,
+    tags,
+  });
+}
+
+export async function getSessionAncestry(
+  sandboxId: string,
+  sessionId: string
+): Promise<string[]> {
+  return invoke<string[]>("get_session_ancestry", { sandboxId, sessionId });
+}
+
+export async function getSessionChildren(
+  sandboxId: string,
+  sessionId: string
+): Promise<SessionFork[]> {
+  return invoke<SessionFork[]>("get_session_children", { sandboxId, sessionId });
+}
+
+export async function getSessionBranches(
+  sandboxId: string,
+  sessionId: string
+): Promise<BranchesResponse> {
+  return invoke<BranchesResponse>("get_session_branches", { sandboxId, sessionId });
+}
+
+export async function addSessionTag(
+  sandboxId: string,
+  sessionId: string,
+  tag: string
+): Promise<string[]> {
+  return invoke<string[]>("add_session_tag", { sandboxId, sessionId, tag });
+}
+
+export async function removeSessionTag(
+  sandboxId: string,
+  sessionId: string,
+  tag: string
+): Promise<string[]> {
+  return invoke<string[]>("remove_session_tag", { sandboxId, sessionId, tag });
+}
+
+export async function setSessionTags(
+  sandboxId: string,
+  sessionId: string,
+  tags: string[]
+): Promise<string[]> {
+  return invoke<string[]>("set_session_tags", { sandboxId, sessionId, tags });
+}
+
+export async function getSessionForkInfo(
+  sandboxId: string,
+  sessionId: string
+): Promise<ForkInfoResponse> {
+  return invoke<ForkInfoResponse>("get_session_fork_info", { sandboxId, sessionId });
+}

@@ -12,6 +12,7 @@ pub mod services;
 pub mod voice;
 
 use commands::{
+    add_session_tag,
     apply_onboarding_config,
     auth_get_status,
     auth_get_token,
@@ -32,6 +33,7 @@ use commands::{
     create_onboarding_session,
     create_sandbox,
     create_sandbox_branch,
+    create_session_fork,
     delete_sandbox,
     delete_sandbox_branch,
     delete_sandbox_preview_port,
@@ -51,6 +53,7 @@ use commands::{
     get_docker_info,
     // Docker image management commands
     get_flavor_images,
+    get_fork_statistics,
     // Onboarding commands
     get_onboarding_session,
     get_onboarding_session_by_id,
@@ -63,6 +66,10 @@ use commands::{
     get_sandbox_preview_ports,
     get_sandbox_stats,
     get_sandbox_status,
+    get_session_ancestry,
+    get_session_branches,
+    get_session_children,
+    get_session_fork_info,
     // Settings commands
     get_settings,
     // User OpenCode config commands
@@ -85,12 +92,14 @@ use commands::{
     // Git branch and diff commands
     list_sandbox_branches,
     list_sandboxes,
+    list_session_forks,
     list_user_opencode_files,
     pause_sandbox,
     poll_oauth_flow,
     pull_image_sync,
     register_sandbox_preview_port,
     remove_provider_credentials,
+    remove_session_tag,
     reset_onboarding,
     restart_sandbox,
     sandbox_opencode_abort_session,
@@ -116,6 +125,7 @@ use commands::{
     sandbox_opencode_unrevert_session,
     save_settings,
     set_default_provider,
+    set_session_tags,
     share_sandbox_preview_port,
     skip_onboarding,
     start_onboarding,
@@ -279,6 +289,17 @@ pub fn run() {
             sandbox_opencode_revert_message,
             sandbox_opencode_unrevert_session,
             sandbox_opencode_list_messages,
+            // Session fork commands
+            list_session_forks,
+            get_fork_statistics,
+            create_session_fork,
+            get_session_ancestry,
+            get_session_children,
+            get_session_branches,
+            add_session_tag,
+            remove_session_tag,
+            set_session_tags,
+            get_session_fork_info,
             sandbox_opencode_send_message,
             sandbox_opencode_get_message,
             sandbox_opencode_list_files,

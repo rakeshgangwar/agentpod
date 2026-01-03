@@ -31,8 +31,12 @@ const LEGACY_THEME_PRESET_KEY = "codeopen-theme-preset";
 // Types
 // =============================================================================
 
-export type ThemeMode = "light" | "dark" | "system";
+export type ThemeMode = "light" | "dark" | "system" | "auto";
 export type ResolvedMode = "light" | "dark";
+
+// Auto mode schedule (when to switch to dark mode)
+const AUTO_DARK_START_HOUR = 18; // 6 PM
+const AUTO_DARK_END_HOUR = 6;    // 6 AM
 
 // =============================================================================
 // State
@@ -67,7 +71,7 @@ function initialize() {
     migrateFromLegacyPreset(legacyPreset);
   }
 
-  if (savedMode && ["light", "dark", "system"].includes(savedMode)) {
+  if (savedMode && ["light", "dark", "system", "auto"].includes(savedMode)) {
     themeMode = savedMode;
   }
 
@@ -87,14 +91,13 @@ function initialize() {
     }
   }
 
-  // Resolve system preference
   updateResolvedMode();
 
-  // Listen for system preference changes
   const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
   mediaQuery.addEventListener("change", updateResolvedMode);
 
-  // Apply initial theme
+  startAutoModeTimer();
+
   applyTheme();
 }
 
@@ -154,6 +157,13 @@ function mapPresetToFontPairing(preset: ThemePreset): string | null {
 // Mode Resolution
 // =============================================================================
 
+let autoModeInterval: ReturnType<typeof setInterval> | null = null;
+
+function shouldBeDarkByTime(): boolean {
+  const hour = new Date().getHours();
+  return hour >= AUTO_DARK_START_HOUR || hour < AUTO_DARK_END_HOUR;
+}
+
 function updateResolvedMode() {
   if (typeof window === "undefined") return;
 
@@ -161,16 +171,32 @@ function updateResolvedMode() {
 
   if (themeMode === "system") {
     resolvedMode = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  } else if (themeMode === "auto") {
+    resolvedMode = shouldBeDarkByTime() ? "dark" : "light";
   } else {
     resolvedMode = themeMode as ResolvedMode;
   }
 
-  // Update document class
   document.documentElement.classList.toggle("dark", resolvedMode === "dark");
 
-  // Re-apply theme colors if mode changed (light/dark have different color values)
   if (previousMode !== resolvedMode) {
     applyTheme();
+  }
+}
+
+function startAutoModeTimer() {
+  stopAutoModeTimer();
+  if (themeMode === "auto") {
+    autoModeInterval = setInterval(() => {
+      updateResolvedMode();
+    }, 60000); // Check every minute
+  }
+}
+
+function stopAutoModeTimer() {
+  if (autoModeInterval) {
+    clearInterval(autoModeInterval);
+    autoModeInterval = null;
   }
 }
 
@@ -379,11 +405,17 @@ export const themeStore = {
     return customThemes;
   },
 
-  /** Get current Shiki themes based on color scheme */
   get shikiThemes() {
     const scheme = currentColorScheme;
     if (!scheme) return { light: "github-light" as const, dark: "github-dark" as const };
     return scheme.shikiThemes;
+  },
+
+  get autoSchedule() {
+    return {
+      darkStartHour: AUTO_DARK_START_HOUR,
+      darkEndHour: AUTO_DARK_END_HOUR,
+    };
   },
 
   // Legacy compatibility - returns a "virtual" preset
@@ -412,6 +444,7 @@ export const themeStore = {
     localStorage.setItem(THEME_MODE_KEY, mode);
     updateResolvedMode();
     applyTheme();
+    startAutoModeTimer();
   },
 
   setColorScheme(id: string) {

@@ -16,6 +16,7 @@
   import SunIcon from "@lucide/svelte/icons/sun";
   import MoonIcon from "@lucide/svelte/icons/moon";
   import MonitorIcon from "@lucide/svelte/icons/monitor";
+  import SunsetIcon from "@lucide/svelte/icons/sunset";
   import SaveIcon from "@lucide/svelte/icons/save";
   import Trash2Icon from "@lucide/svelte/icons/trash-2";
   import type { ColorSchemeCategory, FontPairingCategory } from "$lib/themes/presets/types";
@@ -40,11 +41,11 @@
       : fontPairings.filter((fp) => fp.category === selectedFontCategory)
   );
 
-  // Mode options
   const modeOptions: { value: ThemeMode; label: string; icon: typeof SunIcon }[] = [
     { value: "light", label: "Light", icon: SunIcon },
     { value: "dark", label: "Dark", icon: MoonIcon },
     { value: "system", label: "System", icon: MonitorIcon },
+    { value: "auto", label: "Auto", icon: SunsetIcon },
   ];
 
   function handleModeChange(mode: ThemeMode) {
@@ -88,7 +89,7 @@
   <!-- Mode Selector -->
   <div class="space-y-3">
     <Label class="text-xs font-mono uppercase tracking-wider text-[var(--cyber-cyan)]">Color Mode</Label>
-    <div class="grid grid-cols-3 gap-2">
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
       {#each modeOptions as option}
         <button
           type="button"
@@ -106,6 +107,8 @@
     <p class="text-xs text-muted-foreground font-mono">
       {#if themeStore.mode === "system"}
         Following your system preference ({themeStore.resolvedMode})
+      {:else if themeStore.mode === "auto"}
+        Dark mode {themeStore.autoSchedule.darkStartHour}:00–{themeStore.autoSchedule.darkEndHour}:00 ({themeStore.resolvedMode} now)
       {:else}
         Using {themeStore.mode} mode
       {/if}

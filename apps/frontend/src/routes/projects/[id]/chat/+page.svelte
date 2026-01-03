@@ -13,7 +13,13 @@
   import ModelAgentSheet from "$lib/components/model-agent-sheet.svelte";
   import OnboardingBanner from "$lib/components/onboarding-banner.svelte";
   import SandboxNotRunning from "$lib/components/sandbox-not-running.svelte";
-  import { X, Menu, RefreshCw, CornerDownRight, MessageSquare } from "@lucide/svelte";
+  import { X, Menu, RefreshCw, CornerDownRight, MessageSquare, GitFork } from "@lucide/svelte";
+  import { ForkSessionDialog, ForkIndicator, SessionForkTree } from "$lib/components/session-forks";
+  import {
+    setActiveSandbox,
+    fetchForks,
+    sessionForksStore,
+  } from "$lib/stores/session-forks.svelte";
   import WakewordToggle from "$lib/components/wakeword-toggle.svelte";
   import { sandboxes } from "$lib/stores/sandboxes.svelte";
 import {
@@ -229,16 +235,18 @@ import {
     }
   }
 
-  // Load sessions, onboarding status, agents, and providers when project changes
+  // Load sessions, onboarding status, agents, providers, and forks when project changes
   $effect(() => {
     if (projectId) {
       onboardingBannerDismissed = false;
+      setActiveSandbox(projectId);
 
       untrack(() => {
         loadSessions();
         loadAgents();
         loadProviders();
         fetchOnboardingSession(projectId);
+        fetchForks(projectId);
       });
     }
   });
@@ -631,6 +639,40 @@ import {
   // Mobile sidebar sheet state (replaces simple collapse toggle)
   let mobileSidebarOpen = $state(false);
 
+  // Fork dialog state
+  let forkDialogOpen = $state(false);
+  let forkDialogSessionId = $state<string | null>(null);
+  let forkDialogSessionTitle = $state<string | undefined>(undefined);
+  let forkDialogMessageId = $state<string | undefined>(undefined);
+  let forkDialogMessageRole = $state<'user' | 'assistant' | undefined>(undefined);
+  
+  // Fork tree sidebar collapse state
+  let forkTreeOpen = $state(false);
+
+  function handleForkCreated(forkId: string) {
+    // Select the new fork and reload sessions
+    selectedSessionId = forkId;
+    loadSessions();
+    fetchForks(projectId); // Refresh fork data
+  }
+
+  // Get fork child count for a session (how many sessions forked from this one)
+  function getSessionForkChildCount(sessionId: string): number {
+    return sessionForksStore.forks.filter(f => f.parentSessionId === sessionId).length;
+  }
+
+  // Handle fork request from message action bar in ChatThread
+  // For user messages: fork BEFORE that message (regenerate scenario)
+  // For assistant messages: fork AFTER that message (continue scenario) - handled by API
+  function handleForkFromMessage(messageId: string, messageRole: 'user' | 'assistant') {
+    if (!selectedSessionId) return;
+    forkDialogSessionId = selectedSessionId;
+    forkDialogSessionTitle = selectedSession ? getSessionTitle(selectedSession) : undefined;
+    forkDialogMessageId = messageId;
+    forkDialogMessageRole = messageRole;
+    forkDialogOpen = true;
+  }
+
   // Close mobile sidebar when a session is selected
   function selectSessionAndCloseMobile(sessionId: string) {
     selectedSessionId = sessionId;
@@ -768,6 +810,11 @@ import {
                             {#if hasUnreadMessages(session.id, session.time?.updated) && selectedSessionId !== session.id}
                               <span class="w-1.5 h-1.5 rounded-full bg-[var(--cyber-cyan)] flex-shrink-0" title="Unread messages"></span>
                             {/if}
+                            <ForkIndicator 
+                              fork={sessionForksStore.getFork(session.id)} 
+                              childCount={getSessionForkChildCount(session.id)}
+                              compact={true}
+                            />
                           </div>
                           <div class="text-xs font-mono text-muted-foreground mt-0.5">
                             {formatDate(session.time?.updated || session.time?.created)}
@@ -797,6 +844,11 @@ import {
                               {#if hasUnreadMessages(childSession.id, childSession.time?.updated) && selectedSessionId !== childSession.id}
                                 <span class="w-1.5 h-1.5 rounded-full bg-[var(--cyber-cyan)] flex-shrink-0" title="Unread messages"></span>
                               {/if}
+                              <ForkIndicator 
+                                fork={sessionForksStore.getFork(childSession.id)} 
+                                childCount={getSessionForkChildCount(childSession.id)}
+                                compact={true}
+                              />
                             </div>
                             <div class="text-xs font-mono text-muted-foreground">
                               {formatDate(childSession.time?.updated || childSession.time?.created)}
@@ -911,23 +963,40 @@ import {
                           {#if hasUnreadMessages(session.id, session.time?.updated) && selectedSessionId !== session.id}
                             <span class="w-1.5 h-1.5 rounded-full bg-[var(--cyber-cyan)] flex-shrink-0" title="Unread messages"></span>
                           {/if}
+                          <ForkIndicator 
+                            fork={sessionForksStore.getFork(session.id)} 
+                            childCount={getSessionForkChildCount(session.id)}
+                            compact={true}
+                          />
                         </div>
                         <div class="text-xs font-mono truncate text-muted-foreground mt-0.5">
                           {formatDate(session.time?.updated || session.time?.created)}
                         </div>
                       </div>
-                      <button
-                        class="opacity-0 group-hover:opacity-100 p-1 rounded text-xs
-                               text-muted-foreground hover:text-destructive hover:bg-destructive/10
-                               transition-all"
-                        onclick={(e) => {
-                          e.stopPropagation();
-                          deleteSession(session.id);
-                        }}
-                        title="Delete session"
-                      >
-                        <X class="h-3 w-3" />
-                      </button>
+                      <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+                        <button
+                          class="p-1 rounded text-xs text-muted-foreground hover:text-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/10 transition-all"
+                          onclick={(e) => {
+                            e.stopPropagation();
+                            forkDialogSessionId = session.id;
+                            forkDialogSessionTitle = getSessionTitle(session);
+                            forkDialogOpen = true;
+                          }}
+                          title="Fork session"
+                        >
+                          <GitFork class="h-3 w-3" />
+                        </button>
+                        <button
+                          class="p-1 rounded text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
+                          onclick={(e) => {
+                            e.stopPropagation();
+                            deleteSession(session.id);
+                          }}
+                          title="Delete session"
+                        >
+                          <X class="h-3 w-3" />
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -958,23 +1027,40 @@ import {
                                 {#if hasUnreadMessages(childSession.id, childSession.time?.updated) && selectedSessionId !== childSession.id}
                                   <span class="w-1.5 h-1.5 rounded-full bg-[var(--cyber-cyan)] flex-shrink-0" title="Unread messages"></span>
                                 {/if}
+                                <ForkIndicator 
+                                  fork={sessionForksStore.getFork(childSession.id)} 
+                                  childCount={getSessionForkChildCount(childSession.id)}
+                                  compact={true}
+                                />
                               </div>
                               <div class="text-xs font-mono truncate text-muted-foreground">
                                 {formatDate(childSession.time?.updated || childSession.time?.created)}
                               </div>
                             </div>
-                            <button
-                              class="opacity-0 group-hover:opacity-100 p-1 rounded text-xs
-                                     text-muted-foreground hover:text-destructive hover:bg-destructive/10
-                                     transition-all"
-                              onclick={(e) => {
-                                e.stopPropagation();
-                                deleteSession(childSession.id);
-                              }}
-                              title="Delete session"
-                            >
-                              <X class="h-3 w-3" />
-                            </button>
+                            <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+                              <button
+                                class="p-1 rounded text-xs text-muted-foreground hover:text-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/10 transition-all"
+                                onclick={(e) => {
+                                  e.stopPropagation();
+                                  forkDialogSessionId = childSession.id;
+                                  forkDialogSessionTitle = getSessionTitle(childSession);
+                                  forkDialogOpen = true;
+                                }}
+                                title="Fork session"
+                              >
+                                <GitFork class="h-3 w-3" />
+                              </button>
+                              <button
+                                class="p-1 rounded text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
+                                onclick={(e) => {
+                                  e.stopPropagation();
+                                  deleteSession(childSession.id);
+                                }}
+                                title="Delete session"
+                              >
+                                <X class="h-3 w-3" />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       {/each}
@@ -985,6 +1071,33 @@ import {
             </div>
           {/if}
         </div>
+
+        {#if sessionForksStore.hasForks}
+          <div class="border-t border-border/30">
+            <button
+              class="w-full p-2 flex items-center justify-between text-xs font-mono uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+              onclick={() => forkTreeOpen = !forkTreeOpen}
+            >
+              <span class="flex items-center gap-2">
+                <GitFork class="h-3 w-3" />
+                Fork Tree ({sessionForksStore.forkCount})
+              </span>
+              <span class="text-[10px] transition-transform {forkTreeOpen ? 'rotate-90' : ''}">▶</span>
+            </button>
+            {#if forkTreeOpen}
+              <div class="px-4 py-2 max-h-48 overflow-y-auto scrollbar-thin">
+                {#each sessionForksStore.rootSessions as rootId}
+                  <SessionForkTree
+                    sandboxId={projectId}
+                    sessionId={rootId}
+                    currentSessionId={selectedSessionId ?? undefined}
+                    onSelectSession={(id) => selectedSessionId = id}
+                  />
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/if}
 
         <!-- Sidebar Footer (Desktop) -->
         <div class="p-2 border-t border-border/30">
@@ -1092,6 +1205,7 @@ import {
                   {agents}
                   currentAgent={selectedAgent}
                   onAgentSelect={(name: string | undefined) => { selectedAgent = name; }}
+                  onForkRequest={handleForkFromMessage}
                 />
               </react.RuntimeProvider>
             {/key}
@@ -1130,3 +1244,25 @@ import {
   onOpenChange={(open) => (filePickerOpen = open)}
   onSelect={handleFileSelect}
 />
+
+<!-- Fork Session Dialog -->
+{#if forkDialogSessionId}
+  <ForkSessionDialog
+    sandboxId={projectId}
+    sessionId={forkDialogSessionId}
+    sessionTitle={forkDialogSessionTitle}
+    messageId={forkDialogMessageId}
+    messageRole={forkDialogMessageRole}
+    open={forkDialogOpen}
+    onOpenChange={(open) => {
+      forkDialogOpen = open;
+      if (!open) {
+        forkDialogSessionId = null;
+        forkDialogSessionTitle = undefined;
+        forkDialogMessageId = undefined;
+        forkDialogMessageRole = undefined;
+      }
+    }}
+    onForkCreated={handleForkCreated}
+  />
+{/if}

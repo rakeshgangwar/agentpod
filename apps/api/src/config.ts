@@ -147,6 +147,20 @@ export const config = {
     autoSelect: getEnvBool('AUTO_SELECT_PROVIDER', false),
   },
 
+  metamcp: {
+    // Internal URL for MetaMCP (used for tRPC/auth calls from API container)
+    // Port 12008 is the Next.js frontend which proxies auth + tRPC
+    url: getEnv('METAMCP_URL', 'http://metamcp:12008'),
+    // Public URL for MetaMCP (external access via Traefik)
+    publicUrl: getEnv('METAMCP_PUBLIC_URL', 'http://metamcp.localhost'),
+    enabled: getEnvBool('METAMCP_ENABLED', true),
+    // Service account for tRPC sync
+    serviceAccount: {
+      email: getEnv('METAMCP_SERVICE_EMAIL', 'agentpod-service@agentpod.local'),
+      password: getEnv('METAMCP_SERVICE_PASSWORD', 'agentpod-service-secret-2026'),
+    },
+  },
+
   // Database
   database: {
     path: getEnv('DATABASE_PATH', './data/database.sqlite'),

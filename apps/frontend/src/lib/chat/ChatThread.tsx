@@ -124,6 +124,27 @@ function RefreshIcon({ className }: { className?: string }) {
   );
 }
 
+function ForkIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`w-4 h-4 text-muted-foreground ${className || ""}`}
+    >
+      <circle cx="12" cy="18" r="3" />
+      <circle cx="6" cy="6" r="3" />
+      <circle cx="18" cy="6" r="3" />
+      <path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9" />
+      <path d="M12 12v3" />
+    </svg>
+  );
+}
+
 /**
  * Child session info for matching task tools to their spawned sessions
  */
@@ -140,6 +161,8 @@ interface SessionNavigationContextValue {
   onSessionSelect?: (sessionId: string) => void;
   /** Child sessions of the current session, used to match task tool calls to their spawned sessions */
   childSessions?: ChildSessionInfo[];
+  /** Callback to request forking from a specific message */
+  onForkRequest?: (messageId: string, messageRole: 'user' | 'assistant') => void;
 }
 
 const SessionNavigationContext = createContext<SessionNavigationContextValue>({});
@@ -462,6 +485,7 @@ const ToolGroup = memo<PropsWithChildren<{ startIndex: number; endIndex: number 
 });
 
 const UserMessage = memo(function UserMessage() {
+  const { onForkRequest } = useContext(SessionNavigationContext);
   const message = useMessage();
   
   // Extract custom file attachments from message content (we add these via ThreadMessageLike)
@@ -529,6 +553,16 @@ const UserMessage = memo(function UserMessage() {
           <CopyIcon className="group-data-[copied]/copy:hidden" />
           <CheckIcon className="hidden group-data-[copied]/copy:block text-[var(--cyber-emerald)]" />
         </ActionBarPrimitive.Copy>
+        {onForkRequest && (
+          <button
+            type="button"
+            className="p-1.5 rounded hover:bg-[var(--cyber-cyan)]/10 hover:text-[var(--cyber-cyan)] transition-colors"
+            title="Fork from this message"
+            onClick={() => onForkRequest(message.id, 'user')}
+          >
+            <ForkIcon />
+          </button>
+        )}
       </ActionBarPrimitive.Root>
     </MessagePrimitive.Root>
   );
@@ -633,7 +667,7 @@ const MessageMetadataFooter = memo(function MessageMetadataFooter({ message }: {
 });
 
 const AssistantMessage = memo(function AssistantMessage() {
-  const { onSessionSelect } = useContext(SessionNavigationContext);
+  const { onSessionSelect, onForkRequest } = useContext(SessionNavigationContext);
   const message = useMessage();
   
   // Cast message to our thread message state type for helper functions
@@ -717,6 +751,16 @@ const AssistantMessage = memo(function AssistantMessage() {
           <CopyIcon className="group-data-[copied]/copy:hidden" />
           <CheckIcon className="hidden group-data-[copied]/copy:block text-[var(--cyber-emerald)]" />
         </ActionBarPrimitive.Copy>
+        {onForkRequest && (
+          <button
+            type="button"
+            className="p-1.5 rounded hover:bg-[var(--cyber-cyan)]/10 hover:text-[var(--cyber-cyan)] transition-colors"
+            title="Fork from this message"
+            onClick={() => onForkRequest(message.id, 'assistant')}
+          >
+            <ForkIcon />
+          </button>
+        )}
       </ActionBarPrimitive.Root>
     </MessagePrimitive.Root>
   );
@@ -1391,6 +1435,7 @@ export interface ChatThreadProps {
   agents?: MentionAgent[];
   currentAgent?: string;
   onAgentSelect?: (agentName: string | undefined) => void;
+  onForkRequest?: (messageId: string, messageRole: 'user' | 'assistant') => void;
 }
 
 export function ChatThread({ 
@@ -1404,9 +1449,10 @@ export function ChatThread({
   agents = [],
   currentAgent,
   onAgentSelect,
+  onForkRequest,
 }: ChatThreadProps) {
   // Memoize the context value to prevent unnecessary re-renders
-  const sessionNavigationValue = useMemo(() => ({ onSessionSelect, childSessions }), [onSessionSelect, childSessions]);
+  const sessionNavigationValue = useMemo(() => ({ onSessionSelect, childSessions, onForkRequest }), [onSessionSelect, childSessions, onForkRequest]);
   
   return (
     <SessionNavigationContext.Provider value={sessionNavigationValue}>

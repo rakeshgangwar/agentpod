@@ -5,6 +5,7 @@
 //! and used for API calls from the Rust backend.
 
 use crate::models::AppError;
+use crate::services::environment;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -47,7 +48,6 @@ pub struct AuthStatus {
 // Auth Service
 // =============================================================================
 
-const SERVICE_NAME: &str = "agentpod";
 const AUTH_KEY: &str = "session_token";
 
 /// Authentication service for Better Auth
@@ -63,7 +63,7 @@ impl AuthService {
         let config_dir = dirs::config_dir()
             .ok_or_else(|| AppError::StorageError("Could not find config directory".to_string()))?;
 
-        let app_config_dir = config_dir.join("agentpod");
+        let app_config_dir = config_dir.join(environment::get_app_name());
         if !app_config_dir.exists() {
             fs::create_dir_all(&app_config_dir).map_err(|e| {
                 AppError::StorageError(format!("Failed to create config dir: {}", e))
@@ -83,7 +83,7 @@ impl AuthService {
             .map_err(|e| AppError::StorageError(format!("Failed to write session file: {}", e)))?;
 
         // Also try keyring for extra security
-        if let Ok(entry) = keyring::Entry::new(SERVICE_NAME, AUTH_KEY) {
+        if let Ok(entry) = keyring::Entry::new(environment::get_service_name(), AUTH_KEY) {
             let _ = entry.set_password(&json);
         }
 
@@ -105,7 +105,7 @@ impl AuthService {
         }
 
         // Fallback to keyring
-        if let Ok(entry) = keyring::Entry::new(SERVICE_NAME, AUTH_KEY) {
+        if let Ok(entry) = keyring::Entry::new(environment::get_service_name(), AUTH_KEY) {
             if let Ok(json) = entry.get_password() {
                 let data: SessionData = serde_json::from_str(&json)?;
                 return Ok(Some(data));
@@ -118,7 +118,7 @@ impl AuthService {
     /// Delete session data (logout)
     pub fn delete_session() -> Result<(), AppError> {
         // Delete from keyring
-        if let Ok(entry) = keyring::Entry::new(SERVICE_NAME, AUTH_KEY) {
+        if let Ok(entry) = keyring::Entry::new(environment::get_service_name(), AUTH_KEY) {
             let _ = entry.delete_credential();
         }
 

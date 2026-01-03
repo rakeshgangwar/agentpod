@@ -23,6 +23,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { getSandboxManager } from "../services/sandbox-manager.ts";
 import { opencodeV2, OpenCodeV2Error, cachePermission, uncachePermission } from "../services/opencode-v2.ts";
+import { sessionForkManager } from "../services/session-fork-manager.ts";
 import type { Permission } from "../services/opencode-v2.ts";
 import { createLogger } from "../utils/logger.ts";
 import { getFlavorById, getDefaultFlavor } from "../models/container-flavor.ts";
@@ -952,6 +953,7 @@ export const sandboxRoutes = new Hono()
 
     try {
       await opencodeV2.deleteSession(id, sessionId);
+      await sessionForkManager.deleteFork(sessionId);
       return c.json({ success: true });
     } catch (error) {
       return handleOpenCodeError(c, error, "Failed to delete OpenCode session");
