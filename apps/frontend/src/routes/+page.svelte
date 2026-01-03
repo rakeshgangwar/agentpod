@@ -136,47 +136,164 @@
       .slice(0, 5)
   );
 
-  // Build ticker items - mix of tips and contextual info
+  // =============================================================================
+  // Ticker Helpers
+  // =============================================================================
+  
+  function getTimeBasedMessage(): string {
+    const hour = new Date().getHours();
+    
+    if (hour >= 6 && hour < 12) {
+      const messages = [
+        "☀️ Good morning! Your AI coding assistants are ready",
+        "☕ Rise and code! All systems operational",
+        "🌅 Fresh start — what will you build today?",
+      ];
+      return messages[Math.floor(Math.random() * messages.length)];
+    } else if (hour >= 12 && hour < 18) {
+      const messages = [
+        "⚡ Afternoon productivity mode — keep building!",
+        "🚀 You're on a roll! AI is here to help",
+        "💪 Peak coding hours — let's ship some features",
+      ];
+      return messages[Math.floor(Math.random() * messages.length)];
+    } else if (hour >= 18 && hour < 24) {
+      const messages = [
+        "🌙 Evening session — your AI is here to help",
+        "✨ Winding down? Don't forget to commit your work",
+        "🌆 Evening productivity unlocked",
+      ];
+      return messages[Math.floor(Math.random() * messages.length)];
+    } else {
+      const messages = [
+        "🦉 Late night coding detected — impressive dedication!",
+        "🌌 Night owl mode activated — AI doesn't need sleep",
+        "💡 Burning the midnight oil? You've got this!",
+      ];
+      return messages[Math.floor(Math.random() * messages.length)];
+    }
+  }
+
+  // Build ticker items - dynamic activity feed with contextual info
   let tickerItems = $derived(() => {
     const items: string[] = [];
     
-    // Static tips
+    // =============================================================================
+    // REAL-TIME ACTIVITY (Highest Priority)
+    // =============================================================================
+    
+    // Active AI sessions with project names
+    for (const sandbox of activeSandboxes.slice(0, 2)) {
+      items.push(`🤖 AI actively coding in "${sandbox.name}"`);
+    }
+    
+    // Completed sessions needing review
+    const unseenCount = unseenIds.size;
+    if (unseenCount > 0) {
+      items.push(`✅ ${unseenCount} project${unseenCount > 1 ? 's' : ''} completed — ready for review`);
+    }
+    
+    // =============================================================================
+    // CONTAINER STATUS (Transitional States)
+    // =============================================================================
+    
+    const startingCount = sandboxes.list.filter(s => s.status === "starting").length;
+    const stoppingCount = sandboxes.list.filter(s => s.status === "stopping").length;
+    const sleepingCount = sandboxes.list.filter(s => s.status === "sleeping").length;
+    
+    if (startingCount > 0) {
+      items.push(`⏳ ${startingCount} container${startingCount > 1 ? 's are' : ' is'} starting up...`);
+    }
+    
+    if (stoppingCount > 0) {
+      items.push(`⏹️ ${stoppingCount} container${stoppingCount > 1 ? 's are' : ' is'} shutting down...`);
+    }
+    
+    if (sleepingCount > 0) {
+      items.push(`🌙 ${sleepingCount} sandbox${sleepingCount > 1 ? 'es' : ''} hibernating — wake instantly when needed`);
+    }
+    
+    // =============================================================================
+    // PROVIDER DISTRIBUTION & TIPS
+    // =============================================================================
+    
+    const cloudflareCount = sandboxes.list.filter(s => s.provider === "cloudflare").length;
+    const dockerCount = sandboxes.list.filter(s => s.provider === "docker").length;
+    
+    // Show provider distribution if using both
+    if (cloudflareCount > 0 && dockerCount > 0) {
+      items.push(`☁️ ${cloudflareCount} Cloudflare • 🐳 ${dockerCount} Docker containers`);
+    }
+    
+    // Docker health warnings
+    if (sandboxes.dockerHealthy === false) {
+      if (cloudflareCount > 0) {
+        items.push("ℹ️ Docker offline — Cloudflare sandboxes still available");
+      } else {
+        items.push("⚠️ Docker offline — please start Docker to use containers");
+      }
+    } else if (sandboxes.dockerHealthy && dockerCount > 0 && cloudflareCount === 0) {
+      items.push("🐳 Docker online and ready to spin up new sandboxes");
+    }
+    
+    // Provider-specific tips
+    if (cloudflareCount > 0 && sleepingCount === 0) {
+      items.push("☁️ Tip: Cloudflare sandboxes auto-hibernate when idle to save resources");
+    }
+    
+    // =============================================================================
+    // TIME-BASED GREETING
+    // =============================================================================
+    
+    items.push(getTimeBasedMessage());
+    
+    // =============================================================================
+    // CONTEXTUAL USER STATE
+    // =============================================================================
+    
+    // First-time user guidance
+    if (totalProjects === 0) {
+      items.push("🚀 Welcome! Create your first project to start building with AI");
+    } else if (totalProjects === 1) {
+      if (runningCount === 0) {
+        items.push("💡 Start your container to begin coding with AI assistance");
+      } else {
+        items.push("📂 You have 1 project — ready to build something amazing?");
+      }
+    } else {
+      // Fleet summary for power users
+      if (totalProjects >= 3) {
+        items.push(`📊 Managing ${totalProjects} projects • ${runningCount} running • ${activeSessionsCount} AI active`);
+      } else {
+        items.push(`📂 Managing ${totalProjects} projects — you're on a roll!`);
+      }
+    }
+    
+    // Running containers summary
+    if (runningCount > 0 && activeSessionsCount === 0) {
+      items.push(`🟢 ${runningCount} container${runningCount > 1 ? 's' : ''} running and ready for action`);
+    }
+    
+    // =============================================================================
+    // EDUCATIONAL TIPS (Lowest Priority - Shuffled)
+    // =============================================================================
+    
     const tips = [
       "💡 Pro tip: Your AI assistant remembers context between sessions",
-      "⌨️ Shortcut: Use keyboard navigation to quickly switch between tabs",
+      "⌨️ Shortcut: Press Cmd+, and Cmd+. to cycle between agents",
       "🤖 AI agents can read your AGENTS.md file for project context",
       "📦 Tip: Use different container flavors for different tech stacks",
       "🔄 Your changes are automatically saved to the Git repository",
       "🎯 Define clear project descriptions to help AI understand your goals",
       "⚡ Containers start in seconds with pre-built development environments",
-      "🔐 All your code stays on your machine - nothing leaves your Docker",
+      "🔐 All your code stays on your machine — nothing leaves your containers",
       "🔀 Use the Sync tab to manage branches and view file changes",
       "📝 Check the Logs tab to see container output and debug issues",
     ];
     
-    // Add contextual items based on user state
-    if (totalProjects === 0) {
-      items.push("🚀 Welcome! Create your first project to get started with AI-powered development");
-    } else if (totalProjects === 1) {
-      items.push(`📂 You have 1 project — ready to build something amazing?`);
-    } else {
-      items.push(`📂 Managing ${totalProjects} projects — you're on a roll!`);
-    }
-    
-    if (runningCount > 0) {
-      items.push(`🟢 ${runningCount} container${runningCount > 1 ? 's' : ''} running and ready for action`);
-    }
-    
-    if (activeSessionsCount > 0) {
-      items.push(`⚡ ${activeSessionsCount} AI session${activeSessionsCount > 1 ? 's' : ''} actively working on your code`);
-    }
-    
-    if (sandboxes.dockerHealthy) {
-      items.push("🐳 Docker is online and ready to spin up new sandboxes");
-    }
-    
-    // Add random tips
-    items.push(...tips);
+    // Add 3 random tips (shuffled)
+    const shuffled = [...tips].sort(() => Math.random() - 0.5);
+    items.push(...shuffled.slice(0, 3));
     
     return items;
   });
