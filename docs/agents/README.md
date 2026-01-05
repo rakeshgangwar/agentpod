@@ -73,6 +73,18 @@ This framework enables AgentPod to provide specialized AI assistance through dis
 | [Integration Guide](./integration-guide.md) | How to integrate with AgentPod |
 | [Prompt Engineering](./prompt-engineering.md) | Guidelines for agent system prompts |
 
+### Multi-Agent Ecosystem Research
+
+For comprehensive research on agent protocols, frameworks, and industry standards, see:
+
+| Document | Description |
+|----------|-------------|
+| [Multi-Agent Ecosystem](../research/multi-agent-ecosystem/) | Full research index |
+| [MCP Protocol](../research/multi-agent-ecosystem/protocols/mcp.md) | Model Context Protocol (tool integration) |
+| [A2A Protocol](../research/multi-agent-ecosystem/protocols/a2a.md) | Agent-to-Agent Protocol |
+| [Framework Comparison](../research/multi-agent-ecosystem/frameworks/) | Cloudflare, AWS, Google, Microsoft, etc. |
+| [Recommendations](../research/multi-agent-ecosystem/recommendations.md) | AgentPod-specific guidance |
+
 ---
 
 ## Quick Start

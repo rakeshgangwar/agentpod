@@ -147,8 +147,21 @@ Research notes and explorations.
 
 | Document | Description |
 |----------|-------------|
+| [Multi-Agent Ecosystem](./research/multi-agent-ecosystem/) | **NEW**: Protocols, frameworks, and standards |
 | [Sandbox Patterns](./research/sandbox-environment-patterns.md) | Security and isolation |
 | [Autonomous AgentPod](./research/autonomous-agentpod-poc.md) | POC documentation |
+
+#### Multi-Agent Ecosystem Research
+
+Comprehensive research on the multi-agent AI ecosystem:
+
+| Section | Topics |
+|---------|--------|
+| [Protocols](./research/multi-agent-ecosystem/protocols/) | MCP, A2A, AG-UI, AGENTS.md, Agent Protocol |
+| [Governance](./research/multi-agent-ecosystem/governance/) | AAIF (Linux Foundation) |
+| [Frameworks](./research/multi-agent-ecosystem/frameworks/) | Cloudflare, AWS, Google, Microsoft, Vercel, Open Source |
+| [Infrastructure](./research/multi-agent-ecosystem/infrastructure/) | Docker MCP, Durable Workflows |
+| [Recommendations](./research/multi-agent-ecosystem/recommendations.md) | AgentPod-specific guidance |
 
 ---
 
