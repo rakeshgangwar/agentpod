@@ -26,7 +26,7 @@ tokio = { version = "1", features = ["full"] }
 tokio-tungstenite = { version = "0.28", features = ["rustls-tls-webpki-roots"] }
 http = "1"
 # Use rustls with native root certificates for all platforms including Android/iOS
-reqwest = { version = "0.12", features = ["json", "rustls-tls-native-roots", "stream", "gzip", "deflate"], default-features = false }
+reqwest = { version = "0.13", features = ["json", "rustls-tls-native-roots", "stream", "gzip", "deflate"], default-features = false }
 urlencoding = "2"
 keyring = "3"
 thiserror = "2"
