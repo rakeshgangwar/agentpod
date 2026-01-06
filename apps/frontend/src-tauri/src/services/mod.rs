@@ -2,6 +2,7 @@
 
 pub mod api;
 pub mod auth;
+pub mod environment;
 pub mod settings;
 pub mod storage;
 

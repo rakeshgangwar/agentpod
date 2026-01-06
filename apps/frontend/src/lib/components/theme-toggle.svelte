@@ -3,11 +3,12 @@
   import SunIcon from "@lucide/svelte/icons/sun";
   import MoonIcon from "@lucide/svelte/icons/moon";
   import MonitorIcon from "@lucide/svelte/icons/monitor";
+  import SunsetIcon from "@lucide/svelte/icons/sunset";
 
-  // Mode options
   const modeOptions: { value: ThemeMode; icon: typeof SunIcon; title: string }[] = [
     { value: "light", icon: SunIcon, title: "Light mode" },
     { value: "system", icon: MonitorIcon, title: "System preference" },
+    { value: "auto", icon: SunsetIcon, title: "Auto (6PM–6AM dark)" },
     { value: "dark", icon: MoonIcon, title: "Dark mode" },
   ];
 

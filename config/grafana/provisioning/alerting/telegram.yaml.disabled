@@ -7,8 +7,8 @@ contactPoints:
       - uid: telegram-receiver
         type: telegram
         settings:
-          bottoken: ${TELEGRAM_BOT_TOKEN}
-          chatid: ${TELEGRAM_CHAT_ID}
+          bottoken: ${TELEGRAM_BOT_TOKEN:-placeholder}
+          chatid: "${TELEGRAM_CHAT_ID:-0}"
           parse_mode: HTML
         disableResolveMessage: false
 

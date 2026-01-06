@@ -262,6 +262,57 @@ services:
         condition: service_healthy
 
   # ===========================================================================
+  # MetaMCP - MCP Server Aggregator/Gateway
+  # ===========================================================================
+  # Aggregates multiple MCP servers into unified endpoints with auth
+  # Dashboard: http://metamcp.localhost
+  # Docs: https://docs.metamcp.com
+  #
+  # SSO Configuration:
+  # MetaMCP shares the agentpod database and auth secret for single sign-on.
+  # Users authenticated in AgentPod are automatically authenticated in MetaMCP.
+  # Views in the database alias AgentPod's table names to MetaMCP's expected names.
+  metamcp:
+    image: ghcr.io/metatool-ai/metamcp:latest
+    container_name: agentpod-metamcp
+    restart: unless-stopped
+    environment:
+      # Separate database - auth synced from AgentPod for SSO
+      - DATABASE_URL=postgresql://agentpod:${POSTGRES_PASSWORD:-agentpod-dev-password}@postgres:5432/metamcp
+      # Application URL (for OAuth callbacks and CORS)
+      - APP_URL=http://metamcp.localhost
+      # Authentication secret (MUST match AgentPod's BETTER_AUTH_SECRET for SSO!)
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-dev-better-auth-secret-change-in-production}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-agentpod-dev-password}
+      # Session management
+      - IDLE_SESSION_COUNT=2
+      - SESSION_TIMEOUT_MS=300000
+      # Disable signup - users must create accounts via AgentPod
+      - DISABLE_SIGNUP=true
+    volumes:
+      # Persist MetaMCP data
+      - metamcp-data:/app/data
+    networks:
+      - agentpod-net
+    ports:
+      - "12008:12008"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.metamcp.rule=Host(`metamcp.localhost`) || Host(`metamcp.${BASE_DOMAIN:-localhost}`)"
+      - "traefik.http.routers.metamcp.entrypoints=web"
+      - "traefik.http.services.metamcp.loadbalancer.server.port=12008"
+      - "agentpod.managed=false"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:12008/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ===========================================================================
   # Database Backup Service
   # ===========================================================================
   backup:
@@ -382,6 +433,8 @@ volumes:
   postgres-data:
     driver: local
   agentpod-data:
+    driver: local
+  metamcp-data:
     driver: local
   loki-data:
     driver: local
