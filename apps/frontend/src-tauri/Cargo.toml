@@ -60,7 +60,7 @@ hf-hub = { version = "0.4", optional = true }                   # Hugging Face m
 # rustpotter - disabled due to candle-core 0.2.2 rand version conflict (requires rand 0.8, half uses rand 0.9)
 # Wake word detection now uses OpenWakeWord via ONNX Runtime instead
 ort = { version = "2.0.0-rc.9", optional = true }             # ONNX Runtime for wake word detection
-ndarray = { version = "0.16", optional = true }               # N-dimensional arrays for ONNX model I/O
+ndarray = { version = "0.17", optional = true }               # N-dimensional arrays for ONNX model I/O
 
 [dev-dependencies]
 tokio-test = "0.4"
