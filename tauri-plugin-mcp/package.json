@@ -27,8 +27,8 @@
   },
   "devDependencies": {
     "@rollup/plugin-typescript": "^11.1.6",
-    "rollup": "^4.9.6",
-    "typescript": "^5.3.3",
+    "rollup": "^4.55.1",
+    "typescript": "^5.9.3",
     "tslib": "^2.6.2"
   }
 }
