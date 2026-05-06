@@ -1,0 +1,91 @@
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
+
+use super::ApiClient;
+use crate::types::{Sandbox, SandboxStatus};
+
+/// Create sandbox request
+#[derive(Debug, Serialize)]
+pub struct CreateSandboxRequest {
+    pub name: String,
+    pub description: Option<String>,
+    pub github_url: Option<String>,
+    pub flavor: Option<String>,
+    pub resource_tier: Option<String>,
+    pub addons: Option<Vec<String>>,
+}
+
+/// Sandbox list response
+#[derive(Debug, Deserialize)]
+pub struct SandboxListResponse {
+    pub sandboxes: Vec<Sandbox>,
+}
+
+impl ApiClient {
+    /// List all sandboxes
+    pub async fn list_sandboxes(&self) -> Result<Vec<Sandbox>> {
+        let response: SandboxListResponse = self.get("/api/v2/sandboxes").await?;
+        Ok(response.sandboxes)
+    }
+
+    /// Get a sandbox by ID
+    pub async fn get_sandbox(&self, id: &str) -> Result<Sandbox> {
+        self.get(&format!("/api/v2/sandboxes/{}", id)).await
+    }
+
+    /// Create a new sandbox
+    pub async fn create_sandbox(&self, request: CreateSandboxRequest) -> Result<Sandbox> {
+        self.post("/api/v2/sandboxes", &request).await
+    }
+
+    /// Delete a sandbox
+    pub async fn delete_sandbox(&self, id: &str) -> Result<()> {
+        self.delete(&format!("/api/v2/sandboxes/{}", id)).await
+    }
+
+    /// Start a sandbox
+    pub async fn start_sandbox(&self, id: &str) -> Result<()> {
+        let _: serde_json::Value = self
+            .post(&format!("/api/v2/sandboxes/{}/start", id), &serde_json::json!({}))
+            .await?;
+        Ok(())
+    }
+
+    /// Stop a sandbox
+    pub async fn stop_sandbox(&self, id: &str) -> Result<()> {
+        let _: serde_json::Value = self
+            .post(&format!("/api/v2/sandboxes/{}/stop", id), &serde_json::json!({}))
+            .await?;
+        Ok(())
+    }
+
+    /// Restart a sandbox
+    pub async fn restart_sandbox(&self, id: &str) -> Result<()> {
+        let _: serde_json::Value = self
+            .post(
+                &format!("/api/v2/sandboxes/{}/restart", id),
+                &serde_json::json!({}),
+            )
+            .await?;
+        Ok(())
+    }
+
+    /// Pause a sandbox
+    pub async fn pause_sandbox(&self, id: &str) -> Result<()> {
+        let _: serde_json::Value = self
+            .post(&format!("/api/v2/sandboxes/{}/pause", id), &serde_json::json!({}))
+            .await?;
+        Ok(())
+    }
+
+    /// Unpause a sandbox
+    pub async fn unpause_sandbox(&self, id: &str) -> Result<()> {
+        let _: serde_json::Value = self
+            .post(
+                &format!("/api/v2/sandboxes/{}/unpause", id),
+                &serde_json::json!({}),
+            )
+            .await?;
+        Ok(())
+    }
+}
