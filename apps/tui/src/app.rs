@@ -578,7 +578,9 @@ impl App {
             KeyCode::Up | KeyCode::Char('k') => self.create_sandbox_move_selection(-1),
             KeyCode::Down | KeyCode::Char('j') => self.create_sandbox_move_selection(1),
             KeyCode::Backspace => self.create_sandbox_backspace(),
-            KeyCode::Char(' ') => self.create_sandbox_toggle_current(),
+            KeyCode::Char(' ') if matches!(self.create_sandbox.step, CreateSandboxStep::Source | CreateSandboxStep::Addons) => {
+                self.create_sandbox_toggle_current();
+            }
             KeyCode::Char(c) if key.modifiers.is_empty() || key.modifiers == KeyModifiers::SHIFT => {
                 self.create_sandbox_type_char(c);
             }

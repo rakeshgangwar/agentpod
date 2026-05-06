@@ -184,19 +184,19 @@ async fn test_create_sandbox_details_text_entry_and_focus() {
     app.handle_key_event(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::NONE)).await;
     app.handle_key_event(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)).await;
 
-    for c in "api".chars() {
+    for c in "my api".chars() {
         app.handle_key_event(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE)).await;
     }
-    assert_eq!(app.create_sandbox.name, "api");
+    assert_eq!(app.create_sandbox.name, "my api");
 
     app.handle_key_event(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE)).await;
-    for c in "service".chars() {
+    for c in "api service".chars() {
         app.handle_key_event(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE)).await;
     }
-    assert_eq!(app.create_sandbox.description, "service");
+    assert_eq!(app.create_sandbox.description, "api service");
 
     app.handle_key_event(KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE)).await;
-    assert_eq!(app.create_sandbox.description, "servic");
+    assert_eq!(app.create_sandbox.description, "api servic");
 }
 
 #[tokio::test]
