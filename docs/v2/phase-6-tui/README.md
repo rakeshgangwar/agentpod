@@ -16,6 +16,33 @@ A full-featured terminal UI for AgentPod built with **Rust + ratatui**, providin
 | **Terminal Mode** | Dual (external + embedded) | External (tmux) by default for full fidelity, embedded (VT100 via `vte`) as opt-in via `--embedded-terminal` flag |
 | **Distribution** | cargo-dist CI | Cross-platform binaries via GitHub Actions (Linux, macOS, Windows) |
 
+## Current Checkpoint
+
+As of the current `feat/tui` checkpoint, the TUI is usable for login and core sandbox management, but it is **not full desktop parity yet**.
+
+Available now:
+
+- Login with persisted API token support.
+- Sandbox list refresh from the management API.
+- Sandbox lifecycle actions: start, stop, restart, pause, unpause, and delete.
+- Guided create-sandbox wizard from the dashboard with Source, Details, Runtime, Add-ons, and Review steps.
+- Scratch and Git import modes, including GitHub/GitLab repository URL validation and repo-name derivation.
+- Basic ratatui shell with tabbed views and status bar.
+
+Still pending before full functionality:
+
+- Sandbox detail view with resource stats and logs.
+- AI chat session management, SSE streaming, model/agent controls, permissions, fork, and revert.
+- Terminal modes: external tmux launcher and embedded VT100/WebSocket terminal.
+- File browser and file preview/search.
+- Git status, diff, commit, and branch management UI.
+- Provider configuration and OAuth/device flow UI.
+- Workflows and admin views.
+- Settings UI beyond config loading.
+- Dynamic API-backed selectors for flavors, resource tiers, add-ons, providers, and agents.
+- cargo-dist release packaging and CI.
+- Warning cleanup as scaffolded modules become fully wired.
+
 ## Architecture
 
 ```
