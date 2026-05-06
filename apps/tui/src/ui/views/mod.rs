@@ -1,4 +1,5 @@
 pub mod chat;
+pub mod create_sandbox;
 pub mod dashboard;
 pub mod files;
 pub mod git;
