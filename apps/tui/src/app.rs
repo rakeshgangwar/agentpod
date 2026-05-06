@@ -445,7 +445,10 @@ impl App {
 
     fn create_sandbox_git_url_valid(&self) -> bool {
         let url = self.create_sandbox.git_url.trim();
-        !url.is_empty() && (url.contains("github.com/") || url.contains("gitlab.com/"))
+        url.starts_with("https://github.com/")
+            || url.starts_with("http://github.com/")
+            || url.starts_with("https://gitlab.com/")
+            || url.starts_with("http://gitlab.com/")
     }
 
     async fn handle_create_sandbox_keys(&mut self, key: KeyEvent) {
