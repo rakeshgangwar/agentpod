@@ -13,12 +13,61 @@ use crate::ui;
 pub enum View {
     Login,
     Dashboard,
+    CreateSandbox,
     Chat,
     Terminal,
     Files,
     Git,
     Providers,
     Settings,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CreateSandboxStep {
+    Source,
+    Details,
+    Runtime,
+    Addons,
+    Review,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CreateSandboxSource {
+    Scratch,
+    Git,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CreateSandboxWizardState {
+    pub step: CreateSandboxStep,
+    pub source: CreateSandboxSource,
+    pub focus: usize,
+    pub name: String,
+    pub description: String,
+    pub git_url: String,
+    pub selected_flavor: String,
+    pub selected_resource_tier: String,
+    pub selected_addons: Vec<String>,
+    pub error: Option<String>,
+    pub submitting: bool,
+}
+
+impl CreateSandboxWizardState {
+    fn new(config: &Config) -> Self {
+        Self {
+            step: CreateSandboxStep::Source,
+            source: CreateSandboxSource::Scratch,
+            focus: 0,
+            name: String::new(),
+            description: String::new(),
+            git_url: String::new(),
+            selected_flavor: config.defaults.flavor.clone(),
+            selected_resource_tier: config.defaults.resource_tier.clone(),
+            selected_addons: vec!["code-server".to_string()],
+            error: None,
+            submitting: false,
+        }
+    }
 }
 
 /// Application state
@@ -35,6 +84,7 @@ pub struct App {
     // State
     pub should_quit: bool,
     pub active_view: View,
+    pub create_sandbox: CreateSandboxWizardState,
 
     // Login
     pub login_email: String,
@@ -55,6 +105,7 @@ impl App {
         let has_token = token.is_some();
 
         let api = ApiClient::new(&api_url, token);
+        let create_sandbox = CreateSandboxWizardState::new(&config);
 
         // Start on login if no token, otherwise dashboard
         let active_view = if has_token {
@@ -71,6 +122,7 @@ impl App {
             api_url,
             should_quit: false,
             active_view,
+            create_sandbox,
             login_email: String::new(),
             login_password: String::new(),
             login_focus: 0,
@@ -107,7 +159,9 @@ impl App {
     pub async fn handle_key_event(&mut self, key: KeyEvent) {
         // Global key handling
         match key.code {
-            KeyCode::Char('q') if self.active_view != View::Login => {
+            KeyCode::Char('q')
+                if self.active_view != View::Login && self.active_view != View::CreateSandbox =>
+            {
                 self.should_quit = true;
                 return;
             }
@@ -122,6 +176,7 @@ impl App {
         match self.active_view {
             View::Login => self.handle_login_keys(key).await,
             View::Dashboard => self.handle_dashboard_keys(key).await,
+            View::CreateSandbox => self.handle_create_sandbox_keys(key).await,
             View::Chat => self.handle_chat_keys(key).await,
             View::Terminal => self.handle_terminal_keys(key).await,
             View::Files => self.handle_files_keys(key).await,
@@ -171,7 +226,7 @@ impl App {
     async fn handle_dashboard_keys(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Char('n') => {
-                // TODO: Create new sandbox
+                self.open_create_sandbox();
             }
             KeyCode::Char('s') => {
                 self.start_selected_sandbox().await;
@@ -325,6 +380,23 @@ impl App {
     /// Handle connection status change
     pub fn handle_connection_status(&mut self, connected: bool) {
         self.connected = connected;
+    }
+
+    fn open_create_sandbox(&mut self) {
+        self.create_sandbox = CreateSandboxWizardState::new(&self.config);
+        self.active_view = View::CreateSandbox;
+    }
+
+    fn cancel_create_sandbox(&mut self) {
+        self.create_sandbox = CreateSandboxWizardState::new(&self.config);
+        self.active_view = View::Dashboard;
+    }
+
+    async fn handle_create_sandbox_keys(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc => self.cancel_create_sandbox(),
+            _ => {}
+        }
     }
 
     /// Attempt login
