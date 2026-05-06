@@ -4,6 +4,7 @@ use agentpod_tui::cli::Cli;
 use agentpod_tui::config::Config;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use serde_json::json;
+use tempfile::tempdir;
 use wiremock::{MockServer, Mock, ResponseTemplate};
 use wiremock::matchers::{method, path, body_json};
 
@@ -13,6 +14,19 @@ fn create_test_app() -> App {
         api_url: None,
         token: None,
         config: None,
+        embedded_terminal: false,
+        debug: false,
+        sandbox: None,
+    };
+    App::new(config, cli)
+}
+
+fn create_test_app_with_api_url(api_url: String, config_path: std::path::PathBuf) -> App {
+    let config = Config::default();
+    let cli = Cli {
+        api_url: Some(api_url),
+        token: None,
+        config: Some(config_path),
         embedded_terminal: false,
         debug: false,
         sandbox: None,
@@ -91,6 +105,80 @@ async fn test_login_form_submission() {
     assert_eq!(app.active_view, View::Login);
     // Should have an error message
     assert!(app.login_error.is_some());
+}
+
+#[tokio::test]
+async fn test_login_form_submission_success_persists_token() {
+    let mock_server = MockServer::start().await;
+    let dir = tempdir().unwrap();
+    let config_path = dir.path().join("config.toml");
+
+    Mock::given(method("POST"))
+        .and(path("/api/auth/sign-in/email"))
+        .and(body_json(json!({
+            "email": "test@example.com",
+            "password": "password123"
+        })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "token": "persisted-token-123",
+            "user": {
+                "id": "user-1",
+                "email": "test@example.com",
+                "name": "Test User"
+            }
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let mut app = create_test_app_with_api_url(mock_server.uri(), config_path.clone());
+    app.active_view = View::Login;
+    app.login_email = "test@example.com".to_string();
+    app.login_password = "password123".to_string();
+
+    app.handle_key_event(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)).await;
+
+    assert_eq!(app.active_view, View::Dashboard);
+    assert!(app.connected);
+    assert!(app.api.has_token());
+    assert_eq!(app.login_password, "");
+    assert!(app.login_error.is_none());
+
+    let saved_config = Config::load(Some(&config_path)).unwrap();
+    assert_eq!(
+        saved_config.connection.api_token,
+        Some("persisted-token-123".to_string())
+    );
+}
+
+#[tokio::test]
+async fn test_login_form_submission_error_keeps_login_and_does_not_persist_token() {
+    let mock_server = MockServer::start().await;
+    let dir = tempdir().unwrap();
+    let config_path = dir.path().join("config.toml");
+
+    Mock::given(method("POST"))
+        .and(path("/api/auth/sign-in/email"))
+        .respond_with(ResponseTemplate::new(401).set_body_json(json!({
+            "error": "Invalid email or password"
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let mut app = create_test_app_with_api_url(mock_server.uri(), config_path.clone());
+    app.active_view = View::Login;
+    app.login_email = "test@example.com".to_string();
+    app.login_password = "wrongpassword".to_string();
+
+    app.handle_key_event(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)).await;
+
+    assert_eq!(app.active_view, View::Login);
+    assert!(!app.connected);
+    assert!(!app.api.has_token());
+    assert_eq!(app.login_password, "");
+    assert!(app.login_error.as_ref().unwrap().contains("401"));
+
+    let saved_config = Config::load(Some(&config_path)).unwrap();
+    assert_eq!(saved_config.connection.api_token, None);
 }
 
 #[tokio::test]

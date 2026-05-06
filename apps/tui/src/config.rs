@@ -126,7 +126,7 @@ impl Config {
         Ok(())
     }
     
-    fn default_path() -> Result<PathBuf> {
+    pub fn default_path() -> Result<PathBuf> {
         let config_dir = dirs::config_dir()
             .context("Could not determine config directory")?;
         

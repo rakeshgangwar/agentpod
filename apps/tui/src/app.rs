@@ -179,6 +179,15 @@ impl App {
             KeyCode::Char('x') => {
                 self.stop_selected_sandbox().await;
             }
+            KeyCode::Char('R') => {
+                self.restart_selected_sandbox().await;
+            }
+            KeyCode::Char('p') => {
+                self.pause_selected_sandbox().await;
+            }
+            KeyCode::Char('u') => {
+                self.unpause_selected_sandbox().await;
+            }
             KeyCode::Char('d') => {
                 self.delete_selected_sandbox().await;
             }
@@ -335,8 +344,31 @@ impl App {
         // Clear previous errors
         self.login_error = None;
 
-        // TODO: Implement actual login
-        self.login_error = Some("Login not yet implemented".to_string());
+        match self.api.login(&self.login_email, &self.login_password).await {
+            Ok(response) => {
+                let token = response.token;
+                self.config.connection.api_token = Some(token.clone());
+                self.api.set_token(Some(token));
+                self.connected = true;
+                self.active_view = View::Dashboard;
+                self.login_password = String::new();
+
+                let config_path = match &self.cli.config {
+                    Some(path) => Ok(path.clone()),
+                    None => Config::default_path(),
+                };
+
+                if let Ok(path) = config_path {
+                    if let Err(error) = self.config.save(&path) {
+                        self.login_error = Some(format!("Failed to save token: {error}"));
+                    }
+                }
+            }
+            Err(error) => {
+                self.login_error = Some(error.to_string());
+                self.login_password = String::new();
+            }
+        }
     }
 
     /// Load sandboxes from API
@@ -374,6 +406,45 @@ impl App {
         if self.api.stop_sandbox(&sandbox_id).await.is_ok() {
             if let Some(sandbox) = self.sandboxes.get_mut(self.selected_sandbox) {
                 sandbox.status = SandboxStatus::Stopped;
+            }
+        }
+    }
+
+    async fn restart_selected_sandbox(&mut self) {
+        let Some(sandbox) = self.sandboxes.get(self.selected_sandbox) else {
+            return;
+        };
+        let sandbox_id = sandbox.id.clone();
+
+        if self.api.restart_sandbox(&sandbox_id).await.is_ok() {
+            if let Some(sandbox) = self.sandboxes.get_mut(self.selected_sandbox) {
+                sandbox.status = SandboxStatus::Running;
+            }
+        }
+    }
+
+    async fn pause_selected_sandbox(&mut self) {
+        let Some(sandbox) = self.sandboxes.get(self.selected_sandbox) else {
+            return;
+        };
+        let sandbox_id = sandbox.id.clone();
+
+        if self.api.pause_sandbox(&sandbox_id).await.is_ok() {
+            if let Some(sandbox) = self.sandboxes.get_mut(self.selected_sandbox) {
+                sandbox.status = SandboxStatus::Paused;
+            }
+        }
+    }
+
+    async fn unpause_selected_sandbox(&mut self) {
+        let Some(sandbox) = self.sandboxes.get(self.selected_sandbox) else {
+            return;
+        };
+        let sandbox_id = sandbox.id.clone();
+
+        if self.api.unpause_sandbox(&sandbox_id).await.is_ok() {
+            if let Some(sandbox) = self.sandboxes.get_mut(self.selected_sandbox) {
+                sandbox.status = SandboxStatus::Running;
             }
         }
     }

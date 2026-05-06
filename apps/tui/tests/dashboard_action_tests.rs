@@ -79,6 +79,7 @@ async fn test_dashboard_start_selected_sandbox_updates_local_status() {
     Mock::given(method("POST"))
         .and(path("/api/v2/sandboxes/sb-1/start"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "success": true })))
+        .expect(1)
         .mount(&mock_server)
         .await;
 
@@ -100,6 +101,7 @@ async fn test_dashboard_stop_selected_sandbox_updates_local_status() {
     Mock::given(method("POST"))
         .and(path("/api/v2/sandboxes/sb-1/stop"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "success": true })))
+        .expect(1)
         .mount(&mock_server)
         .await;
 
@@ -115,12 +117,79 @@ async fn test_dashboard_stop_selected_sandbox_updates_local_status() {
 }
 
 #[tokio::test]
+async fn test_dashboard_restart_selected_sandbox_updates_local_status() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("POST"))
+        .and(path("/api/v2/sandboxes/sb-1/restart"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "success": true })))
+        .expect(1)
+        .mount(&mock_server)
+        .await;
+
+    let mut app = create_test_app(mock_server.uri());
+    app.active_view = View::Dashboard;
+    app.sandboxes = vec![sandbox("sb-1", "Running Sandbox", SandboxStatus::Running)];
+    app.selected_sandbox = 0;
+
+    app.handle_key_event(KeyEvent::new(KeyCode::Char('R'), KeyModifiers::SHIFT))
+        .await;
+
+    assert_eq!(app.sandboxes[0].status, SandboxStatus::Running);
+}
+
+#[tokio::test]
+async fn test_dashboard_pause_selected_sandbox_updates_local_status() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("POST"))
+        .and(path("/api/v2/sandboxes/sb-1/pause"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "success": true })))
+        .expect(1)
+        .mount(&mock_server)
+        .await;
+
+    let mut app = create_test_app(mock_server.uri());
+    app.active_view = View::Dashboard;
+    app.sandboxes = vec![sandbox("sb-1", "Running Sandbox", SandboxStatus::Running)];
+    app.selected_sandbox = 0;
+
+    app.handle_key_event(KeyEvent::new(KeyCode::Char('p'), KeyModifiers::NONE))
+        .await;
+
+    assert_eq!(app.sandboxes[0].status, SandboxStatus::Paused);
+}
+
+#[tokio::test]
+async fn test_dashboard_unpause_selected_sandbox_updates_local_status() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("POST"))
+        .and(path("/api/v2/sandboxes/sb-1/unpause"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "success": true })))
+        .expect(1)
+        .mount(&mock_server)
+        .await;
+
+    let mut app = create_test_app(mock_server.uri());
+    app.active_view = View::Dashboard;
+    app.sandboxes = vec![sandbox("sb-1", "Paused Sandbox", SandboxStatus::Paused)];
+    app.selected_sandbox = 0;
+
+    app.handle_key_event(KeyEvent::new(KeyCode::Char('u'), KeyModifiers::NONE))
+        .await;
+
+    assert_eq!(app.sandboxes[0].status, SandboxStatus::Running);
+}
+
+#[tokio::test]
 async fn test_dashboard_delete_selected_sandbox_removes_it_from_list() {
     let mock_server = MockServer::start().await;
 
     Mock::given(method("DELETE"))
         .and(path("/api/v2/sandboxes/sb-1"))
         .respond_with(ResponseTemplate::new(200))
+        .expect(1)
         .mount(&mock_server)
         .await;
 
