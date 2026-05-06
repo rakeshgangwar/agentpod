@@ -1,14 +1,22 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::Frame;
 
-use crate::api::ApiClient;
+use crate::api::{sandboxes::CreateSandboxRequest, ApiClient};
 use crate::cli::Cli;
 use crate::config::Config;
 use crate::event::ApiResult;
 use crate::types::{Sandbox, SandboxStatus};
 use crate::ui;
 
-const CREATE_SANDBOX_FLAVORS: [&str; 7] = ["js", "python", "go", "rust", "fullstack", "polyglot", "bare"];
+const CREATE_SANDBOX_FLAVORS: [&str; 7] = [
+    "js",
+    "python",
+    "go",
+    "rust",
+    "fullstack",
+    "polyglot",
+    "bare",
+];
 const CREATE_SANDBOX_RESOURCE_TIERS: [&str; 2] = ["starter", "builder"];
 const CREATE_SANDBOX_ADDONS: [&str; 1] = ["code-server"];
 
@@ -260,7 +268,8 @@ impl App {
             }
             KeyCode::Down | KeyCode::Char('j') => {
                 if !self.sandboxes.is_empty() {
-                    self.selected_sandbox = (self.selected_sandbox + 1).min(self.sandboxes.len() - 1);
+                    self.selected_sandbox =
+                        (self.selected_sandbox + 1).min(self.sandboxes.len() - 1);
                 }
             }
             KeyCode::Enter => {
@@ -466,13 +475,82 @@ impl App {
             .or_else(|| url.strip_prefix("http://gitlab.com/"))?;
         let mut segments = path.split('/').filter(|segment| !segment.is_empty());
         segments.next()?;
-        segments.next().map(ToString::to_string)
+        segments
+            .next()
+            .map(|segment| segment.trim_end_matches(".git").to_string())
+            .filter(|segment| !segment.is_empty())
+    }
+
+    fn create_sandbox_request_name(&self) -> String {
+        let entered = self.create_sandbox.name.trim();
+        if !entered.is_empty() {
+            return entered.to_string();
+        }
+
+        if self.create_sandbox.source == CreateSandboxSource::Git {
+            if let Some(name) = self.create_sandbox_git_repo_name() {
+                return name;
+            }
+        }
+
+        "imported-project".to_string()
+    }
+
+    fn build_create_sandbox_request(&self) -> CreateSandboxRequest {
+        CreateSandboxRequest {
+            name: self.create_sandbox_request_name(),
+            description: if self.create_sandbox.description.trim().is_empty() {
+                None
+            } else {
+                Some(self.create_sandbox.description.trim().to_string())
+            },
+            github_url: if self.create_sandbox.source == CreateSandboxSource::Git {
+                Some(self.create_sandbox.git_url.trim().to_string())
+            } else {
+                None
+            },
+            flavor: Some(self.create_sandbox.selected_flavor.clone()),
+            resource_tier: Some(self.create_sandbox.selected_resource_tier.clone()),
+            addons: if self.create_sandbox.selected_addons.is_empty() {
+                None
+            } else {
+                Some(self.create_sandbox.selected_addons.clone())
+            },
+        }
+    }
+
+    async fn submit_create_sandbox(&mut self) {
+        if self.create_sandbox.step != CreateSandboxStep::Review || self.create_sandbox.submitting {
+            return;
+        }
+
+        self.create_sandbox.error = None;
+        self.create_sandbox.submitting = true;
+        let request = self.build_create_sandbox_request();
+
+        match self.api.create_sandbox(request).await {
+            Ok(sandbox) => {
+                self.sandboxes.push(sandbox);
+                self.selected_sandbox = self.sandboxes.len().saturating_sub(1);
+                self.sandboxes_loaded = true;
+                self.create_sandbox = CreateSandboxWizardState::new(&self.config);
+                self.active_view = View::Dashboard;
+            }
+            Err(error) => {
+                self.create_sandbox.submitting = false;
+                self.create_sandbox.error = Some(error.to_string());
+            }
+        }
     }
 
     fn create_sandbox_focus_count(&self) -> usize {
         match self.create_sandbox.step {
             CreateSandboxStep::Source => {
-                if self.create_sandbox.source == CreateSandboxSource::Git { 2 } else { 1 }
+                if self.create_sandbox.source == CreateSandboxSource::Git {
+                    2
+                } else {
+                    1
+                }
             }
             CreateSandboxStep::Details => 2,
             CreateSandboxStep::Runtime => 2,
@@ -497,7 +575,10 @@ impl App {
 
     fn create_sandbox_type_char(&mut self, c: char) {
         match self.create_sandbox.step {
-            CreateSandboxStep::Source if self.create_sandbox.source == CreateSandboxSource::Git && self.create_sandbox.focus == 1 => {
+            CreateSandboxStep::Source
+                if self.create_sandbox.source == CreateSandboxSource::Git
+                    && self.create_sandbox.focus == 1 =>
+            {
                 self.create_sandbox.git_url.push(c);
             }
             CreateSandboxStep::Details if self.create_sandbox.focus == 0 => {
@@ -512,7 +593,10 @@ impl App {
 
     fn create_sandbox_backspace(&mut self) {
         match self.create_sandbox.step {
-            CreateSandboxStep::Source if self.create_sandbox.source == CreateSandboxSource::Git && self.create_sandbox.focus == 1 => {
+            CreateSandboxStep::Source
+                if self.create_sandbox.source == CreateSandboxSource::Git
+                    && self.create_sandbox.focus == 1 =>
+            {
                 self.create_sandbox.git_url.pop();
             }
             CreateSandboxStep::Details if self.create_sandbox.focus == 0 => {
@@ -532,7 +616,9 @@ impl App {
                     .iter()
                     .position(|flavor| *flavor == self.create_sandbox.selected_flavor)
                     .unwrap_or(0);
-                let next = (current as isize + delta).clamp(0, (CREATE_SANDBOX_FLAVORS.len() - 1) as isize) as usize;
+                let next = (current as isize + delta)
+                    .clamp(0, (CREATE_SANDBOX_FLAVORS.len() - 1) as isize)
+                    as usize;
                 self.create_sandbox.selected_flavor = CREATE_SANDBOX_FLAVORS[next].to_string();
             }
             CreateSandboxStep::Runtime if self.create_sandbox.focus == 1 => {
@@ -540,8 +626,11 @@ impl App {
                     .iter()
                     .position(|tier| *tier == self.create_sandbox.selected_resource_tier)
                     .unwrap_or(0);
-                let next = (current as isize + delta).clamp(0, (CREATE_SANDBOX_RESOURCE_TIERS.len() - 1) as isize) as usize;
-                self.create_sandbox.selected_resource_tier = CREATE_SANDBOX_RESOURCE_TIERS[next].to_string();
+                let next = (current as isize + delta)
+                    .clamp(0, (CREATE_SANDBOX_RESOURCE_TIERS.len() - 1) as isize)
+                    as usize;
+                self.create_sandbox.selected_resource_tier =
+                    CREATE_SANDBOX_RESOURCE_TIERS[next].to_string();
             }
             _ => {}
         }
@@ -555,12 +644,27 @@ impl App {
                     CreateSandboxSource::Git => CreateSandboxSource::Scratch,
                 };
                 self.create_sandbox.error = None;
-                self.create_sandbox.focus = if self.create_sandbox.source == CreateSandboxSource::Git { 1 } else { 0 };
+                self.create_sandbox.focus =
+                    if self.create_sandbox.source == CreateSandboxSource::Git {
+                        1
+                    } else {
+                        0
+                    };
             }
             CreateSandboxStep::Addons => {
-                let addon = CREATE_SANDBOX_ADDONS[self.create_sandbox.focus.min(CREATE_SANDBOX_ADDONS.len() - 1)];
-                if self.create_sandbox.selected_addons.iter().any(|selected| selected == addon) {
-                    self.create_sandbox.selected_addons.retain(|selected| selected != addon);
+                let addon = CREATE_SANDBOX_ADDONS[self
+                    .create_sandbox
+                    .focus
+                    .min(CREATE_SANDBOX_ADDONS.len() - 1)];
+                if self
+                    .create_sandbox
+                    .selected_addons
+                    .iter()
+                    .any(|selected| selected == addon)
+                {
+                    self.create_sandbox
+                        .selected_addons
+                        .retain(|selected| selected != addon);
                 } else {
                     self.create_sandbox.selected_addons.push(addon.to_string());
                 }
@@ -575,13 +679,31 @@ impl App {
             KeyCode::Enter => self.create_sandbox_next_step(),
             KeyCode::Tab => self.create_sandbox_move_focus_forward(),
             KeyCode::BackTab => self.create_sandbox_move_focus_backward(),
-            KeyCode::Up | KeyCode::Char('k') if self.create_sandbox.step == CreateSandboxStep::Runtime => self.create_sandbox_move_selection(-1),
-            KeyCode::Down | KeyCode::Char('j') if self.create_sandbox.step == CreateSandboxStep::Runtime => self.create_sandbox_move_selection(1),
+            KeyCode::Up | KeyCode::Char('k')
+                if self.create_sandbox.step == CreateSandboxStep::Runtime =>
+            {
+                self.create_sandbox_move_selection(-1)
+            }
+            KeyCode::Down | KeyCode::Char('j')
+                if self.create_sandbox.step == CreateSandboxStep::Runtime =>
+            {
+                self.create_sandbox_move_selection(1)
+            }
             KeyCode::Backspace => self.create_sandbox_backspace(),
-            KeyCode::Char(' ') if matches!(self.create_sandbox.step, CreateSandboxStep::Source | CreateSandboxStep::Addons) => {
+            KeyCode::Char(' ')
+                if matches!(
+                    self.create_sandbox.step,
+                    CreateSandboxStep::Source | CreateSandboxStep::Addons
+                ) =>
+            {
                 self.create_sandbox_toggle_current();
             }
-            KeyCode::Char(c) if key.modifiers.is_empty() || key.modifiers == KeyModifiers::SHIFT => {
+            KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.submit_create_sandbox().await;
+            }
+            KeyCode::Char(c)
+                if key.modifiers.is_empty() || key.modifiers == KeyModifiers::SHIFT =>
+            {
                 self.create_sandbox_type_char(c);
             }
             _ => {}
@@ -605,7 +727,11 @@ impl App {
         // Clear previous errors
         self.login_error = None;
 
-        match self.api.login(&self.login_email, &self.login_password).await {
+        match self
+            .api
+            .login(&self.login_email, &self.login_password)
+            .await
+        {
             Ok(response) => {
                 let token = response.token;
                 self.config.connection.api_token = Some(token.clone());

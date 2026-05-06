@@ -9,10 +9,15 @@ use crate::types::Sandbox;
 #[serde(rename_all = "camelCase")]
 pub struct CreateSandboxRequest {
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub github_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub flavor: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub resource_tier: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub addons: Option<Vec<String>>,
 }
 
@@ -47,7 +52,10 @@ impl ApiClient {
     /// Start a sandbox
     pub async fn start_sandbox(&self, id: &str) -> Result<()> {
         let _: serde_json::Value = self
-            .post(&format!("/api/v2/sandboxes/{}/start", id), &serde_json::json!({}))
+            .post(
+                &format!("/api/v2/sandboxes/{}/start", id),
+                &serde_json::json!({}),
+            )
             .await?;
         Ok(())
     }
@@ -55,7 +63,10 @@ impl ApiClient {
     /// Stop a sandbox
     pub async fn stop_sandbox(&self, id: &str) -> Result<()> {
         let _: serde_json::Value = self
-            .post(&format!("/api/v2/sandboxes/{}/stop", id), &serde_json::json!({}))
+            .post(
+                &format!("/api/v2/sandboxes/{}/stop", id),
+                &serde_json::json!({}),
+            )
             .await?;
         Ok(())
     }
@@ -74,7 +85,10 @@ impl ApiClient {
     /// Pause a sandbox
     pub async fn pause_sandbox(&self, id: &str) -> Result<()> {
         let _: serde_json::Value = self
-            .post(&format!("/api/v2/sandboxes/{}/pause", id), &serde_json::json!({}))
+            .post(
+                &format!("/api/v2/sandboxes/{}/pause", id),
+                &serde_json::json!({}),
+            )
             .await?;
         Ok(())
     }
