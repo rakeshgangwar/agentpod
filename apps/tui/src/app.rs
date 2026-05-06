@@ -285,9 +285,11 @@ impl App {
                 self.connected = true;
                 self.active_view = View::Dashboard;
                 self.login_error = None;
+                self.login_password = String::new(); // Clear password
             }
             ApiResult::LoginError { message } => {
                 self.login_error = Some(message);
+                self.login_password = String::new(); // Clear password on error
             }
             ApiResult::SandboxesLoaded { sandboxes } => {
                 // Parse sandboxes from JSON
@@ -309,6 +311,21 @@ impl App {
 
     /// Attempt login
     async fn attempt_login(&mut self) {
+        // Validate email
+        if self.login_email.trim().is_empty() {
+            self.login_error = Some("email is required".to_string());
+            return;
+        }
+
+        // Validate password
+        if self.login_password.is_empty() {
+            self.login_error = Some("password is required".to_string());
+            return;
+        }
+
+        // Clear previous errors
+        self.login_error = None;
+
         // TODO: Implement actual login
         self.login_error = Some("Login not yet implemented".to_string());
     }
