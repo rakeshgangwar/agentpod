@@ -200,17 +200,36 @@ async fn test_create_sandbox_details_text_entry_and_focus() {
 }
 
 #[tokio::test]
+async fn test_create_sandbox_details_text_entry_preserves_vim_keys() {
+    let mut app = test_app();
+    app.active_view = View::Dashboard;
+    app.handle_key_event(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::NONE)).await;
+    app.handle_key_event(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)).await;
+
+    for c in "jakarta".chars() {
+        app.handle_key_event(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE)).await;
+    }
+    assert_eq!(app.create_sandbox.name, "jakarta");
+
+    app.handle_key_event(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE)).await;
+    for c in "backend".chars() {
+        app.handle_key_event(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE)).await;
+    }
+    assert_eq!(app.create_sandbox.description, "backend");
+}
+
+#[tokio::test]
 async fn test_create_sandbox_git_url_text_entry() {
     let mut app = test_app();
     app.active_view = View::Dashboard;
     app.handle_key_event(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::NONE)).await;
     app.handle_key_event(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE)).await;
 
-    for c in "https://github.com/acme/api".chars() {
+    for c in "https://github.com/acme/joker".chars() {
         app.handle_key_event(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE)).await;
     }
 
-    assert_eq!(app.create_sandbox.git_url, "https://github.com/acme/api");
+    assert_eq!(app.create_sandbox.git_url, "https://github.com/acme/joker");
 }
 
 #[tokio::test]

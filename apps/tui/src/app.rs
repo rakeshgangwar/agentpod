@@ -575,8 +575,8 @@ impl App {
             KeyCode::Enter => self.create_sandbox_next_step(),
             KeyCode::Tab => self.create_sandbox_move_focus_forward(),
             KeyCode::BackTab => self.create_sandbox_move_focus_backward(),
-            KeyCode::Up | KeyCode::Char('k') => self.create_sandbox_move_selection(-1),
-            KeyCode::Down | KeyCode::Char('j') => self.create_sandbox_move_selection(1),
+            KeyCode::Up | KeyCode::Char('k') if self.create_sandbox.step == CreateSandboxStep::Runtime => self.create_sandbox_move_selection(-1),
+            KeyCode::Down | KeyCode::Char('j') if self.create_sandbox.step == CreateSandboxStep::Runtime => self.create_sandbox_move_selection(1),
             KeyCode::Backspace => self.create_sandbox_backspace(),
             KeyCode::Char(' ') if matches!(self.create_sandbox.step, CreateSandboxStep::Source | CreateSandboxStep::Addons) => {
                 self.create_sandbox_toggle_current();
