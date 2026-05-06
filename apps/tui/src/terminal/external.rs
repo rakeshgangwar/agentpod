@@ -1,10 +1,12 @@
 use anyhow::Result;
 
 /// External terminal launcher (tmux)
+#[allow(dead_code)]
 pub struct ExternalTerminal {
     sandbox_id: String,
 }
 
+#[allow(dead_code)]
 impl ExternalTerminal {
     pub fn new(sandbox_id: &str) -> Self {
         Self {

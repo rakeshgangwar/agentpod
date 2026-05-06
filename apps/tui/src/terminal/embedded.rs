@@ -1,10 +1,12 @@
 use anyhow::Result;
 
 /// Embedded VT100 terminal renderer
+#[allow(dead_code)]
 pub struct EmbeddedTerminal {
     sandbox_id: String,
 }
 
+#[allow(dead_code)]
 impl EmbeddedTerminal {
     pub fn new(sandbox_id: &str) -> Self {
         Self {

@@ -1,3 +1,8 @@
+//! Shared type definitions for AgentPod TUI
+//!
+//! This module contains the data structures used throughout the TUI application,
+//! including sandbox management, chat, git, and provider types.
+
 use serde::{Deserialize, Serialize};
 
 /// Sandbox status
@@ -40,6 +45,7 @@ pub struct Sandbox {
 
 /// Container flavor
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct ContainerFlavor {
     pub id: String,
     pub name: String,
@@ -49,6 +55,7 @@ pub struct ContainerFlavor {
 
 /// Resource tier
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct ResourceTier {
     pub id: String,
     pub name: String,
@@ -59,6 +66,7 @@ pub struct ResourceTier {
 
 /// LLM Provider
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct Provider {
     pub id: String,
     pub name: String,
@@ -69,6 +77,7 @@ pub struct Provider {
 
 /// Chat session
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct ChatSession {
     pub id: String,
     pub name: Option<String>,
@@ -78,6 +87,7 @@ pub struct ChatSession {
 
 /// Chat message
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct ChatMessage {
     pub id: String,
     pub role: String,
@@ -87,6 +97,7 @@ pub struct ChatMessage {
 
 /// Git status
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct GitStatus {
     pub branch: String,
     pub ahead: u32,
@@ -98,6 +109,7 @@ pub struct GitStatus {
 
 /// Git commit
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct GitCommit {
     pub hash: String,
     pub author: String,
@@ -107,6 +119,7 @@ pub struct GitCommit {
 
 /// File node in file browser
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct FileNode {
     pub name: String,
     pub path: String,
@@ -117,6 +130,7 @@ pub struct FileNode {
 
 /// Connection status
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct ConnectionInfo {
     pub api_url: String,
     pub connected: bool,
