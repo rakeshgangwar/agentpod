@@ -78,41 +78,58 @@ fn render_active_step(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn source_lines(app: &App) -> Vec<String> {
+    let source_marker = focus_marker(app, 0);
+    let git_url_marker = if app.create_sandbox.source == CreateSandboxSource::Git {
+        focus_marker(app, 1)
+    } else {
+        " "
+    };
+
     vec![
         format!(
-            "Source: {}",
+            "{source_marker} Source: {}",
             match app.create_sandbox.source {
                 CreateSandboxSource::Scratch => "scratch",
                 CreateSandboxSource::Git => "git",
             }
         ),
         "Space toggles scratch/git.".to_string(),
-        format!("Git URL: {}", app.create_sandbox.git_url),
+        format!("{git_url_marker} Git URL: {}", app.create_sandbox.git_url),
     ]
 }
 
 fn details_lines(app: &App) -> Vec<String> {
     vec![
-        format!("Name: {}", app.create_sandbox.name),
-        format!("Description: {}", app.create_sandbox.description),
+        format!("{} Name: {}", focus_marker(app, 0), app.create_sandbox.name),
+        format!(
+            "{} Description: {}",
+            focus_marker(app, 1),
+            app.create_sandbox.description
+        ),
     ]
 }
 
 fn runtime_lines(app: &App) -> Vec<String> {
     vec![
-        format!("Flavor: {}", app.create_sandbox.selected_flavor),
         format!(
-            "Resource tier: {}",
+            "{} Flavor: {}",
+            focus_marker(app, 0),
+            app.create_sandbox.selected_flavor
+        ),
+        format!(
+            "{} Resource tier: {}",
+            focus_marker(app, 1),
             app.create_sandbox.selected_resource_tier
         ),
-        "Use Up/Down then Space to select.".to_string(),
+        "Use Up/Down or j/k to change the focused selection.".to_string(),
     ]
 }
 
 fn addons_lines(app: &App) -> Vec<String> {
     vec![
         format!(
-            "code-server: {}",
+            "{} code-server: {}",
+            focus_marker(app, 0),
             if app
                 .create_sandbox
                 .selected_addons
@@ -126,6 +143,14 @@ fn addons_lines(app: &App) -> Vec<String> {
         ),
         "Space toggles the focused add-on.".to_string(),
     ]
+}
+
+fn focus_marker(app: &App, focus: usize) -> &'static str {
+    if app.create_sandbox.focus == focus {
+        ">"
+    } else {
+        " "
+    }
 }
 
 fn review_lines(app: &App) -> Vec<String> {
