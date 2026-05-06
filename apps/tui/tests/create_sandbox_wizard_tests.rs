@@ -222,6 +222,45 @@ async fn test_create_sandbox_git_source_derives_name_from_repo_slug() {
 }
 
 #[tokio::test]
+async fn test_create_sandbox_git_source_derives_name_from_repo_git_url() {
+    let mut app = test_app();
+    app.active_view = View::Dashboard;
+    app.handle_key_event(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::NONE))
+        .await;
+    app.handle_key_event(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE))
+        .await;
+    assert_eq!(app.create_sandbox.source, CreateSandboxSource::Git);
+
+    app.create_sandbox.git_url = "https://github.com/acme/repo.git".to_string();
+    app.handle_key_event(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE))
+        .await;
+
+    assert_eq!(app.create_sandbox.step, CreateSandboxStep::Details);
+    assert_eq!(app.create_sandbox.name, "repo");
+}
+
+#[tokio::test]
+async fn test_create_sandbox_git_source_rejects_repository_subpath_url() {
+    let mut app = test_app();
+    app.active_view = View::Dashboard;
+    app.handle_key_event(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::NONE))
+        .await;
+    app.handle_key_event(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE))
+        .await;
+    assert_eq!(app.create_sandbox.source, CreateSandboxSource::Git);
+
+    app.create_sandbox.git_url = "https://github.com/acme/repo/issues/1".to_string();
+    app.handle_key_event(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE))
+        .await;
+
+    assert_eq!(app.create_sandbox.step, CreateSandboxStep::Source);
+    assert_eq!(
+        app.create_sandbox.error,
+        Some("Git URL must be a GitHub or GitLab repository URL".to_string())
+    );
+}
+
+#[tokio::test]
 async fn test_create_sandbox_esc_moves_back_one_step() {
     let mut app = test_app();
     app.active_view = View::Dashboard;

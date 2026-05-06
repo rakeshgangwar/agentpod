@@ -475,10 +475,12 @@ impl App {
             .or_else(|| url.strip_prefix("http://gitlab.com/"))?;
         let mut segments = path.split('/').filter(|segment| !segment.is_empty());
         segments.next()?;
-        segments
-            .next()
-            .map(|segment| segment.trim_end_matches(".git").to_string())
-            .filter(|segment| !segment.is_empty())
+        let repo = segments.next()?.trim_end_matches(".git");
+        if repo.is_empty() || segments.next().is_some() {
+            None
+        } else {
+            Some(repo.to_string())
+        }
     }
 
     fn create_sandbox_request_name(&self) -> String {
