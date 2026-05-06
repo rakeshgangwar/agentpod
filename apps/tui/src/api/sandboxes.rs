@@ -2,7 +2,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 use super::ApiClient;
-use crate::types::{Sandbox, SandboxStatus};
+use crate::types::Sandbox;
 
 /// Create sandbox request
 #[derive(Debug, Serialize)]

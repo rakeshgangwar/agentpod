@@ -9,6 +9,7 @@ mod types;
 mod api;
 mod terminal;
 mod ui;
+mod util;
 
 use cli::Cli;
 use config::Config;
@@ -36,10 +37,10 @@ async fn main() -> Result<()> {
     
     // Create app and event loop
     let mut app = App::new(config, cli);
-    let event_loop = EventLoop::new();
+    let mut event_loop = EventLoop::new();
     
     // Run the app
-    let result = run(&mut terminal, &mut app, &event_loop).await;
+    let result = run(&mut terminal, &mut app, &mut event_loop).await;
     
     // Restore terminal
     ratatui::restore();
@@ -50,7 +51,7 @@ async fn main() -> Result<()> {
 async fn run(
     terminal: &mut ratatui::DefaultTerminal,
     app: &mut App,
-    event_loop: &EventLoop,
+    event_loop: &mut EventLoop,
 ) -> Result<()> {
     loop {
         // Render UI
@@ -68,7 +69,7 @@ async fn run(
                 return Ok(());
             }
             event::AppEvent::ApiResult(result) => {
-                app.handle_api_result(result).await;
+                app.handle_api_result(result);
             }
             event::AppEvent::ConnectionStatus(connected) => {
                 app.handle_connection_status(connected);

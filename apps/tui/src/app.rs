@@ -1,10 +1,10 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::Frame;
 
 use crate::api::ApiClient;
 use crate::cli::Cli;
 use crate::config::Config;
-use crate::event::{AppEvent, ApiResult};
+use crate::event::ApiResult;
 use crate::types::Sandbox;
 use crate::ui;
 
@@ -191,6 +191,9 @@ impl App {
             }
             KeyCode::Tab => {
                 self.active_view = View::Chat;
+            }
+            KeyCode::BackTab => {
+                self.active_view = View::Settings;
             }
             _ => {}
         }
