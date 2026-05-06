@@ -4,6 +4,10 @@
   "model": "anthropic/claude-opus-4-5-20251101",
   "small_model": "anthropic/claude-sonnet-4-5-20250929",
   
+  "plugin": [
+    "superpowers@git+https://github.com/obra/superpowers.git"
+  ],
+  
   "mcp": {
     "tauri-mcp": {
       "type": "local",
@@ -24,6 +28,25 @@
     "chrome-devtools": {
       "type": "local",
       "command": ["npx", "-y", "chrome-devtools-mcp@latest"]
+    },
+    "github": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+      }
+    },
+    "postgres": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-postgres", "${DATABASE_URL}"]
+    },
+    "playwright": {
+      "type": "local",
+      "command": ["npx", "-y", "@playwright/mcp@latest"]
+    },
+    "shadcn": {
+      "type": "local",
+      "command": ["npx", "-y", "shadcn@latest", "mcp"]
     }
   },
   
@@ -125,13 +148,6 @@
   "mode": {
     "plan": {
       "model": "anthropic/claude-sonnet-4-5-20250929"
-    }
-  },
-  
-  "tui": {
-    "scroll_speed": 3,
-    "scroll_acceleration": {
-      "enabled": true
     }
   }
 }

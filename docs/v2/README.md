@@ -40,6 +40,7 @@ The [Agent Client Protocol (ACP)](https://agentclientprotocol.com) is an open st
 | 3 | [Frontend](./phase-3-frontend/) | Agent selection UI & chat adapter | 🔲 Pending |
 | 4 | [Migration](./phase-4-migration/) | Migrate OpenCode SDK to ACP | 🔲 Pending |
 | 5 | [Modular Containers](./modular-containers.md) | Resource tiers, flavors, and add-ons | 🔄 In Progress |
+| 6 | [TUI](./phase-6-tui/) | Terminal User Interface (Rust + ratatui) | 📋 Planned |
 
 ## Key Documents
 
