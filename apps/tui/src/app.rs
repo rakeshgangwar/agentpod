@@ -468,6 +468,10 @@ impl App {
 
     fn create_sandbox_git_repo_name(&self) -> Option<String> {
         let url = self.create_sandbox.git_url.trim();
+        if url.contains(['?', '#']) {
+            return None;
+        }
+
         let path = url
             .strip_prefix("https://github.com/")
             .or_else(|| url.strip_prefix("http://github.com/"))
