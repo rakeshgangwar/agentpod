@@ -392,9 +392,73 @@ impl App {
         self.active_view = View::Dashboard;
     }
 
+    fn create_sandbox_next_step(&mut self) {
+        self.create_sandbox.error = None;
+
+        match self.create_sandbox.step {
+            CreateSandboxStep::Source => {
+                if self.create_sandbox.source == CreateSandboxSource::Git
+                    && !self.create_sandbox_git_url_valid()
+                {
+                    self.create_sandbox.error =
+                        Some("Git URL must be a GitHub or GitLab URL".to_string());
+                    return;
+                }
+                self.create_sandbox.step = CreateSandboxStep::Details;
+                self.create_sandbox.focus = 0;
+            }
+            CreateSandboxStep::Details => {
+                if self.create_sandbox.name.trim().is_empty() {
+                    self.create_sandbox.error = Some("name is required".to_string());
+                    return;
+                }
+                self.create_sandbox.step = CreateSandboxStep::Runtime;
+                self.create_sandbox.focus = 0;
+            }
+            CreateSandboxStep::Runtime => {
+                self.create_sandbox.step = CreateSandboxStep::Addons;
+                self.create_sandbox.focus = 0;
+            }
+            CreateSandboxStep::Addons => {
+                self.create_sandbox.step = CreateSandboxStep::Review;
+                self.create_sandbox.focus = 0;
+            }
+            CreateSandboxStep::Review => {}
+        }
+    }
+
+    fn create_sandbox_previous_step(&mut self) {
+        self.create_sandbox.error = None;
+
+        self.create_sandbox.step = match self.create_sandbox.step {
+            CreateSandboxStep::Source => {
+                self.cancel_create_sandbox();
+                return;
+            }
+            CreateSandboxStep::Details => CreateSandboxStep::Source,
+            CreateSandboxStep::Runtime => CreateSandboxStep::Details,
+            CreateSandboxStep::Addons => CreateSandboxStep::Runtime,
+            CreateSandboxStep::Review => CreateSandboxStep::Addons,
+        };
+        self.create_sandbox.focus = 0;
+    }
+
+    fn create_sandbox_git_url_valid(&self) -> bool {
+        let url = self.create_sandbox.git_url.trim();
+        !url.is_empty() && (url.contains("github.com/") || url.contains("gitlab.com/"))
+    }
+
     async fn handle_create_sandbox_keys(&mut self, key: KeyEvent) {
         match key.code {
-            KeyCode::Esc => self.cancel_create_sandbox(),
+            KeyCode::Esc => self.create_sandbox_previous_step(),
+            KeyCode::Enter => self.create_sandbox_next_step(),
+            KeyCode::Char(' ') if self.create_sandbox.step == CreateSandboxStep::Source => {
+                self.create_sandbox.source = match self.create_sandbox.source {
+                    CreateSandboxSource::Scratch => CreateSandboxSource::Git,
+                    CreateSandboxSource::Git => CreateSandboxSource::Scratch,
+                };
+                self.create_sandbox.error = None;
+            }
             _ => {}
         }
     }
