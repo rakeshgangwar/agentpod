@@ -5,7 +5,7 @@ use crate::api::ApiClient;
 use crate::cli::Cli;
 use crate::config::Config;
 use crate::event::ApiResult;
-use crate::types::Sandbox;
+use crate::types::{Sandbox, SandboxStatus};
 use crate::ui;
 
 /// Available views
@@ -173,6 +173,15 @@ impl App {
             KeyCode::Char('n') => {
                 // TODO: Create new sandbox
             }
+            KeyCode::Char('s') => {
+                self.start_selected_sandbox().await;
+            }
+            KeyCode::Char('x') => {
+                self.stop_selected_sandbox().await;
+            }
+            KeyCode::Char('d') => {
+                self.delete_selected_sandbox().await;
+            }
             KeyCode::Char('r') => {
                 self.load_sandboxes().await;
             }
@@ -332,7 +341,56 @@ impl App {
 
     /// Load sandboxes from API
     async fn load_sandboxes(&mut self) {
-        // TODO: Implement actual sandbox loading
-        self.sandboxes_loaded = true;
+        if let Ok(sandboxes) = self.api.list_sandboxes().await {
+            self.sandboxes = sandboxes;
+            if !self.sandboxes.is_empty() {
+                self.selected_sandbox = self.selected_sandbox.min(self.sandboxes.len() - 1);
+            } else {
+                self.selected_sandbox = 0;
+            }
+            self.sandboxes_loaded = true;
+        }
+    }
+
+    async fn start_selected_sandbox(&mut self) {
+        let Some(sandbox) = self.sandboxes.get(self.selected_sandbox) else {
+            return;
+        };
+        let sandbox_id = sandbox.id.clone();
+
+        if self.api.start_sandbox(&sandbox_id).await.is_ok() {
+            if let Some(sandbox) = self.sandboxes.get_mut(self.selected_sandbox) {
+                sandbox.status = SandboxStatus::Running;
+            }
+        }
+    }
+
+    async fn stop_selected_sandbox(&mut self) {
+        let Some(sandbox) = self.sandboxes.get(self.selected_sandbox) else {
+            return;
+        };
+        let sandbox_id = sandbox.id.clone();
+
+        if self.api.stop_sandbox(&sandbox_id).await.is_ok() {
+            if let Some(sandbox) = self.sandboxes.get_mut(self.selected_sandbox) {
+                sandbox.status = SandboxStatus::Stopped;
+            }
+        }
+    }
+
+    async fn delete_selected_sandbox(&mut self) {
+        let Some(sandbox) = self.sandboxes.get(self.selected_sandbox) else {
+            return;
+        };
+        let sandbox_id = sandbox.id.clone();
+
+        if self.api.delete_sandbox(&sandbox_id).await.is_ok() {
+            self.sandboxes.remove(self.selected_sandbox);
+            if self.sandboxes.is_empty() {
+                self.selected_sandbox = 0;
+            } else {
+                self.selected_sandbox = self.selected_sandbox.min(self.sandboxes.len() - 1);
+            }
+        }
     }
 }

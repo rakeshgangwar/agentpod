@@ -6,6 +6,7 @@ use crate::types::Sandbox;
 
 /// Create sandbox request
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateSandboxRequest {
     pub name: String,
     pub description: Option<String>,

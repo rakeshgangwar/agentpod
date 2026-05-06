@@ -1,5 +1,4 @@
 use agentpod_tui::config::Config;
-use std::path::PathBuf;
 use tempfile::tempdir;
 
 #[test]

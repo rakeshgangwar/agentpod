@@ -1,5 +1,4 @@
 use agentpod_tui::api::ApiClient;
-use serde_json::json;
 
 #[tokio::test]
 async fn test_api_client_new() {

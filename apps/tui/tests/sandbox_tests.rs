@@ -1,8 +1,8 @@
-use agentpod_tui::api::ApiClient;
-use agentpod_tui::types::{Sandbox, SandboxStatus};
+use agentpod_tui::api::{ApiClient, sandboxes::CreateSandboxRequest};
+use agentpod_tui::types::SandboxStatus;
 use serde_json::json;
 use wiremock::{MockServer, Mock, ResponseTemplate};
-use wiremock::matchers::{method, path, header};
+use wiremock::matchers::{body_json, method, path};
 
 #[tokio::test]
 async fn test_list_sandboxes_success() {
@@ -163,6 +163,72 @@ async fn test_delete_sandbox_success() {
 
     let client = ApiClient::new(&mock_server.uri(), Some("test-token".to_string()));
     let result = client.delete_sandbox("sb-1").await;
+
+    assert!(result.is_ok());
+}
+
+#[tokio::test]
+async fn test_create_sandbox_sends_api_field_names() {
+    let mock_server = MockServer::start().await;
+
+    let expected_body = json!({
+        "name": "New Sandbox",
+        "description": "Created from the TUI",
+        "githubUrl": "https://github.com/test/repo",
+        "flavor": "fullstack",
+        "resourceTier": "builder",
+        "addons": ["code-server"]
+    });
+
+    let response_body = json!({
+        "id": "sb-new",
+        "name": "New Sandbox",
+        "description": "Created from the TUI",
+        "status": "creating",
+        "container_id": null,
+        "git_url": "https://github.com/test/repo",
+        "flavor_id": "fullstack",
+        "resource_tier_id": "builder",
+        "created_at": "2024-01-03T00:00:00Z",
+        "updated_at": "2024-01-03T00:00:00Z"
+    });
+
+    Mock::given(method("POST"))
+        .and(path("/api/v2/sandboxes"))
+        .and(body_json(expected_body))
+        .respond_with(ResponseTemplate::new(200).set_body_json(response_body))
+        .mount(&mock_server)
+        .await;
+
+    let client = ApiClient::new(&mock_server.uri(), Some("test-token".to_string()));
+    let result = client
+        .create_sandbox(CreateSandboxRequest {
+            name: "New Sandbox".to_string(),
+            description: Some("Created from the TUI".to_string()),
+            github_url: Some("https://github.com/test/repo".to_string()),
+            flavor: Some("fullstack".to_string()),
+            resource_tier: Some("builder".to_string()),
+            addons: Some(vec!["code-server".to_string()]),
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(result.id, "sb-new");
+    assert_eq!(result.status, SandboxStatus::Creating);
+}
+
+#[tokio::test]
+async fn test_restart_sandbox_success() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("POST"))
+        .and(path("/api/v2/sandboxes/sb-1/restart"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"success": true})))
+        .mount(&mock_server)
+        .await;
+
+    let client = ApiClient::new(&mock_server.uri(), Some("test-token".to_string()));
+    let result = client.restart_sandbox("sb-1").await;
 
     assert!(result.is_ok());
 }
