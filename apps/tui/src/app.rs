@@ -397,12 +397,18 @@ impl App {
 
         match self.create_sandbox.step {
             CreateSandboxStep::Source => {
-                if self.create_sandbox.source == CreateSandboxSource::Git
-                    && !self.create_sandbox_git_url_valid()
-                {
-                    self.create_sandbox.error =
-                        Some("Git URL must be a GitHub or GitLab URL".to_string());
-                    return;
+                if self.create_sandbox.source == CreateSandboxSource::Git {
+                    if !self.create_sandbox_git_url_valid() {
+                        self.create_sandbox.error =
+                            Some("Git URL must be a GitHub or GitLab repository URL".to_string());
+                        return;
+                    }
+
+                    if self.create_sandbox.name.trim().is_empty() {
+                        if let Some(repo_name) = self.create_sandbox_git_repo_name() {
+                            self.create_sandbox.name = repo_name;
+                        }
+                    }
                 }
                 self.create_sandbox.step = CreateSandboxStep::Details;
                 self.create_sandbox.focus = 0;
@@ -444,11 +450,19 @@ impl App {
     }
 
     fn create_sandbox_git_url_valid(&self) -> bool {
+        self.create_sandbox_git_repo_name().is_some()
+    }
+
+    fn create_sandbox_git_repo_name(&self) -> Option<String> {
         let url = self.create_sandbox.git_url.trim();
-        url.starts_with("https://github.com/")
-            || url.starts_with("http://github.com/")
-            || url.starts_with("https://gitlab.com/")
-            || url.starts_with("http://gitlab.com/")
+        let path = url
+            .strip_prefix("https://github.com/")
+            .or_else(|| url.strip_prefix("http://github.com/"))
+            .or_else(|| url.strip_prefix("https://gitlab.com/"))
+            .or_else(|| url.strip_prefix("http://gitlab.com/"))?;
+        let mut segments = path.split('/').filter(|segment| !segment.is_empty());
+        segments.next()?;
+        segments.next().map(ToString::to_string)
     }
 
     async fn handle_create_sandbox_keys(&mut self, key: KeyEvent) {
