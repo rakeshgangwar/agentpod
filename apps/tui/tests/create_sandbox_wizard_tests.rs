@@ -176,3 +176,72 @@ async fn test_create_sandbox_esc_moves_back_one_step() {
     assert_eq!(app.active_view, View::CreateSandbox);
     assert_eq!(app.create_sandbox.step, CreateSandboxStep::Source);
 }
+
+#[tokio::test]
+async fn test_create_sandbox_details_text_entry_and_focus() {
+    let mut app = test_app();
+    app.active_view = View::Dashboard;
+    app.handle_key_event(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::NONE)).await;
+    app.handle_key_event(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)).await;
+
+    for c in "api".chars() {
+        app.handle_key_event(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE)).await;
+    }
+    assert_eq!(app.create_sandbox.name, "api");
+
+    app.handle_key_event(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE)).await;
+    for c in "service".chars() {
+        app.handle_key_event(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE)).await;
+    }
+    assert_eq!(app.create_sandbox.description, "service");
+
+    app.handle_key_event(KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE)).await;
+    assert_eq!(app.create_sandbox.description, "servic");
+}
+
+#[tokio::test]
+async fn test_create_sandbox_git_url_text_entry() {
+    let mut app = test_app();
+    app.active_view = View::Dashboard;
+    app.handle_key_event(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::NONE)).await;
+    app.handle_key_event(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE)).await;
+
+    for c in "https://github.com/acme/api".chars() {
+        app.handle_key_event(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE)).await;
+    }
+
+    assert_eq!(app.create_sandbox.git_url, "https://github.com/acme/api");
+}
+
+#[tokio::test]
+async fn test_create_sandbox_runtime_selection_changes_values() {
+    let mut app = test_app();
+    app.active_view = View::Dashboard;
+    app.handle_key_event(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::NONE)).await;
+    app.handle_key_event(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)).await;
+    app.create_sandbox.name = "Runtime Test".to_string();
+    app.handle_key_event(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)).await;
+
+    app.handle_key_event(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE)).await;
+    app.handle_key_event(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE)).await;
+    assert_eq!(app.create_sandbox.selected_flavor, "go");
+
+    app.handle_key_event(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE)).await;
+    app.handle_key_event(KeyEvent::new(KeyCode::Up, KeyModifiers::NONE)).await;
+    app.handle_key_event(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE)).await;
+    assert_eq!(app.create_sandbox.selected_resource_tier, "starter");
+}
+
+#[tokio::test]
+async fn test_create_sandbox_addon_space_toggles_code_server() {
+    let mut app = test_app();
+    app.active_view = View::Dashboard;
+    app.handle_key_event(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::NONE)).await;
+    app.create_sandbox.step = CreateSandboxStep::Addons;
+
+    app.handle_key_event(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE)).await;
+    assert!(app.create_sandbox.selected_addons.is_empty());
+
+    app.handle_key_event(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE)).await;
+    assert_eq!(app.create_sandbox.selected_addons, vec!["code-server".to_string()]);
+}

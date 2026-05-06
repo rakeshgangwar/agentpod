@@ -1,4 +1,4 @@
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::Frame;
 
 use crate::api::ApiClient;
@@ -7,6 +7,10 @@ use crate::config::Config;
 use crate::event::ApiResult;
 use crate::types::{Sandbox, SandboxStatus};
 use crate::ui;
+
+const CREATE_SANDBOX_FLAVORS: [&str; 7] = ["js", "python", "go", "rust", "fullstack", "polyglot", "bare"];
+const CREATE_SANDBOX_RESOURCE_TIERS: [&str; 2] = ["starter", "builder"];
+const CREATE_SANDBOX_ADDONS: [&str; 1] = ["code-server"];
 
 /// Available views
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -465,16 +469,118 @@ impl App {
         segments.next().map(ToString::to_string)
     }
 
-    async fn handle_create_sandbox_keys(&mut self, key: KeyEvent) {
-        match key.code {
-            KeyCode::Esc => self.create_sandbox_previous_step(),
-            KeyCode::Enter => self.create_sandbox_next_step(),
-            KeyCode::Char(' ') if self.create_sandbox.step == CreateSandboxStep::Source => {
+    fn create_sandbox_focus_count(&self) -> usize {
+        match self.create_sandbox.step {
+            CreateSandboxStep::Source => {
+                if self.create_sandbox.source == CreateSandboxSource::Git { 2 } else { 1 }
+            }
+            CreateSandboxStep::Details => 2,
+            CreateSandboxStep::Runtime => 2,
+            CreateSandboxStep::Addons => CREATE_SANDBOX_ADDONS.len().max(1),
+            CreateSandboxStep::Review => 1,
+        }
+    }
+
+    fn create_sandbox_move_focus_forward(&mut self) {
+        let count = self.create_sandbox_focus_count();
+        self.create_sandbox.focus = (self.create_sandbox.focus + 1) % count;
+    }
+
+    fn create_sandbox_move_focus_backward(&mut self) {
+        let count = self.create_sandbox_focus_count();
+        self.create_sandbox.focus = if self.create_sandbox.focus == 0 {
+            count - 1
+        } else {
+            self.create_sandbox.focus - 1
+        };
+    }
+
+    fn create_sandbox_type_char(&mut self, c: char) {
+        match self.create_sandbox.step {
+            CreateSandboxStep::Source if self.create_sandbox.source == CreateSandboxSource::Git && self.create_sandbox.focus == 1 => {
+                self.create_sandbox.git_url.push(c);
+            }
+            CreateSandboxStep::Details if self.create_sandbox.focus == 0 => {
+                self.create_sandbox.name.push(c);
+            }
+            CreateSandboxStep::Details if self.create_sandbox.focus == 1 => {
+                self.create_sandbox.description.push(c);
+            }
+            _ => {}
+        }
+    }
+
+    fn create_sandbox_backspace(&mut self) {
+        match self.create_sandbox.step {
+            CreateSandboxStep::Source if self.create_sandbox.source == CreateSandboxSource::Git && self.create_sandbox.focus == 1 => {
+                self.create_sandbox.git_url.pop();
+            }
+            CreateSandboxStep::Details if self.create_sandbox.focus == 0 => {
+                self.create_sandbox.name.pop();
+            }
+            CreateSandboxStep::Details if self.create_sandbox.focus == 1 => {
+                self.create_sandbox.description.pop();
+            }
+            _ => {}
+        }
+    }
+
+    fn create_sandbox_move_selection(&mut self, delta: isize) {
+        match self.create_sandbox.step {
+            CreateSandboxStep::Runtime if self.create_sandbox.focus == 0 => {
+                let current = CREATE_SANDBOX_FLAVORS
+                    .iter()
+                    .position(|flavor| *flavor == self.create_sandbox.selected_flavor)
+                    .unwrap_or(0);
+                let next = (current as isize + delta).clamp(0, (CREATE_SANDBOX_FLAVORS.len() - 1) as isize) as usize;
+                self.create_sandbox.selected_flavor = CREATE_SANDBOX_FLAVORS[next].to_string();
+            }
+            CreateSandboxStep::Runtime if self.create_sandbox.focus == 1 => {
+                let current = CREATE_SANDBOX_RESOURCE_TIERS
+                    .iter()
+                    .position(|tier| *tier == self.create_sandbox.selected_resource_tier)
+                    .unwrap_or(0);
+                let next = (current as isize + delta).clamp(0, (CREATE_SANDBOX_RESOURCE_TIERS.len() - 1) as isize) as usize;
+                self.create_sandbox.selected_resource_tier = CREATE_SANDBOX_RESOURCE_TIERS[next].to_string();
+            }
+            _ => {}
+        }
+    }
+
+    fn create_sandbox_toggle_current(&mut self) {
+        match self.create_sandbox.step {
+            CreateSandboxStep::Source => {
                 self.create_sandbox.source = match self.create_sandbox.source {
                     CreateSandboxSource::Scratch => CreateSandboxSource::Git,
                     CreateSandboxSource::Git => CreateSandboxSource::Scratch,
                 };
                 self.create_sandbox.error = None;
+                self.create_sandbox.focus = if self.create_sandbox.source == CreateSandboxSource::Git { 1 } else { 0 };
+            }
+            CreateSandboxStep::Addons => {
+                let addon = CREATE_SANDBOX_ADDONS[self.create_sandbox.focus.min(CREATE_SANDBOX_ADDONS.len() - 1)];
+                if self.create_sandbox.selected_addons.iter().any(|selected| selected == addon) {
+                    self.create_sandbox.selected_addons.retain(|selected| selected != addon);
+                } else {
+                    self.create_sandbox.selected_addons.push(addon.to_string());
+                }
+            }
+            _ => {}
+        }
+    }
+
+    async fn handle_create_sandbox_keys(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc => self.create_sandbox_previous_step(),
+            KeyCode::Enter => self.create_sandbox_next_step(),
+            KeyCode::Tab => self.create_sandbox_move_focus_forward(),
+            KeyCode::BackTab => self.create_sandbox_move_focus_backward(),
+            KeyCode::Up | KeyCode::Char('k') => self.create_sandbox_move_selection(-1),
+            KeyCode::Down | KeyCode::Char('j') => self.create_sandbox_move_selection(1),
+            KeyCode::Backspace => self.create_sandbox_backspace(),
+            KeyCode::Char(' ') => self.create_sandbox_toggle_current(),
+            KeyCode::Char(c) if key.modifiers.is_empty() || key.modifiers == KeyModifiers::SHIFT => {
+                self.create_sandbox_type_char(c);
             }
             _ => {}
         }
