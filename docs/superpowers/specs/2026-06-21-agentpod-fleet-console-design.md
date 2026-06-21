@@ -392,3 +392,42 @@ Adding a harness = adding a descriptor, **not** changing the daemon.
 - Provisioning is **pluggable** (a `provisioner` interface): **Docker** and **Cloudflare
   Sandbox** exist today, **Kubernetes/agent-sandbox** is added, more (E2B/Daytona/VM) later.
   agent-sandbox is optional (k8s only) so "no lock-in" holds.
+- Terminals are **durable/reattachable** (tmux/`dtach` when present, in-daemon PTY keepalive
+  fallback) — see §7.
+- The OpenCode product is **frozen as legacy** (tagged snapshot); stale docs are **archived**,
+  not deleted — see §16.
+
+---
+
+## 16. Transition & migration (existing docs & code)
+
+Nothing is lost — `main`/`develop` plus git history preserve the entire OpenCode product.
+
+### Legacy
+- The OpenCode product is **frozen**: `main`/`develop` become a recoverable snapshot, tagged
+  **`v0.0.4-opencode`**. No parallel maintenance. `redesign/fleet-console` is the future.
+
+### Code
+- **Refactor in place** the keepers (§10): Bun/Hono `apps/api` → hub; Svelte components
+  (`apps/frontend`) → web console; Docker orchestrator + `cloudflare/worker` → `provisioner`
+  drivers; ACP gateway/agent-registry → descriptors; provider/secret sync → `config` capability.
+- **Delete as replaced** the retired (§10): assistant-ui chat, the Tauri `src-tauri` shell +
+  `invoke()` + `tauri-plugin-mcp`, OpenCode-specific routes/tables, chat schema, pgvector. Git
+  history is the archive — no dead code kept in-tree.
+- **Add** `apps/node-agent` (Go) and `packages/contract`; a Svelte web build replaces the Tauri build.
+- **Restructure** `apps/` to the three tiers (`apps/hub`, `apps/console`, `apps/node-agent`).
+- **Fresh Drizzle migrations**: drop OpenCode/chat tables, add node/cubicle/enrollment/audit. No
+  data migration (old data is OpenCode sandbox/chat state).
+
+### Docs
+- **Archive** the now-stale product docs → `docs/archive/`: old `architecture/`, `implementation/`
+  (current-features, pending-work), `features/*`, `agents/*`, `onboarding-system/`.
+- **Keep** the forward-looking material: `research/multi-agent-ecosystem`, `ideas/cloudflare-*`,
+  `operations/*`, `testing/tdd-workflow`, `design/design-language` — re-evaluated as we build.
+- **Source of truth** = this spec; new docs grow from it. Add a banner atop `docs/README.md` and
+  the root `README.md` pointing here; update `AGENTS.md` as the layout changes.
+
+### Sequencing
+These moves are **P0** work (tag legacy · restructure `apps/` · archive docs · scaffold node-agent
++ contract + web build + banners). Code **deletions** happen incrementally as each piece is
+replaced across P1–P3 — never a big-bang removal.
