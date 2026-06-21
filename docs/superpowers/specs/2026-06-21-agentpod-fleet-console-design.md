@@ -71,6 +71,16 @@ systemd, Claude Code/Codex = ephemeral CLI); (3) descriptors should **wrap each 
 native CLI/API** rather than reinvent introspection. Real maintenance pain (96% disk,
 clobbered configs) makes cleanup and config-backup day-one features.
 
+### Complementary substrates (not competitors)
+
+`kubernetes-sigs/agent-sandbox` (SIG Apps, ~2.9k★, Apache-2.0) provides a Kubernetes
+`Sandbox` CRD for *"isolated, stateful, singleton workloads, ideal for AI agent runtimes"*
+(stable identity, persistent storage, pause/resume/hibernate, warm pools) — and ships
+first-party **Hermes and OpenClaw** examples. It *provisions* sandboxes in Kubernetes; it does
+**not** *attach* to runtimes it didn't create. So it is complementary: a **provisioning
+driver** for AgentPod (§6.5) and validation of the pod/cubicle abstraction — not a competitor
+to the attach-first console.
+
 ---
 
 ## 3. Goals & non-goals
@@ -170,7 +180,8 @@ hub**. It keeps the reusable essentials and gains a node gateway.
 
 - **Keeps:** Better Auth (operator auth + multi-tenant seam), Drizzle + Postgres (registry,
   enrollment tokens, audit, health history — **drop pgvector**), admin/audit, observability
-  (Loki/Grafana), and the Docker orchestrator (for the *provisioning* path).
+  (Loki/Grafana), and the provisioning backends (now generalized behind a driver interface —
+  see §6.5).
 - **Gains:**
   - **Node gateway** — a WSS endpoint holding the live connection from every node-agent.
   - **Broker** — routes a console request to the right node's socket and streams the response
@@ -200,6 +211,22 @@ A workspace package defining the management contract **once**: entities (Node, C
 Capability), verbs, a normalized **event/activity envelope** (for streaming logs, PTY, fs,
 health), and capability flags. Candidate to be shared with kaambaan (kaambaan already
 isolates a `packages/contract`).
+
+### 6.5 Provisioner drivers (the *provision* path)
+
+Provisioning is **pluggable**. A `provisioner` interface (`create` / `destroy` / `pause` /
+`resume` / `status`) has multiple drivers; whichever is used, the provisioned host runs the
+node-agent (baked in / injected) and **auto-enrolls** — so the management contract is identical
+to an attached host. Provisioning is simply *attach where AgentPod created the host.*
+
+| Driver | Target | Status | Notes |
+|---|---|---|---|
+| **Docker** | local / self-host | exists (`orchestrator/docker.ts` + `traefik.ts`) | simplest; default for solo/self-host |
+| **Cloudflare Sandbox** | Cloudflare edge | exists (`cloudflare/worker` + `cloudflare-webhook.ts`) | uses the Cloudflare Sandbox SDK; cloud, no servers to run |
+| **Kubernetes (agent-sandbox)** | k8s cluster | new (P3) | wraps `kubernetes-sigs/agent-sandbox`'s `Sandbox` CRD — stable identity, persistent storage, pause/resume/hibernate, warm pools. **Optional** (only where k8s exists) so "no lock-in" holds |
+| **…more** | E2B, Daytona, Fly, raw VM | future | the interface is open |
+
+This keeps the attach-first core **k8s-free** while letting heavier backends slot in. See §14.
 
 ---
 
@@ -261,8 +288,11 @@ Adding a harness = adding a descriptor, **not** changing the daemon.
 **Reuse / refactor:**
 - `apps/frontend` Svelte components (file browser, xterm, log viewer, config editor) → web console.
 - `apps/api` (Bun + Hono, Drizzle, Better Auth) → hub.
-- Docker orchestrator (`apps/api/src/services/orchestrator`, `sandbox-manager`) → provisioning path
-  (provision = attach where AgentPod also created the host; node-agent baked into the image).
+- Provisioning backends → `provisioner` drivers (§6.5): the **Docker orchestrator**
+  (`apps/api/src/services/orchestrator`, `sandbox-manager`) and the existing **Cloudflare
+  Sandbox** integration (`cloudflare/worker`, `cloudflare-webhook.ts`) both become drivers;
+  Kubernetes/agent-sandbox is a new one. (Provision = attach where AgentPod created the host;
+  node-agent baked in / injected, auto-enrolls.)
 - ACP gateway + `agent-registry` → seed for harness descriptors.
 - Provider/secret sync → the `config` capability (generalized beyond OpenCode).
 - Admin / audit / observability → hub ops.
@@ -311,7 +341,7 @@ Adding a harness = adding a descriptor, **not** changing the daemon.
 | **P0** | contract package + node-agent skeleton + enrollment + WSS + hub registry + console node-list |
 | **P1** | read/observe capabilities (inventory, health, logs, filesystem) + Hermes & OpenClaw descriptors |
 | **P2** | exec/PTY + config (backup/restore/diff) + lifecycle + cleanup (the write/dangerous ops) |
-| **P3** | provisioning-as-attach + Tailscale fast-path + Claude Code / Codex leaf descriptors |
+| **P3** | provisioning-as-attach via the `provisioner` interface (Docker + Cloudflare Sandbox today; Kubernetes/agent-sandbox new) + Tailscale fast-path + Claude Code / Codex leaf descriptors |
 | **P4** | multi-tenant hardening + Cloudflare hub option + optional kaambaan work-plane bridge |
 
 ---
@@ -329,8 +359,12 @@ Adding a harness = adding a descriptor, **not** changing the daemon.
   (WSS is the floor).
 - **kaambaan contract sharing.** Decide whether to extract a shared package now or let each
   product keep its own contract and converge later.
-- **Provisioning scope.** How much of the existing Docker orchestrator survives vs. is rebuilt
-  around the node-agent — to be scoped in P3.
+- **Provisioning scope.** The `provisioner` interface (§6.5) unifies Docker, Cloudflare
+  Sandbox, and Kubernetes/agent-sandbox; how much of the existing Docker/Cloudflare code is
+  reused vs. rebuilt around node-agent auto-enrollment is scoped in P3.
+- **agent-sandbox alignment.** Track `kubernetes-sigs/agent-sandbox` — its Hermes/OpenClaw
+  examples, its in-progress portable-backend proto, and its planned MCP server + fs/exec SDK —
+  as both a provisioning driver *and* a possible transport for k8s-provisioned cubicles.
 
 ---
 
@@ -342,3 +376,6 @@ Adding a harness = adding a descriptor, **not** changing the daemon.
 - Backend: **Bun + Hono hub** (refactor `apps/api`, not replace); broker behind an interface.
 - node-agent: **Go**, attach-first, descriptors wrap native CLIs, Tailscale as accelerator.
 - v1 capabilities: **all eight**. Trust: **single-operator**, multi-tenant-ready model.
+- Provisioning is **pluggable** (a `provisioner` interface): **Docker** and **Cloudflare
+  Sandbox** exist today, **Kubernetes/agent-sandbox** is added, more (E2B/Daytona/VM) later.
+  agent-sandbox is optional (k8s only) so "no lock-in" holds.
