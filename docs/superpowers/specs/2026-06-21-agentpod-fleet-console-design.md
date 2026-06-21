@@ -239,7 +239,7 @@ Each capability is advertised **per cubicle**; the console greys out unsupported
 | **inventory** | enumerate cubicles (recursively) + their advertised capabilities + metadata |
 | **filesystem** | list / read / write / move / delete, upload / download, watch — **jailed to the cubicle root** |
 | **logs** | tail + live-follow + history (process / container / file streams) |
-| **exec / PTY** | one-off commands + interactive shell (xterm.js ↔ PTY) |
+| **exec / PTY** | one-off commands + interactive shell (xterm.js ↔ PTY); **durable & reattachable** — survives console/network drops (see note below) |
 | **config** | read/edit known config files, secret/env injection, **backup / restore / diff / clobber-detection** |
 | **health** | status (running/stopped/crashed), CPU/RAM/disk, uptime, restart count, last activity |
 | **lifecycle** | start / stop / restart — whole runtime, and per-cubicle where supported |
@@ -248,6 +248,17 @@ Each capability is advertised **per cubicle**; the console greys out unsupported
 Streaming verbs (logs, exec, fs-watch) flow over the node tunnel as framed messages in the
 normalized envelope; large blobs (file download, big diffs) go via chunked transfer (and an
 object store later).
+
+**Terminal durability.** Interactive terminals survive console/network disconnects. The
+node-agent backs each cubicle terminal with **tmux** (or lighter `dtach`) when present — the
+operator's PTY is a *client attached* to a host-side session, so a dropped connection leaves
+the session (and any running command) alive to re-attach, scrollback intact. When tmux/`dtach`
+is absent it falls back to an **in-daemon PTY keepalive** (the node-agent holds the PTY master
+and buffers scrollback) — resilient to network blips, though not to a node-agent restart. tmux
+*secondarily* hosts AgentPod-**launched** runs (provisioned cubicles / leaf CLI harnesses) so an
+operator can attach and watch a live run. It is **optional** (never required), Unix-only, used
+only for AgentPod-initiated terminals — never retrofitted onto already-running *attached*
+runtimes (observe those via native logs/CLI). Orphaned sessions are reaped by **cleanup**.
 
 ---
 
@@ -353,6 +364,8 @@ Adding a harness = adding a descriptor, **not** changing the daemon.
   carefully so the swap is real, not aspirational.
 - **node-agent privilege.** Running as the harness's user vs. a dedicated `agentpod` user with
   scoped sudo — to be decided per install mode. Security-sensitive (remote fs+exec).
+- **Terminal durability mechanism.** tmux vs lighter `dtach` vs in-daemon PTY keepalive (likely
+  a hybrid: keepalive by default, tmux when available). Decide in P2 with the exec/PTY work.
 - **Descriptor brittleness.** Wrapping native CLIs couples to their output formats; prefer
   structured/JSON CLI modes where available, snapshot-test parsing.
 - **Tailscale assumption.** Great for the operator's own fleet; must never be *required*
