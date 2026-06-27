@@ -44,3 +44,6 @@ export * from "./session-forks";
 
 // MCP server management (MetaMCP integration)
 export * from "./mcp";
+
+// Node registry (fleet console)
+export * from "./nodes";
