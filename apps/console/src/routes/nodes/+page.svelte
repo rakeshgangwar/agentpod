@@ -9,7 +9,7 @@
 
 <h1>Nodes</h1>
 <button onclick={mint}>Create enrollment token</button>
-{#if lastToken}<code>agentpod-node enroll --hub http://localhost:3000 --token {lastToken}</code>{/if}
+{#if lastToken}<code>agentpod-node enroll --hub http://localhost:3001 --token {lastToken}</code>{/if}
 
 {#if nodes.isLoading}<p>Loading…</p>
 {:else if nodes.error}<p class="error">{nodes.error}</p>
