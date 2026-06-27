@@ -1,3 +1,8 @@
+> ⚠️ **AgentPod is being redesigned** into a fleet/facilities console for agent runtimes.
+> The current source of truth is the design spec:
+> [`superpowers/specs/2026-06-21-agentpod-fleet-console-design.md`](./superpowers/specs/2026-06-21-agentpod-fleet-console-design.md).
+> Docs describing the previous OpenCode product are under [`archive/`](./archive/). The OpenCode era is tagged `v0.0.4-opencode`.
+
 # AgentPod Documentation
 
 > **Version:** 0.0.4  

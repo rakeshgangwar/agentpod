@@ -1,10 +1,10 @@
 /**
  * Node Type Registry
- * 
+ *
  * Centralized registry of all workflow node types with their metadata,
  * parameter schemas, and frontend component mappings.
- * 
- * @see docs/implementation/workflow-nodes-catalog.md for full documentation
+ *
+ * @see docs/archive/implementation/workflow-nodes-catalog.md for full documentation
  */
 
 import type { WorkflowNodeType, WorkflowNodeCategory, INodeParameterSchema } from "@agentpod/types";

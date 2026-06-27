@@ -1,3 +1,8 @@
+> ⚠️ **AgentPod is being redesigned** into a fleet/facilities console for agent runtimes.
+> The current source of truth is the design spec:
+> [`docs/superpowers/specs/2026-06-21-agentpod-fleet-console-design.md`](./docs/superpowers/specs/2026-06-21-agentpod-fleet-console-design.md).
+> Docs describing the previous OpenCode product are under [`docs/archive/`](./docs/archive/). The OpenCode era is tagged `v0.0.4-opencode`.
+
 # AgentPod
 
 A cross-platform application for running AI coding agents in isolated sandbox environments. Create, manage, and interact with containerized development workspaces powered by [OpenCode](https://opencode.ai).

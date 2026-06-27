@@ -1,7 +1,7 @@
 /**
  * Knowledge Base Seed Script
  *
- * Reads markdown and JSON files from docs/onboarding-system/knowledge-base/
+ * Reads markdown and JSON files from docs/archive/onboarding-system/knowledge-base/
  * and seeds them into the knowledge_documents table.
  *
  * Usage: bun run src/scripts/seed-knowledge.ts [--clear]
@@ -28,10 +28,10 @@ import type { KnowledgeCategory, CreateKnowledgeDocument } from "@agentpod/types
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = join(__filename, "..");
 
-// Navigate from apps/api/src/scripts/ to repo root, then to docs/
+// Navigate from apps/api/src/scripts/ to repo root, then to docs/archive/
 const KNOWLEDGE_BASE_PATH = join(
   __dirname,
-  "../../../../docs/onboarding-system/knowledge-base"
+  "../../../../docs/archive/onboarding-system/knowledge-base"
 );
 
 // Map directory names to knowledge categories

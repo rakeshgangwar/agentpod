@@ -615,7 +615,7 @@ export const migrations: Migration[] = [
   
   // =============================================================================
   // DATA PERSISTENCE MIGRATIONS (v13-v18)
-  // See docs/implementation/data-persistence-plan.md for full architecture
+  // See docs/archive/implementation/data-persistence-plan.md for full architecture
   // =============================================================================
   
   // Migration 13: Add sandboxes table

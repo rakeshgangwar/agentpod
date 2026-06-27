@@ -82,5 +82,5 @@ docker run -p 3001:3001 --env-file .env management-api
 
 ## Related Documentation
 
-- [Phase 2 Implementation Guide](../docs/implementation/phase-2-management-api/)
+- [Phase 2 Implementation Guide](../docs/archive/implementation/phase-2-management-api/)
 - [Technical Architecture](../docs/technical-architecture.md)
