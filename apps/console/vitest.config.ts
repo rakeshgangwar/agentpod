@@ -12,5 +12,10 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
+    // Disable vite CSS processing — Svelte <style> blocks (including those in
+    // transitively imported components like code-block.svelte) trigger
+    // preprocessCSS which fails in the jsdom environment with vite 6 +
+    // vite-plugin-svelte. Tests don't need CSS to function.
+    css: false,
   },
 });
