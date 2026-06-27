@@ -22,6 +22,7 @@ import {
   verifyNodeCredential,
 } from "../../src/services/enrollment";
 import { listNodes } from "../../src/services/node-registry";
+import { ensurePgMigrations } from "../helpers/pg-migrations";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Test fixtures
@@ -34,6 +35,7 @@ const TEST_USER_ID = "test-user-enrollment-001";
 // ─────────────────────────────────────────────────────────────────────────────
 
 beforeAll(async () => {
+  await ensurePgMigrations();
   // Ensure a real user row exists so FK on nodes/enrollment_tokens holds
   await createTestUser({
     id: TEST_USER_ID,

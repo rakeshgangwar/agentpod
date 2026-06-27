@@ -22,6 +22,7 @@ import { Hono } from "hono";
 // src/ imports — DB URL is already set above
 import { rawSql } from "../../src/db/drizzle";
 import { createTestUser } from "../helpers/database";
+import { ensurePgMigrations } from "../helpers/pg-migrations";
 import {
   mintEnrollmentToken,
   enrollNode,
@@ -39,6 +40,7 @@ const TEST_USER_ID = "test-user-broker-gw-001";
 // ─── Setup & Teardown ─────────────────────────────────────────────────────────
 
 beforeAll(async () => {
+  await ensurePgMigrations();
   await createTestUser({
     id: TEST_USER_ID,
     email: "broker-gw-test@example.com",
