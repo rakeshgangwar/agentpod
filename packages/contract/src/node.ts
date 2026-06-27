@@ -1,0 +1,23 @@
+import { z } from "zod";
+
+export const HostInfo = z.object({
+  hostname: z.string().min(1),
+  os: z.string().min(1),
+  arch: z.string().min(1),
+  cpuCount: z.number().int().positive(),
+});
+export type HostInfo = z.infer<typeof HostInfo>;
+
+export const EnrollRequest = z.object({ token: z.string().min(1), hostInfo: HostInfo });
+export type EnrollRequest = z.infer<typeof EnrollRequest>;
+
+export const EnrollResponse = z.object({ nodeId: z.string(), nodeSecret: z.string() });
+export type EnrollResponse = z.infer<typeof EnrollResponse>;
+
+export const NodeStatus = z.enum(["online", "offline"]);
+export const NodeSummary = z.object({
+  id: z.string(), name: z.string(), hostname: z.string(), os: z.string(),
+  arch: z.string(), cpuCount: z.number().int(),
+  status: NodeStatus, lastSeenAt: z.string().nullable(), createdAt: z.string(),
+});
+export type NodeSummary = z.infer<typeof NodeSummary>;
