@@ -15,7 +15,7 @@ import { GatewayClientMessage } from "@agentpod/contract";
 import { verifyNodeCredential } from "../services/enrollment";
 import { setNodeStatus } from "../services/node-registry";
 import { connectionManager } from "../services/connection-manager";
-import { handleNodeMessage } from "../services/broker";
+import { handleNodeMessage, dropNode } from "../services/broker";
 import { upgradeWebSocket } from "../ws";
 
 // Node connects with `Authorization: Bearer <nodeId>:<nodeSecret>`.
@@ -66,6 +66,7 @@ export const gatewayRoutes = new Hono().get(
 
       async onClose() {
         if (authed) {
+          dropNode(authed);
           connectionManager.unregister(authed);
           await setNodeStatus(authed, "offline");
         }

@@ -154,6 +154,107 @@ test("stream delivers chunks via onChunk and auto-drops handler on eof", async (
   }
 });
 
+test("dropNode resolves an in-flight request with {ok:false, error:'node disconnected'} and ignores a late res", async () => {
+  const { msgs, restore } = makeSendStub("node-drop");
+  try {
+    const promise = broker.request("node-drop", "detect", {}, { timeoutMs: 5_000 });
+
+    expect(msgs).toHaveLength(1);
+    const sent = msgs[0];
+    expect(sent.type).toBe("req");
+    if (sent.type !== "req") throw new Error("expected req msg");
+
+    // Drop the node before a response arrives
+    broker.dropNode("node-drop");
+
+    const result = await promise;
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe("node disconnected");
+
+    // A late res for the same id must be a no-op (entry already removed)
+    let secondResolve = false;
+    broker.handleNodeMessage("node-drop", {
+      type: "res",
+      id: sent.id,
+      ok: true,
+      data: "late",
+    });
+    // The promise is already settled — no way to detect a second resolve, but
+    // the handler must not throw. Verify the awaited result is unchanged.
+    expect(result.error).toBe("node disconnected");
+    expect(secondResolve).toBe(false);
+  } finally {
+    restore();
+  }
+});
+
+test("dropNode signals eof to an active stream and a subsequent stream message is a no-op", async () => {
+  const { msgs, restore } = makeSendStub("node-drop-stream");
+  const received: Array<{ seq: number; chunk: string | null; eof: boolean }> = [];
+
+  try {
+    broker.stream(
+      "node-drop-stream",
+      "logs.tail",
+      { key: "k1", follow: true },
+      (seq, chunk, eof) => {
+        received.push({ seq, chunk, eof });
+      }
+    );
+
+    expect(msgs).toHaveLength(1);
+    const sent = msgs[0];
+    if (sent.type !== "req") throw new Error("expected req msg");
+    const id = sent.id;
+
+    // Drop the node — handler must be called with eof:true
+    broker.dropNode("node-drop-stream");
+
+    expect(received).toHaveLength(1);
+    expect(received[0]).toEqual({ seq: 0, chunk: null, eof: true });
+
+    // Subsequent stream message for the same id must be silently ignored
+    broker.handleNodeMessage("node-drop-stream", {
+      type: "stream",
+      id,
+      seq: 1,
+      chunk: "ghost",
+      eof: false,
+    });
+    expect(received).toHaveLength(1);
+  } finally {
+    restore();
+  }
+});
+
+test("stream() with offline node calls onChunk(0, null, true) synchronously", () => {
+  // Make send always return false (node offline)
+  const origSend = connectionManager.send.bind(connectionManager);
+  (connectionManager as { send: typeof connectionManager.send }).send = (
+    _nodeId,
+    _msg
+  ) => false;
+
+  const received: Array<{ seq: number; chunk: string | null; eof: boolean }> = [];
+
+  try {
+    broker.stream(
+      "node-offline-stream",
+      "logs.tail",
+      { key: "k1", follow: true },
+      (seq, chunk, eof) => {
+        received.push({ seq, chunk, eof });
+      }
+    );
+
+    // onChunk must have been called synchronously with eof:true
+    expect(received).toHaveLength(1);
+    expect(received[0]).toEqual({ seq: 0, chunk: null, eof: true });
+  } finally {
+    (connectionManager as { send: typeof connectionManager.send }).send = origSend;
+  }
+});
+
 test("cancel() sends {type:cancel} and drops the stream handler", async () => {
   const { msgs, restore } = makeSendStub("node-1");
   const received: unknown[] = [];

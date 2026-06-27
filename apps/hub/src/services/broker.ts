@@ -22,6 +22,7 @@ import { connectionManager } from "./connection-manager";
 type RequestResult = { ok: boolean; data?: unknown; error?: string };
 
 type PendingEntry = {
+  nodeId: string;
   resolve: (result: RequestResult) => void;
   timer: ReturnType<typeof setTimeout>;
 };
@@ -32,10 +33,15 @@ type StreamHandler = (
   eof: boolean
 ) => void;
 
+type StreamEntry = {
+  nodeId: string;
+  handler: StreamHandler;
+};
+
 // ─── Module-level registries (single-operator; same posture as connection-manager) ─
 
 const pending = new Map<string, PendingEntry>();
-const streams = new Map<string, StreamHandler>();
+const streams = new Map<string, StreamEntry>();
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 
@@ -63,7 +69,7 @@ export function request(
       resolve({ ok: false, error: "timeout" });
     }, timeoutMs);
 
-    pending.set(id, { resolve, timer });
+    pending.set(id, { nodeId, resolve, timer });
 
     const sent = connectionManager.send(nodeId, {
       type: "req",
@@ -95,7 +101,7 @@ export function stream(
   const id = crypto.randomUUID();
   let active = true;
 
-  streams.set(id, onChunk);
+  streams.set(id, { nodeId, handler: onChunk });
 
   const sent = connectionManager.send(nodeId, {
     type: "req",
@@ -105,9 +111,10 @@ export function stream(
   });
 
   if (!sent) {
-    // Node offline — drop the handler immediately; cancel is a no-op.
+    // Node offline — drop the handler and signal eof so the caller is not left hanging.
     streams.delete(id);
     active = false;
+    onChunk(0, null, true);
   }
 
   return {
@@ -139,11 +146,34 @@ export function handleNodeMessage(
   }
 
   if (msg.type === "stream") {
-    const handler = streams.get(msg.id);
-    if (!handler) return;
-    handler(msg.seq, msg.chunk, msg.eof);
+    const entry = streams.get(msg.id);
+    if (!entry) return;
+    entry.handler(msg.seq, msg.chunk, msg.eof);
     if (msg.eof) {
       streams.delete(msg.id);
+    }
+  }
+}
+
+/**
+ * Called when a node disconnects to purge all in-flight state for that node.
+ *
+ * - Pending requests: timer is cleared and the promise resolves with {ok:false, error:"node disconnected"}.
+ * - Active streams: onChunk is called with eof:true so the caller is not left hanging, then the entry is removed.
+ */
+export function dropNode(nodeId: string): void {
+  for (const [id, entry] of pending) {
+    if (entry.nodeId === nodeId) {
+      clearTimeout(entry.timer);
+      pending.delete(id);
+      entry.resolve({ ok: false, error: "node disconnected" });
+    }
+  }
+
+  for (const [id, entry] of streams) {
+    if (entry.nodeId === nodeId) {
+      streams.delete(id);
+      entry.handler(0, null, true);
     }
   }
 }
