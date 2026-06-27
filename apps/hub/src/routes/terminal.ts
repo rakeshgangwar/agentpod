@@ -9,18 +9,15 @@
  */
 
 import { Hono } from "hono";
-import { createBunWebSocket } from "hono/bun";
 import type { WSContext } from "hono/ws";
 import { getSandboxManager } from "../services/sandbox-manager.ts";
 import { createLogger } from "../utils/logger.ts";
 import type { InteractiveExecSession } from "../services/orchestrator/types.ts";
 import { auth } from "../auth/drizzle-auth.ts";
 import { config } from "../config.ts";
+import { upgradeWebSocket } from "../ws.ts";
 
 const log = createLogger("terminal-routes");
-
-// Create Bun WebSocket handler
-const { upgradeWebSocket, websocket } = createBunWebSocket();
 
 // Track active terminal sessions for cleanup
 const activeSessions = new Map<string, InteractiveExecSession>();
@@ -276,11 +273,6 @@ export const terminalRoutes = new Hono()
       };
     })
   );
-
-/**
- * Export the WebSocket handler for Bun.serve()
- */
-export { websocket as terminalWebsocket };
 
 /**
  * Cleanup all active terminal sessions

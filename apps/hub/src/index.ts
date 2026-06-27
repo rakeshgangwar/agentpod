@@ -26,7 +26,11 @@ import { sandboxRoutes, sandboxHealthRoutes, pendingActionsRoutes } from './rout
 import { repoRoutes } from './routes/repos.ts';
 import { chatRoutes } from './routes/chat.ts';
 // Terminal WebSocket routes
-import { terminalRoutes, terminalWebsocket, cleanupTerminalSessions } from './routes/terminal.ts';
+import { terminalRoutes, cleanupTerminalSessions } from './routes/terminal.ts';
+// Node gateway WebSocket routes
+import { gatewayRoutes } from './routes/gateway.ts';
+// Shared Bun WebSocket handler (terminal + gateway share one instance)
+import { websocket } from './ws.ts';
 // Onboarding system routes
 import { knowledgeRoutes } from './routes/knowledge.ts';
 import { onboardingRoutes } from './routes/onboarding.ts';
@@ -98,6 +102,8 @@ origin: (origin) => {
   .route('/mcp/status', mcpPublicStatusRoutes)
   // Public node enrollment (no session — node authenticates with a one-time token in the body)
   .route('/public/nodes', nodeEnrollRoutes)  // POST /public/nodes/enroll
+  // Public node gateway (no session — node authenticates with long-term credentials)
+  .route('/public/nodes', gatewayRoutes)     // GET /public/nodes/gateway (WSS)
   // Signup check middleware - block signup if disabled (runs before auth handler)
   .use('/api/auth/*', signupCheckMiddleware)
   // Better Auth routes - handle authentication (public, no auth middleware)
@@ -352,5 +358,5 @@ console.log(`
 export default {
   port,
   fetch: app.fetch,
-  websocket: terminalWebsocket,
+  websocket,
 };
