@@ -47,3 +47,6 @@ export * from "./mcp";
 
 // Node registry (fleet console)
 export * from "./nodes";
+
+// Station registry (adopted stations, fleet console)
+export * from "./stations";

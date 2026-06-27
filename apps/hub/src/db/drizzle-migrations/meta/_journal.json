@@ -127,6 +127,13 @@
       "when": 1782552902042,
       "tag": "0017_damp_inhumans",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1782568259377,
+      "tag": "0018_hard_red_ghost",
+      "breakpoints": true
     }
   ]
 }
