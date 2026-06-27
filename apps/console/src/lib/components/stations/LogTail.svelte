@@ -23,7 +23,10 @@
     }
 
     const url = logsUrl(stationId);
-    es = new EventSource(url);
+    // withCredentials so the Better Auth session cookie is sent on the
+    // cross-origin SSE request (console :1420 → hub :3001); without it the
+    // /logs endpoint returns 401.
+    es = new EventSource(url, { withCredentials: true });
 
     es.onopen = () => {
       status = "connected";
