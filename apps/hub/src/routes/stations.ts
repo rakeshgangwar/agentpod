@@ -13,6 +13,7 @@
  */
 
 import { Hono } from "hono";
+import { streamSSE } from "hono/streaming";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { and, eq } from "drizzle-orm";
@@ -143,4 +144,175 @@ export const stationRoutes = new Hono()
 
     await unadopt(userId, stationId);
     return new Response(null, { status: 204 });
+  })
+  /**
+   * GET /api/stations/:stationId/health
+   *
+   * Forwards a "health" RPC to the node that owns this station.
+   * Returns 404 if the station is not owned by the requesting user.
+   * Returns 502 if the node is offline, times out, or returns invalid data.
+   */
+  .get("/stations/:stationId/health", async (c) => {
+    const userId = c.get("user").id;
+    const stationId = c.req.param("stationId");
+
+    const station = await getStation(userId, stationId);
+    if (!station) {
+      return c.json({ error: "Not Found" }, 404);
+    }
+
+    const result = await broker.request(station.nodeId, "health", {
+      key: station.stationKey,
+    });
+    if (!result.ok) {
+      return c.json({ error: result.error ?? "health failed" }, 502);
+    }
+
+    const parsed = VERB_RESULTS.health.safeParse(result.data);
+    if (!parsed.success) {
+      return c.json({ error: "invalid health response from node" }, 502);
+    }
+
+    return c.json(parsed.data);
+  })
+  /**
+   * GET /api/stations/:stationId/files?path=<rel>
+   *
+   * Lists files/directories at the given path on the station's node.
+   * Returns 404 if the station is not owned by the requesting user.
+   * Returns 502 if the node is offline, times out, or returns invalid data.
+   */
+  .get(
+    "/stations/:stationId/files",
+    zValidator("query", z.object({ path: z.string().default(".") })),
+    async (c) => {
+      const userId = c.get("user").id;
+      const stationId = c.req.param("stationId");
+      const { path } = c.req.valid("query");
+
+      const station = await getStation(userId, stationId);
+      if (!station) {
+        return c.json({ error: "Not Found" }, 404);
+      }
+
+      const result = await broker.request(station.nodeId, "fs.list", {
+        key: station.stationKey,
+        path,
+      });
+      if (!result.ok) {
+        return c.json({ error: result.error ?? "fs.list failed" }, 502);
+      }
+
+      const parsed = VERB_RESULTS["fs.list"].safeParse(result.data);
+      if (!parsed.success) {
+        return c.json({ error: "invalid fs.list response from node" }, 502);
+      }
+
+      return c.json(parsed.data);
+    }
+  )
+  /**
+   * GET /api/stations/:stationId/file?path=<rel>
+   *
+   * Reads a single file from the station's node.  If the node returns
+   * base64-encoded content it is decoded to bytes and returned as
+   * application/octet-stream; utf8 content is returned as text/plain.
+   * Sets X-Truncated: true when the node reports the file was capped.
+   *
+   * Returns 404 if the station is not owned by the requesting user.
+   * Returns 502 if the node is offline, times out, or returns invalid data.
+   */
+  .get(
+    "/stations/:stationId/file",
+    zValidator("query", z.object({ path: z.string().min(1) })),
+    async (c) => {
+      const userId = c.get("user").id;
+      const stationId = c.req.param("stationId");
+      const { path } = c.req.valid("query");
+
+      const station = await getStation(userId, stationId);
+      if (!station) {
+        return c.json({ error: "Not Found" }, 404);
+      }
+
+      const result = await broker.request(station.nodeId, "fs.read", {
+        key: station.stationKey,
+        path,
+      });
+      if (!result.ok) {
+        return c.json({ error: result.error ?? "fs.read failed" }, 502);
+      }
+
+      const parsed = VERB_RESULTS["fs.read"].safeParse(result.data);
+      if (!parsed.success) {
+        return c.json({ error: "invalid fs.read response from node" }, 502);
+      }
+
+      const { content, encoding, truncated } = parsed.data;
+
+      if (encoding === "base64") {
+        const bytes = Uint8Array.from(atob(content), (ch) => ch.charCodeAt(0));
+        return new Response(bytes, {
+          headers: {
+            "Content-Type": "application/octet-stream",
+            "X-Truncated": String(truncated),
+          },
+        });
+      }
+
+      return new Response(content, {
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "X-Truncated": String(truncated),
+        },
+      });
+    }
+  )
+  /**
+   * GET /api/stations/:stationId/logs
+   *
+   * Opens an SSE stream that tails the station's log output.
+   * Each log chunk is forwarded as an SSE `data:` event.
+   * The broker stream is cancelled when the client disconnects.
+   *
+   * Returns 404 if the station is not owned by the requesting user.
+   */
+  .get("/stations/:stationId/logs", async (c) => {
+    const userId = c.get("user").id;
+    const stationId = c.req.param("stationId");
+
+    const station = await getStation(userId, stationId);
+    if (!station) {
+      return c.json({ error: "Not Found" }, 404);
+    }
+
+    return streamSSE(c, async (stream) => {
+      let cancelled = false;
+
+      const { cancel } = broker.stream(
+        station.nodeId,
+        "logs.tail",
+        { key: station.stationKey, follow: true },
+        async (_seq, chunk, eof) => {
+          if (cancelled) return;
+          if (chunk !== null) {
+            await stream.writeSSE({ data: chunk });
+          }
+          if (eof) {
+            await stream.close();
+          }
+        }
+      );
+
+      // Cancel the broker stream when the client disconnects.
+      stream.onAbort(() => {
+        cancelled = true;
+        cancel();
+      });
+
+      // Keep the SSE handler alive until the stream is closed externally.
+      await new Promise<void>((resolve) => {
+        stream.onAbort(resolve);
+      });
+    });
   });
