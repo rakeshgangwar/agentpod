@@ -119,12 +119,15 @@ func serve(ctx context.Context, c *websocket.Conn, h Handler, mus ...*sync.Mutex
 				if streamed {
 					// Send the terminal eof frame; use the parent ctx so we
 					// can still send even if the handler's reqCtx was cancelled.
+					// chunk must be present (as null) so the hub's StreamMsg
+					// schema (chunk: z.string().nullable()) validates successfully.
 					finalSeq := int(atomic.LoadInt64(&seqNext))
 					_ = writeMsg(ctx, map[string]any{
-						"type": "stream",
-						"id":   reqID,
-						"seq":  finalSeq,
-						"eof":  true,
+						"type":  "stream",
+						"id":    reqID,
+						"seq":   finalSeq,
+						"chunk": nil,
+						"eof":   true,
 					})
 				} else {
 					if herr != nil {

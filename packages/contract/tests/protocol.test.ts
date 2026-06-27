@@ -12,3 +12,11 @@ test("node→hub union includes stream + res, still accepts heartbeat", () => {
 test("RequestMsg requires id+verb", () => {
   expect(() => RequestMsg.parse({ type:"req", verb:"detect", params:{} })).toThrow();
 });
+test("GatewayClientMessage accepts terminal eof stream frame with chunk:null", () => {
+  const m = GatewayClientMessage.parse({ type:"stream", id:"r1", seq:5, chunk:null, eof:true });
+  expect(m.type).toBe("stream");
+  if (m.type === "stream") {
+    expect(m.chunk).toBeNull();
+    expect(m.eof).toBe(true);
+  }
+});
