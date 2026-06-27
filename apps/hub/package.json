@@ -1,5 +1,5 @@
 {
-  "name": "@agentpod/api",
+  "name": "@agentpod/hub",
   "version": "0.1.0",
   "description": "Agentpod Management API - orchestrates projects, containers, and credentials",
   "type": "module",
