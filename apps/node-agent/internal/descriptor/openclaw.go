@@ -1,0 +1,366 @@
+package descriptor
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"io/fs"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"time"
+)
+
+// openclawDescriptor implements Descriptor for the OpenClaw agent harness.
+// The OpenClaw home directory layout is:
+//
+//	~/.openclaw/
+//	  openclaw.json          ← main config
+//	  agents/
+//	    <name>/              ← one dir per subagent (deity names: hanuman, kubera, …)
+//	  workspace/             ← main workspace
+//	    agent-workspaces/
+//	      <name>/            ← per-subagent workspace (nested inside main workspace)
+//	  logs/                  ← log files
+//
+// A single gateway process (`node … openclaw/dist/index.js gateway`) serves all
+// subagents; per-subagent process state is not separable.
+type openclawDescriptor struct {
+	home string // absolute path to the .openclaw home directory
+}
+
+// NewOpenClaw returns a Descriptor for the OpenClaw harness.
+// home is the path to the OpenClaw home directory (e.g. "~/.openclaw").
+// If home is empty it defaults to $HOME/.openclaw.
+func NewOpenClaw(home string) Descriptor {
+	if home == "" {
+		userHome, err := os.UserHomeDir()
+		if err != nil {
+			userHome = "."
+		}
+		home = filepath.Join(userHome, ".openclaw")
+	}
+	return &openclawDescriptor{home: home}
+}
+
+// Harness returns the harness identifier.
+func (o *openclawDescriptor) Harness() string { return "openclaw" }
+
+// Detect discovers all OpenClaw stations. It returns empty (nil-safe) if the
+// home directory does not exist.
+func (o *openclawDescriptor) Detect() ([]Station, error) {
+	if _, err := os.Stat(o.home); os.IsNotExist(err) {
+		return []Station{}, nil
+	}
+
+	caps := []string{"health", "logs", "fs.read"}
+
+	// Root workspace: prefer <home>/workspace if it exists, else fall back to <home>.
+	rootWs := o.resolveRootWorkspace()
+	rootWsCopy := rootWs
+
+	stations := []Station{
+		{
+			Key:           "openclaw",
+			Harness:       "openclaw",
+			Kind:          "composite",
+			DisplayName:   "OpenClaw",
+			ParentKey:     nil,
+			WorkspacePath: &rootWsCopy,
+			Capabilities:  caps,
+		},
+	}
+
+	agentsDir := filepath.Join(o.home, "agents")
+	entries, err := os.ReadDir(agentsDir)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("openclaw: reading agents dir: %w", err)
+	}
+
+	parentKey := "openclaw"
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		key := "openclaw:" + name
+		wsPath := o.resolveAgentWorkspace(name)
+		wsCopy := wsPath
+		stations = append(stations, Station{
+			Key:           key,
+			Harness:       "openclaw",
+			Kind:          "composite",
+			DisplayName:   name,
+			ParentKey:     &parentKey,
+			WorkspacePath: &wsCopy,
+			Capabilities:  caps,
+		})
+	}
+
+	return stations, nil
+}
+
+// resolveRootWorkspace returns <home>/workspace if it exists, else <home>.
+func (o *openclawDescriptor) resolveRootWorkspace() string {
+	ws := filepath.Join(o.home, "workspace")
+	if _, err := os.Stat(ws); err == nil {
+		return ws
+	}
+	return o.home
+}
+
+// resolveAgentWorkspace returns the workspace for a named subagent.
+// Prefers <home>/workspace/agent-workspaces/<name>; falls back to
+// <home>/agents/<name> if the nested workspace dir is absent.
+func (o *openclawDescriptor) resolveAgentWorkspace(name string) string {
+	nested := filepath.Join(o.home, "workspace", "agent-workspaces", name)
+	if _, err := os.Stat(nested); err == nil {
+		return nested
+	}
+	return filepath.Join(o.home, "agents", name)
+}
+
+// workspaceFor maps a station key to its workspace root path.
+func (o *openclawDescriptor) workspaceFor(key string) (string, error) {
+	if key == "openclaw" {
+		return o.resolveRootWorkspace(), nil
+	}
+	if strings.HasPrefix(key, "openclaw:") {
+		name := strings.TrimPrefix(key, "openclaw:")
+		if name == "" {
+			return "", fmt.Errorf("openclaw: empty agent name in key %q", key)
+		}
+		return o.resolveAgentWorkspace(name), nil
+	}
+	return "", fmt.Errorf("openclaw: unrecognized key %q", key)
+}
+
+// Health returns a best-effort liveness/resource snapshot for a station.
+//
+// Process liveness is checked against the gateway process or the user systemd
+// unit openclaw-gateway.service. Because all subagents share a single gateway
+// process, per-subagent process state is not separable; Health.Note is always
+// set for subagent keys to communicate this.
+func (o *openclawDescriptor) Health(key string) (Health, error) {
+	workspace, err := o.workspaceFor(key)
+	if err != nil {
+		return Health{}, err
+	}
+
+	health := Health{}
+
+	// Compute disk usage by walking the workspace.
+	var diskBytes int64
+	_ = filepath.WalkDir(workspace, func(_ string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil // skip unreadable entries
+		}
+		if !d.IsDir() {
+			info, err := d.Info()
+			if err == nil {
+				diskBytes += info.Size()
+			}
+		}
+		return nil
+	})
+	health.DiskBytes = &diskBytes
+
+	// Best-effort process check against the gateway.
+	running, note := openclawGatewayRunning()
+	health.Running = running
+
+	if key != "openclaw" {
+		// Per-subagent: the gateway serves all agents; state is not separable.
+		subNote := "gateway process shared across all subagents"
+		if note != "" {
+			subNote = note
+		}
+		health.Note = &subNote
+	} else if note != "" {
+		health.Note = &note
+	}
+
+	return health, nil
+}
+
+// openclawGatewayRunning checks whether the OpenClaw gateway process is running.
+// It tries (in order):
+//  1. systemctl --user is-active openclaw-gateway.service
+//  2. pgrep -f "openclaw.*gateway"
+//
+// Returns running=false and a non-empty note when neither check can be performed.
+func openclawGatewayRunning() (running bool, note string) {
+	// Try systemctl --user first (Linux with user systemd units).
+	cmd := exec.Command("systemctl", "--user", "is-active", "openclaw-gateway.service")
+	if out, err := cmd.Output(); err == nil {
+		state := strings.TrimSpace(string(out))
+		return state == "active", ""
+	}
+
+	// Fall back to pgrep -f for the gateway process pattern.
+	pgrepCmd := exec.Command("pgrep", "-f", "openclaw.*gateway")
+	if err := pgrepCmd.Run(); err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			if exitErr.ExitCode() == 1 {
+				// pgrep exit 1 = no match (process not found), not an error.
+				return false, ""
+			}
+		}
+		// pgrep not available or unexpected error.
+		return false, "process check unavailable"
+	}
+	return true, ""
+}
+
+// ListDir lists the directory at rel (relative to the station's workspace).
+func (o *openclawDescriptor) ListDir(key, rel string) ([]FsEntry, error) {
+	workspace, err := o.workspaceFor(key)
+	if err != nil {
+		return nil, err
+	}
+
+	target, err := safeJoin(workspace, rel)
+	if err != nil {
+		return nil, err
+	}
+
+	entries, err := os.ReadDir(target)
+	if err != nil {
+		return nil, fmt.Errorf("openclaw: ListDir %q: %w", target, err)
+	}
+
+	result := make([]FsEntry, 0, len(entries))
+	for _, entry := range entries {
+		fsEntry := FsEntry{
+			Name: entry.Name(),
+			Path: filepath.Join(rel, entry.Name()),
+		}
+		switch {
+		case entry.Type()&fs.ModeSymlink != 0:
+			fsEntry.Type = "symlink"
+		case entry.IsDir():
+			fsEntry.Type = "dir"
+		default:
+			fsEntry.Type = "file"
+			info, err := entry.Info()
+			if err == nil {
+				sz := info.Size()
+				fsEntry.Size = &sz
+				mod := info.ModTime().UTC().Format(time.RFC3339)
+				fsEntry.Modified = &mod
+			}
+		}
+		result = append(result, fsEntry)
+	}
+	return result, nil
+}
+
+// ReadFile reads up to maxBytes from path within the station's workspace.
+// It returns the raw bytes, encoding hint ("" means auto-detect in handler),
+// whether the file was truncated, and any error.
+func (o *openclawDescriptor) ReadFile(key, rel string, maxBytes int64) ([]byte, string, bool, error) {
+	workspace, err := o.workspaceFor(key)
+	if err != nil {
+		return nil, "", false, err
+	}
+
+	target, err := safeJoin(workspace, rel)
+	if err != nil {
+		return nil, "", false, err
+	}
+
+	if maxBytes <= 0 {
+		maxBytes = defaultMaxBytes
+	}
+
+	f, err := os.Open(target)
+	if err != nil {
+		return nil, "", false, fmt.Errorf("openclaw: ReadFile %q: %w", target, err)
+	}
+	defer f.Close()
+
+	// Read up to maxBytes+1 so we can detect truncation.
+	buf := make([]byte, maxBytes+1)
+	n, err := io.ReadFull(f, buf)
+	if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
+		return nil, "", false, fmt.Errorf("openclaw: ReadFile read %q: %w", target, err)
+	}
+
+	truncated := int64(n) > maxBytes
+	if truncated {
+		n = int(maxBytes)
+	}
+
+	return buf[:n], "", truncated, nil
+}
+
+// TailLogs emits existing log content from <home>/logs and, if follow is true,
+// polls for appends until ctx is cancelled.
+//
+// Only files with log-ish extensions (.log, .txt) are emitted; other files
+// (e.g. binary or config files that may appear in the logs dir) are skipped.
+func (o *openclawDescriptor) TailLogs(ctx context.Context, key string, follow bool, emit func([]byte) error) error {
+	logsDir := filepath.Join(o.home, "logs")
+	logFiles := collectOpenClawLogFiles(logsDir)
+
+	if !follow {
+		return emitLogFiles(logFiles, emit)
+	}
+
+	// Follow mode: emit existing content, then poll for appends.
+	if err := emitLogFiles(logFiles, emit); err != nil {
+		return err
+	}
+
+	// Track offsets per file for incremental reads.
+	offsets := make(map[string]int64, len(logFiles))
+	for _, f := range logFiles {
+		info, err := os.Stat(f)
+		if err == nil {
+			offsets[f] = info.Size()
+		}
+	}
+
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			logFiles = collectOpenClawLogFiles(logsDir)
+			for _, path := range logFiles {
+				off := offsets[path]
+				n, err := emitLogFileFrom(path, off, emit)
+				if err != nil {
+					continue // best effort
+				}
+				offsets[path] = off + n
+			}
+		}
+	}
+}
+
+// isLogFile reports whether name has a log-ish extension (.log or .txt).
+func isLogFile(name string) bool {
+	ext := strings.ToLower(filepath.Ext(name))
+	return ext == ".log" || ext == ".txt"
+}
+
+// collectOpenClawLogFiles walks logsDir and returns paths of log-ish files.
+// Missing directory is silently skipped.
+func collectOpenClawLogFiles(logsDir string) []string {
+	var files []string
+	_ = filepath.WalkDir(logsDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if !d.IsDir() && isLogFile(d.Name()) {
+			files = append(files, path)
+		}
+		return nil
+	})
+	return files
+}
