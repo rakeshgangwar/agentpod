@@ -8,7 +8,6 @@
  */
 
 import { createAuthClient } from "better-auth/svelte";
-import { authStoreSession, authLogout as tauriAuthLogout, authGetStatus } from "$lib/api/tauri";
 
 // =============================================================================
 // Dynamic Auth Client
@@ -18,54 +17,21 @@ import { authStoreSession, authLogout as tauriAuthLogout, authGetStatus } from "
 let currentAuthClient: ReturnType<typeof createAuthClient> | null = null;
 let currentApiUrl: string | null = null;
 
-// Store the latest bearer token captured from response headers
-let pendingBearerToken: string | null = null;
-
 /**
- * Get or create the auth client for the given API URL
+ * Get the current auth client, or null if not yet configured.
  */
-function getAuthClient(apiUrl?: string): ReturnType<typeof createAuthClient> {
-  const url = apiUrl || currentApiUrl || "http://localhost:3001";
-  
-  // Create a new client if URL changed or client doesn't exist
-  if (!currentAuthClient || url !== currentApiUrl) {
-    currentApiUrl = url;
-    currentAuthClient = createAuthClient({
-      baseURL: url,
-      // Capture the Bearer token from response headers
-      fetchOptions: {
-        onSuccess: (ctx) => {
-          const authToken = ctx.response.headers.get("set-auth-token");
-          if (authToken) {
-            pendingBearerToken = authToken;
-            console.debug("[Auth] Captured bearer token from response headers");
-          }
-        },
-      },
-    });
-  }
-  
+function getAuthClient(): ReturnType<typeof createAuthClient> | null {
   return currentAuthClient;
 }
 
 /**
- * Set the API URL and create a new auth client
- * Called when connection is established
+ * Set the API URL and create a new auth client.
+ * Called when connection is established (from the connection store).
  */
 export function setAuthApiUrl(apiUrl: string) {
   currentApiUrl = apiUrl;
   currentAuthClient = createAuthClient({
     baseURL: apiUrl,
-    // Capture the Bearer token from response headers
-    fetchOptions: {
-      onSuccess: (ctx) => {
-        const authToken = ctx.response.headers.get("set-auth-token");
-        if (authToken) {
-          pendingBearerToken = authToken;
-          console.debug("[Auth] Captured bearer token from response headers");
-        }
-      },
-    },
   });
 }
 
@@ -151,32 +117,42 @@ export const auth = {
 // =============================================================================
 
 /**
- * Initialize auth state
- * First tries to load from Tauri's secure storage, which persists across refreshes
+ * Initialize auth state by restoring the session via the Better Auth cookie.
+ *
+ * If the auth client has not been configured yet (setAuthApiUrl not called),
+ * this is a no-op — the caller is expected to call initAuth again once the
+ * connection (and therefore the auth client) is established.
  */
 export async function initAuth(): Promise<void> {
   if (isInitialized) return;
+
+  const client = getAuthClient();
+
+  // No client yet (API URL not set) — mark initialized but stay unauthenticated
+  if (!client) {
+    isInitialized = true;
+    return;
+  }
 
   isLoading = true;
   error = null;
 
   try {
-    // First, try to load from Tauri secure storage (persists across app restarts)
-    const storedStatus = await authGetStatus();
-    if (storedStatus.authenticated && storedStatus.user) {
+    // Restore session from the HTTP-only cookie set by the hub
+    const { data } = await client.getSession();
+    if (data?.user) {
       sessionData = {
         user: {
-          id: storedStatus.user.id,
-          email: storedStatus.user.email ?? "",
-          name: storedStatus.user.name ?? null,
-          image: null,
+          id: data.user.id,
+          email: data.user.email,
+          name: data.user.name ?? null,
+          image: data.user.image ?? null,
         },
       };
     }
   } catch (err) {
-    // Tauri storage failed, continue without stored session
-    console.warn("[Auth] Failed to load stored session:", err);
-    error = err instanceof Error ? err.message : "Failed to initialize auth";
+    // Session fetch failed (network error, etc.) — stay unauthenticated
+    console.warn("[Auth] Failed to restore session:", err);
   } finally {
     isLoading = false;
     isInitialized = true;
@@ -193,6 +169,10 @@ export async function login(): Promise<boolean> {
 
   try {
     const client = getAuthClient();
+    if (!client) {
+      error = "Not connected to hub";
+      return false;
+    }
     const result = await client.signIn.social({
       provider: "github",
     });
@@ -220,6 +200,10 @@ export async function loginWithEmail(emailInput: string, password: string): Prom
 
   try {
     const client = getAuthClient();
+    if (!client) {
+      error = "Not connected to hub";
+      return false;
+    }
     const result = await client.signIn.email({
       email: emailInput,
       password,
@@ -230,7 +214,8 @@ export async function loginWithEmail(emailInput: string, password: string): Prom
       return false;
     }
 
-    // Store the session data
+    // The hub sets an HTTP-only cookie — the cookie IS the session.
+    // No bearer token storage needed.
     if (result.data?.user) {
       sessionData = {
         user: {
@@ -240,20 +225,6 @@ export async function loginWithEmail(emailInput: string, password: string): Prom
           image: result.data.user.image,
         },
       };
-
-      // Store the session token for Tauri API calls
-      // Use the bearer token from response headers (captured by onSuccess callback)
-      // Fall back to result.data.token if not available
-      const tokenToStore = pendingBearerToken || result.data.token;
-      if (tokenToStore) {
-        await authStoreSession(
-          tokenToStore,
-          result.data.user.id,
-          result.data.user.email,
-          result.data.user.name
-        );
-        pendingBearerToken = null; // Clear after use
-      }
     }
 
     return true;
@@ -274,6 +245,10 @@ export async function signUp(emailInput: string, password: string, name: string)
 
   try {
     const client = getAuthClient();
+    if (!client) {
+      error = "Not connected to hub";
+      return false;
+    }
     const result = await client.signUp.email({
       email: emailInput,
       password,
@@ -285,7 +260,7 @@ export async function signUp(emailInput: string, password: string, name: string)
       return false;
     }
 
-    // Store the session data
+    // The hub sets an HTTP-only cookie — the cookie IS the session.
     if (result.data?.user) {
       sessionData = {
         user: {
@@ -295,20 +270,6 @@ export async function signUp(emailInput: string, password: string, name: string)
           image: result.data.user.image,
         },
       };
-
-      // Store the session token for Tauri API calls
-      // Use the bearer token from response headers (captured by onSuccess callback)
-      // Fall back to result.data.token if not available
-      const tokenToStore = pendingBearerToken || result.data.token;
-      if (tokenToStore) {
-        await authStoreSession(
-          tokenToStore,
-          result.data.user.id,
-          result.data.user.email,
-          result.data.user.name
-        );
-        pendingBearerToken = null; // Clear after use
-      }
     }
 
     return true;
@@ -329,14 +290,10 @@ export async function logout(): Promise<void> {
 
   try {
     const client = getAuthClient();
-    
-    // Clear both Better Auth session and Tauri stored session
-    await Promise.all([
-      client.signOut(),
-      tauriAuthLogout()
-    ]);
-    
-    // Clear local session data
+    if (client) {
+      await client.signOut();
+    }
+    // Clear local session data regardless
     sessionData = null;
   } catch (err) {
     error = err instanceof Error ? err.message : "Logout failed";
