@@ -22,12 +22,5 @@ func runCmd() {
 	defer stop()
 	fmt.Println("connecting to", cfg.Hub, "as", cfg.NodeID)
 
-	// Build the descriptor registry. Concrete harness descriptors are registered
-	// here. Hermes (Task 5) and OpenClaw (Task 6) are active; home defaults are
-	// resolved inside each constructor.
-	reg := descriptor.NewRegistry()
-	reg.Register(descriptor.NewHermes(""))   // Task 5
-	reg.Register(descriptor.NewOpenClaw("")) // Task 6
-
-	gateway.Run(ctx, cfg, descriptor.NewHandler(reg))
+	gateway.Run(ctx, cfg, descriptor.NewHandler(buildRegistry()))
 }

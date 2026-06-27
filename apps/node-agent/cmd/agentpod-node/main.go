@@ -6,7 +6,7 @@ import ("flag"; "fmt"; "os"
   "github.com/rakeshgangwar/agentpod/node-agent/internal/host")
 
 func main() {
-  if len(os.Args) < 2 { fmt.Println("usage: agentpod-node <enroll|run>"); os.Exit(2) }
+  if len(os.Args) < 2 { fmt.Println("usage: agentpod-node <enroll|run|detect>"); os.Exit(2) }
   switch os.Args[1] {
   case "enroll":
     fs := flag.NewFlagSet("enroll", flag.ExitOnError)
@@ -19,6 +19,8 @@ func main() {
     fmt.Println("enrolled:", id)
   case "run":
     runCmd() // implemented in Task 9
+  case "detect":
+    detectCmd() // debug/ops: print detected stations as JSON
   default:
     fmt.Println("unknown command:", os.Args[1]); os.Exit(2)
   }
