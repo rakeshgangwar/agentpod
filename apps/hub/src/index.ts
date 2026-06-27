@@ -44,6 +44,9 @@ import { sessionForkRoutes } from './routes/session-forks.ts';
 // MetaMCP integration
 import { mcpServerRoutes, mcpNamespaceRoutes, mcpEndpointRoutes, mcpStatusRoutes, mcpApiKeyRoutes, mcpPublicStatusRoutes } from './routes/mcp-servers.ts';
 import { mcpOauthRoutes } from './routes/mcp-oauth.ts';
+// Node fleet enrollment & registry
+import { nodeEnrollRoutes, nodeRoutes } from './routes/nodes.ts';
+import { enrollmentTokenRoutes } from './routes/enrollment-tokens.ts';
 // Middleware
 import { activityLoggerMiddleware } from './middleware/activity-logger.ts';
 // Sync services
@@ -93,6 +96,8 @@ origin: (origin) => {
   .use('*', rateLimitMiddleware)
   .route('/', healthRoutes)
   .route('/mcp/status', mcpPublicStatusRoutes)
+  // Public node enrollment (no session — node authenticates with a one-time token in the body)
+  .route('/public/nodes', nodeEnrollRoutes)  // POST /public/nodes/enroll
   // Signup check middleware - block signup if disabled (runs before auth handler)
   .use('/api/auth/*', signupCheckMiddleware)
   // Better Auth routes - handle authentication (public, no auth middleware)
@@ -141,7 +146,10 @@ origin: (origin) => {
   .route('/api/mcp/endpoints', mcpEndpointRoutes)
   .route('/api/mcp/status', mcpStatusRoutes)
   .route('/api/mcp/keys', mcpApiKeyRoutes)
-  .route('/api/mcp/oauth', mcpOauthRoutes);
+  .route('/api/mcp/oauth', mcpOauthRoutes)
+  // Node fleet management (authenticated)
+  .route('/api/enrollment-tokens', enrollmentTokenRoutes)  // POST /api/enrollment-tokens
+  .route('/api/nodes', nodeRoutes);                         // GET /api/nodes
 
 app.onError((err, c) => {
   const requestId = c.req.header('x-request-id') || crypto.randomUUID();
