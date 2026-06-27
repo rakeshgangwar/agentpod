@@ -2,13 +2,13 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/rakeshgangwar/agentpod/node-agent/internal/config"
+	"github.com/rakeshgangwar/agentpod/node-agent/internal/descriptor"
 	"github.com/rakeshgangwar/agentpod/node-agent/internal/gateway"
 )
 
@@ -22,10 +22,12 @@ func runCmd() {
 	defer stop()
 	fmt.Println("connecting to", cfg.Hub, "as", cfg.NodeID)
 
-	// TODO(Task 4): replace with the real descriptor handler.
-	stub := gateway.HandlerFunc(func(_ context.Context, verb string, _ json.RawMessage, _ func(int, string, bool) error) (any, bool, error) {
-		return nil, false, fmt.Errorf("no handler yet (verb=%s)", verb)
-	})
+	// Build the descriptor registry. Concrete harness descriptors (hermes,
+	// opencode, …) are registered here as they land in Tasks 5–7. For now the
+	// registry is empty and detect returns [].
+	reg := descriptor.NewRegistry()
+	// reg.Register(hermes.New())  // added in Task 5
+	// reg.Register(opencode.New()) // added in Task 6
 
-	gateway.Run(ctx, cfg, stub)
+	gateway.Run(ctx, cfg, descriptor.NewHandler(reg))
 }
