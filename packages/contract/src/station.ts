@@ -17,7 +17,7 @@ export const StationHealth = z.object({
 });
 export type StationHealth = z.infer<typeof StationHealth>;
 export const FsEntry = z.object({
-  name: z.string(), path: z.string(), type: z.enum(["file","dir"]),
+  name: z.string(), path: z.string(), type: z.enum(["file","dir","symlink"]),
   size: z.number().nullable(), modified: z.string().nullable(),
 });
 export type FsEntry = z.infer<typeof FsEntry>;
