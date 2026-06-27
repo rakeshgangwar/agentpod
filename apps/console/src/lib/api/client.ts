@@ -1,9 +1,14 @@
 import type { NodeSummary, DetectedStation, StationHealth, FsEntry } from "@agentpod/contract";
 
-const HUB = import.meta.env.PUBLIC_HUB_URL ?? "http://localhost:3001";
+/** Resolves the hub base URL at call time so it reflects the runtime connection. */
+function hubUrl(): string {
+  const stored =
+    typeof window !== "undefined" ? window.localStorage.getItem("agentpod.apiUrl") : null;
+  return stored ?? import.meta.env.PUBLIC_HUB_URL ?? "http://localhost:3001";
+}
 
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${HUB}${path}`, { credentials: "include", ...init });
+  const res = await fetch(`${hubUrl()}${path}`, { credentials: "include", ...init });
   if (!res.ok) throw new Error(`${init?.method ?? "GET"} ${path} → ${res.status}`);
   return res.json() as Promise<T>;
 }
@@ -57,7 +62,7 @@ export async function readFile(
   path: string
 ): Promise<{ content: string; truncated: boolean }> {
   const res = await fetch(
-    `${HUB}/api/stations/${stationId}/file?path=${encodeURIComponent(path)}`,
+    `${hubUrl()}/api/stations/${stationId}/file?path=${encodeURIComponent(path)}`,
     { credentials: "include" }
   );
   if (!res.ok) throw new Error(`GET /api/stations/${stationId}/file → ${res.status}`);
@@ -68,4 +73,4 @@ export async function readFile(
 }
 
 export const logsUrl = (stationId: string) =>
-  `${HUB}/api/stations/${stationId}/logs`;
+  `${hubUrl()}/api/stations/${stationId}/logs`;

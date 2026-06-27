@@ -4,6 +4,7 @@
   import { BottomNav, BottomNavItem } from "$lib/components/ui/bottom-nav";
   import Home from "@lucide/svelte/icons/home";
   import FolderKanban from "@lucide/svelte/icons/folder-kanban";
+  import Server from "@lucide/svelte/icons/server";
   import Settings from "@lucide/svelte/icons/settings";
 
   interface Props {
@@ -46,15 +47,20 @@
         label="Home" 
         badge={attentionCount}
       />
-      <BottomNavItem 
-        href="/projects" 
-        icon={FolderKanban} 
-        label="Projects" 
+      <BottomNavItem
+        href="/projects"
+        icon={FolderKanban}
+        label="Projects"
       />
-      <BottomNavItem 
-        href="/settings" 
-        icon={Settings} 
-        label="Settings" 
+      <BottomNavItem
+        href="/nodes"
+        icon={Server}
+        label="Nodes"
+      />
+      <BottomNavItem
+        href="/settings"
+        icon={Settings}
+        label="Settings"
       />
     </BottomNav>
   {/if}

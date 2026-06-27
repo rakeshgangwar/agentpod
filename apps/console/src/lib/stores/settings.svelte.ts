@@ -112,11 +112,17 @@ export async function initSettings(): Promise<void> {
   error = null;
   
   try {
-    currentSettings = await api.getSettings();
+    // Only call Tauri when running inside a Tauri context; fall through to
+    // defaults in a plain browser so the web build works without noise.
+    if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+      currentSettings = await api.getSettings();
+    } else {
+      currentSettings = { ...defaultSettings };
+    }
     applyTheme(currentSettings.theme);
     setupThemeListener();
   } catch (e) {
-    // Use defaults if no settings exist yet
+    // Use defaults if no settings exist yet (or Tauri invoke fails)
     console.warn("Failed to load settings, using defaults:", e);
     currentSettings = { ...defaultSettings };
     applyTheme(currentSettings.theme);

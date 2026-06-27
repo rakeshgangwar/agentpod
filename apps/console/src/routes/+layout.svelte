@@ -46,14 +46,14 @@
     themeStore.initialize();
     
     await initSettings();
+    await initConnection(); // must run before initAuth — sets the auth client base URL
     await initAuth();
-    await initConnection();
     isInitializing = false;
 
     window.addEventListener("keydown", handleGlobalKeydown);
-    
+
     console.log("[LAYOUT] dev mode:", dev);
-    if (dev) {
+    if (dev && typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
       initMcpDebugTools().catch(e => console.warn("[MCP-DEBUG] Failed to initialize:", e));
     }
   });
