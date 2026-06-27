@@ -1,12 +1,23 @@
 /**
  * Connection Store
- * 
+ *
  * Manages the connection state to the Management API using Svelte 5 runes.
+ * Uses fetch + localStorage (no Tauri) so it works in the browser/SPA build.
  */
 
-import * as api from "$lib/api/tauri";
-import type { ConnectionStatus } from "$lib/api/tauri";
 import { setAuthApiUrl } from "./auth.svelte";
+import { probeHealth, getStoredApiUrl, setStoredApiUrl, clearStoredApiUrl } from "$lib/api/connection-web";
+
+// =============================================================================
+// Types
+// =============================================================================
+
+export interface ConnectionStatus {
+  connected: boolean;
+  apiUrl: string | null;
+  lastTested: string | null;
+  error: string | null;
+}
 
 // =============================================================================
 // State
@@ -40,51 +51,37 @@ export const connection = {
 // =============================================================================
 
 /**
- * Initialize the connection state from storage
+ * Connect to a Management API instance.
+ *
+ * Probes GET /health; on success persists the URL to localStorage and updates
+ * the auth client via setAuthApiUrl.
  */
-export async function initConnection(): Promise<void> {
-  if (isInitialized) return;
-  
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function connect(apiUrl: string, _apiKey?: string): Promise<boolean> {
   isLoading = true;
   try {
-    connectionStatus = await api.getConnectionStatus();
-    
-    // If we have a stored connection, test it
-    if (connectionStatus.connected) {
-      connectionStatus = await api.testConnection();
-      
-      // Set the API URL for the auth client
-      if (connectionStatus.connected && connectionStatus.apiUrl) {
-        setAuthApiUrl(connectionStatus.apiUrl);
-      }
-    }
-  } catch (error) {
-    connectionStatus = {
-      connected: false,
-      apiUrl: null,
-      lastTested: null,
-      error: error instanceof Error ? error.message : "Failed to initialize connection",
-    };
-  } finally {
-    isLoading = false;
-    isInitialized = true;
-  }
-}
+    const ok = await probeHealth(apiUrl);
 
-/**
- * Connect to a Management API instance
- */
-export async function connect(apiUrl: string, apiKey?: string): Promise<boolean> {
-  isLoading = true;
-  try {
-    connectionStatus = await api.connect(apiUrl, apiKey);
-    
-    // Set the API URL for the auth client when connection succeeds
-    if (connectionStatus.connected) {
-      setAuthApiUrl(apiUrl);
+    if (ok) {
+      const normalised = apiUrl.replace(/\/$/, "");
+      connectionStatus = {
+        connected: true,
+        apiUrl: normalised,
+        lastTested: new Date().toISOString(),
+        error: null,
+      };
+      setStoredApiUrl(normalised);
+      setAuthApiUrl(normalised);
+      return true;
+    } else {
+      connectionStatus = {
+        connected: false,
+        apiUrl,
+        lastTested: new Date().toISOString(),
+        error: "Health check failed",
+      };
+      return false;
     }
-    
-    return connectionStatus.connected;
   } catch (error) {
     connectionStatus = {
       connected: false,
@@ -99,37 +96,67 @@ export async function connect(apiUrl: string, apiKey?: string): Promise<boolean>
 }
 
 /**
- * Disconnect from the Management API
+ * Restore connection from localStorage.
+ *
+ * Idempotent — safe to call multiple times. Re-probes /health whenever
+ * called so the UI always reflects the current reachability of the hub.
+ * If already connected and isInitialized, this is a no-op.
  */
-export async function disconnect(): Promise<void> {
+export async function initConnection(): Promise<void> {
+  if (isInitialized && connectionStatus.connected) return;
+
+  const storedUrl = getStoredApiUrl();
+  if (!storedUrl) {
+    isInitialized = true;
+    return;
+  }
+
   isLoading = true;
   try {
-    await api.disconnect();
-    connectionStatus = {
-      connected: false,
-      apiUrl: null,
-      lastTested: null,
-      error: null,
-    };
-  } catch (error) {
-    connectionStatus.error = error instanceof Error ? error.message : "Disconnect failed";
+    const ok = await probeHealth(storedUrl);
+
+    if (ok) {
+      const normalised = storedUrl.replace(/\/$/, "");
+      connectionStatus = {
+        connected: true,
+        apiUrl: normalised,
+        lastTested: new Date().toISOString(),
+        error: null,
+      };
+      setAuthApiUrl(normalised);
+    }
+    // On failure: leave disconnected; keep the stored URL so the connect
+    // screen can prefill the last-used address.
+  } catch {
+    // Network error — stay disconnected, URL remains in localStorage.
   } finally {
     isLoading = false;
+    isInitialized = true;
   }
 }
 
 /**
- * Test the current connection
+ * Disconnect from the Management API.
+ *
+ * Clears the persisted URL and resets all state so initConnection can be
+ * called again (important for test isolation).
+ */
+export async function disconnect(): Promise<void> {
+  clearStoredApiUrl();
+  connectionStatus = {
+    connected: false,
+    apiUrl: null,
+    lastTested: null,
+    error: null,
+  };
+  isInitialized = false;
+  isLoading = false;
+}
+
+/**
+ * Test the current connection (compatibility shim).
  */
 export async function testConnection(): Promise<boolean> {
-  isLoading = true;
-  try {
-    connectionStatus = await api.testConnection();
-    return connectionStatus.connected;
-  } catch (error) {
-    connectionStatus.error = error instanceof Error ? error.message : "Connection test failed";
-    return false;
-  } finally {
-    isLoading = false;
-  }
+  if (!connectionStatus.apiUrl) return false;
+  return connect(connectionStatus.apiUrl);
 }
