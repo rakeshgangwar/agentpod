@@ -51,6 +51,8 @@ import { mcpOauthRoutes } from './routes/mcp-oauth.ts';
 // Node fleet enrollment & registry
 import { nodeEnrollRoutes, nodeRoutes } from './routes/nodes.ts';
 import { enrollmentTokenRoutes } from './routes/enrollment-tokens.ts';
+// Station routes (detect, adopt, list, unadopt)
+import { stationRoutes } from './routes/stations.ts';
 // Middleware
 import { activityLoggerMiddleware } from './middleware/activity-logger.ts';
 // Sync services
@@ -155,7 +157,9 @@ origin: (origin) => {
   .route('/api/mcp/oauth', mcpOauthRoutes)
   // Node fleet management (authenticated)
   .route('/api/enrollment-tokens', enrollmentTokenRoutes)  // POST /api/enrollment-tokens
-  .route('/api/nodes', nodeRoutes);                         // GET /api/nodes
+  .route('/api/nodes', nodeRoutes)                         // GET /api/nodes
+  // Station routes (detect, adopt, list, unadopt)
+  .route('/api', stationRoutes);                           // GET/POST/DELETE /api/nodes/:id/... and /api/stations/:id
 
 app.onError((err, c) => {
   const requestId = c.req.header('x-request-id') || crypto.randomUUID();
