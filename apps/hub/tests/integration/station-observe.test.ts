@@ -126,7 +126,8 @@ afterAll(async () => {
 async function connectFakeNode(
   serverPort: number,
   nodeId: string,
-  nodeSecret: string
+  nodeSecret: string,
+  overrides?: { fsRead?: unknown }
 ): Promise<WebSocket> {
   const ws = new WebSocket(
     `ws://localhost:${serverPort}/public/nodes/gateway`,
@@ -165,7 +166,12 @@ async function connectFakeNode(
 
         case "fs.read":
           ws.send(
-            JSON.stringify({ type: "res", id: msg.id, ok: true, data: fakeFileContent })
+            JSON.stringify({
+              type: "res",
+              id: msg.id,
+              ok: true,
+              data: overrides?.fsRead ?? fakeFileContent,
+            })
           );
           break;
 
@@ -383,6 +389,89 @@ test(
 
       ws.close();
       await new Promise((r) => setTimeout(r, 100));
+    } finally {
+      server.stop(true);
+    }
+  },
+  15_000
+);
+
+test(
+  "GET /api/stations/:id/file returns decoded bytes for base64-encoded content",
+  async () => {
+    const server = Bun.serve({ fetch: testApp.fetch, websocket, port: 0 });
+    const baseUrl = `http://localhost:${server.port}`;
+
+    try {
+      const { token } = await mintEnrollmentToken(TEST_USER);
+      const { nodeId, nodeSecret } = await enrollNode(token, {
+        hostname: "observe-file-b64-host",
+        os: "linux",
+        arch: "amd64",
+        cpuCount: 2,
+      });
+
+      // binary\x00data → base64
+      const binaryData = "binary\x00data";
+      const base64Content = btoa(binaryData);
+      const ws = await connectFakeNode(server.port, nodeId, nodeSecret, {
+        fsRead: { content: base64Content, encoding: "base64", truncated: false },
+      });
+      const station = await adoptStation(baseUrl, nodeId, TEST_USER);
+
+      const res = await fetch(
+        `${baseUrl}/api/stations/${station.id}/file?path=binary.bin`,
+        { headers: { "X-Test-User-Id": TEST_USER } }
+      );
+      expect(res.status).toBe(200);
+      expect(res.headers.get("Content-Type")).toContain("application/octet-stream");
+
+      const buf = await res.arrayBuffer();
+      const decoded = new TextDecoder("latin1").decode(buf);
+      expect(decoded).toBe(binaryData);
+
+      const truncated = res.headers.get("X-Truncated");
+      expect(truncated).toBe("false");
+
+      ws.close();
+      await new Promise((r) => setTimeout(r, 100));
+    } finally {
+      server.stop(true);
+    }
+  },
+  15_000
+);
+
+test(
+  "GET /api/stations/:id/logs returns 502 when node is offline",
+  async () => {
+    const server = Bun.serve({ fetch: testApp.fetch, websocket, port: 0 });
+    const baseUrl = `http://localhost:${server.port}`;
+
+    try {
+      // Enroll + connect a node, adopt a station, then disconnect the node.
+      const { token } = await mintEnrollmentToken(TEST_USER);
+      const { nodeId, nodeSecret } = await enrollNode(token, {
+        hostname: "observe-logs-offline-host",
+        os: "linux",
+        arch: "amd64",
+        cpuCount: 2,
+      });
+
+      const ws = await connectFakeNode(server.port, nodeId, nodeSecret);
+      const station = await adoptStation(baseUrl, nodeId, TEST_USER);
+
+      // Disconnect node and let the connection manager unregister it.
+      ws.close();
+      await new Promise((r) => setTimeout(r, 200));
+
+      const res = await fetch(`${baseUrl}/api/stations/${station.id}/logs`, {
+        headers: { "X-Test-User-Id": TEST_USER },
+      });
+      expect(res.status).toBe(502);
+
+      const body = await res.json() as { error: string };
+      expect(body.error).toBe("node offline");
     } finally {
       server.stop(true);
     }

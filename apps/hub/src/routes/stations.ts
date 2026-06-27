@@ -20,6 +20,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "../db/drizzle";
 import { nodes } from "../db/schema/nodes";
 import * as broker from "../services/broker";
+import { connectionManager } from "../services/connection-manager";
 import { VERB_RESULTS } from "@agentpod/contract";
 import {
   adoptStations,
@@ -276,6 +277,7 @@ export const stationRoutes = new Hono()
    * The broker stream is cancelled when the client disconnects.
    *
    * Returns 404 if the station is not owned by the requesting user.
+   * Returns 502 if the node is offline.
    */
   .get("/stations/:stationId/logs", async (c) => {
     const userId = c.get("user").id;
@@ -286,8 +288,19 @@ export const stationRoutes = new Hono()
       return c.json({ error: "Not Found" }, 404);
     }
 
+    // Finding 1: Return 502 immediately instead of opening a dead SSE stream.
+    if (!connectionManager.isOnline(station.nodeId)) {
+      return c.json({ error: "node offline" }, 502);
+    }
+
     return streamSSE(c, async (stream) => {
       let cancelled = false;
+
+      // Finding 2: shared resolver so BOTH eof and client-abort unblock the callback.
+      let resolveKeepAlive!: () => void;
+      const keepAlive = new Promise<void>((r) => {
+        resolveKeepAlive = r;
+      });
 
       const { cancel } = broker.stream(
         station.nodeId,
@@ -299,7 +312,8 @@ export const stationRoutes = new Hono()
             await stream.writeSSE({ data: chunk });
           }
           if (eof) {
-            await stream.close();
+            cancelled = true;
+            resolveKeepAlive();
           }
         }
       );
@@ -308,11 +322,10 @@ export const stationRoutes = new Hono()
       stream.onAbort(() => {
         cancelled = true;
         cancel();
+        resolveKeepAlive();
       });
 
-      // Keep the SSE handler alive until the stream is closed externally.
-      await new Promise<void>((resolve) => {
-        stream.onAbort(resolve);
-      });
+      // Keep the SSE handler alive until either eof or client disconnect.
+      await keepAlive;
     });
   });
