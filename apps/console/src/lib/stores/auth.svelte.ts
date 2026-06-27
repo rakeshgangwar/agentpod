@@ -120,17 +120,22 @@ export const auth = {
  * Initialize auth state by restoring the session via the Better Auth cookie.
  *
  * If the auth client has not been configured yet (setAuthApiUrl not called),
- * this is a no-op — the caller is expected to call initAuth again once the
- * connection (and therefore the auth client) is established.
+ * this is a no-op and isInitialized remains false — the caller MUST call
+ * initAuth again once the connection (and therefore the auth client) is
+ * established, at which point the session will be properly restored.
+ *
+ * Once a real attempt with a client completes (success OR a definitive
+ * no-session result), isInitialized is set to true and subsequent calls
+ * become no-ops.
  */
 export async function initAuth(): Promise<void> {
   if (isInitialized) return;
 
   const client = getAuthClient();
 
-  // No client yet (API URL not set) — mark initialized but stay unauthenticated
+  // No client yet (API URL not set) — leave isInitialized=false so a later
+  // call after setAuthApiUrl() will proceed and restore the session.
   if (!client) {
-    isInitialized = true;
     return;
   }
 
@@ -151,8 +156,10 @@ export async function initAuth(): Promise<void> {
       };
     }
   } catch (err) {
-    // Session fetch failed (network error, etc.) — stay unauthenticated
+    // Session fetch failed (network error, etc.) — stay unauthenticated but
+    // surface the error so the UI can reflect the failed restore attempt.
     console.warn("[Auth] Failed to restore session:", err);
+    error = err instanceof Error ? err.message : "Failed to restore session";
   } finally {
     isLoading = false;
     isInitialized = true;

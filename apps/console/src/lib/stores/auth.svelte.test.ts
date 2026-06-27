@@ -65,19 +65,56 @@ beforeEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// initAuth — no client configured yet → no-op (graceful)
+// initAuth — no client configured yet → no-op (graceful), isInitialized stays false
 // ---------------------------------------------------------------------------
 
-test("initAuth with no API URL configured → no-op, stays unauthenticated", async () => {
+test("initAuth with no API URL configured → no-op, stays unauthenticated, isInitialized=false", async () => {
   const { initAuth, auth } = await freshAuthStore();
 
   // Don't call setAuthApiUrl — client is not configured
   await initAuth();
 
   expect(auth.isAuthenticated).toBe(false);
-  expect(auth.isInitialized).toBe(true);
+  // isInitialized must remain false so a later call (after setAuthApiUrl) can proceed
+  expect(auth.isInitialized).toBe(false);
   // getSession should NOT be called when there is no client
   expect(mockAuthClient.getSession).not.toHaveBeenCalled();
+});
+
+// ---------------------------------------------------------------------------
+// initAuth — re-callable: second call AFTER setAuthApiUrl restores session
+// ---------------------------------------------------------------------------
+
+test("initAuth called before client ready, then again after setAuthApiUrl → session restored", async () => {
+  mockAuthClient.getSession.mockResolvedValue({
+    data: {
+      user: {
+        id: "user-retry",
+        email: "retry@example.com",
+        name: "Retry User",
+        image: null,
+      },
+      session: {},
+    },
+  });
+
+  const { setAuthApiUrl, initAuth, auth } = await freshAuthStore();
+
+  // First call with no client — should be a no-op, isInitialized stays false
+  await initAuth();
+  expect(auth.isInitialized).toBe(false);
+  expect(auth.isAuthenticated).toBe(false);
+  expect(mockAuthClient.getSession).not.toHaveBeenCalled();
+
+  // Now the connection is established — configure the client and call again
+  setAuthApiUrl("http://localhost:3001");
+  await initAuth();
+
+  // Second call should have restored the session
+  expect(mockAuthClient.getSession).toHaveBeenCalledOnce();
+  expect(auth.isAuthenticated).toBe(true);
+  expect(auth.user?.id).toBe("user-retry");
+  expect(auth.isInitialized).toBe(true);
 });
 
 // ---------------------------------------------------------------------------
