@@ -111,31 +111,46 @@ test("a node that connects to the gateway shows online via listNodes", async () 
 });
 
 test("a node with invalid credentials is rejected", async () => {
+  // Enroll a real node so auth machinery is exercised, then connect with a
+  // deliberately WRONG secret — this proves the rejection is credential-based,
+  // not a missing-node-id shortcut.
   const server = Bun.serve({ fetch: testApp.fetch, websocket, port: 0 });
 
   try {
+    const { token } = await mintEnrollmentToken(TEST_USER_ID);
+    const { nodeId } = await enrollNode(token, {
+      hostname: "bad-creds-host",
+      os: "linux",
+      arch: "amd64",
+      cpuCount: 1,
+    });
+
     const ws = new WebSocket(
       `ws://localhost:${server.port}/public/nodes/gateway`,
       {
-        headers: { Authorization: "Bearer node_bad:wrong-secret" },
+        // Valid nodeId, deliberately wrong secret
+        headers: { Authorization: `Bearer ${nodeId}:totally-wrong-secret` },
       } as RequestInit & { headers: Record<string, string> }
     );
 
     let closeCode: number | null = null;
-    await new Promise<void>((res) => {
+    await new Promise<void>((res, rej) => {
       ws.onclose = (e) => {
         closeCode = e.code;
         res();
       };
-      // If it somehow opens, wait a moment then check
-      ws.onopen = () => setTimeout(res, 500);
+      ws.onopen = () => {
+        ws.close();
+        rej(new Error("connection should have been rejected but was accepted"));
+      };
     });
 
-    // Should be closed with 1008 (Policy Violation / unauthorized)
-    // or closed without opening at all
-    if (closeCode !== null) {
-      expect(closeCode).toBe(1008);
-    }
+    // Server calls ws.close(1008, "unauthorized"); Bun's WS client normalises
+    // the server-sent 1008 to 1000 on the receiving end (a Bun quirk), so we
+    // accept either.  The unconditional assertion still proves the connection
+    // was terminated — the hardened onopen handler above is what proves no
+    // successful open ever happened.
+    expect([1000, 1008]).toContain(closeCode);
   } finally {
     server.stop(true);
   }
