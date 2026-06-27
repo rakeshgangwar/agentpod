@@ -2,6 +2,8 @@ package gateway
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +13,11 @@ import (
 	"github.com/coder/websocket"
 	"github.com/rakeshgangwar/agentpod/node-agent/internal/config"
 )
+
+// stubHandler is a no-op handler used by tests that only care about hello/heartbeat.
+var stubHandler Handler = HandlerFunc(func(_ context.Context, _ string, _ json.RawMessage, _ func(int, string, bool) error) (any, bool, error) {
+	return nil, false, fmt.Errorf("no handler yet")
+})
 
 func TestRunSendsHello(t *testing.T) {
 	got := make(chan string, 1)
@@ -35,7 +42,7 @@ func TestRunSendsHello(t *testing.T) {
 	defer cancel()
 
 	cfg := config.Config{Hub: srv.URL, NodeID: "node_1", NodeSecret: "s"}
-	go Run(ctx, cfg)
+	go Run(ctx, cfg, stubHandler)
 
 	select {
 	case msg := <-got:

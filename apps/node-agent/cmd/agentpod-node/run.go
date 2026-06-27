@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -20,5 +21,11 @@ func runCmd() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	fmt.Println("connecting to", cfg.Hub, "as", cfg.NodeID)
-	gateway.Run(ctx, cfg)
+
+	// TODO(Task 4): replace with the real descriptor handler.
+	stub := gateway.HandlerFunc(func(_ context.Context, verb string, _ json.RawMessage, _ func(int, string, bool) error) (any, bool, error) {
+		return nil, false, fmt.Errorf("no handler yet (verb=%s)", verb)
+	})
+
+	gateway.Run(ctx, cfg, stub)
 }
