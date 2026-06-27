@@ -204,7 +204,7 @@ pnpm install
 
 # Copy environment files
 cp .env.example .env
-cp apps/api/.env.example apps/api/.env
+cp apps/hub/.env.example apps/hub/.env
 
 # Start infrastructure (PostgreSQL, Traefik)
 docker compose up -d postgres traefik
@@ -239,10 +239,10 @@ pnpm test
 pnpm check
 
 # API tests only
-cd apps/api && bun test
+cd apps/hub && bun test
 
 # Rust tests
-cd apps/frontend/src-tauri && cargo test
+cd apps/console/src-tauri && cargo test
 ```
 
 ## Configuration

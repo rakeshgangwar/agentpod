@@ -5,7 +5,7 @@
  * These handle the conversion from raw OpenCode parts to our internal
  * representation used by RuntimeProvider.
  * 
- * @see /apps/frontend/src/lib/chat/types/messages.ts for type definitions
+ * @see /apps/console/src/lib/chat/types/messages.ts for type definitions
  */
 
 import type {

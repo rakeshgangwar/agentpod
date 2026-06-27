@@ -5,7 +5,7 @@
  * used by RuntimeProvider. This handles the full message structure including
  * all 12+ part types.
  * 
- * @see /apps/frontend/src/lib/chat/types/messages.ts for type definitions
+ * @see /apps/console/src/lib/chat/types/messages.ts for type definitions
  */
 
 import type {

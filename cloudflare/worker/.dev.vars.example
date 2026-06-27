@@ -12,7 +12,7 @@
 # URL of your local API server
 AGENTPOD_API_URL=http://localhost:3001
 
-# API authentication token (must match API_TOKEN in apps/api/.env)
+# API authentication token (must match API_TOKEN in apps/hub/.env)
 # Generate with: openssl rand -hex 32
 AGENTPOD_API_TOKEN=your-local-api-token-here
 

@@ -28,7 +28,7 @@ import type { KnowledgeCategory, CreateKnowledgeDocument } from "@agentpod/types
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = join(__filename, "..");
 
-// Navigate from apps/api/src/scripts/ to repo root, then to docs/archive/
+// Navigate from apps/hub/src/scripts/ to repo root, then to docs/archive/
 const KNOWLEDGE_BASE_PATH = join(
   __dirname,
   "../../../../docs/archive/onboarding-system/knowledge-base"

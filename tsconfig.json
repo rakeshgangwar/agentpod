@@ -8,8 +8,8 @@
     "resolveJsonModule": true
   },
   "references": [
-    { "path": "apps/frontend" },
-    { "path": "apps/api" },
+    { "path": "apps/console" },
+    { "path": "apps/hub" },
     { "path": "packages/types" },
     { "path": "packages/ui" }
   ]

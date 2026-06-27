@@ -72,11 +72,11 @@ npm install
    AGENTPOD_API_TOKEN=your-local-api-token
    ```
 
-   The `AGENTPOD_API_TOKEN` must match the `API_TOKEN` in your `apps/api/.env` file.
+   The `AGENTPOD_API_TOKEN` must match the `API_TOKEN` in your `apps/hub/.env` file.
 
 3. **Start the local API:**
    ```bash
-   cd apps/api
+   cd apps/hub
    bun dev
    ```
 
@@ -232,13 +232,13 @@ Visit [Cloudflare Dashboard](https://dash.cloudflare.com) â†’ Workers & Pages â†
 
 The worker can't reach the AgentPod API. Check:
 1. `.dev.vars` has correct `AGENTPOD_API_URL`
-2. Local API is running (`cd apps/api && bun dev`)
+2. Local API is running (`cd apps/hub && bun dev`)
 3. API is accessible from where worker runs
 
 ### "Authentication failed"
 
 The API token doesn't match. Verify:
-1. `.dev.vars` `AGENTPOD_API_TOKEN` matches `apps/api/.env` `API_TOKEN`
+1. `.dev.vars` `AGENTPOD_API_TOKEN` matches `apps/hub/.env` `API_TOKEN`
 2. For production: `npm run secret:list` shows the secret is set
 
 ### Container startup issues

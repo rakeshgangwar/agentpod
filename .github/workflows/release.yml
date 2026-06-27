@@ -105,7 +105,7 @@ jobs:
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: apps/frontend/src-tauri
+          workspaces: apps/console/src-tauri
           cache-on-failure: true
           key: ${{ matrix.platform.target }}-${{ matrix.platform.rust_features }}
 
@@ -174,7 +174,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          projectPath: apps/frontend
+          projectPath: apps/console
           releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.platform.args }}
           tauriScript: pnpm tauri

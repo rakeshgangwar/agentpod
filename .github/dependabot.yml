@@ -25,7 +25,7 @@ updates:
         update-types: ["version-update:semver-major"]
 
   - package-ecosystem: cargo
-    directory: /apps/frontend/src-tauri
+    directory: /apps/console/src-tauri
     schedule:
       interval: weekly
       day: monday
@@ -48,7 +48,7 @@ updates:
         update-types: ["version-update:semver-major"]
 
   - package-ecosystem: docker
-    directory: /apps/api
+    directory: /apps/hub
     schedule:
       interval: weekly
     open-pull-requests-limit: 3
