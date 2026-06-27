@@ -15,6 +15,7 @@ import { GatewayClientMessage } from "@agentpod/contract";
 import { verifyNodeCredential } from "../services/enrollment";
 import { setNodeStatus } from "../services/node-registry";
 import { connectionManager } from "../services/connection-manager";
+import { handleNodeMessage } from "../services/broker";
 import { upgradeWebSocket } from "../ws";
 
 // Node connects with `Authorization: Bearer <nodeId>:<nodeSecret>`.
@@ -55,6 +56,11 @@ export const gatewayRoutes = new Hono().get(
         if (parsed.data.type === "heartbeat") {
           await setNodeStatus(authed, "online");
           connectionManager.send(authed, { type: "ack", ts: Date.now() });
+        } else if (
+          parsed.data.type === "res" ||
+          parsed.data.type === "stream"
+        ) {
+          handleNodeMessage(authed, parsed.data);
         }
       },
 
