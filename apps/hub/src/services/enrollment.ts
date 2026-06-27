@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, gt, isNull } from "drizzle-orm";
 import { db } from "../db/drizzle";
 import { nodes, enrollmentTokens } from "../db/schema/nodes";
 import type { HostInfo, EnrollResponse } from "@agentpod/contract";
@@ -54,21 +54,25 @@ export async function enrollNode(
 ): Promise<EnrollResponse> {
   const hash = await sha256(token);
 
-  // Look up an unused token row matching this hash
+  // Atomically consume the token: mark usedAt only if the token exists,
+  // is unused, and has not expired. This single UPDATE eliminates the
+  // TOCTOU race where two concurrent requests could both pass a SELECT
+  // guard before either writes usedAt.
   const [row] = await db
-    .select()
-    .from(enrollmentTokens)
-    .where(and(eq(enrollmentTokens.tokenHash, hash), isNull(enrollmentTokens.usedAt)));
-
-  if (!row || row.expiresAt.getTime() < Date.now()) {
-    throw new Error("invalid or expired enrollment token");
-  }
-
-  // Mark token as used (consume it)
-  await db
     .update(enrollmentTokens)
     .set({ usedAt: new Date() })
-    .where(eq(enrollmentTokens.id, row.id));
+    .where(
+      and(
+        eq(enrollmentTokens.tokenHash, hash),
+        isNull(enrollmentTokens.usedAt),
+        gt(enrollmentTokens.expiresAt, new Date()),
+      )
+    )
+    .returning();
+
+  if (!row) {
+    throw new Error("invalid or expired enrollment token");
+  }
 
   // Generate node identity
   const nodeId = prefixedId("node");

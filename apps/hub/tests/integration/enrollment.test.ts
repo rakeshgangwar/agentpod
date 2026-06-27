@@ -108,4 +108,32 @@ describe("Enrollment service", () => {
       })
     ).rejects.toThrow();
   });
+
+  test("concurrent enrollments with the same token — exactly one succeeds", async () => {
+    // Mint a single-use token
+    const { token } = await mintEnrollmentToken(TEST_USER_ID);
+
+    // Fire two concurrent enrollNode calls with the same token
+    const results = await Promise.allSettled([
+      enrollNode(token, {
+        hostname: "concurrent-node-a",
+        os: "linux",
+        arch: "amd64",
+        cpuCount: 2,
+      }),
+      enrollNode(token, {
+        hostname: "concurrent-node-b",
+        os: "linux",
+        arch: "amd64",
+        cpuCount: 2,
+      }),
+    ]);
+
+    const fulfilled = results.filter((r) => r.status === "fulfilled");
+    const rejected = results.filter((r) => r.status === "rejected");
+
+    // Exactly one must succeed; the other must be rejected (token already consumed)
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+  });
 });
