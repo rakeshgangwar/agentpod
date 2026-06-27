@@ -1,5 +1,5 @@
 CREATE TYPE "public"."node_status" AS ENUM('online', 'offline');--> statement-breakpoint
-ALTER TYPE "public"."mcp_auth_type" ADD VALUE 'provider_link';--> statement-breakpoint
+ALTER TYPE "public"."mcp_auth_type" ADD VALUE IF NOT EXISTS 'provider_link';--> statement-breakpoint
 CREATE TABLE "enrollment_tokens" (
 	"id" text PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
