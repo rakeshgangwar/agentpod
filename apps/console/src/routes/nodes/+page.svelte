@@ -16,7 +16,7 @@
 {:else}
   <ul>
     {#each nodes.list as n (n.id)}
-      <li><strong>{n.hostname}</strong> — {n.os}/{n.arch} · {n.cpuCount} CPU · <em>{n.status}</em></li>
+      <li><a href="/nodes/{n.id}"><strong>{n.hostname}</strong> — {n.os}/{n.arch} · {n.cpuCount} CPU · <em>{n.status}</em></a></li>
     {/each}
   </ul>
 {/if}
