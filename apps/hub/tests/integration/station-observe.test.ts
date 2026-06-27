@@ -25,6 +25,7 @@ import { Hono } from "hono";
 // src/ imports — DB URL is already set
 import { rawSql } from "../../src/db/drizzle";
 import { createTestUser } from "../helpers/database";
+import { ensurePgMigrations } from "../helpers/pg-migrations";
 import {
   mintEnrollmentToken,
   enrollNode,
@@ -103,6 +104,8 @@ const testApp = new Hono()
 // ─── Setup & Teardown ─────────────────────────────────────────────────────────
 
 beforeAll(async () => {
+  // Apply Drizzle Postgres migrations so the suite is self-contained on a fresh DB.
+  await ensurePgMigrations();
   await createTestUser({
     id: TEST_USER,
     email: "observe-a@test.example.com",
