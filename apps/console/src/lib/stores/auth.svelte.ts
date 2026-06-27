@@ -344,6 +344,21 @@ export function clearError(): void {
   error = null;
 }
 
+/**
+ * Clear the auth session and reset the client.
+ *
+ * Called on disconnect / "use different server" so a previous hub's identity
+ * and auth client don't persist when connecting to a different hub. Resets
+ * isInitialized so a subsequent setAuthApiUrl() + initAuth() restores fresh.
+ */
+export function clearAuthSession(): void {
+  sessionData = null;
+  currentAuthClient = null;
+  currentApiUrl = null;
+  isInitialized = false;
+  error = null;
+}
+
 // =============================================================================
 // Legacy Exports (for backward compatibility)
 // =============================================================================

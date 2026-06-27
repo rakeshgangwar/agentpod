@@ -287,3 +287,28 @@ test("logout → signOut called, isAuthenticated false, tauriAuthLogout NOT call
   expect(auth.isAuthenticated).toBe(false);
   expect(tauri.authLogout).not.toHaveBeenCalled();
 });
+
+// ---------------------------------------------------------------------------
+// clearAuthSession — resets session + isInitialized (used on disconnect/switch)
+// ---------------------------------------------------------------------------
+
+test("clearAuthSession → unauthenticated and isInitialized reset to false", async () => {
+  mockAuthClient.getSession.mockResolvedValue({
+    data: {
+      user: { id: "u-clear", email: "eve@example.com", name: "Eve", image: null },
+      session: {},
+    },
+  });
+
+  const { setAuthApiUrl, initAuth, clearAuthSession, auth } = await freshAuthStore();
+  setAuthApiUrl("http://localhost:3001");
+  await initAuth();
+  expect(auth.isAuthenticated).toBe(true);
+  expect(auth.isInitialized).toBe(true);
+
+  clearAuthSession();
+
+  expect(auth.isAuthenticated).toBe(false);
+  // isInitialized reset so a fresh setAuthApiUrl + initAuth restores cleanly
+  expect(auth.isInitialized).toBe(false);
+});

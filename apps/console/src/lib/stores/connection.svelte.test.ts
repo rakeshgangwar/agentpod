@@ -10,10 +10,11 @@ import { vi, test, expect, beforeEach } from "vitest";
 // Mock auth.svelte to avoid its Tauri/better-auth transitive imports
 vi.mock("./auth.svelte", () => ({
   setAuthApiUrl: vi.fn(),
+  clearAuthSession: vi.fn(),
 }));
 
 import { connect, disconnect, initConnection, connection } from "./connection.svelte";
-import { setAuthApiUrl } from "./auth.svelte";
+import { setAuthApiUrl, clearAuthSession } from "./auth.svelte";
 
 const LS_KEY = "agentpod.apiUrl";
 
@@ -92,6 +93,17 @@ test("disconnect → clears localStorage and resets isConnected to false", async
   expect(connection.isConnected).toBe(false);
   expect(connection.apiUrl).toBeNull();
   expect(localStorage.getItem(LS_KEY)).toBeNull();
+});
+
+test("disconnect → clears the auth session (no stale identity on server switch)", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true }));
+  await connect("http://localhost:3001");
+
+  // clear the call made by the beforeEach disconnect, then assert this one
+  vi.mocked(clearAuthSession).mockClear();
+  await disconnect();
+
+  expect(clearAuthSession).toHaveBeenCalledOnce();
 });
 
 // ---------------------------------------------------------------------------

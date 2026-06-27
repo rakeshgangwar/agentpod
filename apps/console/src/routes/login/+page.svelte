@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { auth, loginWithEmail, signUp, clearError } from "$lib/stores/auth.svelte";
+  import { auth, loginWithEmail, signUp, clearError, initAuth } from "$lib/stores/auth.svelte";
   import { connection, connect } from "$lib/stores/connection.svelte";
   import { goto } from "$app/navigation";
   import { Button } from "$lib/components/ui/button";
@@ -66,11 +66,16 @@
 
     // Connect without API key - we'll use OAuth tokens instead
     const success = await connect(apiUrl, undefined);
-    
-    if (!success) {
+
+    if (success) {
+      // Connection established → the auth client now has a baseURL. Attempt to
+      // restore an existing cookie session; the redirect $effect routes home if
+      // one is found, otherwise the login form is shown.
+      await initAuth();
+    } else {
       connectionError = connection.error || "Connection failed";
     }
-    
+
     isConnecting = false;
   }
 

@@ -5,7 +5,7 @@
  * Uses fetch + localStorage (no Tauri) so it works in the browser/SPA build.
  */
 
-import { setAuthApiUrl } from "./auth.svelte";
+import { setAuthApiUrl, clearAuthSession } from "./auth.svelte";
 import { probeHealth, getStoredApiUrl, setStoredApiUrl, clearStoredApiUrl } from "$lib/api/connection-web";
 
 // =============================================================================
@@ -151,6 +151,8 @@ export async function disconnect(): Promise<void> {
   };
   isInitialized = false;
   isLoading = false;
+  // Also clear auth so a previous hub's identity doesn't persist on switch.
+  clearAuthSession();
 }
 
 /**
