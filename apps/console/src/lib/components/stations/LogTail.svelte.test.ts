@@ -80,3 +80,30 @@ test("LogTail appends multiple lines in order", async () => {
     expect(getByText(/line three/)).toBeTruthy();
   });
 });
+
+test(
+  "LogTail caps rendered lines at MAX_LINES=2000 and keeps most recent",
+  async () => {
+    vi.spyOn(api, "logsUrl").mockReturnValue("http://hub/api/stations/s1/logs");
+    (globalThis as unknown as Record<string, unknown>).EventSource = MockEventSource;
+
+    render(LogTail, { props: { stationId: "s1" } });
+    await waitFor(() => expect(MockEventSource.instance).toBeTruthy());
+
+    // Fire 2500 log lines — 500 more than MAX_LINES
+    for (let i = 1; i <= 2500; i++) {
+      MockEventSource.instance!.fireMessage(`logline-${i}`);
+    }
+
+    await waitFor(
+      () => {
+        // The header counter must reflect the cap (2000), not the total (2500)
+        expect(document.body.textContent).toMatch(/\b2000 lines\b/);
+        // The most-recent line must be visible
+        expect(document.body.textContent).toContain("logline-2500");
+      },
+      { timeout: 15000 }
+    );
+  },
+  20000 // vitest test-level timeout
+);

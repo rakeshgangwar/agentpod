@@ -8,6 +8,10 @@
 
   let { stationId }: Props = $props();
 
+  // Maximum number of log lines kept in the DOM at any time.
+  // Older lines are dropped when new ones push past this cap.
+  const MAX_LINES = 2000;
+
   let lines = $state<string[]>([]);
   let status = $state<"connecting" | "connected" | "closed">("connecting");
   let containerEl = $state<HTMLElement | null>(null);
@@ -33,7 +37,8 @@
     };
 
     es.onmessage = (event: MessageEvent) => {
-      lines = [...lines, event.data];
+      const next = [...lines, event.data];
+      lines = next.length > MAX_LINES ? next.slice(-MAX_LINES) : next;
       // Auto-scroll to bottom on next tick
       if (containerEl) {
         setTimeout(() => {

@@ -365,10 +365,12 @@ func (c *claudeCodeDescriptor) TailLogs(ctx context.Context, key string, follow 
 	logFiles := collectJsonlFiles(sessDir)
 
 	if !follow {
-		return emitLogFiles(logFiles, emit)
+		// One-shot: emit the last N lines of existing content.
+		return emitLastNLines(logFiles, tailDefaultN, tailMaxBytes, emit)
 	}
 
-	if err := emitLogFiles(logFiles, emit); err != nil {
+	// Follow mode: emit the last N lines first, then poll for appends.
+	if err := emitLastNLines(logFiles, tailDefaultN, tailMaxBytes, emit); err != nil {
 		return err
 	}
 

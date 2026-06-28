@@ -357,11 +357,12 @@ func (o *openclawDescriptor) TailLogs(ctx context.Context, key string, follow bo
 	logFiles := collectOpenClawLogFiles(logsDir)
 
 	if !follow {
-		return emitLogFiles(logFiles, emit)
+		// One-shot: emit the last N lines of existing content.
+		return emitLastNLines(logFiles, tailDefaultN, tailMaxBytes, emit)
 	}
 
-	// Follow mode: emit existing content, then poll for appends.
-	if err := emitLogFiles(logFiles, emit); err != nil {
+	// Follow mode: emit the last N lines first, then poll for appends.
+	if err := emitLastNLines(logFiles, tailDefaultN, tailMaxBytes, emit); err != nil {
 		return err
 	}
 
