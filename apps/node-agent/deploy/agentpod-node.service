@@ -26,14 +26,15 @@ Restart=always
 RestartSec=5
 
 # --- Hardening -------------------------------------------------------
+# NOTE: the node-agent is a PRIVILEGED facilities daemon — its job is to
+# read AND write the operator's filesystem (fs.write/cleanup), spawn
+# interactive PTY shells (terminal), and manage agents under the operator's
+# home. So filesystem/namespace isolation is intentionally MINIMAL:
+# ProtectSystem/ProtectHome/PrivateTmp/PrivateDevices are deliberately NOT
+# set, or write ops, cleanup, config edits, and terminals would fail.
+# We keep only the privilege/kernel hardening that does not restrict the
+# agent's legitimate file + PTY access.
 NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=read-only
-ReadWritePaths=/root/.config/agentpod-node
-# If running as a non-root service account, replace the line above with:
-#   ReadWritePaths=/home/<user>/.config/agentpod-node
-PrivateTmp=true
-PrivateDevices=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
