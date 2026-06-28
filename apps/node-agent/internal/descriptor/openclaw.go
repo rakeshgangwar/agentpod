@@ -61,7 +61,7 @@ func (o *openclawDescriptor) Detect() ([]Station, error) {
 		return []Station{}, nil
 	}
 
-	caps := []string{"health", "logs", "fs.read", "lifecycle", "cleanup"}
+	caps := []string{"health", "logs", "fs.read", "fs.write", "terminal", "lifecycle", "cleanup"}
 
 	// Root workspace: prefer <home>/workspace if it exists, else fall back to <home>.
 	rootWs := o.resolveRootWorkspace()

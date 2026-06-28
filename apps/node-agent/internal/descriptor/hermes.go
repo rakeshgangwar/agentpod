@@ -61,7 +61,7 @@ func (h *hermesDescriptor) Detect() ([]Station, error) {
 		return []Station{}, nil
 	}
 
-	caps := []string{"health", "logs", "fs.read", "lifecycle", "cleanup"}
+	caps := []string{"health", "logs", "fs.read", "fs.write", "terminal", "lifecycle", "cleanup"}
 	homeCopy := h.home
 
 	stations := []Station{

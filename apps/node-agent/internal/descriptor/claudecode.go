@@ -82,7 +82,7 @@ func (c *claudeCodeDescriptor) Detect() ([]Station, error) {
 		return nil, err
 	}
 
-	caps := []string{"health", "logs", "fs.read", "cleanup"}
+	caps := []string{"health", "logs", "fs.read", "fs.write", "terminal", "cleanup"}
 	var stations []Station
 
 	for _, projPath := range paths {
