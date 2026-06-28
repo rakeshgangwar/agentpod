@@ -21,9 +21,15 @@
     stationId: string;
     /** Show write actions when the station advertises fs.write capability. */
     canWrite?: boolean;
+    /**
+     * Called when the user clicks "Edit (diff)" on a file.
+     * The station page uses this to open the ConfigEditor modal.
+     * Only invoked when canWrite is true.
+     */
+    onOpenConfigEditor?: (path: string) => void;
   }
 
-  let { stationId, canWrite = false }: Props = $props();
+  let { stationId, canWrite = false, onOpenConfigEditor }: Props = $props();
 
   // ── Read-only file tree state ────────────────────────────────────────────────
   let rootEntries = $state<FsEntry[]>([]);
@@ -398,13 +404,24 @@
           </span>
         {/if}
         {#if canWrite && fileContent !== null && !editMode}
-          <button
-            type="button"
-            class="ml-auto shrink-0 rounded border border-input bg-background px-2 py-0.5 text-[11px] font-sans hover:bg-muted/60"
-            onclick={startEdit}
-          >
-            Edit
-          </button>
+          <div class="ml-auto flex shrink-0 items-center gap-1.5">
+            <button
+              type="button"
+              class="rounded border border-input bg-background px-2 py-0.5 text-[11px] font-sans hover:bg-muted/60"
+              onclick={startEdit}
+            >
+              Edit
+            </button>
+            {#if onOpenConfigEditor}
+              <button
+                type="button"
+                class="rounded border border-input bg-background px-2 py-0.5 text-[11px] font-sans hover:bg-muted/60"
+                onclick={() => onOpenConfigEditor!(selectedPath!)}
+              >
+                Edit (diff)
+              </button>
+            {/if}
+          </div>
         {/if}
         {#if editMode}
           <div class="ml-auto flex shrink-0 items-center gap-1.5">

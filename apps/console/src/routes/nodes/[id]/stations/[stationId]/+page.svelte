@@ -4,6 +4,7 @@
   import HealthPanel from "$lib/components/stations/HealthPanel.svelte";
   import LogTail from "$lib/components/stations/LogTail.svelte";
   import FileBrowser from "$lib/components/stations/FileBrowser.svelte";
+  import ConfigEditor from "$lib/components/stations/ConfigEditor.svelte";
   import Terminal from "$lib/components/stations/Terminal.svelte";
   import { listStations } from "$lib/api/client";
   import type { StationRow } from "$lib/api/client";
@@ -15,6 +16,9 @@
   let activeTab = $state<Tab>("health");
 
   let station = $state<StationRow | null>(null);
+
+  /** Path of the file currently open in the ConfigEditor modal, or null. */
+  let configEditorPath = $state<string | null>(null);
 
   const hasTerminal = $derived(
     Array.isArray(station?.capabilities) && station!.capabilities.includes("terminal")
@@ -84,7 +88,11 @@
       </div>
     {:else if activeTab === "files"}
       <div class="files-wrap">
-        <FileBrowser {stationId} {canWrite} />
+        <FileBrowser
+          {stationId}
+          {canWrite}
+          onOpenConfigEditor={canWrite ? (p) => (configEditorPath = p) : undefined}
+        />
       </div>
     {:else if activeTab === "terminal" && hasTerminal}
       <div class="terminal-wrap">
@@ -93,6 +101,25 @@
     {/if}
   </div>
 </div>
+
+<!-- ── ConfigEditor modal (opened via "Edit (diff)" in the FileBrowser) ── -->
+{#if configEditorPath !== null && canWrite}
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+    role="presentation"
+    onclick={(e) => { if (e.target === e.currentTarget) configEditorPath = null; }}
+    onkeydown={(e) => { if (e.key === "Escape") configEditorPath = null; }}
+  >
+    <div class="relative z-10 w-full max-w-4xl h-[80vh] flex flex-col rounded-lg border border-border shadow-lg overflow-hidden">
+      <ConfigEditor
+        {stationId}
+        path={configEditorPath}
+        onClose={() => (configEditorPath = null)}
+      />
+    </div>
+  </div>
+{/if}
 
 <style>
   .station-page {
