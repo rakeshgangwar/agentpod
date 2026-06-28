@@ -1,0 +1,50 @@
+[Unit]
+Description=AgentPod node-agent — fleet management daemon
+Documentation=https://github.com/rakeshgangwar/agentpod
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# -----------------------------------------------------------------------
+# User= / Group=
+# Run as the operator account that owns the managed-agent config dirs
+# (e.g. Hermes profiles under ~/profiles/, OpenClaw configs).
+# Set this to the Linux user that runs those agents.
+# On a single-operator host "root" works; for a dedicated service account
+# create one and set User=agentpod Group=agentpod here.
+# -----------------------------------------------------------------------
+User=root
+
+# Enroll once before starting the service:
+#   agentpod-node enroll --hub <HUB_URL> --token <TOKEN>
+# That writes ~/.config/agentpod-node/config.json (or
+# /root/.config/agentpod-node/config.json when User=root).
+# The config is read automatically by `agentpod-node run`.
+ExecStart=/usr/local/bin/agentpod-node run
+
+Restart=always
+RestartSec=5
+
+# --- Hardening -------------------------------------------------------
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/root/.config/agentpod-node
+# If running as a non-root service account, replace the line above with:
+#   ReadWritePaths=/home/<user>/.config/agentpod-node
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+
+# --- Logging ---------------------------------------------------------
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=agentpod-node
+
+[Install]
+WantedBy=multi-user.target
