@@ -10,23 +10,23 @@ import (
 
 // writeFakeSystemctl writes an executable shell script named "systemctl" in
 // tmpDir. The script records each invocation (joined args) to a log file.
-// When unitKnown is true, list-unit-files calls exit 0 (unit known);
-// when false, they exit 4 (unit not found), mirroring real systemd semantics.
+// When unitKnown is true, `cat` subcommand calls exit 0 (unit file readable);
+// when false, they exit 1 (unit file not found), matching real systemd behaviour.
 // All other subcommands (stop, start, …) always exit 0.
 func writeFakeSystemctl(t *testing.T, tmpDir string, unitKnown bool) string {
 	t.Helper()
 	logFile := filepath.Join(tmpDir, "systemctl.log")
-	listExit := 0
+	catExit := 0
 	if !unitKnown {
-		listExit = 4
+		catExit = 1
 	}
 	script := fmt.Sprintf(`#!/bin/sh
 printf '%%s\n' "$*" >> %s
 case "$*" in
-  *list-unit-files*) exit %d ;;
+  *cat*) exit %d ;;
   *) exit 0 ;;
 esac
-`, logFile, listExit)
+`, logFile, catExit)
 	scriptPath := filepath.Join(tmpDir, "systemctl")
 	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
 		t.Fatalf("writeFakeSystemctl: %v", err)
@@ -111,9 +111,9 @@ func TestHermesStop_KnownUnit_UsesSystemctl(t *testing.T) {
 	if !strings.Contains(log, "--user stop hermes-gateway-analyst-echo.service") {
 		t.Errorf("expected 'systemctl --user stop hermes-gateway-analyst-echo.service' in log, got:\n%s", log)
 	}
-	// Confirm the existence check was run before the stop.
-	if !strings.Contains(log, "list-unit-files") {
-		t.Errorf("expected 'list-unit-files' existence check in log, got:\n%s", log)
+	// Confirm the existence check (cat) was run before the stop.
+	if !strings.Contains(log, "cat") {
+		t.Errorf("expected 'cat' existence check in log, got:\n%s", log)
 	}
 }
 
@@ -135,7 +135,7 @@ func TestHermesStop_AbsentUnit_FallsBackToPgrep(t *testing.T) {
 	}
 
 	sysLogContent := readLog(t, sysLog)
-	// The existence check (list-unit-files) IS called, but stop is NOT.
+	// The existence check (cat) IS called, but stop is NOT.
 	if strings.Contains(sysLogContent, " stop ") {
 		t.Errorf("systemctl stop should NOT be called when unit is absent; log:\n%s", sysLogContent)
 	}

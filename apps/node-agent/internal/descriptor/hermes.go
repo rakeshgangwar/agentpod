@@ -171,16 +171,11 @@ func hermesUnitName(key string) string {
 	return fmt.Sprintf("hermes-gateway-%s.service", profile)
 }
 
-// hermesUnitKnown reports whether the given systemd user unit file is known
-// to the running user session. It runs:
-//
-//	systemctl --user list-unit-files <unit>
-//
-// and treats exit code 0 as "known". Any non-zero exit (unit absent, systemctl
-// not available, no user systemd session) returns false so the pgrep/SIGTERM
-// fallback is used transparently.
+// hermesUnitKnown reports whether the given systemd --user unit file exists.
+// `systemctl --user cat <unit>` exits 0 iff the unit file can be read, and
+// non-zero when absent or when systemctl/the user session is unavailable.
 func hermesUnitKnown(unit string) bool {
-	return exec.Command("systemctl", "--user", "list-unit-files", unit).Run() == nil
+	return exec.Command("systemctl", "--user", "cat", unit).Run() == nil
 }
 
 // hermesPattern returns the pgrep pattern for a Hermes station key.
