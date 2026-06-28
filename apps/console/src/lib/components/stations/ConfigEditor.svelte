@@ -2,6 +2,8 @@
   import { onMount } from "svelte";
   import { readFile, writeFile } from "$lib/api/client";
   import { diffLines } from "diff";
+  import { MonacoEditor } from "$lib/components/ui/monaco-editor";
+  import { Button } from "$lib/components/ui/button";
   import ConfirmDialog from "$lib/components/ui/ConfirmDialog.svelte";
 
   interface Props {
@@ -28,6 +30,12 @@
   const diff = $derived(
     hasChanges ? diffLines(original, buffer) : []
   );
+
+  // ── Language detection ───────────────────────────────────────────────────────
+  function getLanguage(filePath: string): string {
+    const ext = filePath.split(".").pop()?.toLowerCase() ?? "plaintext";
+    return ext;
+  }
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
   onMount(async () => {
@@ -62,7 +70,7 @@
 
 <div class="flex flex-col h-full min-h-[400px] overflow-hidden rounded-md border border-border bg-background">
   <!-- ── Header ── -->
-  <div class="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-muted/20 shrink-0 text-xs font-mono">
+  <div class="flex items-center gap-2 px-3 py-2 border-b border-border/60 bg-muted/5 shrink-0 text-xs font-mono">
     <span class="truncate text-foreground">{path}</span>
     <div class="ml-auto flex items-center gap-2 shrink-0">
       {#if backupPath}
@@ -74,22 +82,24 @@
         <span class="text-[11px] text-destructive font-sans">{saveError}</span>
       {/if}
       {#if onClose}
-        <button
-          type="button"
-          class="rounded border border-input bg-background px-2 py-0.5 text-[11px] font-sans hover:bg-muted/60"
+        <Button
+          variant="outline"
+          size="sm"
+          class="h-7 px-2 text-[11px] font-sans"
           onclick={onClose}
         >
           Close
-        </button>
+        </Button>
       {/if}
-      <button
-        type="button"
-        class="rounded border border-primary bg-primary px-2 py-0.5 text-[11px] font-sans text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed"
+      <Button
+        variant="default"
+        size="sm"
+        class="h-7 px-2 text-[11px] font-sans"
         disabled={!hasChanges || isSaving}
         onclick={() => (showConfirm = true)}
       >
         {isSaving ? "Saving…" : "Save"}
-      </button>
+      </Button>
     </div>
   </div>
 
@@ -101,18 +111,21 @@
   {:else}
     <!-- Editor + diff split: editor on top, diff below when changes exist -->
     <div class="flex flex-col flex-1 overflow-hidden">
-      <!-- Editable textarea -->
+      <!-- Monaco editor replaces textarea -->
       <div class="flex flex-col flex-1 overflow-hidden" style:flex={hasChanges ? "0 0 50%" : "1 1 100%"}>
-        <textarea
-          class="w-full h-full resize-none m-0 p-3 font-mono text-[13px] leading-relaxed bg-transparent text-foreground outline-none"
-          bind:value={buffer}
-        ></textarea>
+        <MonacoEditor
+          code={buffer}
+          language={getLanguage(path)}
+          onchange={(v) => { buffer = v; }}
+          onsave={() => { if (hasChanges) showConfirm = true; }}
+          class="h-full"
+        />
       </div>
 
       <!-- Diff view — rendered below the editor whenever there are pending changes -->
       {#if hasChanges}
         <div class="flex flex-col flex-1 overflow-auto border-t border-border bg-muted/10">
-          <div class="px-3 py-1 text-[11px] font-sans text-muted-foreground border-b border-border">
+          <div class="px-3 py-1 text-[11px] font-sans text-muted-foreground border-b border-border/60">
             Diff (original → buffer)
           </div>
           <div

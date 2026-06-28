@@ -154,3 +154,45 @@ test("FileBrowser: new folder button calls mkdir", async () => {
     expect(api.mkdir).toHaveBeenCalledWith("station_1", "my-new-dir");
   });
 });
+
+test("FileBrowser: 'Edit (diff)' button calls onOpenConfigEditor with the file path", async () => {
+  vi.spyOn(api, "listFiles").mockResolvedValue([mockFile]);
+  vi.spyOn(api, "readFile").mockResolvedValue({ content: "# Hello", truncated: false });
+
+  const onOpenConfigEditor = vi.fn();
+
+  const { getByText, getByRole } = render(FileBrowser, {
+    props: { stationId: "station_1", canWrite: true, onOpenConfigEditor },
+  });
+
+  await waitFor(() => expect(getByText("README.md")).toBeTruthy());
+
+  // Click the file to open the preview
+  fireEvent.click(getByText("README.md"));
+
+  // Wait for file content to load and "Edit (diff)" to appear
+  await waitFor(() => {
+    expect(getByRole("button", { name: /edit \(diff\)/i })).toBeTruthy();
+  });
+
+  fireEvent.click(getByRole("button", { name: /edit \(diff\)/i }));
+
+  expect(onOpenConfigEditor).toHaveBeenCalledWith("README.md");
+});
+
+test("FileBrowser: write actions are hidden when canWrite is false", async () => {
+  vi.spyOn(api, "listFiles").mockResolvedValue([mockFile]);
+
+  const { queryByRole, getByText } = render(FileBrowser, {
+    props: { stationId: "station_1", canWrite: false },
+  });
+
+  // Wait for entries to render
+  await waitFor(() => expect(getByText("README.md")).toBeTruthy());
+
+  // Toolbar and per-entry write actions must not exist
+  expect(queryByRole("button", { name: /new file/i })).toBeNull();
+  expect(queryByRole("button", { name: /new folder/i })).toBeNull();
+  expect(queryByRole("button", { name: "Delete README.md" })).toBeNull();
+  expect(queryByRole("button", { name: "Rename README.md" })).toBeNull();
+});

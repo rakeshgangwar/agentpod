@@ -8,7 +8,7 @@
   import Circle from "@lucide/svelte/icons/circle";
 
   // Form state
-  let apiUrl = $state("http://localhost:3001");
+  let apiUrl = $state(import.meta.env.PUBLIC_HUB_URL ?? "http://localhost:3001");
   let isConnecting = $state(false);
   let connectionError = $state<string | null>(null);
 

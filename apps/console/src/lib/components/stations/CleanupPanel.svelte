@@ -2,6 +2,9 @@
   import { cleanupPlan, cleanupApply } from "$lib/api/client";
   import type { CleanupItem } from "$lib/api/client";
   import TypeToConfirmDialog from "$lib/components/ui/TypeToConfirmDialog.svelte";
+  import * as Card from "$lib/components/ui/card";
+  import { Badge } from "$lib/components/ui/badge";
+  import { Button } from "$lib/components/ui/button";
 
   interface Props {
     stationId: string;
@@ -100,27 +103,17 @@
   }
 </script>
 
-<div class="cleanup-panel p-4 flex flex-col gap-4">
+<div class="flex flex-col gap-4 p-4">
   <!-- Toolbar -->
   <div class="flex items-center gap-2">
-    <button
-      type="button"
-      class="inline-flex h-8 items-center justify-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground shadow-xs hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-      disabled={scanning}
-      onclick={doScan}
-    >
+    <Button size="sm" disabled={scanning} onclick={doScan}>
       {scanning ? "Scanning…" : "Scan"}
-    </button>
+    </Button>
 
     {#if scanned || items.length > 0}
-      <button
-        type="button"
-        class="inline-flex h-8 items-center justify-center rounded-md border border-destructive bg-background px-3 text-sm font-medium text-destructive shadow-xs hover:bg-destructive/10 disabled:pointer-events-none disabled:opacity-50"
-        disabled={applyDisabled}
-        onclick={handleApplyClick}
-      >
+      <Button variant="destructive" size="sm" disabled={applyDisabled} onclick={handleApplyClick}>
         Apply
-      </button>
+      </Button>
     {/if}
   </div>
 
@@ -134,7 +127,7 @@
 
   <!-- Freed bytes feedback -->
   {#if removedBytes !== null}
-    <p class="text-sm text-green-600">
+    <p class="text-sm text-emerald-600 dark:text-emerald-400">
       Freed {formatBytes(removedBytes)}.
     </p>
   {/if}
@@ -144,43 +137,50 @@
     {#if items.length === 0}
       <p class="text-sm text-muted-foreground">Nothing to clean.</p>
     {:else}
-      <div class="flex flex-col gap-1">
+      <div class="flex flex-col gap-2">
         <p class="text-xs text-muted-foreground">
           Total: {formatBytes(totalBytes)}
           {#if selected.size > 0}
             &nbsp;·&nbsp;Selected: {formatBytes(selectedTotal)}
           {/if}
         </p>
-        <ul class="divide-y divide-border/40 rounded-md border border-border overflow-hidden">
-          {#each items as item (item.path)}
-            <li class="flex items-center gap-3 px-3 py-2 text-sm hover:bg-muted/40">
-              <input
-                type="checkbox"
-                id="cleanup-{item.path}"
-                aria-label={item.path}
-                checked={selected.has(item.path)}
-                onchange={() => toggleItem(item.path)}
-                class="h-4 w-4 rounded border-border accent-primary cursor-pointer"
-              />
-              <label
-                for="cleanup-{item.path}"
-                class="flex flex-1 items-center justify-between cursor-pointer gap-2 min-w-0"
+        <Card.Root class="overflow-hidden border-border/60">
+          <ul class="divide-y divide-border/40">
+            {#each items as item (item.path)}
+              <li
+                class="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-muted/40"
               >
-                <span class="font-mono text-xs truncate text-foreground" title={item.path}>
-                  {item.path}
-                </span>
-                <span class="flex items-center gap-2 shrink-0 text-muted-foreground text-xs">
-                  <span
-                    class="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide"
-                  >
-                    {item.kind}
+                <input
+                  type="checkbox"
+                  id="cleanup-{item.path}"
+                  aria-label={item.path}
+                  checked={selected.has(item.path)}
+                  onchange={() => toggleItem(item.path)}
+                  class="h-4 w-4 shrink-0 cursor-pointer rounded border-border accent-primary"
+                />
+                <label
+                  for="cleanup-{item.path}"
+                  class="flex min-w-0 flex-1 cursor-pointer items-center justify-between gap-2"
+                >
+                  <span class="truncate font-mono text-xs text-foreground" title={item.path}>
+                    {item.path}
                   </span>
-                  {formatBytes(item.size)}
-                </span>
-              </label>
-            </li>
-          {/each}
-        </ul>
+                  <span class="flex shrink-0 items-center gap-1.5">
+                    <Badge
+                      variant="secondary"
+                      class="rounded font-mono text-[10px] uppercase tracking-wide"
+                    >
+                      {item.kind}
+                    </Badge>
+                    <Badge variant="outline" class="font-mono text-[10px] tabular-nums">
+                      {formatBytes(item.size)}
+                    </Badge>
+                  </span>
+                </label>
+              </li>
+            {/each}
+          </ul>
+        </Card.Root>
       </div>
     {/if}
   {/if}

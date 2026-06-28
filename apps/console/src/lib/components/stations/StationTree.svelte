@@ -2,6 +2,7 @@
   import { untrack } from "svelte";
   import { ChevronRight, ChevronDown } from "@lucide/svelte";
   import type { StationRow } from "$lib/api/client";
+  import { Badge } from "$lib/components/ui/badge";
 
   interface Props {
     stations: StationRow[];
@@ -46,13 +47,13 @@
 
   <div data-station-id={station.id} class="flex flex-col">
     <div
-      class="flex items-center gap-1.5 py-1 rounded-md hover:bg-muted/50"
+      class="flex items-center gap-1.5 py-1.5 rounded-md hover:bg-muted/50 transition-colors group"
       style:padding-left="{depth * 16 + 8}px"
     >
       {#if hasChildren}
         <button
           type="button"
-          class="flex items-center justify-center w-5 h-5 p-0 bg-transparent border-0 cursor-pointer shrink-0"
+          class="flex items-center justify-center w-5 h-5 p-0 bg-transparent border-0 cursor-pointer shrink-0 text-muted-foreground"
           onclick={() => toggle(station.id)}
           aria-expanded={isOpen}
         >
@@ -70,8 +71,18 @@
         href="/nodes/{nodeId}/stations/{station.id}"
         class="flex items-center gap-2 flex-1 min-w-0 no-underline text-inherit"
       >
-        <span class="text-sm font-medium truncate">{station.displayName}</span>
-        <span class="text-xs text-muted-foreground whitespace-nowrap">{station.harness} · {station.kind}</span>
+        <span class="text-sm font-medium truncate group-hover:text-foreground transition-colors">
+          {station.displayName}
+        </span>
+        <div class="flex items-center gap-1 shrink-0 ml-auto">
+          <Badge
+            variant="outline"
+            class="font-mono text-[10px] text-[var(--cyber-cyan)] border-[var(--cyber-cyan)]/40"
+          >
+            {station.harness}
+          </Badge>
+          <span class="text-xs text-muted-foreground">{station.kind}</span>
+        </div>
       </a>
     </div>
 
@@ -85,9 +96,9 @@
   </div>
 {/snippet}
 
-<div class="flex flex-col gap-0.5">
+<div class="flex flex-col gap-0.5 rounded-xl border bg-card p-2">
   {#if roots.length === 0}
-    <p class="text-sm text-muted-foreground">No stations adopted.</p>
+    <p class="text-sm text-muted-foreground p-2">No stations adopted.</p>
   {:else}
     {#each roots as root (root.id)}
       {@render stationNode(root, 0)}

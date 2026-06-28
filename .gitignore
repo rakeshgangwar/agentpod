@@ -50,3 +50,6 @@ docs/reference/agentic-space/
 
 # SDD scratch (any package)
 **/.superpowers/
+
+# Playwright MCP scratch artifacts
+.playwright-mcp/

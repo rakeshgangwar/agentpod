@@ -2,6 +2,7 @@
   import "../app.css";
   import { onMount, onDestroy } from "svelte";
   import { goto } from "$app/navigation";
+  import { page } from "$app/state";
   import { initConnection } from "$lib/stores/connection.svelte";
   import { auth, initAuth } from "$lib/stores/auth.svelte";
   import { initSettings } from "$lib/stores/settings.svelte";
@@ -15,8 +16,11 @@
 
   let { children } = $props();
   let isInitializing = $state(true);
-  let currentPath = $state("/");
   let mcpCleanup: (() => Promise<void>) | null = null;
+
+  // Reactive current path (tracks SvelteKit client navigations — using
+  // window.location.pathname imperatively goes stale across goto()).
+  let currentPath = $derived(page.url.pathname);
 
   // Public routes that don't require authentication (no AppShell/BottomNav)
   const publicRoutes = ["/login", "/setup"];
@@ -41,8 +45,6 @@
   }
 
   onMount(async () => {
-    currentPath = window.location.pathname;
-    
     themeStore.initialize();
     
     await initSettings();
@@ -88,11 +90,6 @@
   // Auth guard - redirect to login if not authenticated
   $effect(() => {
     if (!isInitializing && auth.isInitialized) {
-      // Update current path on navigation
-      if (typeof window !== "undefined") {
-        currentPath = window.location.pathname;
-      }
-      
       if (!auth.isAuthenticated && !isPublicRoute) {
         goto("/login");
       }

@@ -10,6 +10,16 @@
   import ActivityPanel from "$lib/components/stations/ActivityPanel.svelte";
   import { listStations } from "$lib/api/client";
   import type { StationRow } from "$lib/api/client";
+  import PageHeader from "$lib/components/page-header.svelte";
+  import { Button } from "$lib/components/ui/button";
+  import { Badge } from "$lib/components/ui/badge";
+  import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
+  import HeartPulseIcon from "@lucide/svelte/icons/heart-pulse";
+  import ScrollTextIcon from "@lucide/svelte/icons/scroll-text";
+  import FolderIcon from "@lucide/svelte/icons/folder";
+  import TerminalIcon from "@lucide/svelte/icons/terminal";
+  import Trash2Icon from "@lucide/svelte/icons/trash-2";
+  import ActivityIcon from "@lucide/svelte/icons/activity";
 
   const nodeId = $derived($page.params.id as string);
   const stationId = $derived($page.params.stationId as string);
@@ -46,94 +56,77 @@
       // Capabilities will stay null — Terminal tab won't appear
     }
   });
+
+  const tabs = $derived.by(() => [
+    { id: "health", label: "Health", icon: HeartPulseIcon },
+    { id: "logs", label: "Logs", icon: ScrollTextIcon },
+    { id: "files", label: "Files", icon: FolderIcon },
+    ...(hasTerminal ? [{ id: "terminal", label: "Terminal", icon: TerminalIcon }] : []),
+    ...(hasCleanup ? [{ id: "cleanup", label: "Cleanup", icon: Trash2Icon }] : []),
+    { id: "activity", label: "Activity", icon: ActivityIcon },
+  ]);
+
+  function handleTabChange(tabId: string) {
+    activeTab = tabId as Tab;
+  }
 </script>
 
-<div class="station-page">
-  <header class="page-header">
-    <a href="/nodes/{nodeId}" class="back-link">← Back to node</a>
-    <h1>Station: <code>{stationId}</code></h1>
-  </header>
+<!-- Themed header: station name, harness badge, back link, and tab bar -->
+<PageHeader
+  title={station?.displayName ?? stationId}
+  subtitle={station?.workspacePath ?? undefined}
+  {tabs}
+  activeTab={activeTab}
+  onTabChange={handleTabChange}
+  sticky={true}
+  collapsible={true}
+>
+  {#snippet leading()}
+    <Button
+      variant="ghost"
+      size="icon"
+      href="/nodes/{nodeId}"
+      class="h-8 w-8 border border-border/30 hover:border-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]"
+    >
+      <ArrowLeftIcon class="h-4 w-4" />
+    </Button>
+    {#if station?.harness}
+      <Badge variant="outline" class="font-mono text-xs uppercase tracking-wider shrink-0">
+        {station.harness}
+      </Badge>
+    {/if}
+  {/snippet}
+</PageHeader>
 
-  <!-- Tab bar -->
-  <nav class="tab-bar" aria-label="Station panels">
-    <button
-      type="button"
-      class="tab-btn {activeTab === 'health' ? 'active' : ''}"
-      onclick={() => (activeTab = "health")}
-    >
-      Health
-    </button>
-    <button
-      type="button"
-      class="tab-btn {activeTab === 'logs' ? 'active' : ''}"
-      onclick={() => (activeTab = "logs")}
-    >
-      Logs
-    </button>
-    <button
-      type="button"
-      class="tab-btn {activeTab === 'files' ? 'active' : ''}"
-      onclick={() => (activeTab = "files")}
-    >
-      Files
-    </button>
-    {#if hasTerminal}
-      <button
-        type="button"
-        class="tab-btn {activeTab === 'terminal' ? 'active' : ''}"
-        onclick={() => (activeTab = "terminal")}
-      >
-        Terminal
-      </button>
-    {/if}
-    {#if hasCleanup}
-      <button
-        type="button"
-        class="tab-btn {activeTab === 'cleanup' ? 'active' : ''}"
-        onclick={() => (activeTab = "cleanup")}
-      >
-        Cleanup
-      </button>
-    {/if}
-    <button
-      type="button"
-      class="tab-btn {activeTab === 'activity' ? 'active' : ''}"
-      onclick={() => (activeTab = "activity")}
-    >
-      Activity
-    </button>
-  </nav>
-
-  <!-- Panel content -->
-  <div class="panel-content">
-    {#if activeTab === "health"}
-      <HealthPanel {stationId} {canLifecycle} matrixId={station?.matrixId ?? null} />
-    {:else if activeTab === "logs"}
-      <div class="logs-wrap">
-        <LogTail {stationId} />
-      </div>
-    {:else if activeTab === "files"}
-      <div class="files-wrap">
-        <FileBrowser
-          {stationId}
-          {canWrite}
-          onOpenConfigEditor={canWrite ? (p) => (configEditorPath = p) : undefined}
-        />
-      </div>
-    {:else if activeTab === "terminal" && hasTerminal}
-      <div class="terminal-wrap">
-        <Terminal {stationId} />
-      </div>
-    {:else if activeTab === "cleanup" && hasCleanup}
-      <div class="cleanup-wrap">
-        <CleanupPanel {stationId} />
-      </div>
-    {:else if activeTab === "activity"}
-      <div class="activity-wrap">
-        <ActivityPanel {stationId} />
-      </div>
-    {/if}
-  </div>
+<!-- Panel content -->
+<div class="container mx-auto px-4 sm:px-6 py-4 md:py-6 max-w-7xl">
+  {#if activeTab === "health"}
+    <HealthPanel {stationId} {canLifecycle} matrixId={station?.matrixId ?? null} />
+  {:else if activeTab === "logs"}
+    <div class="h-[480px]">
+      <LogTail {stationId} />
+    </div>
+  {:else if activeTab === "files"}
+    <div class="h-[480px]">
+      <FileBrowser
+        {stationId}
+        {canWrite}
+        onOpenConfigEditor={canWrite ? (p) => (configEditorPath = p) : undefined}
+      />
+    </div>
+  {:else if activeTab === "terminal" && hasTerminal}
+    <div class="h-[480px]">
+      <Terminal {stationId} />
+    </div>
+  {:else if activeTab === "cleanup" && hasCleanup}
+    <div class="min-h-[200px]">
+      <CleanupPanel {stationId} />
+    </div>
+  {:else if activeTab === "activity"}
+    <div class="min-h-[200px]">
+      <ActivityPanel {stationId} />
+    </div>
+  {/if}
 </div>
 
 <!-- ── ConfigEditor modal (opened via "Edit (diff)" in the FileBrowser) ── -->
@@ -154,96 +147,3 @@
     </div>
   </div>
 {/if}
-
-<style>
-  .station-page {
-    max-width: 960px;
-    margin: 0 auto;
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .page-header {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  .back-link {
-    font-size: 0.875rem;
-    color: hsl(var(--muted-foreground));
-    text-decoration: none;
-  }
-
-  .back-link:hover {
-    text-decoration: underline;
-  }
-
-  h1 {
-    font-size: 1.25rem;
-    font-weight: 600;
-    margin: 0;
-  }
-
-  h1 code {
-    font-size: 1rem;
-    font-family: var(--font-mono), ui-monospace, monospace;
-    background-color: hsl(var(--muted));
-    padding: 0.125rem 0.375rem;
-    border-radius: 0.25rem;
-  }
-
-  .tab-bar {
-    display: flex;
-    gap: 0;
-    border-bottom: 1px solid hsl(var(--border));
-  }
-
-  .tab-btn {
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    background: transparent;
-    border: none;
-    border-bottom: 2px solid transparent;
-    cursor: pointer;
-    color: hsl(var(--muted-foreground));
-    transition: color 0.15s, border-color 0.15s;
-    margin-bottom: -1px;
-  }
-
-  .tab-btn:hover {
-    color: hsl(var(--foreground));
-  }
-
-  .tab-btn.active {
-    color: hsl(var(--foreground));
-    border-bottom-color: hsl(var(--primary));
-  }
-
-  .panel-content {
-    flex: 1;
-  }
-
-  .logs-wrap {
-    height: 480px;
-  }
-
-  .files-wrap {
-    height: 480px;
-  }
-
-  .terminal-wrap {
-    height: 480px;
-  }
-
-  .cleanup-wrap {
-    min-height: 200px;
-  }
-
-  .activity-wrap {
-    min-height: 200px;
-  }
-</style>

@@ -10,6 +10,7 @@ func buildRegistry(hermesStartCmd, openclawStartCmd string) *descriptor.Registry
 	reg.Register(descriptor.NewHermes("", hermesStartCmd))
 	reg.Register(descriptor.NewOpenClaw("", openclawStartCmd))
 	reg.Register(descriptor.NewClaudeCode(""))
+	reg.Register(descriptor.NewOpenCode(""))
 	reg.Register(descriptor.NewCodex(""))
 	return reg
 }

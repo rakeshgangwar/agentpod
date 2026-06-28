@@ -1145,10 +1145,16 @@ article,
 
 .cyber-card:hover {
   border-color: color-mix(in oklch, var(--cyber-cyan) 30%, transparent);
-  box-shadow: 
+  box-shadow:
     0 4px 24px hsl(var(--background) / 0.1),
     0 0 30px color-mix(in oklch, var(--cyber-cyan) 5%, transparent);
   transform: translateY(-2px);
+}
+
+/* Opt out of the hover-lift for live/interactive panels (e.g. the terminal),
+   where a 2px lift on hover is jarring. Keeps the glow + border animation. */
+.cyber-card.no-lift:hover {
+  transform: none;
 }
 
 .dark .cyber-card:hover {
