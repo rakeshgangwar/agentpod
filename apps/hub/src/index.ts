@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
-import { config } from './config.ts';
+import { config, corsAllowedOrigins, isAllowedOrigin } from './config.ts';
 import { validateConfig } from './utils/validate-config.ts';
 import { initDatabase } from './db/drizzle.ts';
 import { ensureSsoViews } from './db/sso-views.ts';
@@ -77,22 +77,12 @@ const app = new Hono()
   .use('*', logger())
   // CORS configuration - allow credentials for Better Auth cookies
   .use('*', cors({
-origin: (origin) => {
-      // Allow requests from frontend (localhost in dev, production domain)
-      const allowedOrigins = [
-        'http://localhost:1420',  // Tauri dev
-        'http://localhost:5173',  // Vite dev
-        'tauri://localhost',      // Tauri production
-        config.publicUrl,
-      ];
-      
-      // Allow local network IPs for mobile development
-      // Matches 192.168.x.x and 10.x.x.x patterns
-      if (origin && /^https?:\/\/(192\.168|10)\.\d+\.\d+:\d+$/.test(origin)) {
-        return origin;
-      }
-      
-      return allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+    // Origin list lives in config.ts (corsAllowedOrigins) so station-terminal.ts
+    // can re-use it for CSWSH defence without duplicating it here.
+    origin: (origin) => {
+      if (!origin) return corsAllowedOrigins[0]!;
+      if (isAllowedOrigin(origin)) return origin;
+      return corsAllowedOrigins[0]!;
     },
     credentials: true,
     allowHeaders: ['Content-Type', 'Authorization'],

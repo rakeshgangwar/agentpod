@@ -21,6 +21,10 @@
  * On client disconnect: sends a cancel frame to detach from the stream
  * (DETACH — leaves the PTY session alive on the node).  Does NOT send
  * term.close so reconnecting clients can re-attach.
+ *
+ * Security: Origin header is validated against the hub's CORS allowed-origins
+ * list (see config.ts) to prevent Cross-Site WebSocket Hijacking (CSWSH, #71).
+ * WS upgrades are plain GETs so the CSRF middleware does not run for them.
  */
 
 import { Hono } from "hono";
@@ -29,6 +33,7 @@ import * as broker from "../services/broker";
 import { getStation } from "../services/station-registry";
 import { connectionManager } from "../services/connection-manager";
 import { recordAudit } from "../services/audit";
+import { isAllowedOrigin } from "../config";
 import type { AuthUser } from "../auth/middleware";
 
 export const stationTerminalRoutes = new Hono().get(
@@ -38,6 +43,8 @@ export const stationTerminalRoutes = new Hono().get(
     // inside the async onOpen callbacks (Hono closes over it for us).
     const user = c.get("user") as AuthUser | undefined;
     const stationId = c.req.param("id");
+    // Capture the Origin header now for CSWSH validation inside onOpen.
+    const upgradeOrigin = c.req.header("Origin") ?? null;
 
     // Mutable state shared across onOpen / onMessage / onClose.
     let nodeId: string | null = null;
@@ -46,9 +53,25 @@ export const stationTerminalRoutes = new Hono().get(
     let auditDone:
       | ((result: "ok" | "error", error?: string) => Promise<void>)
       | null = null;
+    // Fix 1: closed flag guards against stream leak on early client disconnect.
+    // Set in onClose; checked immediately after broker.stream() assigns cancel.
+    let closed = false;
+    // Fix 2: set true when the node sends eof so onClose does not send a
+    // spurious cancel frame for an already-ended stream.
+    let streamEnded = false;
 
     return {
       async onOpen(_e, ws) {
+        // ── 0. CSWSH origin check (closes #71) ───────────────────────────
+        // WS upgrades are plain GETs — the CSRF middleware does not run for
+        // them.  Validate the Origin header against the hub's CORS policy so
+        // a malicious page cannot open this shell WS with the victim's cookie.
+        // Missing Origin (server-to-server, no browser) is always permitted.
+        if (!isAllowedOrigin(upgradeOrigin)) {
+          ws.close(1008, "Forbidden: origin not allowed");
+          return;
+        }
+
         // ── 1. Authenticate ───────────────────────────────────────────────
         if (!user || user.id === "anonymous") {
           ws.close(1008, "Unauthorized");
@@ -112,6 +135,10 @@ export const stationTerminalRoutes = new Hono().get(
               }
             }
             if (eof) {
+              // Fix 2: mark stream ended BEFORE closing the WS so that the
+              // onClose handler does not send a spurious cancel frame for an
+              // already-ended (and already-deleted) stream subscription.
+              streamEnded = true;
               try {
                 ws.send(JSON.stringify({ t: "exit" }));
                 ws.close();
@@ -128,6 +155,14 @@ export const stationTerminalRoutes = new Hono().get(
 
         attachCancel = cancel;
         attachId = id;
+
+        // Fix 1: if the client disconnected while we were awaiting the DB
+        // lookup or the term.open RPC, onClose already ran and set closed=true
+        // but could not cancel (attachCancel was still null then).  Cancel now.
+        if (closed) {
+          cancel();
+          return;
+        }
       },
 
       onMessage(evt, _ws) {
@@ -159,9 +194,16 @@ export const stationTerminalRoutes = new Hono().get(
       },
 
       async onClose() {
+        // Fix 1: record that the client is gone so that onOpen, if still
+        // running its awaits, can cancel as soon as broker.stream returns.
+        closed = true;
+
         // DETACH: cancel the attach stream so the node stops streaming to this
         // client.  The PTY session remains alive on the node for reconnects.
-        if (attachCancel) {
+        // Fix 2: skip if the stream already signalled eof — the subscription
+        // has already been removed by the broker and sending cancel would be
+        // a no-op at best (the broker guards it) but is semantically wrong.
+        if (attachCancel && !streamEnded) {
           attachCancel();
           attachCancel = null;
         }

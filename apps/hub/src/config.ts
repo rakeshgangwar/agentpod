@@ -174,3 +174,31 @@ export const config = {
 } as const;
 
 export type Config = typeof config;
+
+// ─── CORS / CSWSH origin policy (single source of truth) ──────────────────────
+
+/**
+ * Static allowed origins — must match the cors() call in index.ts.
+ * Exported so that WebSocket endpoints can re-use the same list for
+ * Cross-Site WebSocket Hijacking (CSWSH) defence without hardcoding a
+ * separate copy.
+ */
+export const corsAllowedOrigins: readonly string[] = [
+  'http://localhost:1420',  // Tauri dev
+  'http://localhost:5173',  // Vite dev
+  'tauri://localhost',      // Tauri production
+  config.publicUrl,
+];
+
+const _LOCAL_IP_ORIGIN_RE = /^https?:\/\/(192\.168|10)\.\d+\.\d+:\d+$/;
+
+/**
+ * Returns true if the given Origin header value is permitted by the hub's
+ * CORS policy.  A missing / empty origin (server-to-server, no browser) is
+ * treated as allowed — there is no CSWSH risk without a browser context.
+ */
+export function isAllowedOrigin(origin: string | null | undefined): boolean {
+  if (!origin) return true;
+  if (_LOCAL_IP_ORIGIN_RE.test(origin)) return true;
+  return corsAllowedOrigins.includes(origin);
+}

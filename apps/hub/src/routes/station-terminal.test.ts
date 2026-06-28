@@ -214,6 +214,27 @@ async function adoptStation(
   return rows[0]!;
 }
 
+// ─── Helpers (event-driven) ───────────────────────────────────────────────────
+
+/**
+ * Poll condition() every pollMs until it returns a truthy value, or throw
+ * after timeoutMs.  Used in the new tests instead of arbitrary setTimeout
+ * waits so the suite doesn't waste time waiting for already-arrived frames.
+ */
+async function pollUntil<T>(
+  condition: () => T | undefined | null | false,
+  timeoutMs = 4000,
+  pollMs = 30
+): Promise<T> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const result = condition();
+    if (result) return result as T;
+    await new Promise((r) => setTimeout(r, pollMs));
+  }
+  throw new Error(`pollUntil timed out after ${timeoutMs} ms`);
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 test(
@@ -336,6 +357,162 @@ test(
       expect(frame.id).toBe(attachIdRef[0]);
 
       clientWs!.close();
+      fakeNode.close();
+      await new Promise((r) => setTimeout(r, 100));
+    } finally {
+      server.stop(true);
+    }
+  },
+  20_000
+);
+
+test(
+  "client {t:'resize'} is forwarded to the node as a resize frame with the attach id",
+  async () => {
+    const server = Bun.serve({ fetch: testApp.fetch, websocket, port: 0 });
+    const baseUrl = `http://localhost:${server.port}`;
+
+    try {
+      const { token } = await mintEnrollmentToken(TEST_USER);
+      const { nodeId, nodeSecret } = await enrollNode(token, {
+        hostname: "sterm-resize-host",
+        os: "linux",
+        arch: "amd64",
+        cpuCount: 2,
+      });
+
+      const attachIdRef: [string | null] = [null];
+      const capturedNodeMsgs: string[] = [];
+
+      // Hold the stream open so we can send a resize message.
+      const fakeNode = await connectFakeNode(server.port!, nodeId, nodeSecret, {
+        holdStream: true,
+        attachIdRef,
+        capturedNodeMsgs,
+      });
+
+      const station = await adoptStation(baseUrl, nodeId);
+
+      // Connect authenticated client.
+      let clientWs: WebSocket;
+      await new Promise<void>((resolve, reject) => {
+        clientWs = new WebSocket(
+          `ws://localhost:${server.port}/api/stations/${station.id}/terminal`,
+          {
+            headers: { "X-Test-User-Id": TEST_USER },
+          } as RequestInit & { headers: Record<string, string> }
+        );
+        clientWs.onopen = () => resolve();
+        clientWs.onerror = () => reject(new Error("Client WS error"));
+      });
+
+      // Wait until the attach handshake completes on the node side.
+      await pollUntil(() => attachIdRef[0]);
+
+      // Send a resize event from the client.
+      clientWs!.send(JSON.stringify({ t: "resize", cols: 120, rows: 40 }));
+
+      // Poll until the node receives a resize frame.
+      const resizeFrame = await pollUntil(() => {
+        for (const raw of capturedNodeMsgs) {
+          try {
+            const m = JSON.parse(raw);
+            if (m?.type === "resize") return m;
+          } catch { /* skip */ }
+        }
+        return null;
+      });
+
+      expect(resizeFrame.type).toBe("resize");
+      expect(resizeFrame.cols).toBe(120);
+      expect(resizeFrame.rows).toBe(40);
+      // Frame must carry the attach id so the node routes it to the right PTY.
+      expect(resizeFrame.id).toBe(attachIdRef[0]);
+
+      clientWs!.close();
+      fakeNode.close();
+      await new Promise((r) => setTimeout(r, 100));
+    } finally {
+      server.stop(true);
+    }
+  },
+  20_000
+);
+
+test(
+  "client disconnect sends cancel (detach) to the node and does NOT send term.close — PTY session survives",
+  async () => {
+    const server = Bun.serve({ fetch: testApp.fetch, websocket, port: 0 });
+    const baseUrl = `http://localhost:${server.port}`;
+
+    try {
+      const { token } = await mintEnrollmentToken(TEST_USER);
+      const { nodeId, nodeSecret } = await enrollNode(token, {
+        hostname: "sterm-disconnect-host",
+        os: "linux",
+        arch: "amd64",
+        cpuCount: 2,
+      });
+
+      const attachIdRef: [string | null] = [null];
+      const capturedNodeMsgs: string[] = [];
+
+      // Hold the stream open so the session is active when we disconnect.
+      const fakeNode = await connectFakeNode(server.port!, nodeId, nodeSecret, {
+        holdStream: true,
+        attachIdRef,
+        capturedNodeMsgs,
+      });
+
+      const station = await adoptStation(baseUrl, nodeId);
+
+      // Connect authenticated client.
+      let clientWs: WebSocket;
+      await new Promise<void>((resolve, reject) => {
+        clientWs = new WebSocket(
+          `ws://localhost:${server.port}/api/stations/${station.id}/terminal`,
+          {
+            headers: { "X-Test-User-Id": TEST_USER },
+          } as RequestInit & { headers: Record<string, string> }
+        );
+        clientWs.onopen = () => resolve();
+        clientWs.onerror = () => reject(new Error("Client WS error"));
+      });
+
+      // Wait for attach to be established before disconnecting.
+      await pollUntil(() => attachIdRef[0]);
+
+      // Disconnect the client — this should trigger a cancel (detach), not term.close.
+      clientWs!.close();
+
+      // Poll until the node sees a cancel frame.
+      const cancelFrame = await pollUntil(() => {
+        for (const raw of capturedNodeMsgs) {
+          try {
+            const m = JSON.parse(raw);
+            if (m?.type === "cancel") return m;
+          } catch { /* skip */ }
+        }
+        return null;
+      });
+
+      expect(cancelFrame.type).toBe("cancel");
+      // The cancel must reference the attach stream id so the node detaches the
+      // right PTY subscription — not blindly close it.
+      expect(cancelFrame.id).toBe(attachIdRef[0]);
+
+      // The node must NOT have received a term.close verb.  The PTY session is
+      // kept alive on the node so a reconnecting client can re-attach.
+      const termCloseReceived = capturedNodeMsgs.some((raw) => {
+        try {
+          const m = JSON.parse(raw);
+          return m?.type === "req" && m?.verb === "term.close";
+        } catch {
+          return false;
+        }
+      });
+      expect(termCloseReceived).toBe(false);
+
       fakeNode.close();
       await new Promise((r) => setTimeout(r, 100));
     } finally {
