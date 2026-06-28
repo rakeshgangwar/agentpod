@@ -23,6 +23,10 @@ type Station struct {
 	ParentKey     *string  `json:"parentKey"`
 	WorkspacePath *string  `json:"workspacePath"`
 	Capabilities  []string `json:"capabilities"`
+	// MatrixId is the agent's Matrix user ID (mxid), e.g. "@name:id.agentpod.dev".
+	// It is nil when the agent has no Matrix identity or the config cannot be read.
+	// SECURITY: the access_token is NEVER read or stored here.
+	MatrixId      *string  `json:"matrixId"`
 }
 
 // Health is a point-in-time resource/liveness snapshot for a station.

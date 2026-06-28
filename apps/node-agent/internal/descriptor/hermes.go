@@ -91,6 +91,7 @@ func (h *hermesDescriptor) Detect() ([]Station, error) {
 		key := "hermes:" + name
 		wsPath := filepath.Join(profilesDir, name)
 		wsCopy := wsPath
+		profileDir := wsPath
 		stations = append(stations, Station{
 			Key:           key,
 			Harness:       "hermes",
@@ -99,6 +100,7 @@ func (h *hermesDescriptor) Detect() ([]Station, error) {
 			ParentKey:     &parentKey,
 			WorkspacePath: &wsCopy,
 			Capabilities:  caps,
+			MatrixId:      MatrixIDFromProfile(profileDir, "id.agentpod.dev"),
 		})
 	}
 

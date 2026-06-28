@@ -94,6 +94,7 @@ func (o *openclawDescriptor) Detect() ([]Station, error) {
 		key := "openclaw:" + name
 		wsPath := o.resolveAgentWorkspace(name)
 		wsCopy := wsPath
+		agentConfigDir := filepath.Join(agentsDir, name)
 		stations = append(stations, Station{
 			Key:           key,
 			Harness:       "openclaw",
@@ -102,6 +103,7 @@ func (o *openclawDescriptor) Detect() ([]Station, error) {
 			ParentKey:     &parentKey,
 			WorkspacePath: &wsCopy,
 			Capabilities:  caps,
+			MatrixId:      MatrixIDFromProfile(agentConfigDir, "id.agentpod.dev"),
 		})
 	}
 
