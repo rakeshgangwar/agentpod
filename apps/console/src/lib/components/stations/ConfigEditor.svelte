@@ -119,7 +119,7 @@
             data-testid="diff-view"
             class="flex-1 overflow-auto p-2 font-mono text-[12px] leading-relaxed"
           >
-            {#each diff as part (part.value)}
+            {#each diff as part, i (i)}
               {#if part.added}
                 <pre
                   class="m-0 whitespace-pre-wrap break-all rounded px-1 bg-green-500/15 text-green-700 dark:text-green-400"
