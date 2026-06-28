@@ -77,6 +77,17 @@ func TestJail_RejectsSymlinkEscape(t *testing.T) {
 	}
 }
 
+func TestJail_RejectsSymlinkFinalComponent(t *testing.T) {
+	root := t.TempDir()
+	linkPath := filepath.Join(root, "link")
+	if err := os.Symlink("/etc", linkPath); err != nil {
+		t.Fatalf("symlink: %v", err)
+	}
+	if _, err := fsops.Jail(root, "link"); !errors.Is(err, fsops.ErrEscape) {
+		t.Fatalf("expected ErrEscape for symlink final component, got %v", err)
+	}
+}
+
 // ── Write tests ──────────────────────────────────────────────────────────────
 
 func TestWrite_RoundTripUtf8(t *testing.T) {
