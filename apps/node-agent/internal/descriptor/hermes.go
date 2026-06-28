@@ -153,6 +153,36 @@ func (h *hermesDescriptor) Health(key string) (Health, error) {
 	return health, nil
 }
 
+// hermesUnitName returns the systemd user unit name for a Hermes station key.
+//
+// For profile keys ("hermes:<name>") the unit is "hermes-gateway-<name>.service",
+// matching the naming convention used on the real fleet (e.g.
+// "hermes-gateway-analyst-echo.service").
+//
+// For the root "hermes" key (no --profile flag) the unit is
+// "hermes-gateway.service" — used when the operator runs a single Hermes
+// instance without a named profile. If no such unit is configured the
+// existence check will return false and the pgrep/SIGTERM path is taken.
+func hermesUnitName(key string) string {
+	if key == "hermes" {
+		return "hermes-gateway.service"
+	}
+	profile := strings.TrimPrefix(key, "hermes:")
+	return fmt.Sprintf("hermes-gateway-%s.service", profile)
+}
+
+// hermesUnitKnown reports whether the given systemd user unit file is known
+// to the running user session. It runs:
+//
+//	systemctl --user list-unit-files <unit>
+//
+// and treats exit code 0 as "known". Any non-zero exit (unit absent, systemctl
+// not available, no user systemd session) returns false so the pgrep/SIGTERM
+// fallback is used transparently.
+func hermesUnitKnown(unit string) bool {
+	return exec.Command("systemctl", "--user", "list-unit-files", unit).Run() == nil
+}
+
 // hermesPattern returns the pgrep pattern for a Hermes station key.
 func hermesPattern(key string) string {
 	if key == "hermes" {
@@ -193,9 +223,15 @@ func hermesProcessRunning(key string) (bool, error) {
 	return true, nil
 }
 
-// Stop implements Lifecycle. It finds the running Hermes process and sends
-// SIGTERM, escalating to SIGKILL after LifecycleGracePeriod.
+// Stop implements Lifecycle. It prefers "systemctl --user stop <unit>" when
+// the unit is registered in the user session, falling back to the pgrep/SIGTERM
+// path for installations that do not use systemd user units.
 func (h *hermesDescriptor) Stop(key string) error {
+	unit := hermesUnitName(key)
+	if hermesUnitKnown(unit) {
+		return exec.Command("systemctl", "--user", "stop", unit).Run()
+	}
+	// Fallback: locate the process via pgrep and send SIGTERM/SIGKILL.
 	pid, err := hermesPID(key)
 	if err != nil {
 		return fmt.Errorf("hermes: stop %q: %w", key, err)
@@ -203,12 +239,19 @@ func (h *hermesDescriptor) Stop(key string) error {
 	return stopProcess(pid, LifecycleGracePeriod)
 }
 
-// Start implements Lifecycle. It runs the configured start command in a new
-// session (detached). If no start command is set it returns a descriptive error.
+// Start implements Lifecycle. It prefers "systemctl --user start <unit>" when
+// the unit is registered in the user session. Otherwise it runs the configured
+// start command in a new session (detached). If neither is available it returns
+// a descriptive error.
 //
 // Configure the start command by passing it to NewHermes or by setting
 // hermesStartCmd in the node config file.
 func (h *hermesDescriptor) Start(key string) error {
+	unit := hermesUnitName(key)
+	if hermesUnitKnown(unit) {
+		return exec.Command("systemctl", "--user", "start", unit).Run()
+	}
+	// Fallback: run the configured start command.
 	if h.startCmd == "" {
 		return fmt.Errorf("no start command configured for hermes (set hermesStartCmd in node config)")
 	}
