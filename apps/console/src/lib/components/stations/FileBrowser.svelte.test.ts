@@ -6,6 +6,7 @@ import type { FsEntry } from "@agentpod/contract";
 // first test doesn't pay the ~4s compilation cost inside its waitFor window.
 import FileBrowser from "./FileBrowser.svelte";
 
+
 beforeEach(() => vi.restoreAllMocks());
 afterEach(cleanup);
 
@@ -90,5 +91,66 @@ test("FileBrowser shows truncated notice when file is truncated", async () => {
 
   await waitFor(() => {
     expect(getByText(/truncated/i)).toBeTruthy();
+  });
+});
+
+// ─── Write-action tests (canWrite=true) ──────────────────────────────────────
+
+test("FileBrowser: delete button opens type-to-confirm dialog and calls del on confirm", async () => {
+  vi.spyOn(api, "listFiles").mockResolvedValue([mockFile]);
+  vi.spyOn(api, "del").mockResolvedValue({ ok: true });
+
+  const { getByText, getByRole, getByPlaceholderText } = render(FileBrowser, {
+    props: { stationId: "station_1", canWrite: true },
+  });
+
+  await waitFor(() => expect(getByText("README.md")).toBeTruthy());
+
+  // Click the delete button for README.md
+  fireEvent.click(getByRole("button", { name: "Delete README.md" }));
+
+  // The type-to-confirm dialog should now be open
+  await waitFor(() => expect(getByRole("dialog")).toBeTruthy());
+
+  // Type the confirm phrase (the file name)
+  const input = getByPlaceholderText("README.md");
+  fireEvent.input(input, { target: { value: "README.md" } });
+
+  // Confirm button should now be enabled
+  await waitFor(() => {
+    const btn = getByRole("button", { name: /confirm/i }) as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
+  });
+
+  fireEvent.click(getByRole("button", { name: /confirm/i }));
+
+  await waitFor(() => {
+    expect(api.del).toHaveBeenCalledWith("station_1", "README.md", { recursive: false });
+  });
+});
+
+test("FileBrowser: new folder button calls mkdir", async () => {
+  vi.spyOn(api, "listFiles").mockResolvedValue([]);
+  vi.spyOn(api, "mkdir").mockResolvedValue({ ok: true });
+
+  const { getByRole, getByPlaceholderText } = render(FileBrowser, {
+    props: { stationId: "station_1", canWrite: true },
+  });
+
+  // Toolbar is rendered immediately (outside the loading state block)
+  const newFolderBtn = getByRole("button", { name: /new folder/i });
+  fireEvent.click(newFolderBtn);
+
+  // An inline name input should appear
+  await waitFor(() => {
+    expect(getByPlaceholderText(/folder name/i)).toBeTruthy();
+  });
+
+  const input = getByPlaceholderText(/folder name/i);
+  fireEvent.input(input, { target: { value: "my-new-dir" } });
+  fireEvent.keyDown(input, { key: "Enter" });
+
+  await waitFor(() => {
+    expect(api.mkdir).toHaveBeenCalledWith("station_1", "my-new-dir");
   });
 });

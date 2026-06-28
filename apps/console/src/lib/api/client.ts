@@ -74,3 +74,46 @@ export async function readFile(
 
 export const logsUrl = (stationId: string) =>
   `${hubUrl()}/api/stations/${stationId}/logs`;
+
+// ─── Station write endpoints ──────────────────────────────────────────────────
+
+export const writeFile = (
+  stationId: string,
+  path: string,
+  content: string,
+  opts?: { backup?: boolean; encoding?: "utf8" | "base64" }
+) =>
+  http<{ bytesWritten: number; backupPath?: string | null }>(
+    `/api/stations/${stationId}/fs/write`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        path,
+        content,
+        encoding: opts?.encoding ?? "utf8",
+        ...(opts?.backup !== undefined ? { backup: opts.backup } : {}),
+      }),
+    }
+  );
+
+export const mkdir = (stationId: string, path: string) =>
+  http<{ ok: boolean }>(`/api/stations/${stationId}/fs/mkdir`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path }),
+  });
+
+export const move = (stationId: string, from: string, to: string) =>
+  http<{ ok: boolean }>(`/api/stations/${stationId}/fs/move`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ from, to }),
+  });
+
+export const del = (stationId: string, path: string, opts?: { recursive?: boolean }) =>
+  http<{ ok: boolean }>(`/api/stations/${stationId}/fs/delete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path, ...(opts?.recursive !== undefined ? { recursive: opts.recursive } : {}) }),
+  });
