@@ -6,13 +6,16 @@
 
 ## 1. Goal & Scope
 
-The fleet-console pages (P0–P3) are functionally complete but **visually plain** (hand-rolled tables + raw CSS), while the rest of the app (OpenCode-era) has a polished design system. This phase brings the fleet console up to that visual standard and makes it the **primary** AgentPod experience.
+The fleet-console pages (P0–P3) are functionally complete but **visually plain** (hand-rolled tables + raw CSS) and live *parallel to* the polished OpenCode UI. Rather than build a separate fleet-first redesign, this phase **integrates the fleet features into the existing UI** — reusing its shell, layouts, design system, and patterns — and **phases out the OpenCode pages that are no longer usable**.
 
-Two coordinated changes:
-1. **Re-skin** every fleet-console page/panel using the **existing design system** (`apps/console/src/lib/components/ui/*` + the cyber theme) — reuse, don't reinvent — and make every page **responsive** (mobile → desktop).
-2. **Fleet-first IA**: a Fleet Overview landing, fleet-first navigation, and **demotion** (not deletion) of the OpenCode-specific pages.
+Three coordinated changes:
+1. **Integrate, reusing existing chrome.** Bring the fleet pages under the existing `app-shell` and existing **layout patterns** instead of their parallel plain pages: the sandboxes-dashboard card grid → nodes/stations cards; the `/projects/[id]` **tabbed workspace** (files/logs/terminal) → the station page (its panels are the same shape). Style everything with the existing design system (`lib/components/ui/*` + the cyber theme) so the fleet pages look native to the app. Every page **responsive** (mobile → desktop).
+2. **Surface the fleet prominently** in the existing IA (home + nav) — fleet becomes the main content the app opens to.
+3. **Phase out unusable pages**: demote/remove from nav the OpenCode-client pages that don't work without the now-separate client (see §3), keeping infrastructure (Admin, Settings).
 
-**Web-only / responsive, no desktop shell.** Tauri features are being removed; the target is a single **responsive web** UI (one adaptive layout, not a separate desktop/Tauri shell). This phase does not need to add — and should not assume — any Tauri/desktop-app surface. (Full Tauri-code removal is a separate cleanup, folded into the later OpenCode retirement; this phase simply must not depend on Tauri and must work as responsive web.)
+**Web-only / responsive, no desktop shell.** Tauri features are being removed; the target is a single **responsive web** UI — reuse the existing shell, do not add a separate desktop/Tauri shell, and do not depend on Tauri. (Full Tauri-code removal rides with the later OpenCode retirement.)
+
+**Approach is reuse + integrate, NOT greenfield.** Prefer adapting existing components/layouts over building new ones. No fleet-feature logic changes; existing tests stay green.
 
 **Hard constraint: presentation only.** No changes to fleet-feature logic, data flow, API calls, or store behavior. Existing vitest suites must stay green — re-skins preserve component logic and the selectors/`data-testid`/roles those tests rely on.
 
@@ -32,11 +35,16 @@ The console already ships a shadcn-style component set on **bits-ui + Tailwind 4
 
 The re-skin uses these exclusively. The OpenCode home (`routes/+page.svelte`) and `/projects` pages are the **reference** for how the system is applied (card grids, badges, status colors, loading skeletons, toasts).
 
-## 3. IA / Shell — fleet-first
+## 3. IA / Shell — integrate into the existing shell
 
-- **Fleet Overview landing.** A new overview becomes the post-login landing (replacing the OpenCode sandboxes dashboard): a grid of **node cards** (host, online/offline Badge, arch/CPU, station count, a health rollup) + the "Create enrollment token" CTA + empty state. Routed at `/` (the OpenCode dashboard moves to a demoted route, e.g. `/legacy` or stays at its component but is unlinked).
-- **Primary navigation — one RESPONSIVE shell.** Not a separate desktop shell: a single adaptive layout (`lib/components/app-shell.svelte`) that flows from mobile to desktop via Tailwind breakpoints — the BottomNav on small screens becomes a persistent side/top nav on `md+`. Same items everywhere: **Fleet** (overview/nodes) · **Activity** (fleet-wide audit — optional, include if cheap) · **Settings** · **Admin** (admins only). **Projects / Workflows are removed from the primary nav.** Every fleet page must be responsive (mobile → desktop), not fixed-width.
-- **Demote OpenCode.** `/projects/*`, `/workflows/*`, and the old sandboxes home are dropped from navigation but remain routable (code retained). A minimal "Legacy" affordance (e.g. a link in Settings or a menu) keeps them reachable. The post-login redirect target changes from the OpenCode home to the Fleet Overview.
+- **Reuse the existing `app-shell`** (`lib/components/app-shell.svelte`) — do NOT build a new shell. Make it responsive (mobile BottomNav → side/top nav on `md+` via Tailwind breakpoints). Nav becomes fleet-first: **Fleet** (nodes) · **Activity** (fleet-wide audit — optional) · **Settings** · **Admin** (admins only). Projects/Workflows leave the nav.
+- **Home surfaces the fleet.** The post-login landing (`/`) shows the fleet — a grid of **node cards** (host, online/offline Badge, arch/CPU, station count, health rollup) + "Create enrollment token" + empty state — reusing the existing dashboard card-grid pattern rather than a new component. The OpenCode sandboxes dashboard is unlinked (demoted, see below).
+- **Phase out unusable OpenCode pages.** Drop from nav + leave routable (code retained for later deletion):
+  - **Unusable without the separated client → demote:** `/workflows/*` (OpenCode workflow builder), `/projects/[id]/chat` (agent chat = the client product), `/projects/[id]/{preview,sync}` (OpenCode sandbox backend), and the sandboxes home dashboard.
+  - **Reuse, don't demote:** the `/projects/[id]` **tabbed-workspace layout** + its files/logs/terminal patterns — these are the visual reference (and ideally shared components) for the station page.
+  - **Keep:** `/admin/*`, `/settings`, `/login`, `/setup`.
+  - During planning, confirm each page's status by inspection; a minimal "Legacy" link (in Settings) keeps demoted pages reachable. The post-login redirect changes from the OpenCode home to the fleet home.
+- **Provisioning (P4) is later** — do not pre-build provisioning UI now; just leave the IA able to host a future "new runtime" entry point.
 
 ## 4. Pages Re-skinned
 
