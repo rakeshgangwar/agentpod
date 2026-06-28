@@ -24,7 +24,7 @@ func TestDispatchUnaryResponse(t *testing.T) {
 	defer srv.Close()
 
 	c, _, _ := websocket.Dial(context.Background(), "ws"+strings.TrimPrefix(srv.URL, "http"), nil)
-	go serve(context.Background(), c, HandlerFunc(func(ctx context.Context, verb string, p json.RawMessage, emit func(int, string, bool) error) (any, bool, error) {
+	go serve(context.Background(), c, HandlerFunc(func(ctx context.Context, verb string, p json.RawMessage, emit func(int, string, bool, string) error) (any, bool, error) {
 		return map[string]bool{"pong": true}, false, nil
 	}))
 
@@ -53,7 +53,7 @@ func TestDispatchCancelRequest(t *testing.T) {
 	defer srv.Close()
 
 	c, _, _ := websocket.Dial(context.Background(), "ws"+strings.TrimPrefix(srv.URL, "http"), nil)
-	go serve(context.Background(), c, HandlerFunc(func(ctx context.Context, verb string, p json.RawMessage, emit func(int, string, bool) error) (any, bool, error) {
+	go serve(context.Background(), c, HandlerFunc(func(ctx context.Context, verb string, p json.RawMessage, emit func(int, string, bool, string) error) (any, bool, error) {
 		// block until cancelled
 		<-ctx.Done()
 		cancelSeen <- struct{}{}

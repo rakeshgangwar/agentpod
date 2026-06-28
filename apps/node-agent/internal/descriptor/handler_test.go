@@ -106,7 +106,7 @@ func TestHandlerLogsTail_IsStreamed(t *testing.T) {
 	reg.Register(&fakeDescriptor{harness: "fake"})
 
 	var chunks []string
-	emit := func(seq int, chunk string, eof bool) error {
+	emit := func(seq int, chunk string, eof bool, enc string) error {
 		chunks = append(chunks, chunk)
 		return nil
 	}

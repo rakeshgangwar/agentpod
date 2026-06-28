@@ -9,21 +9,34 @@ import (
 	"github.com/coder/websocket"
 )
 
+// reqIDKey is an unexported context key used to pass the current request ID
+// into Handler.Handle so long-lived handlers (e.g. term.attach) can key
+// their per-request state.
+type reqIDKey struct{}
+
 // Handler handles a hub→node verb request.
 //
 // emit writes a stream frame; seq is the frame sequence number, chunk is the
-// payload, eof signals the last frame in the stream. If streamed is true the
+// payload, eof signals the last frame in the stream, enc is the encoding
+// ("base64" or "" to omit the field, implying utf8). If streamed is true the
 // dispatcher appends one final {type:"stream",eof:true} frame after Handle
 // returns. If streamed is false the dispatcher writes a {type:"res"} frame.
 type Handler interface {
-	Handle(ctx context.Context, verb string, params json.RawMessage, emit func(seq int, chunk string, eof bool) error) (result any, streamed bool, err error)
+	Handle(ctx context.Context, verb string, params json.RawMessage, emit func(seq int, chunk string, eof bool, enc string) error) (result any, streamed bool, err error)
 }
 
 // HandlerFunc is a function adapter for Handler.
-type HandlerFunc func(ctx context.Context, verb string, params json.RawMessage, emit func(seq int, chunk string, eof bool) error) (any, bool, error)
+type HandlerFunc func(ctx context.Context, verb string, params json.RawMessage, emit func(seq int, chunk string, eof bool, enc string) error) (any, bool, error)
 
-func (f HandlerFunc) Handle(ctx context.Context, verb string, params json.RawMessage, emit func(seq int, chunk string, eof bool) error) (any, bool, error) {
+func (f HandlerFunc) Handle(ctx context.Context, verb string, params json.RawMessage, emit func(seq int, chunk string, eof bool, enc string) error) (any, bool, error) {
 	return f(ctx, verb, params, emit)
+}
+
+// FrameHandler may be implemented by a Handler to receive inbound hub→node
+// frames that are not req/cancel (currently: "input" and "resize" for
+// terminal stdin and window-size changes).
+type FrameHandler interface {
+	HandleFrame(frameType, id string, raw json.RawMessage) error
 }
 
 // inboundEnvelope is the decoded shape of a hub→node message.
@@ -103,18 +116,25 @@ func serve(ctx context.Context, c *websocket.Conn, h Handler, mus ...*sync.Mutex
 				// dispatcher can append the correct seq on the final eof frame.
 				var seqNext int64
 
-				emit := func(seq int, chunk string, eof bool) error {
+				emit := func(seq int, chunk string, eof bool, enc string) error {
 					atomic.StoreInt64(&seqNext, int64(seq)+1)
-					return writeMsg(reqCtx, map[string]any{
+					m := map[string]any{
 						"type":  "stream",
 						"id":    reqID,
 						"seq":   seq,
 						"chunk": chunk,
 						"eof":   eof,
-					})
+					}
+					if enc != "" {
+						m["enc"] = enc
+					}
+					return writeMsg(reqCtx, m)
 				}
 
-				result, streamed, herr := h.Handle(reqCtx, verb, params, emit)
+				// Embed the request ID in context so handlers such as
+				// term.attach can key per-attach state by request ID.
+				reqCtxWithID := context.WithValue(reqCtx, reqIDKey{}, reqID)
+				result, streamed, herr := h.Handle(reqCtxWithID, verb, params, emit)
 
 				if streamed {
 					// Send the terminal eof frame; use the parent ctx so we
@@ -154,6 +174,15 @@ func serve(ctx context.Context, c *websocket.Conn, h Handler, mus ...*sync.Mutex
 				cancel()
 			}
 			cancelsMu.Unlock()
+
+		case "input", "resize":
+			// Route terminal input/resize frames to the handler if it supports them.
+			if fh, ok := h.(FrameHandler); ok {
+				// Pass the full raw frame so HandleFrame can unpack data/cols/rows.
+				rawCopy := make([]byte, len(raw))
+				copy(rawCopy, raw)
+				_ = fh.HandleFrame(env.Type, env.ID, rawCopy)
+			}
 		}
 	}
 }

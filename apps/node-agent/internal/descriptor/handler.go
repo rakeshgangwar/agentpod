@@ -18,12 +18,15 @@ import (
 //	fs.list   – directory listing (unary)
 //	fs.read   – file contents (unary, base64 or utf8 encoded)
 //	logs.tail – streaming log tail (streamed)
+//
+// Terminal verbs (term.open/attach/close) and input/resize frame routing are
+// handled by gateway.NewTerminalHandler, which wraps this handler.
 func NewHandler(reg *Registry) gateway.Handler {
 	return gateway.HandlerFunc(func(
 		ctx context.Context,
 		verb string,
 		params json.RawMessage,
-		emit func(seq int, chunk string, eof bool) error,
+		emit func(seq int, chunk string, eof bool, enc string) error,
 	) (any, bool, error) {
 		switch verb {
 		case "detect":
@@ -148,7 +151,7 @@ func handleLogsTail(
 	ctx context.Context,
 	reg *Registry,
 	params json.RawMessage,
-	emit func(seq int, chunk string, eof bool) error,
+	emit func(seq int, chunk string, eof bool, enc string) error,
 ) (any, bool, error) {
 	var p struct {
 		Key    string `json:"key"`
@@ -166,7 +169,7 @@ func handleLogsTail(
 	emitChunk := func(chunk []byte) error {
 		s := seq
 		seq++
-		return emit(s, string(chunk), false)
+		return emit(s, string(chunk), false, "") // enc="" → utf8 (field omitted)
 	}
 
 	if err := d.TailLogs(ctx, p.Key, p.Follow, emitChunk); err != nil && ctx.Err() == nil {

@@ -15,7 +15,7 @@ import (
 )
 
 // stubHandler is a no-op handler used by tests that only care about hello/heartbeat.
-var stubHandler Handler = HandlerFunc(func(_ context.Context, _ string, _ json.RawMessage, _ func(int, string, bool) error) (any, bool, error) {
+var stubHandler Handler = HandlerFunc(func(_ context.Context, _ string, _ json.RawMessage, _ func(int, string, bool, string) error) (any, bool, error) {
 	return nil, false, fmt.Errorf("no handler yet")
 })
 
