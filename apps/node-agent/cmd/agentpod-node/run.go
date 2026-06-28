@@ -23,12 +23,10 @@ func runCmd() {
 	defer stop()
 	fmt.Println("connecting to", cfg.Hub, "as", cfg.NodeID)
 
-	reg := buildRegistry()
+	reg := buildRegistry(cfg.HermesStartCmd, cfg.OpenClawStartCmd)
 	mgr := terminal.NewManager()
 	defer mgr.Shutdown()
 
-	// workspaceResolver finds the workspace path for a station key by calling
-	// the harness descriptor's Detect() and scanning for the matching station.
 	resolver := gateway.WorkspaceFunc(func(key string) (string, error) {
 		d, err := reg.For(key)
 		if err != nil {
@@ -46,6 +44,32 @@ func runCmd() {
 		return "", fmt.Errorf("workspace resolver: no workspacePath for key %q", key)
 	})
 
-	h := gateway.NewTerminalHandler(descriptor.NewHandler(reg), resolver, mgr)
+	// lifecycleFn resolves the descriptor for key, checks it implements Lifecycle,
+	// then performs stop/start/restart as requested.
+	lifecycleFn := gateway.LifecycleFunc(func(key, action string) error {
+		d, err := reg.For(key)
+		if err != nil {
+			return err
+		}
+		lc, ok := d.(descriptor.Lifecycle)
+		if !ok {
+			return fmt.Errorf("lifecycle: descriptor for %q does not support lifecycle", key)
+		}
+		switch action {
+		case "stop":
+			return lc.Stop(key)
+		case "start":
+			return lc.Start(key)
+		case "restart":
+			if err := lc.Stop(key); err != nil {
+				return err
+			}
+			return lc.Start(key)
+		default:
+			return fmt.Errorf("lifecycle: unknown action %q", action)
+		}
+	})
+
+	h := gateway.NewTerminalHandler(descriptor.NewHandler(reg), resolver, mgr, lifecycleFn)
 	gateway.Run(ctx, cfg, h)
 }

@@ -9,7 +9,7 @@ import (
 // detectCmd prints the stations detected on this host as JSON. Debug/ops smoke
 // test for the descriptors — no hub connection required.
 func detectCmd() {
-	stations := buildRegistry().DetectAll()
+	stations := buildRegistry("", "").DetectAll()
 	b, err := json.MarshalIndent(stations, "", "  ")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

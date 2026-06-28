@@ -59,6 +59,7 @@ import { stationTerminalRoutes } from './routes/station-terminal.ts';
 import { stationActivityRoutes } from './routes/station-activity.ts';
 // Station write routes (fs.write/mkdir/move/delete — capability-gated, audited)
 import { stationWriteRoutes } from './routes/station-writes.ts';
+import { stationLifecycleRoutes } from './routes/station-lifecycle.ts';
 // Middleware
 import { activityLoggerMiddleware } from './middleware/activity-logger.ts';
 // Sync services
@@ -161,7 +162,8 @@ const app = new Hono()
   // Station activity log (audit rows, fleet console)
   .route('/api', stationActivityRoutes)                    // GET /api/stations/:id/activity
   // Station write routes (fs.write/mkdir/move/delete — capability-gated, audited)
-  .route('/api', stationWriteRoutes);                      // POST /api/stations/:id/fs/{write,mkdir,move,delete}
+  .route('/api', stationWriteRoutes)                       // POST /api/stations/:id/fs/{write,mkdir,move,delete}
+  .route('/api', stationLifecycleRoutes);                  // POST /api/stations/:id/lifecycle
 
 app.onError((err, c) => {
   const requestId = c.req.header('x-request-id') || crypto.randomUUID();

@@ -8,7 +8,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -24,13 +26,17 @@ import (
 //	  profiles/
 //	    <name>/      ← one workspace per profile
 type hermesDescriptor struct {
-	home string // absolute path to the .hermes home directory
+	home     string // absolute path to the .hermes home directory
+	startCmd string // optional; set by NewHermes; used by Start
 }
 
 // NewHermes returns a Descriptor for the Hermes harness.
 // home is the path to the Hermes home directory (e.g. "~/.hermes").
 // If home is empty it defaults to $HOME/.hermes.
-func NewHermes(home string) Descriptor {
+// startCmd (optional) is the shell command used by Start to launch Hermes.
+// Hermes always advertises the "lifecycle" capability; if startCmd is empty,
+// Start returns a descriptive error.
+func NewHermes(home string, startCmd ...string) Descriptor {
 	if home == "" {
 		userHome, err := os.UserHomeDir()
 		if err != nil {
@@ -38,7 +44,11 @@ func NewHermes(home string) Descriptor {
 		}
 		home = filepath.Join(userHome, ".hermes")
 	}
-	return &hermesDescriptor{home: home}
+	var cmd string
+	if len(startCmd) > 0 {
+		cmd = startCmd[0]
+	}
+	return &hermesDescriptor{home: home, startCmd: cmd}
 }
 
 // Harness returns the harness identifier.
@@ -51,7 +61,7 @@ func (h *hermesDescriptor) Detect() ([]Station, error) {
 		return []Station{}, nil
 	}
 
-	caps := []string{"health", "logs", "fs.read"}
+	caps := []string{"health", "logs", "fs.read", "lifecycle"}
 	homeCopy := h.home
 
 	stations := []Station{
@@ -141,32 +151,68 @@ func (h *hermesDescriptor) Health(key string) (Health, error) {
 	return health, nil
 }
 
+// hermesPattern returns the pgrep pattern for a Hermes station key.
+func hermesPattern(key string) string {
+	if key == "hermes" {
+		return "hermes"
+	}
+	name := strings.TrimPrefix(key, "hermes:")
+	return fmt.Sprintf("hermes -p %s gateway", name)
+}
+
+// hermesPID returns the PID of the running Hermes process for key,
+// or an error if no matching process is found.
+func hermesPID(key string) (int, error) {
+	out, err := exec.Command("pgrep", "-f", hermesPattern(key)).Output()
+	if err != nil {
+		return 0, fmt.Errorf("no hermes process for key %q", key)
+	}
+	lines := strings.Fields(strings.TrimSpace(string(out)))
+	if len(lines) == 0 {
+		return 0, fmt.Errorf("no hermes process for key %q", key)
+	}
+	return strconv.Atoi(lines[0])
+}
+
 // hermesProcessRunning checks the process table for a running Hermes process.
 // For a profile key "hermes:<name>" it looks for "hermes -p <name> gateway".
 // For the root key it looks for any "hermes" process.
 // Returns false (not an error) when the check cannot be performed.
 func hermesProcessRunning(key string) (bool, error) {
-	var pattern string
-	if key == "hermes" {
-		pattern = "hermes"
-	} else {
-		name := strings.TrimPrefix(key, "hermes:")
-		pattern = fmt.Sprintf("hermes -p %s gateway", name)
-	}
-
-	// Try pgrep -f first (available on macOS and Linux).
-	cmd := exec.Command("pgrep", "-f", pattern)
+	cmd := exec.Command("pgrep", "-f", hermesPattern(key))
 	if err := cmd.Run(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			// pgrep exit status 1 means no processes matched (not an error per se).
 			if exitErr.ExitCode() == 1 {
 				return false, nil
 			}
 		}
-		// pgrep not available or other error — fall back to false.
 		return false, nil
 	}
 	return true, nil
+}
+
+// Stop implements Lifecycle. It finds the running Hermes process and sends
+// SIGTERM, escalating to SIGKILL after LifecycleGracePeriod.
+func (h *hermesDescriptor) Stop(key string) error {
+	pid, err := hermesPID(key)
+	if err != nil {
+		return fmt.Errorf("hermes: stop %q: %w", key, err)
+	}
+	return stopProcess(pid, LifecycleGracePeriod)
+}
+
+// Start implements Lifecycle. It runs the configured start command in a new
+// session (detached). If no start command is set it returns a descriptive error.
+//
+// Configure the start command by passing it to NewHermes or by setting
+// hermesStartCmd in the node config file.
+func (h *hermesDescriptor) Start(key string) error {
+	if h.startCmd == "" {
+		return fmt.Errorf("no start command configured for hermes (set hermesStartCmd in node config)")
+	}
+	cmd := exec.Command("sh", "-c", h.startCmd)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	return cmd.Start()
 }
 
 // ListDir lists the directory at rel (relative to the station's workspace).

@@ -8,7 +8,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -27,13 +29,14 @@ import (
 // A single gateway process (`node … openclaw/dist/index.js gateway`) serves all
 // subagents; per-subagent process state is not separable.
 type openclawDescriptor struct {
-	home string // absolute path to the .openclaw home directory
+	home     string // absolute path to the .openclaw home directory
+	startCmd string
 }
 
 // NewOpenClaw returns a Descriptor for the OpenClaw harness.
 // home is the path to the OpenClaw home directory (e.g. "~/.openclaw").
 // If home is empty it defaults to $HOME/.openclaw.
-func NewOpenClaw(home string) Descriptor {
+func NewOpenClaw(home string, startCmd ...string) Descriptor {
 	if home == "" {
 		userHome, err := os.UserHomeDir()
 		if err != nil {
@@ -41,7 +44,11 @@ func NewOpenClaw(home string) Descriptor {
 		}
 		home = filepath.Join(userHome, ".openclaw")
 	}
-	return &openclawDescriptor{home: home}
+	var cmd string
+	if len(startCmd) > 0 {
+		cmd = startCmd[0]
+	}
+	return &openclawDescriptor{home: home, startCmd: cmd}
 }
 
 // Harness returns the harness identifier.
@@ -54,7 +61,7 @@ func (o *openclawDescriptor) Detect() ([]Station, error) {
 		return []Station{}, nil
 	}
 
-	caps := []string{"health", "logs", "fs.read"}
+	caps := []string{"health", "logs", "fs.read", "lifecycle"}
 
 	// Root workspace: prefer <home>/workspace if it exists, else fall back to <home>.
 	rootWs := o.resolveRootWorkspace()
@@ -211,6 +218,49 @@ func openclawGatewayRunning() (running bool, note string) {
 		return false, "process check unavailable"
 	}
 	return true, ""
+}
+
+// openclawGatewayPID returns the PID of the OpenClaw gateway process, or an
+// error if no matching process is found.
+func openclawGatewayPID() (int, error) {
+	out, err := exec.Command("pgrep", "-f", "openclaw.*gateway").Output()
+	if err != nil {
+		return 0, fmt.Errorf("no openclaw gateway process found")
+	}
+	lines := strings.Fields(strings.TrimSpace(string(out)))
+	if len(lines) == 0 {
+		return 0, fmt.Errorf("no openclaw gateway process found")
+	}
+	return strconv.Atoi(lines[0])
+}
+
+// Stop implements Lifecycle. It first tries systemctl --user stop; if that
+// fails it falls back to finding the gateway PID via pgrep and sending
+// SIGTERM (escalating to SIGKILL after LifecycleGracePeriod).
+func (o *openclawDescriptor) Stop(key string) error {
+	// Prefer systemctl stop (no-ops gracefully if service not configured).
+	if err := exec.Command("systemctl", "--user", "stop", "openclaw-gateway.service").Run(); err == nil {
+		return nil
+	}
+	pid, err := openclawGatewayPID()
+	if err != nil {
+		return fmt.Errorf("openclaw: stop %q: %w", key, err)
+	}
+	return stopProcess(pid, LifecycleGracePeriod)
+}
+
+// Start implements Lifecycle. It runs the configured start command in a new
+// session (detached). If no start command is set it returns a descriptive error.
+//
+// Configure the start command by passing it to NewOpenClaw or by setting
+// openclawStartCmd in the node config file.
+func (o *openclawDescriptor) Start(key string) error {
+	if o.startCmd == "" {
+		return fmt.Errorf("no start command configured for openclaw (set openclawStartCmd in node config)")
+	}
+	cmd := exec.Command("sh", "-c", o.startCmd)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	return cmd.Start()
 }
 
 // ListDir lists the directory at rel (relative to the station's workspace).

@@ -24,6 +24,12 @@ type WorkspaceFunc func(key string) (string, error)
 // Workspace implements WorkspaceResolver.
 func (f WorkspaceFunc) Workspace(key string) (string, error) { return f(key) }
 
+// LifecycleFunc performs a lifecycle action ("stop", "start", or "restart") on
+// the station identified by key. "restart" = Stop then Start. The dispatcher
+// resolves the actual Lifecycle implementation, keeping this package free of
+// a direct descriptor import.
+type LifecycleFunc func(key, action string) error
+
 // attachState tracks an active term.attach subscription.
 type attachState struct {
 	sessionID string
@@ -34,9 +40,10 @@ type attachState struct {
 // terminal verbs (term.open, term.attach, term.close) plus inbound
 // input/resize frame handling via the FrameHandler interface.
 type terminalHandler struct {
-	inner    Handler
-	resolver WorkspaceResolver
-	mgr      *terminal.Manager
+	inner       Handler
+	resolver    WorkspaceResolver
+	mgr         *terminal.Manager
+	lifecycleFn LifecycleFunc // nil if lifecycle not configured
 
 	attachMu sync.Mutex
 	attaches map[string]*attachState // keyed by attach request ID
@@ -45,14 +52,21 @@ type terminalHandler struct {
 // NewTerminalHandler wraps inner with terminal verb and input/resize support.
 //   - resolver provides workspace path lookup for term.open.
 //   - mgr is shared across the lifetime of the gateway connection.
+//   - lifecycleFn (optional) is called by the "lifecycle" verb handler; if nil,
+//     the lifecycle verb returns an error.
 //
 // The returned handler implements both Handler and FrameHandler.
-func NewTerminalHandler(inner Handler, resolver WorkspaceResolver, mgr *terminal.Manager) Handler {
+func NewTerminalHandler(inner Handler, resolver WorkspaceResolver, mgr *terminal.Manager, lifecycleFn ...LifecycleFunc) Handler {
+	var lcFn LifecycleFunc
+	if len(lifecycleFn) > 0 {
+		lcFn = lifecycleFn[0]
+	}
 	return &terminalHandler{
-		inner:    inner,
-		resolver: resolver,
-		mgr:      mgr,
-		attaches: make(map[string]*attachState),
+		inner:       inner,
+		resolver:    resolver,
+		mgr:         mgr,
+		lifecycleFn: lcFn,
+		attaches:    make(map[string]*attachState),
 	}
 }
 
@@ -79,6 +93,8 @@ func (h *terminalHandler) Handle(
 		return h.handleFsMove(params)
 	case "fs.delete":
 		return h.handleFsDelete(params)
+	case "lifecycle":
+		return h.handleLifecycle(ctx, params)
 	default:
 		return h.inner.Handle(ctx, verb, params, emit)
 	}
@@ -279,6 +295,27 @@ func (h *terminalHandler) handleFsDelete(params json.RawMessage) (any, bool, err
 		return nil, false, fmt.Errorf("fs.delete: %w", err)
 	}
 	return map[string]any{"ok": true}, false, nil
+}
+
+// handleLifecycle performs a lifecycle action and returns the post-action
+// health snapshot by delegating back to the inner handler's "health" verb.
+func (h *terminalHandler) handleLifecycle(ctx context.Context, params json.RawMessage) (any, bool, error) {
+	var p struct {
+		Key    string `json:"key"`
+		Action string `json:"action"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, false, fmt.Errorf("lifecycle: bad params: %w", err)
+	}
+	if h.lifecycleFn == nil {
+		return nil, false, fmt.Errorf("lifecycle: not configured for this node")
+	}
+	if err := h.lifecycleFn(p.Key, p.Action); err != nil {
+		return nil, false, err
+	}
+	// Return post-action health snapshot via the inner handler.
+	healthParams, _ := json.Marshal(map[string]string{"key": p.Key})
+	return h.inner.Handle(ctx, "health", healthParams, nil)
 }
 
 // HandleFrame implements FrameHandler for inbound terminal input/resize frames.

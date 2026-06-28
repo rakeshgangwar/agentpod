@@ -6,6 +6,12 @@ type Config struct {
   Hub        string `json:"hub"`
   NodeID     string `json:"nodeId"`
   NodeSecret string `json:"nodeSecret"`
+  // HermesStartCmd is the shell command used to start the Hermes gateway.
+  // Needed by the lifecycle "start" and "restart" actions. Optional.
+  HermesStartCmd   string `json:"hermesStartCmd,omitempty"`
+  // OpenClawStartCmd is the shell command used to start the OpenClaw gateway.
+  // Needed by the lifecycle "start" and "restart" actions. Optional.
+  OpenClawStartCmd string `json:"openclawStartCmd,omitempty"`
 }
 
 func DefaultPath() string {
