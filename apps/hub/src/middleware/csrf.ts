@@ -1,37 +1,22 @@
 import { createMiddleware } from "hono/factory";
 import type { Context, Next } from "hono";
-import { config } from "../config";
+import { isAllowedOrigin } from "../config";
 import { createLogger } from "../utils/logger";
 
 const log = createLogger("csrf");
 
 const STATE_CHANGING_METHODS = ["POST", "PUT", "PATCH", "DELETE"];
 
-function getAllowedOrigins(): string[] {
-  const origins = [
-    "http://localhost:1420",
-    "http://localhost:5173",
-    "tauri://localhost",
-    config.publicUrl,
-  ];
-
-  if (config.domain.base !== "localhost") {
-    origins.push(`${config.domain.protocol}://${config.domain.base}`);
-    origins.push(`${config.domain.protocol}://api.${config.domain.base}`);
-  }
-
-  return origins.filter(Boolean);
-}
-
+/**
+ * Returns true when the given origin is permitted by the hub's unified
+ * allowlist (config.ts → allowedOrigins + LAN-IP passthrough).
+ * Note: unlike the CSWSH check, CSRF must reject a *missing* origin when
+ * the request carries a session cookie (handled in the middleware body).
+ */
 function isValidOrigin(origin: string | undefined): boolean {
   if (!origin) return false;
-  
-  const allowed = getAllowedOrigins();
-  return allowed.some(allowedOrigin => {
-    if (origin === allowedOrigin) return true;
-    if (origin.startsWith("tauri://")) return true;
-    return false;
-  });
+  // Delegate to the single canonical helper (closes #89 — no second list).
+  return isAllowedOrigin(origin);
 }
 
 export const csrfMiddleware = createMiddleware(async (c: Context, next: Next) => {
@@ -52,7 +37,6 @@ export const csrfMiddleware = createMiddleware(async (c: Context, next: Next) =>
       log.warn("CSRF check failed: invalid origin", {
         origin,
         path: c.req.path,
-        allowed: getAllowedOrigins(),
       });
       
       return c.json(

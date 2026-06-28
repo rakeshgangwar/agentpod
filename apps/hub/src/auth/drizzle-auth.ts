@@ -17,7 +17,7 @@ import { bearer, admin, customSession } from "better-auth/plugins";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "../db/drizzle";
 import { user as userTable, userResourceLimits, DEFAULT_RESOURCE_LIMITS } from "../db/schema";
-import { config } from "../config";
+import { config, allowedOrigins, sessionCookieOptions } from "../config";
 import { createLogger } from "../utils/logger";
 import { count, eq } from "drizzle-orm";
 import { disableSignup } from "../models/system-settings";
@@ -98,14 +98,9 @@ export const auth = betterAuth({
   },
 
   // ==========================================================================
-  // Trusted Origins (for CORS)
+  // Trusted Origins — single canonical list from config (closes #89)
   // ==========================================================================
-  trustedOrigins: [
-    "http://localhost:1420", // Tauri dev
-    "http://localhost:5173", // Vite dev
-    "tauri://localhost", // Tauri production
-    config.publicUrl, // API URL itself
-  ],
+  trustedOrigins: allowedOrigins,
 
   // ==========================================================================
   // Plugins
@@ -264,14 +259,34 @@ export const auth = betterAuth({
   // ==========================================================================
   // Advanced Options
   // ==========================================================================
-  advanced: {
-    // Use secure cookies in production
-    useSecureCookies: config.nodeEnv === "production",
-    // Cookie prefix - use 'better-auth' to match MetaMCP for SSO compatibility
-    cookiePrefix: "better-auth",
-    // Generate unique session IDs
-    generateId: () => crypto.randomUUID(),
-  },
+  advanced: (() => {
+    // Derive cookie attributes from env at startup (dev-safe defaults).
+    // COOKIE_DOMAIN=.agentpod.dev + COOKIE_SECURE=true in production;
+    // both unset in local dev so the cookie works over http://localhost.
+    const cookieOpts = sessionCookieOptions(process.env as Record<string, string>);
+    return {
+      // Controls the __Secure- prefix on cookie names (requires HTTPS).
+      useSecureCookies: cookieOpts.secure,
+      // Cross-subdomain sharing (app.agentpod.dev ↔ hub.agentpod.dev).
+      // Only enabled when COOKIE_DOMAIN is set (never in dev).
+      ...(cookieOpts.domain
+        ? {
+            crossSubDomainCookies: {
+              enabled: true,
+              domain: cookieOpts.domain,
+            },
+          }
+        : {}),
+      // Explicit SameSite=Lax (already Better Auth's default, stated for clarity).
+      defaultCookieAttributes: {
+        sameSite: cookieOpts.sameSite,
+      },
+      // Cookie prefix — keeps MetaMCP SSO compatibility.
+      cookiePrefix: "better-auth",
+      // Generate unique session IDs.
+      generateId: () => crypto.randomUUID(),
+    };
+  })(),
 
   // ==========================================================================
   // Callbacks

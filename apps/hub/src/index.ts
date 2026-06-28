@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
-import { config, corsAllowedOrigins, isAllowedOrigin } from './config.ts';
+import { config, allowedOrigins, isAllowedOrigin } from './config.ts';
 import { validateConfig } from './utils/validate-config.ts';
 import { initDatabase } from './db/drizzle.ts';
 import { ensureSsoViews } from './db/sso-views.ts';
@@ -86,9 +86,9 @@ const app = new Hono()
     // Origin list lives in config.ts (corsAllowedOrigins) so station-terminal.ts
     // can re-use it for CSWSH defence without duplicating it here.
     origin: (origin) => {
-      if (!origin) return corsAllowedOrigins[0]!;
+      if (!origin) return allowedOrigins[0]!;
       if (isAllowedOrigin(origin)) return origin;
-      return corsAllowedOrigins[0]!;
+      return allowedOrigins[0]!;
     },
     credentials: true,
     allowHeaders: ['Content-Type', 'Authorization'],

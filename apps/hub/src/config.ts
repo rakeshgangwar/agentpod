@@ -175,30 +175,81 @@ export const config = {
 
 export type Config = typeof config;
 
-// ─── CORS / CSWSH origin policy (single source of truth) ──────────────────────
+// ─── CORS / CSWSH / CSRF origin policy (single source of truth) ───────────────
 
 /**
- * Static allowed origins — must match the cors() call in index.ts.
- * Exported so that WebSocket endpoints can re-use the same list for
- * Cross-Site WebSocket Hijacking (CSWSH) defence without hardcoding a
- * separate copy.
+ * Default browser origins that are always permitted.
+ * Add more at runtime via the ALLOWED_ORIGINS env var (comma-separated).
  */
-export const corsAllowedOrigins: readonly string[] = [
-  'http://localhost:1420',  // Tauri dev
-  'http://localhost:5173',  // Vite dev
-  'tauri://localhost',      // Tauri production
-  config.publicUrl,
+const _DEFAULT_ALLOWED_ORIGINS = [
+  'http://localhost:1420',    // SvelteKit + Tauri dev
+  'http://localhost:5173',    // Vite dev
+  'tauri://localhost',        // Tauri production
+  'https://app.agentpod.dev', // Production console
+] as const;
+
+/**
+ * The single canonical allowlist consumed by CORS middleware, the CSRF
+ * middleware, and the station-terminal WebSocket CSWSH check.
+ * Extend at deployment time with ALLOWED_ORIGINS="https://a.example.com,https://b.example.com".
+ */
+export const allowedOrigins: string[] = [
+  ..._DEFAULT_ALLOWED_ORIGINS,
+  ...(process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
+    : []),
 ];
 
-const _LOCAL_IP_ORIGIN_RE = /^https?:\/\/(192\.168|10)\.\d+\.\d+:\d+$/;
+/**
+ * @deprecated Use `allowedOrigins` — kept for any external callers.
+ */
+export const corsAllowedOrigins: readonly string[] = allowedOrigins;
+
+// Matches 192.168.A.B and 10.A.B.C private-network origins (4-octet).
+const _LOCAL_IP_ORIGIN_RE = /^https?:\/\/(192\.168|10\.\d+)\.\d+\.\d+:\d+$/;
 
 /**
  * Returns true if the given Origin header value is permitted by the hub's
- * CORS policy.  A missing / empty origin (server-to-server, no browser) is
- * treated as allowed — there is no CSWSH risk without a browser context.
+ * CORS / CSRF / CSWSH policy.  A missing / empty origin (server-to-server,
+ * no browser) is treated as allowed — there is no CSWSH risk without a
+ * browser context.
  */
 export function isAllowedOrigin(origin: string | null | undefined): boolean {
   if (!origin) return true;
   if (_LOCAL_IP_ORIGIN_RE.test(origin)) return true;
-  return corsAllowedOrigins.includes(origin);
+  return allowedOrigins.includes(origin);
+}
+
+// ─── Cookie configuration (env-driven, dev-safe) ──────────────────────────────
+
+export interface SessionCookieOptions {
+  /** Cookie Domain attribute — undefined in dev (http://localhost) */
+  domain: string | undefined;
+  /** SameSite attribute — always "lax" */
+  sameSite: 'lax';
+  /** Secure attribute — false in dev, true in prod */
+  secure: boolean;
+}
+
+/**
+ * Pure function that derives Better Auth session cookie attributes from the
+ * process environment.  Pass `process.env` at runtime; pass a stub in tests.
+ *
+ * CRITICAL: when COOKIE_DOMAIN is unset and COOKIE_SECURE is not "true", the
+ * returned options have `domain: undefined` and `secure: false` so that the
+ * cookie works over http://localhost in local development without any changes.
+ *
+ * In production, set:
+ *   COOKIE_DOMAIN=.agentpod.dev
+ *   COOKIE_SECURE=true
+ */
+export function sessionCookieOptions(
+  env: Partial<Record<string, string>> = process.env as Record<string, string>,
+): SessionCookieOptions {
+  const rawDomain = env.COOKIE_DOMAIN?.trim();
+  return {
+    domain: rawDomain || undefined,
+    sameSite: 'lax',
+    secure: env.COOKIE_SECURE === 'true',
+  };
 }
