@@ -135,7 +135,7 @@ async function connectFakeNode(
                   displayName: "Station Terminal Test",
                   parentKey: null,
                   workspacePath: "/workspace/sterm",
-                  capabilities: ["health"],
+                  capabilities: ["health", "terminal"],
                 },
               ],
             })

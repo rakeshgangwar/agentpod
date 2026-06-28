@@ -31,6 +31,7 @@ import { Hono } from "hono";
 import { upgradeWebSocket } from "../ws";
 import * as broker from "../services/broker";
 import { getStation } from "../services/station-registry";
+import { gateCapability } from "./station-writes";
 import { connectionManager } from "../services/connection-manager";
 import { recordAudit } from "../services/audit";
 import { db } from "../db/drizzle";
@@ -84,6 +85,15 @@ export const stationTerminalRoutes = new Hono().get(
         if (!station) {
           ws.send(JSON.stringify({ t: "exit" }));
           ws.close(1011, "station not found");
+          return;
+        }
+
+        // ── 2b. Capability gate (uniform with the POST mutation routes) ───
+        // A terminal is the most powerful mutation (arbitrary shell); enforce
+        // the capability server-side, not just by hiding the console tab.
+        if (!gateCapability(station, "terminal")) {
+          ws.send(JSON.stringify({ t: "exit" }));
+          ws.close(1008, "Forbidden: terminal capability");
           return;
         }
 
