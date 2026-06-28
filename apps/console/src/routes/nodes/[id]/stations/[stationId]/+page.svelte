@@ -1,14 +1,33 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { page } from "$app/stores";
   import HealthPanel from "$lib/components/stations/HealthPanel.svelte";
   import LogTail from "$lib/components/stations/LogTail.svelte";
   import FileBrowser from "$lib/components/stations/FileBrowser.svelte";
+  import Terminal from "$lib/components/stations/Terminal.svelte";
+  import { listStations } from "$lib/api/client";
+  import type { StationRow } from "$lib/api/client";
 
   const nodeId = $derived($page.params.id as string);
   const stationId = $derived($page.params.stationId as string);
 
-  type Tab = "health" | "logs" | "files";
+  type Tab = "health" | "logs" | "files" | "terminal";
   let activeTab = $state<Tab>("health");
+
+  let station = $state<StationRow | null>(null);
+
+  const hasTerminal = $derived(
+    Array.isArray(station?.capabilities) && station!.capabilities.includes("terminal")
+  );
+
+  onMount(async () => {
+    try {
+      const rows = await listStations(nodeId);
+      station = rows.find((r) => r.id === stationId) ?? null;
+    } catch {
+      // Capabilities will stay null — Terminal tab won't appear
+    }
+  });
 </script>
 
 <div class="station-page">
@@ -40,6 +59,15 @@
     >
       Files
     </button>
+    {#if hasTerminal}
+      <button
+        type="button"
+        class="tab-btn {activeTab === 'terminal' ? 'active' : ''}"
+        onclick={() => (activeTab = "terminal")}
+      >
+        Terminal
+      </button>
+    {/if}
   </nav>
 
   <!-- Panel content -->
@@ -53,6 +81,10 @@
     {:else if activeTab === "files"}
       <div class="files-wrap">
         <FileBrowser {stationId} />
+      </div>
+    {:else if activeTab === "terminal" && hasTerminal}
+      <div class="terminal-wrap">
+        <Terminal {stationId} />
       </div>
     {/if}
   </div>
@@ -135,6 +167,10 @@
   }
 
   .files-wrap {
+    height: 480px;
+  }
+
+  .terminal-wrap {
     height: 480px;
   }
 </style>
