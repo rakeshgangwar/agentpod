@@ -114,7 +114,7 @@
 </script>
 
 <div
-  class="cyber-card flex flex-col h-full min-h-[200px]"
+  class="cyber-card no-lift flex flex-col h-full min-h-[200px]"
   style="background:#0a0a0a"
 >
   <!-- Status bar -->
