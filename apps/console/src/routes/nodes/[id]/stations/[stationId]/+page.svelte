@@ -20,6 +20,10 @@
     Array.isArray(station?.capabilities) && station!.capabilities.includes("terminal")
   );
 
+  const canWrite = $derived(
+    Array.isArray(station?.capabilities) && station!.capabilities.includes("fs.write")
+  );
+
   onMount(async () => {
     try {
       const rows = await listStations(nodeId);
@@ -80,7 +84,7 @@
       </div>
     {:else if activeTab === "files"}
       <div class="files-wrap">
-        <FileBrowser {stationId} />
+        <FileBrowser {stationId} {canWrite} />
       </div>
     {:else if activeTab === "terminal" && hasTerminal}
       <div class="terminal-wrap">
