@@ -2,6 +2,10 @@
   import { onMount } from "svelte";
   import { activity } from "$lib/api/client";
   import type { StationAuditRow } from "$lib/api/client";
+  import { Button } from "$lib/components/ui/button";
+  import { Badge } from "$lib/components/ui/badge";
+  import { Skeleton } from "$lib/components/ui/skeleton";
+  import * as Card from "$lib/components/ui/card";
 
   interface Props {
     stationId: string;
@@ -42,69 +46,77 @@
     return d.toLocaleString();
   }
 
-  function resultBadgeClass(result: string): string {
-    if (result === "ok") return "text-green-700 bg-green-100 dark:text-green-400 dark:bg-green-950/50";
-    if (result === "error") return "text-red-700 bg-red-100 dark:text-red-400 dark:bg-red-950/50";
-    return "text-muted-foreground bg-muted";
+  function resultVariant(result: string): "default" | "destructive" | "secondary" | "outline" {
+    if (result === "ok") return "default";
+    if (result === "error") return "destructive";
+    return "secondary";
+  }
+
+  function resultClass(result: string): string {
+    if (result === "ok")
+      return "bg-[var(--cyber-emerald)] text-[var(--cyber-emerald-foreground)] border-transparent";
+    return "";
   }
 </script>
 
 <div class="flex flex-col gap-3 p-4">
   <!-- Toolbar -->
   <div class="flex justify-end">
-    <button
-      type="button"
-      class="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-[13px] font-medium text-muted-foreground shadow-xs hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
-      disabled={isLoading}
-      onclick={load}
-      aria-label="Refresh"
-    >
+    <Button variant="outline" size="sm" disabled={isLoading} onclick={load} aria-label="Refresh">
       Refresh
-    </button>
+    </Button>
   </div>
 
   {#if isLoading}
-    <p class="text-sm text-muted-foreground py-2">Loading activity…</p>
+    <div class="flex flex-col gap-2">
+      <p class="text-sm text-muted-foreground">Loading activity…</p>
+      <Skeleton class="h-9 w-full rounded-md" />
+      <Skeleton class="h-9 w-full rounded-md" />
+      <Skeleton class="h-9 w-full rounded-md" />
+    </div>
   {:else if error}
     <p class="text-sm text-destructive py-2">{error}</p>
   {:else if rows.length === 0}
     <p class="text-sm text-muted-foreground py-2">No activity yet.</p>
   {:else}
-    <ul class="divide-y divide-border/40 rounded-md border border-border overflow-hidden">
-      {#each rows as row (row.id)}
-        <li
-          class="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 px-3 py-2 text-[13px] hover:bg-muted/40"
-          data-testid="activity-row"
-        >
-          <span
-            class="shrink-0 text-xs text-muted-foreground tabular-nums min-w-[4.5rem]"
-            title={String(row.createdAt)}
+    <Card.Root class="overflow-hidden border-border/60">
+      <ul class="divide-y divide-border/40">
+        {#each rows as row (row.id)}
+          <li
+            class="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 px-4 py-2.5 text-[13px] transition-colors hover:bg-muted/40"
+            data-testid="activity-row"
           >
-            {fmtTimestamp(row.createdAt)}
-          </span>
-          <span class="shrink-0 font-mono text-xs font-semibold text-foreground">
-            {row.verb}
-          </span>
-          {#if row.paramsSummary}
             <span
-              class="flex-1 font-mono text-[11px] text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap"
-              title={row.paramsSummary}
+              class="min-w-[4.5rem] shrink-0 text-xs text-muted-foreground tabular-nums"
+              title={String(row.createdAt)}
             >
-              {row.paramsSummary}
+              {fmtTimestamp(row.createdAt)}
             </span>
-          {/if}
-          <span
-            class="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide {resultBadgeClass(row.result)}"
-          >
-            {row.result}
-          </span>
-          {#if row.error}
-            <span class="shrink-0 text-xs text-destructive italic truncate max-w-xs">
-              {row.error}
+            <span class="shrink-0 font-mono text-xs font-semibold text-foreground">
+              {row.verb}
             </span>
-          {/if}
-        </li>
-      {/each}
-    </ul>
+            {#if row.paramsSummary}
+              <span
+                class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px] text-muted-foreground"
+                title={row.paramsSummary}
+              >
+                {row.paramsSummary}
+              </span>
+            {/if}
+            <Badge
+              variant={resultVariant(row.result)}
+              class="text-[11px] uppercase tracking-wide {resultClass(row.result)}"
+            >
+              {row.result}
+            </Badge>
+            {#if row.error}
+              <span class="w-full truncate font-mono text-xs italic text-destructive">
+                {row.error}
+              </span>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    </Card.Root>
   {/if}
 </div>
