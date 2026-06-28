@@ -190,3 +190,55 @@ test("HealthPanel: Restart opens type-to-confirm dialog; confirming calls lifecy
     expect(api.lifecycle).toHaveBeenCalledWith("station_lc", "restart"),
   );
 });
+
+// ─── Matrix ID display ────────────────────────────────────────────────────────
+
+test("HealthPanel: renders Matrix row with matrix.to link when matrixId is set", async () => {
+  vi.spyOn(api, "stationHealth").mockResolvedValue(healthFull);
+
+  const { getByRole, getByText } = render(HealthPanel, {
+    props: {
+      stationId: "station_mx",
+      matrixId: "@analyst-echo:id.agentpod.dev",
+    },
+  });
+
+  await waitFor(() => expect(getByText(/12345/)).toBeTruthy());
+
+  // The Matrix row label should appear
+  expect(getByText(/matrix/i)).toBeTruthy();
+
+  // A link pointing to the matrix.to deep-link must exist
+  const link = getByRole("link", { name: /@analyst-echo:id\.agentpod\.dev/ });
+  expect(link).toBeTruthy();
+  expect(link.getAttribute("href")).toBe(
+    "https://matrix.to/#/@analyst-echo:id.agentpod.dev",
+  );
+  expect(link.getAttribute("rel")).toContain("noopener");
+});
+
+test("HealthPanel: no Matrix row when matrixId is null", async () => {
+  vi.spyOn(api, "stationHealth").mockResolvedValue(healthFull);
+
+  const { queryByText, getByText } = render(HealthPanel, {
+    props: { stationId: "station_no_mx", matrixId: null },
+  });
+
+  await waitFor(() => expect(getByText(/12345/)).toBeTruthy());
+
+  // No Matrix row or matrix.to link should be present
+  expect(queryByText(/matrix/i)).toBeNull();
+  expect(queryByText(/matrix\.to/)).toBeNull();
+});
+
+test("HealthPanel: no Matrix row when matrixId prop is omitted", async () => {
+  vi.spyOn(api, "stationHealth").mockResolvedValue(healthFull);
+
+  const { queryByText, getByText } = render(HealthPanel, {
+    props: { stationId: "station_no_mx2" },
+  });
+
+  await waitFor(() => expect(getByText(/12345/)).toBeTruthy());
+
+  expect(queryByText(/matrix/i)).toBeNull();
+});

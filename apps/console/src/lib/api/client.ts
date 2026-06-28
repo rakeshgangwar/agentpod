@@ -32,6 +32,7 @@ export type StationRow = {
   displayName: string;
   workspacePath: string | null;
   capabilities: string[] | null;
+  matrixId: string | null;
   adoptedAt: string | Date;
   createdAt: string | Date;
 };

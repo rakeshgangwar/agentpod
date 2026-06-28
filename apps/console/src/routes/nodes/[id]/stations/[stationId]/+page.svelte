@@ -107,7 +107,7 @@
   <!-- Panel content -->
   <div class="panel-content">
     {#if activeTab === "health"}
-      <HealthPanel {stationId} {canLifecycle} />
+      <HealthPanel {stationId} {canLifecycle} matrixId={station?.matrixId ?? null} />
     {:else if activeTab === "logs"}
       <div class="logs-wrap">
         <LogTail {stationId} />

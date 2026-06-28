@@ -7,9 +7,10 @@
   interface Props {
     stationId: string;
     canLifecycle?: boolean;
+    matrixId?: string | null;
   }
 
-  let { stationId, canLifecycle = false }: Props = $props();
+  let { stationId, canLifecycle = false, matrixId = null }: Props = $props();
 
   let health = $state<StationHealth | null>(null);
   let isLoading = $state(true);
@@ -141,10 +142,22 @@
           <th class="text-left text-muted-foreground font-medium py-2 pr-4">Last Activity</th>
           <td class="py-2 font-mono text-[13px]">{fmtStr(health.lastActivity)}</td>
         </tr>
-        <tr>
+        <tr class="border-b border-border/40">
           <th class="text-left text-muted-foreground font-medium py-2 pr-4">Note</th>
           <td class="py-2 font-mono text-[13px]">{fmtStr(health.note)}</td>
         </tr>
+        {#if matrixId}
+        <tr>
+          <th class="text-left text-muted-foreground font-medium py-2 pr-4">Matrix</th>
+          <td class="py-2 font-mono text-[13px]">
+            <a
+              href="https://matrix.to/#/{matrixId}"
+              target="_blank"
+              rel="noopener noreferrer"
+            >{matrixId}</a>
+          </td>
+        </tr>
+        {/if}
       </tbody>
     </table>
 
