@@ -1,9 +1,32 @@
 import { defineConfig } from "vitest/config";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import path from "node:path";
+import type { Plugin } from "vite";
+
+/**
+ * Strip <style> blocks from bits-ui Svelte components before vite-plugin-svelte
+ * processes them.  bits-ui's select-viewport.svelte (and potentially others)
+ * contain style blocks that call preprocessCSS internally, which fails in the
+ * jsdom test environment under Vite 6 because PartialEnvironment is unavailable.
+ * Tests never need CSS to function, so stripping these blocks is safe.
+ */
+function stripNodeModuleStyles(): Plugin {
+  return {
+    name: "strip-node-module-svelte-styles",
+    enforce: "pre",
+    transform(code: string, id: string) {
+      if (id.includes("node_modules") && id.endsWith(".svelte")) {
+        return {
+          code: code.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ""),
+          map: null,
+        };
+      }
+    },
+  };
+}
 
 export default defineConfig({
-  plugins: [svelte({ hot: false })],
+  plugins: [stripNodeModuleStyles(), svelte({ hot: false })],
   resolve: {
     conditions: ["browser"],
     alias: {
