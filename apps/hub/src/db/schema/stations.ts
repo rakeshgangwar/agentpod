@@ -13,6 +13,7 @@ export const stations = pgTable("stations", {
   displayName: text("display_name").notNull(),
   workspacePath: text("workspace_path"),
   capabilities: jsonb("capabilities").$type<string[]>(),
+  matrixId: text("matrix_id"),
   adoptedAt: timestamp("adopted_at").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (t) => [

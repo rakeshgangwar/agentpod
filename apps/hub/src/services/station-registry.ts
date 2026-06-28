@@ -54,6 +54,7 @@ export async function adoptStations(
         displayName: station.displayName,
         workspacePath: station.workspacePath ?? null,
         capabilities: station.capabilities as string[],
+        matrixId: station.matrixId ?? null,
         parentStationId: null,
         adoptedAt: new Date(),
         createdAt: new Date(),
@@ -66,6 +67,7 @@ export async function adoptStations(
           displayName: station.displayName,
           workspacePath: station.workspacePath ?? null,
           capabilities: station.capabilities as string[],
+          matrixId: station.matrixId ?? null,
           adoptedAt: new Date(),
         },
       });
