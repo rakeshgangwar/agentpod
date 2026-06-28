@@ -9,8 +9,10 @@
 The fleet-console pages (P0–P3) are functionally complete but **visually plain** (hand-rolled tables + raw CSS), while the rest of the app (OpenCode-era) has a polished design system. This phase brings the fleet console up to that visual standard and makes it the **primary** AgentPod experience.
 
 Two coordinated changes:
-1. **Re-skin** every fleet-console page/panel using the **existing design system** (`apps/console/src/lib/components/ui/*` + the cyber theme) — reuse, don't reinvent.
+1. **Re-skin** every fleet-console page/panel using the **existing design system** (`apps/console/src/lib/components/ui/*` + the cyber theme) — reuse, don't reinvent — and make every page **responsive** (mobile → desktop).
 2. **Fleet-first IA**: a Fleet Overview landing, fleet-first navigation, and **demotion** (not deletion) of the OpenCode-specific pages.
+
+**Web-only / responsive, no desktop shell.** Tauri features are being removed; the target is a single **responsive web** UI (one adaptive layout, not a separate desktop/Tauri shell). This phase does not need to add — and should not assume — any Tauri/desktop-app surface. (Full Tauri-code removal is a separate cleanup, folded into the later OpenCode retirement; this phase simply must not depend on Tauri and must work as responsive web.)
 
 **Hard constraint: presentation only.** No changes to fleet-feature logic, data flow, API calls, or store behavior. Existing vitest suites must stay green — re-skins preserve component logic and the selectors/`data-testid`/roles those tests rely on.
 
@@ -33,7 +35,7 @@ The re-skin uses these exclusively. The OpenCode home (`routes/+page.svelte`) an
 ## 3. IA / Shell — fleet-first
 
 - **Fleet Overview landing.** A new overview becomes the post-login landing (replacing the OpenCode sandboxes dashboard): a grid of **node cards** (host, online/offline Badge, arch/CPU, station count, a health rollup) + the "Create enrollment token" CTA + empty state. Routed at `/` (the OpenCode dashboard moves to a demoted route, e.g. `/legacy` or stays at its component but is unlinked).
-- **Primary navigation.** Fleet-first, via the existing shell (`lib/components/app-shell.svelte` BottomNav for mobile) plus a **desktop sidebar/top-nav** (added if none exists): **Fleet** (overview/nodes) · **Activity** (fleet-wide audit — optional, include if cheap) · **Settings** · **Admin** (admins only). **Projects / Workflows are removed from the primary nav.**
+- **Primary navigation — one RESPONSIVE shell.** Not a separate desktop shell: a single adaptive layout (`lib/components/app-shell.svelte`) that flows from mobile to desktop via Tailwind breakpoints — the BottomNav on small screens becomes a persistent side/top nav on `md+`. Same items everywhere: **Fleet** (overview/nodes) · **Activity** (fleet-wide audit — optional, include if cheap) · **Settings** · **Admin** (admins only). **Projects / Workflows are removed from the primary nav.** Every fleet page must be responsive (mobile → desktop), not fixed-width.
 - **Demote OpenCode.** `/projects/*`, `/workflows/*`, and the old sandboxes home are dropped from navigation but remain routable (code retained). A minimal "Legacy" affordance (e.g. a link in Settings or a menu) keeps them reachable. The post-login redirect target changes from the OpenCode home to the Fleet Overview.
 
 ## 4. Pages Re-skinned
@@ -62,7 +64,7 @@ Each below moves from plain markup to the design system, behavior unchanged:
 ## 6. Risks & Open Items
 
 - **Test-selector churn.** Re-skinning structural markup can break tests that query tags/classes. Mitigation: prefer role/text/test-id selectors; update tests alongside each re-skin; keep changes per-component.
-- **Desktop shell may not exist.** The current `app-shell` is a mobile BottomNav; a desktop nav (sidebar/top-bar) likely needs to be added. Keep it within the existing design system.
+- **Responsive shell, not a desktop shell.** The current `app-shell` is a mobile BottomNav; extend it into one responsive layout (bottom nav on mobile → side/top nav on `md+`) within the existing design system. Do NOT build a separate desktop/Tauri shell — Tauri is being removed; target is responsive web. Test the key breakpoints (mobile, tablet, desktop).
 - **Scope creep into logic.** Strictly presentation — resist "while I'm here" logic changes; route those to follow-ups.
 - **Demote vs break.** Demoting must not break the demoted pages (they still must load if visited) nor the auth redirect — verify the new landing redirect + that legacy routes still render.
 - **#102** (connect/enroll URL default) — fold the small fix into the login pass if low-risk; otherwise leave for its own follow-up.
