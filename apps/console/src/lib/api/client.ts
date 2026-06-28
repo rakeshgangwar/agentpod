@@ -117,3 +117,10 @@ export const del = (stationId: string, path: string, opts?: { recursive?: boolea
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ path, ...(opts?.recursive !== undefined ? { recursive: opts.recursive } : {}) }),
   });
+
+export const lifecycle = (stationId: string, action: "start" | "stop" | "restart") =>
+  http<StationHealth>(`/api/stations/${stationId}/lifecycle`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action }),
+  });

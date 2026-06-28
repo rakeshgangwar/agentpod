@@ -28,6 +28,10 @@
     Array.isArray(station?.capabilities) && station!.capabilities.includes("fs.write")
   );
 
+  const canLifecycle = $derived(
+    Array.isArray(station?.capabilities) && station!.capabilities.includes("lifecycle")
+  );
+
   onMount(async () => {
     try {
       const rows = await listStations(nodeId);
@@ -81,7 +85,7 @@
   <!-- Panel content -->
   <div class="panel-content">
     {#if activeTab === "health"}
-      <HealthPanel {stationId} />
+      <HealthPanel {stationId} {canLifecycle} />
     {:else if activeTab === "logs"}
       <div class="logs-wrap">
         <LogTail {stationId} />

@@ -1,17 +1,25 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { stationHealth } from "$lib/api/client";
+  import { stationHealth, lifecycle } from "$lib/api/client";
+  import TypeToConfirmDialog from "$lib/components/ui/TypeToConfirmDialog.svelte";
   import type { StationHealth } from "@agentpod/contract";
 
   interface Props {
     stationId: string;
+    canLifecycle?: boolean;
   }
 
-  let { stationId }: Props = $props();
+  let { stationId, canLifecycle = false }: Props = $props();
 
   let health = $state<StationHealth | null>(null);
   let isLoading = $state(true);
   let error = $state<string | null>(null);
+
+  // Lifecycle action state
+  let dialogOpen = $state(false);
+  let pendingAction = $state<"stop" | "restart" | null>(null);
+  let actionInFlight = $state(false);
+  let actionError = $state<string | null>(null);
 
   onMount(async () => {
     try {
@@ -47,6 +55,44 @@
     if (h > 0) return `${h}h ${m}m`;
     if (m > 0) return `${m}m ${s}s`;
     return `${s}s`;
+  }
+
+  async function doLifecycle(action: "start" | "stop" | "restart") {
+    actionInFlight = true;
+    actionError = null;
+    try {
+      health = await lifecycle(stationId, action);
+    } catch (err) {
+      actionError = err instanceof Error ? err.message : "Action failed";
+    } finally {
+      actionInFlight = false;
+    }
+  }
+
+  function handleStart() {
+    doLifecycle("start");
+  }
+
+  function handleStop() {
+    pendingAction = "stop";
+    dialogOpen = true;
+  }
+
+  function handleRestart() {
+    pendingAction = "restart";
+    dialogOpen = true;
+  }
+
+  function handleDialogConfirm() {
+    dialogOpen = false;
+    const action = pendingAction;
+    pendingAction = null;
+    if (action) doLifecycle(action);
+  }
+
+  function handleDialogCancel() {
+    dialogOpen = false;
+    pendingAction = null;
   }
 </script>
 
@@ -101,5 +147,49 @@
         </tr>
       </tbody>
     </table>
+
+    {#if canLifecycle}
+      <div class="mt-4 flex gap-2">
+        <button
+          type="button"
+          class="inline-flex h-8 items-center justify-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground shadow-xs hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+          disabled={actionInFlight}
+          onclick={handleStart}
+        >
+          Start
+        </button>
+        <button
+          type="button"
+          class="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium shadow-xs hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
+          disabled={actionInFlight}
+          onclick={handleStop}
+        >
+          Stop
+        </button>
+        <button
+          type="button"
+          class="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium shadow-xs hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
+          disabled={actionInFlight}
+          onclick={handleRestart}
+        >
+          Restart
+        </button>
+      </div>
+      {#if actionError}
+        <p class="mt-2 text-sm text-destructive">{actionError}</p>
+      {/if}
+    {/if}
   </div>
+
+  {#if canLifecycle}
+    <TypeToConfirmDialog
+      open={dialogOpen}
+      title="{pendingAction === 'stop' ? 'Stop' : 'Restart'} station"
+      message="This will {pendingAction} the station process. Type the station ID below to confirm."
+      confirmPhrase={stationId}
+      confirmLabel="Confirm"
+      onConfirm={handleDialogConfirm}
+      onCancel={handleDialogCancel}
+    />
+  {/if}
 {/if}
