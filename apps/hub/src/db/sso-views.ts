@@ -12,6 +12,14 @@ const metamcpConnectionString =
   connectionString.replace(/\/agentpod$/, "/metamcp");
 
 export async function ensureSsoViews(): Promise<void> {
+  // MetaMCP SSO sync is an OpenCode-era integration. The fleet console does not
+  // use it; when disabled, skip entirely so startup doesn't block ~30s waiting
+  // for a non-existent metamcp database (and spam connection errors).
+  if (process.env.METAMCP_ENABLED === "false") {
+    log.info("MetaMCP integration disabled (METAMCP_ENABLED=false); skipping SSO setup");
+    return;
+  }
+
   log.info("Setting up bidirectional sync triggers for MetaMCP...");
 
   const agentpodClient = postgres(connectionString, { max: 1 });
