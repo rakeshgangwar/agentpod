@@ -14,6 +14,7 @@
   let error = $state<string | null>(null);
   let lastToken = $state<string | null>(null);
   let isMinting = $state(false);
+  let mintError = $state<string | null>(null);
 
   function resolvedHubUrl(): string {
     const stored =
@@ -32,12 +33,13 @@
   });
 
   async function handleCreateToken() {
+    mintError = null;
     isMinting = true;
     try {
       const result = await createEnrollmentToken();
       lastToken = result.token;
     } catch (e) {
-      error = e instanceof Error ? e.message : "Failed to create enrollment token";
+      mintError = e instanceof Error ? e.message : "Failed to create enrollment token";
     } finally {
       isMinting = false;
     }
@@ -51,10 +53,13 @@
       <h2 class="text-2xl font-bold tracking-tight">Fleet Overview</h2>
       <p class="text-sm text-muted-foreground font-mono">// connected nodes</p>
     </div>
-    <Button onclick={handleCreateToken} disabled={isMinting} class="font-mono text-xs uppercase tracking-wider w-full sm:w-auto">
-      <PlusIcon class="h-4 w-4 mr-2" />
-      {isMinting ? "Creating…" : "Create enrollment token"}
-    </Button>
+    <div class="flex flex-col items-start sm:items-end gap-1">
+      <Button onclick={handleCreateToken} disabled={isMinting} class="font-mono text-xs uppercase tracking-wider w-full sm:w-auto">
+        <PlusIcon class="h-4 w-4 mr-2" />
+        {isMinting ? "Creating…" : "Create enrollment token"}
+      </Button>
+      {#if mintError}<p class="text-xs text-destructive">{mintError}</p>{/if}
+    </div>
   </div>
 
   <!-- Enrollment command block -->

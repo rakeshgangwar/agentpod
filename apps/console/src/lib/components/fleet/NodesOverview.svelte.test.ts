@@ -91,6 +91,31 @@ test("'Create enrollment token' button is present", async () => {
   expect(btn).toBeTruthy();
 });
 
+test("mint failure shows inline mintError without replacing the node grid", async () => {
+  vi.spyOn(api, "listNodes").mockResolvedValue(mockNodes);
+  vi.spyOn(api, "createEnrollmentToken").mockRejectedValue(new Error("token quota exceeded"));
+
+  const { getByRole, getByText, queryByText } = render(NodesOverview);
+
+  // Wait for nodes to load
+  await waitFor(() => {
+    expect(getByText("vps1.example.com")).toBeTruthy();
+  });
+
+  const btn = getByRole("button", { name: /create enrollment token/i });
+  fireEvent.click(btn);
+
+  await waitFor(() => {
+    // Inline mint error is shown
+    expect(getByText("token quota exceeded")).toBeTruthy();
+    // Node grid is still visible
+    expect(getByText("vps1.example.com")).toBeTruthy();
+    expect(getByText("vps2.example.com")).toBeTruthy();
+    // Full-page error banner is NOT shown (no cyber-card border-destructive replacing the grid)
+    expect(queryByText(/no nodes yet/i)).toBeNull();
+  });
+});
+
 test("clicking 'Create enrollment token' calls createEnrollmentToken and shows the token command", async () => {
   vi.spyOn(api, "listNodes").mockResolvedValue([]);
   vi.spyOn(api, "createEnrollmentToken").mockResolvedValue({
