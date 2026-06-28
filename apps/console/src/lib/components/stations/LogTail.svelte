@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import { logsUrl } from "$lib/api/client";
+  import { Badge } from "$lib/components/ui/badge";
 
   interface Props {
     stationId: string;
@@ -64,25 +65,38 @@
     closed: "Disconnected",
   };
 
-  const statusColor: Record<string, string> = {
-    connecting: "bg-yellow-500",
-    connected: "bg-green-500",
-    closed: "bg-muted-foreground",
+  const statusVariant: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
+    connecting: "outline",
+    connected: "default",
+    closed: "secondary",
+  };
+
+  const statusBadgeClass: Record<string, string> = {
+    connecting: "text-[var(--cyber-amber)] border-[var(--cyber-amber)]/50",
+    connected:
+      "bg-[var(--cyber-emerald)] text-[var(--cyber-emerald-foreground)] border-transparent",
+    closed: "",
   };
 </script>
 
-<div class="flex flex-col h-full min-h-[200px] rounded-md border border-border overflow-hidden bg-black/90">
+<div class="cyber-card flex flex-col h-full min-h-[200px]">
   <!-- Header -->
-  <div class="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-muted/20 text-xs font-mono shrink-0">
-    <span class="inline-block w-2 h-2 rounded-full {statusColor[status]}"></span>
-    <span class="text-muted-foreground">{statusLabel[status]}</span>
-    <span class="ml-auto text-muted-foreground">{lines.length} line{lines.length === 1 ? "" : "s"}</span>
+  <div
+    class="flex items-center gap-2 px-3 py-1.5 border-b border-border/50 bg-black/30 shrink-0"
+  >
+    <span class="text-xs font-mono text-muted-foreground/70 uppercase tracking-wide">Logs</span>
+    <Badge variant={statusVariant[status]} class={statusBadgeClass[status]}>
+      {statusLabel[status]}
+    </Badge>
+    <span class="ml-auto text-xs font-mono text-muted-foreground/60">
+      {lines.length} line{lines.length === 1 ? "" : "s"}
+    </span>
   </div>
 
-  <!-- Log lines -->
+  <!-- Log lines — styled scroll container preserving auto-scroll + line-cap -->
   <div
     bind:this={containerEl}
-    class="flex-1 overflow-y-auto py-1 font-mono text-[13px] leading-relaxed"
+    class="flex-1 overflow-y-auto min-h-0 bg-black/90 py-1 font-mono text-[13px] leading-relaxed"
   >
     {#if lines.length === 0 && status === "connecting"}
       <div class="px-3 py-1 text-[#6b7280] italic">Waiting for log output…</div>
@@ -90,7 +104,9 @@
       <div class="px-3 py-1 text-[#6b7280] italic">No log output yet.</div>
     {:else}
       {#each lines as line}
-        <div class="px-3 py-0.5 text-[#d4d4d4] whitespace-pre-wrap break-all hover:bg-white/5">{line}</div>
+        <div class="px-3 py-0.5 text-[#d4d4d4] whitespace-pre-wrap break-all hover:bg-white/5">
+          {line}
+        </div>
       {/each}
     {/if}
   </div>

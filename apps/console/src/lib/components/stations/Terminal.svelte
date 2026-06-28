@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from "svelte";
   import { createTerminalClient } from "$lib/api/terminal";
   import type { TerminalClient } from "$lib/api/terminal";
+  import { Badge } from "$lib/components/ui/badge";
 
   interface Props {
     stationId: string;
@@ -98,26 +99,36 @@
     disconnected: "Disconnected",
   };
 
-  const statusDot: Record<string, string> = {
-    connecting: "bg-yellow-500",
-    connected: "bg-green-500",
-    disconnected: "bg-muted-foreground",
+  const statusVariant: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
+    connecting: "outline",
+    connected: "default",
+    disconnected: "secondary",
+  };
+
+  const statusBadgeClass: Record<string, string> = {
+    connecting: "text-[var(--cyber-amber)] border-[var(--cyber-amber)]/50",
+    connected:
+      "bg-[var(--cyber-emerald)] text-[var(--cyber-emerald-foreground)] border-transparent",
+    disconnected: "",
   };
 </script>
 
 <div
-  class="flex flex-col h-full min-h-[200px] rounded-md border border-border overflow-hidden"
+  class="cyber-card flex flex-col h-full min-h-[200px]"
   style="background:#0a0a0a"
 >
   <!-- Status bar -->
   <div
-    class="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-muted/20 text-xs font-mono shrink-0"
+    class="flex items-center gap-2 px-3 py-1.5 border-b border-border/50 bg-black/30 shrink-0"
   >
-    <span class="inline-block w-2 h-2 rounded-full {statusDot[status]}"></span>
-    <span class="text-muted-foreground">{statusLabel[status]}</span>
-    <span class="ml-auto text-muted-foreground/50 text-[11px]">terminal</span>
+    <span class="text-xs font-mono text-muted-foreground/70 uppercase tracking-wide"
+      >Terminal</span
+    >
+    <Badge variant={statusVariant[status]} class={statusBadgeClass[status]}>
+      {statusLabel[status]}
+    </Badge>
   </div>
 
-  <!-- xterm.js mount point -->
+  <!-- xterm.js mount point — bind:this, classes, and style unchanged -->
   <div bind:this={containerEl} class="flex-1 overflow-hidden p-1" style="min-height:0"></div>
 </div>
