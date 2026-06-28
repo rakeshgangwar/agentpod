@@ -3,7 +3,6 @@
 package terminal
 
 import (
-	"context"
 	"os"
 	"os/exec"
 	"sync"
@@ -33,8 +32,7 @@ type Session struct {
 	subs   map[int]*subscriber
 	subSeq int             // monotonic key for subs map
 
-	cancel context.CancelFunc
-	done   chan struct{} // closed when the read loop exits
+	done chan struct{} // closed when the read loop exits
 }
 
 // newSession spawns a PTY-attached process and returns a running Session.
@@ -55,22 +53,21 @@ func newSession(id, shell, cwd string, cols, rows uint16) (*Session, error) {
 		return nil, err
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
 	s := &Session{
-		ID:     id,
-		ptm:    ptm,
-		cmd:    cmd,
-		subs:   make(map[int]*subscriber),
-		cancel: cancel,
-		done:   make(chan struct{}),
+		ID:   id,
+		ptm:  ptm,
+		cmd:  cmd,
+		subs: make(map[int]*subscriber),
+		done: make(chan struct{}),
 	}
-	go s.readLoop(ctx)
+	go s.readLoop()
 	return s, nil
 }
 
 // readLoop copies PTY output into the ring buffer and every subscriber channel.
-// It exits when the PTY file returns an error (closed or EOF) or ctx is done.
-func (s *Session) readLoop(ctx context.Context) {
+// It exits when the PTY file returns an error (closed or EOF), which is
+// triggered by Close() calling ptm.Close().
+func (s *Session) readLoop() {
 	defer close(s.done)
 
 	buf := make([]byte, 4096)
@@ -161,8 +158,6 @@ func (s *Session) Subscribe() (<-chan []byte, func()) {
 // Close kills the child process (by its process group) and closes the PTY
 // file. It blocks until the read loop has exited to avoid goroutine leaks.
 func (s *Session) Close() error {
-	s.cancel()
-
 	// PTY-started processes become their own session / process group leader,
 	// so pgid == pid. Kill the whole group to reap any grandchildren.
 	if s.cmd.Process != nil {

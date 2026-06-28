@@ -2,6 +2,7 @@ package terminal_test
 
 import (
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -77,5 +78,31 @@ func TestCloseReapsChild(t *testing.T) {
 	}
 	if _, ok := m.Get(s.ID); ok {
 		t.Fatal("session should be gone after Close")
+	}
+}
+
+func TestConcurrentOpenIdempotent(t *testing.T) {
+	m := terminal.NewManager()
+	defer m.Shutdown()
+	const n = 10
+	ids := make([]string, n)
+	var wg sync.WaitGroup
+	for i := range n {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			s, err := m.Open("k", "/bin/cat", t.TempDir(), 80, 24)
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			ids[i] = s.ID
+		}(i)
+	}
+	wg.Wait()
+	for _, id := range ids[1:] {
+		if id != ids[0] {
+			t.Fatalf("concurrent Open returned different session IDs: %s vs %s", id, ids[0])
+		}
 	}
 }
