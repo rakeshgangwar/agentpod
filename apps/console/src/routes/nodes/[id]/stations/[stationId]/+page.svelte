@@ -6,13 +6,14 @@
   import FileBrowser from "$lib/components/stations/FileBrowser.svelte";
   import ConfigEditor from "$lib/components/stations/ConfigEditor.svelte";
   import Terminal from "$lib/components/stations/Terminal.svelte";
+  import CleanupPanel from "$lib/components/stations/CleanupPanel.svelte";
   import { listStations } from "$lib/api/client";
   import type { StationRow } from "$lib/api/client";
 
   const nodeId = $derived($page.params.id as string);
   const stationId = $derived($page.params.stationId as string);
 
-  type Tab = "health" | "logs" | "files" | "terminal";
+  type Tab = "health" | "logs" | "files" | "terminal" | "cleanup";
   let activeTab = $state<Tab>("health");
 
   let station = $state<StationRow | null>(null);
@@ -30,6 +31,10 @@
 
   const canLifecycle = $derived(
     Array.isArray(station?.capabilities) && station!.capabilities.includes("lifecycle")
+  );
+
+  const hasCleanup = $derived(
+    Array.isArray(station?.capabilities) && station!.capabilities.includes("cleanup")
   );
 
   onMount(async () => {
@@ -80,6 +85,15 @@
         Terminal
       </button>
     {/if}
+    {#if hasCleanup}
+      <button
+        type="button"
+        class="tab-btn {activeTab === 'cleanup' ? 'active' : ''}"
+        onclick={() => (activeTab = "cleanup")}
+      >
+        Cleanup
+      </button>
+    {/if}
   </nav>
 
   <!-- Panel content -->
@@ -101,6 +115,10 @@
     {:else if activeTab === "terminal" && hasTerminal}
       <div class="terminal-wrap">
         <Terminal {stationId} />
+      </div>
+    {:else if activeTab === "cleanup" && hasCleanup}
+      <div class="cleanup-wrap">
+        <CleanupPanel {stationId} />
       </div>
     {/if}
   </div>
@@ -207,5 +225,9 @@
 
   .terminal-wrap {
     height: 480px;
+  }
+
+  .cleanup-wrap {
+    min-height: 200px;
   }
 </style>

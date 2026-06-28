@@ -124,3 +124,20 @@ export const lifecycle = (stationId: string, action: "start" | "stop" | "restart
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action }),
   });
+
+// ─── Cleanup endpoints ────────────────────────────────────────────────────────
+
+export type CleanupItem = { path: string; size: number; kind: string };
+
+export const cleanupPlan = (stationId: string) =>
+  http<{ items: CleanupItem[]; totalBytes: number }>(
+    `/api/stations/${stationId}/cleanup/plan`,
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }
+  );
+
+export const cleanupApply = (stationId: string, paths: string[]) =>
+  http<{ removedBytes: number }>(`/api/stations/${stationId}/cleanup/apply`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ paths }),
+  });
