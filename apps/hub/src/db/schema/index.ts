@@ -50,3 +50,6 @@ export * from "./nodes";
 
 // Station registry (adopted stations, fleet console)
 export * from "./stations";
+
+// Station audit log (write ops + terminal events, fleet console)
+export * from "./audit";

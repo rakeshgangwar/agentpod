@@ -55,6 +55,8 @@ import { enrollmentTokenRoutes } from './routes/enrollment-tokens.ts';
 import { stationRoutes } from './routes/stations.ts';
 // Station terminal WebSocket bridge (fleet console ↔ node PTY)
 import { stationTerminalRoutes } from './routes/station-terminal.ts';
+// Station activity endpoint (audit log, fleet console)
+import { stationActivityRoutes } from './routes/station-activity.ts';
 // Middleware
 import { activityLoggerMiddleware } from './middleware/activity-logger.ts';
 // Sync services
@@ -153,7 +155,9 @@ const app = new Hono()
   // Station routes (detect, adopt, list, unadopt)
   .route('/api', stationRoutes)                            // GET/POST/DELETE /api/nodes/:id/... and /api/stations/:id
   // Station terminal WebSocket bridge (fleet console ↔ node PTY)
-  .route('/api', stationTerminalRoutes);                   // WS /api/stations/:id/terminal
+  .route('/api', stationTerminalRoutes)                    // WS /api/stations/:id/terminal
+  // Station activity log (audit rows, fleet console)
+  .route('/api', stationActivityRoutes);                   // GET /api/stations/:id/activity
 
 app.onError((err, c) => {
   const requestId = c.req.header('x-request-id') || crypto.randomUUID();

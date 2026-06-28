@@ -33,6 +33,7 @@ import * as broker from "../services/broker";
 import { getStation } from "../services/station-registry";
 import { connectionManager } from "../services/connection-manager";
 import { recordAudit } from "../services/audit";
+import { db } from "../db/drizzle";
 import { isAllowedOrigin } from "../config";
 import type { AuthUser } from "../auth/middleware";
 
@@ -94,8 +95,8 @@ export const stationTerminalRoutes = new Hono().get(
         }
         nodeId = station.nodeId;
 
-        // ── 4. Audit (no-op until P2 Task 6) ─────────────────────────────
-        const audit = await recordAudit({
+        // ── 4. Audit (P2 Task 6) ──────────────────────────────────────────
+        const audit = await recordAudit(db, {
           userId: user.id,
           nodeId: station.nodeId,
           stationKey: station.stationKey,
