@@ -20,6 +20,21 @@ export default defineConfig(async () => ({
   ssr: {
     external: ["tauri-plugin-mcp", "html2canvas"],
   },
+  // tauri-plugin-mcp is a Tauri-only workspace plugin with no web entry; it is
+  // dynamically imported in +layout.svelte ONLY under Tauri (gated on
+  // __TAURI_INTERNALS__), so it never runs in the browser. Exclude it (and the
+  // dev-only html2canvas) from the CLIENT build too — otherwise `vite build`
+  // fails to resolve the package entry on a clean checkout (no Tauri build
+  // artifacts present). The gated dynamic import is left unresolved and never
+  // executes in a browser.
+  optimizeDeps: {
+    exclude: ["tauri-plugin-mcp", "html2canvas"],
+  },
+  build: {
+    rollupOptions: {
+      external: ["tauri-plugin-mcp", "html2canvas"],
+    },
+  },
   // 2. tauri expects a fixed port, fail if that port is not available
   server: {
     port: 1420,
