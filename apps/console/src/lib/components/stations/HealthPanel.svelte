@@ -2,6 +2,9 @@
   import { onMount } from "svelte";
   import { stationHealth, lifecycle } from "$lib/api/client";
   import TypeToConfirmDialog from "$lib/components/ui/TypeToConfirmDialog.svelte";
+  import * as Card from "$lib/components/ui/card";
+  import { Badge } from "$lib/components/ui/badge";
+  import { Button } from "$lib/components/ui/button";
   import type { StationHealth } from "@agentpod/contract";
 
   interface Props {
@@ -102,97 +105,119 @@
 {:else if error}
   <p class="text-sm text-destructive p-3">{error}</p>
 {:else if health}
-  <div class="p-4">
-    <table class="w-full text-sm border-collapse">
-      <tbody>
-        <tr class="border-b border-border/40">
-          <th class="text-left text-muted-foreground font-medium py-2 pr-4 w-36 whitespace-nowrap">Status</th>
-          <td class="py-2 font-mono text-[13px]">
-            <span class="inline-flex items-center gap-1.5">
-              <span
-                class="inline-block w-2 h-2 rounded-full {health.running ? 'bg-green-500' : 'bg-muted-foreground'}"
-              ></span>
+  <Card.Root class="border-0 shadow-none rounded-none">
+    <Card.Content class="py-4 space-y-4">
+      <!-- Responsive stat grid: 1 col mobile → 2 cols sm -->
+      <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+        <!-- Status -->
+        <div class="flex flex-col gap-1">
+          <dt class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</dt>
+          <dd>
+            <Badge
+              variant={health.running ? "default" : "secondary"}
+              class={health.running
+                ? "bg-[var(--cyber-emerald)] text-[var(--cyber-emerald-foreground)] border-transparent"
+                : ""}
+            >
               {health.running ? "Running" : "Stopped"}
-            </span>
-          </td>
-        </tr>
-        <tr class="border-b border-border/40">
-          <th class="text-left text-muted-foreground font-medium py-2 pr-4">PID</th>
-          <td class="py-2 font-mono text-[13px]">{fmt(health.pid)}</td>
-        </tr>
-        <tr class="border-b border-border/40">
-          <th class="text-left text-muted-foreground font-medium py-2 pr-4">CPU</th>
-          <td class="py-2 font-mono text-[13px]">
-            {health.cpuPct !== null ? `${health.cpuPct}%` : "—"}
-          </td>
-        </tr>
-        <tr class="border-b border-border/40">
-          <th class="text-left text-muted-foreground font-medium py-2 pr-4">Memory</th>
-          <td class="py-2 font-mono text-[13px]">{fmtBytes(health.memBytes)}</td>
-        </tr>
-        <tr class="border-b border-border/40">
-          <th class="text-left text-muted-foreground font-medium py-2 pr-4">Disk</th>
-          <td class="py-2 font-mono text-[13px]">{fmtBytes(health.diskBytes)}</td>
-        </tr>
-        <tr class="border-b border-border/40">
-          <th class="text-left text-muted-foreground font-medium py-2 pr-4">Uptime</th>
-          <td class="py-2 font-mono text-[13px]">{fmtUptime(health.uptimeSec)}</td>
-        </tr>
-        <tr class="border-b border-border/40">
-          <th class="text-left text-muted-foreground font-medium py-2 pr-4">Last Activity</th>
-          <td class="py-2 font-mono text-[13px]">{fmtStr(health.lastActivity)}</td>
-        </tr>
-        <tr class="border-b border-border/40">
-          <th class="text-left text-muted-foreground font-medium py-2 pr-4">Note</th>
-          <td class="py-2 font-mono text-[13px]">{fmtStr(health.note)}</td>
-        </tr>
-        {#if matrixId}
-        <tr>
-          <th class="text-left text-muted-foreground font-medium py-2 pr-4">Matrix</th>
-          <td class="py-2 font-mono text-[13px]">
-            <a
-              href="https://matrix.to/#/{matrixId}"
-              target="_blank"
-              rel="noopener noreferrer"
-            >{matrixId}</a>
-          </td>
-        </tr>
-        {/if}
-      </tbody>
-    </table>
+            </Badge>
+          </dd>
+        </div>
 
-    {#if canLifecycle}
-      <div class="mt-4 flex gap-2">
-        <button
-          type="button"
-          class="inline-flex h-8 items-center justify-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground shadow-xs hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-          disabled={actionInFlight}
-          onclick={handleStart}
-        >
-          Start
-        </button>
-        <button
-          type="button"
-          class="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium shadow-xs hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
-          disabled={actionInFlight}
-          onclick={handleStop}
-        >
-          Stop
-        </button>
-        <button
-          type="button"
-          class="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium shadow-xs hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
-          disabled={actionInFlight}
-          onclick={handleRestart}
-        >
-          Restart
-        </button>
-      </div>
-      {#if actionError}
-        <p class="mt-2 text-sm text-destructive">{actionError}</p>
+        <!-- PID -->
+        <div class="flex flex-col gap-1">
+          <dt class="text-xs font-medium text-muted-foreground uppercase tracking-wide">PID</dt>
+          <dd class="font-mono text-sm text-foreground">{fmt(health.pid)}</dd>
+        </div>
+
+        <!-- CPU -->
+        <div class="flex flex-col gap-1">
+          <dt class="text-xs font-medium text-muted-foreground uppercase tracking-wide">CPU</dt>
+          <dd class="font-mono text-sm text-foreground">
+            {health.cpuPct !== null ? `${health.cpuPct}%` : "—"}
+          </dd>
+        </div>
+
+        <!-- Memory -->
+        <div class="flex flex-col gap-1">
+          <dt class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Memory</dt>
+          <dd class="font-mono text-sm text-foreground">{fmtBytes(health.memBytes)}</dd>
+        </div>
+
+        <!-- Disk -->
+        <div class="flex flex-col gap-1">
+          <dt class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Disk</dt>
+          <dd class="font-mono text-sm text-foreground">{fmtBytes(health.diskBytes)}</dd>
+        </div>
+
+        <!-- Uptime -->
+        <div class="flex flex-col gap-1">
+          <dt class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Uptime</dt>
+          <dd class="font-mono text-sm text-foreground">{fmtUptime(health.uptimeSec)}</dd>
+        </div>
+
+        <!-- Last Activity -->
+        <div class="flex flex-col gap-1">
+          <dt class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Last Activity</dt>
+          <dd class="font-mono text-sm text-foreground">{fmtStr(health.lastActivity)}</dd>
+        </div>
+
+        <!-- Note -->
+        <div class="flex flex-col gap-1">
+          <dt class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Note</dt>
+          <dd class="font-mono text-sm text-foreground">{fmtStr(health.note)}</dd>
+        </div>
+
+        <!-- Matrix ID (conditional) -->
+        {#if matrixId}
+          <div class="flex flex-col gap-1 sm:col-span-2">
+            <dt class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Matrix</dt>
+            <dd class="font-mono text-sm">
+              <a
+                href="https://matrix.to/#/{matrixId}"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-[var(--cyber-cyan)] hover:underline break-all"
+              >{matrixId}</a>
+            </dd>
+          </div>
+        {/if}
+      </dl>
+
+      <!-- Lifecycle controls -->
+      {#if canLifecycle}
+        <div class="pt-2 border-t border-border/40 flex flex-wrap gap-2">
+          <Button
+            variant="default"
+            size="sm"
+            disabled={actionInFlight}
+            onclick={handleStart}
+          >
+            Start
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={actionInFlight}
+            onclick={handleStop}
+          >
+            Stop
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={actionInFlight}
+            onclick={handleRestart}
+          >
+            Restart
+          </Button>
+        </div>
+        {#if actionError}
+          <p class="text-sm text-destructive">{actionError}</p>
+        {/if}
       {/if}
-    {/if}
-  </div>
+    </Card.Content>
+  </Card.Root>
 
   {#if canLifecycle}
     <TypeToConfirmDialog
