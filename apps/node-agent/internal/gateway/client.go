@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"encoding/json"
+	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -12,35 +13,115 @@ import (
 	"github.com/rakeshgangwar/agentpod/node-agent/internal/host"
 )
 
+const (
+	// backoffBase is the starting backoff duration (attempt 0).
+	backoffBase = time.Second
+	// backoffCap is the maximum backoff duration.
+	backoffCap = 30 * time.Second
+)
+
+// wsURL derives the WebSocket gateway URL from the hub's HTTP(S) URL.
+// https://host → wss://host/public/nodes/gateway
+// http://host  → ws://host/public/nodes/gateway
 func wsURL(hub string) string {
 	u := strings.Replace(strings.Replace(hub, "http://", "ws://", 1), "https://", "wss://", 1)
 	return u + "/public/nodes/gateway"
 }
 
-// Run connects to the hub and dispatches inbound requests to h.
-// It reconnects with exponential backoff on failure.
-func Run(ctx context.Context, cfg config.Config, h Handler) error {
-	backoff := time.Second
+// calcBackoff returns min(backoffCap, backoffBase * 2^attempt) for attempt ≥ 0.
+func calcBackoff(attempt int) time.Duration {
+	if attempt < 0 {
+		attempt = 0
+	}
+	b := backoffBase << uint(attempt)
+	if b > backoffCap || b <= 0 { // overflow guard
+		return backoffCap
+	}
+	return b
+}
+
+// defaultJitter returns a random duration in [0, base/2) to spread reconnects.
+func defaultJitter(base time.Duration) time.Duration {
+	if base <= 0 {
+		return 0
+	}
+	return time.Duration(rand.Int63n(int64(base)/2 + 1))
+}
+
+// defaultSleep waits for d or until ctx is cancelled.
+// Returns false if ctx was cancelled (caller should stop the retry loop).
+func defaultSleep(ctx context.Context, d time.Duration) bool {
+	t := time.NewTimer(d)
+	select {
+	case <-ctx.Done():
+		t.Stop()
+		return false
+	case <-t.C:
+		return true
+	}
+}
+
+// runOptions configures the internal reconnect loop.
+// Every field has a production default supplied by Run; tests inject fakes to
+// avoid real network dials and real sleeps.
+type runOptions struct {
+	// dialFn connects and serves one gateway session. On success it calls
+	// onConnected (to reset the attempt counter) then blocks until the
+	// connection is lost or ctx is cancelled. Returns non-nil on error.
+	dialFn func(ctx context.Context, cfg config.Config, h Handler, onConnected func()) error
+
+	// sleepFn waits for d before the next dial attempt. It receives ctx so it
+	// can return early on cancellation. Returns false if ctx was cancelled.
+	sleepFn func(ctx context.Context, d time.Duration) bool
+
+	// jitterFn returns extra duration to add to the computed backoff.
+	// nil means no jitter (used in tests for deterministic assertions).
+	jitterFn func(base time.Duration) time.Duration
+}
+
+// runWithOpts is the testable core of the reconnect loop.
+//
+// It calls opts.dialFn in a loop; on any error it computes the exponential
+// backoff (min(cap, base*2^attempt) + optional jitter), waits via opts.sleepFn,
+// and retries. When dialFn calls onConnected the attempt counter is reset to
+// 0 so a freshly recovered connection does not inherit a stale penalty.
+// The loop exits only when ctx is cancelled.
+func runWithOpts(ctx context.Context, cfg config.Config, h Handler, opts runOptions) error {
+	attempt := 0
 	for ctx.Err() == nil {
-		// onConnected is called by connectOnce after a successful dial+hello,
-		// resetting the backoff so a previously-flaky connection doesn't stay
-		// penalised once it recovers.
-		if err := connectOnce(ctx, cfg, h, func() { backoff = time.Second }); err != nil {
-			t := time.NewTimer(backoff)
-			select {
-			case <-ctx.Done():
-				t.Stop()
-				return ctx.Err()
-			case <-t.C:
+		err := opts.dialFn(ctx, cfg, h, func() { attempt = 0 })
+		if err != nil && ctx.Err() == nil {
+			d := calcBackoff(attempt)
+			if opts.jitterFn != nil {
+				d += opts.jitterFn(d)
 			}
-			if backoff < 30*time.Second {
-				backoff *= 2
+			attempt++
+			if !opts.sleepFn(ctx, d) {
+				break
 			}
 		}
 	}
 	return ctx.Err()
 }
 
+// Run connects to the hub gateway and dispatches inbound requests to h.
+// It derives wss:// from an https:// hub URL automatically (Go's default TLS
+// stack uses system root CAs — no extra config needed).
+// On any disconnect or dial error it reconnects with exponential back-off +
+// jitter (min(30 s, 1 s × 2^n) + [0, base/2)), resetting the counter on each
+// successful connection. It exits only when ctx is cancelled.
+func Run(ctx context.Context, cfg config.Config, h Handler) error {
+	return runWithOpts(ctx, cfg, h, runOptions{
+		dialFn:   connectOnce,
+		sleepFn:  defaultSleep,
+		jitterFn: defaultJitter,
+	})
+}
+
+// connectOnce dials the hub, sends the hello frame, starts the heartbeat
+// ticker, and serves the inbound read loop until the connection is lost or ctx
+// is cancelled. onConnected is called immediately after the hello is sent so
+// the caller can reset the backoff counter.
 func connectOnce(ctx context.Context, cfg config.Config, h Handler, onConnected func()) error {
 	c, _, err := websocket.Dial(ctx, wsURL(cfg.Hub), &websocket.DialOptions{
 		HTTPHeader: map[string][]string{"Authorization": {"Bearer " + cfg.NodeID + ":" + cfg.NodeSecret}},
