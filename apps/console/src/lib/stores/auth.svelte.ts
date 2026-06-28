@@ -55,6 +55,8 @@ let sessionData = $state<{
     email: string;
     name?: string | null;
     image?: string | null;
+    /** Server-assigned role, e.g. "admin". Populated when the hub includes it in the session. */
+    role?: string | null;
   };
 } | null>(null);
 

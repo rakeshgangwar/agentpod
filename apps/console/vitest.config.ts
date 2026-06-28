@@ -8,6 +8,12 @@ export default defineConfig({
     conditions: ["browser"],
     alias: {
       $lib: path.resolve(__dirname, "./src/lib"),
+      // SvelteKit runtime modules — resolved to stubs in the jsdom environment.
+      // Individual test files can override via vi.mock("$app/...").
+      "$app/state": path.resolve(__dirname, "./src/mocks/app-state.ts"),
+      "$app/navigation": path.resolve(__dirname, "./src/mocks/app-navigation.ts"),
+      "$app/environment": path.resolve(__dirname, "./src/mocks/app-environment.ts"),
+      "$app/stores": path.resolve(__dirname, "./src/mocks/app-stores.ts"),
     },
   },
   test: {
