@@ -71,6 +71,11 @@ type Lifecycle interface {
 // kill(pid, 0) calls return ESRCH. For non-child processes (production use),
 // we fall back to kill(0) which returns ESRCH once the process is gone.
 func stopProcess(pid int, grace time.Duration) error {
+	// Safety: never signal pid<=1 — a 0/-1 pid would target the whole process
+	// group (or every reachable process), and pid 1 is init.
+	if pid <= 1 {
+		return fmt.Errorf("stopProcess: refusing unsafe pid %d", pid)
+	}
 	proc, err := os.FindProcess(pid)
 	if err != nil {
 		return fmt.Errorf("find process %d: %w", pid, err)
