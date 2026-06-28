@@ -53,6 +53,8 @@ import { nodeEnrollRoutes, nodeRoutes } from './routes/nodes.ts';
 import { enrollmentTokenRoutes } from './routes/enrollment-tokens.ts';
 // Station routes (detect, adopt, list, unadopt)
 import { stationRoutes } from './routes/stations.ts';
+// Station terminal WebSocket bridge (fleet console ↔ node PTY)
+import { stationTerminalRoutes } from './routes/station-terminal.ts';
 // Middleware
 import { activityLoggerMiddleware } from './middleware/activity-logger.ts';
 // Sync services
@@ -159,7 +161,9 @@ origin: (origin) => {
   .route('/api/enrollment-tokens', enrollmentTokenRoutes)  // POST /api/enrollment-tokens
   .route('/api/nodes', nodeRoutes)                         // GET /api/nodes
   // Station routes (detect, adopt, list, unadopt)
-  .route('/api', stationRoutes);                           // GET/POST/DELETE /api/nodes/:id/... and /api/stations/:id
+  .route('/api', stationRoutes)                            // GET/POST/DELETE /api/nodes/:id/... and /api/stations/:id
+  // Station terminal WebSocket bridge (fleet console ↔ node PTY)
+  .route('/api', stationTerminalRoutes);                   // WS /api/stations/:id/terminal
 
 app.onError((err, c) => {
   const requestId = c.req.header('x-request-id') || crypto.randomUUID();

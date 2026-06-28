@@ -1,0 +1,408 @@
+/**
+ * Integration Test: console↔hub terminal WebSocket bridge (P2 Task 4)
+ *
+ * Verifies GET /api/stations/:id/terminal (WebSocket):
+ *   1. Authenticated connect → hub sends term.open then term.attach to the node.
+ *   2. Node stream{enc:"base64"} chunk → client receives {t:"data", data:chunk}.
+ *   3. Client {t:"input"} → forwarded to node as an input frame with attach id.
+ *   4. Unauthenticated upgrade → WS closed (code 1008), no term.open sent.
+ *
+ * Uses the local Docker test-postgres (localhost:5434).
+ * DATABASE_URL must be set before any src/ modules are imported.
+ */
+
+// ─── Set env vars BEFORE any src/ imports ─────────────────────────────────────
+process.env.DATABASE_URL =
+  process.env.DATABASE_URL ||
+  "postgres://agentpod:agentpod-dev-password@localhost:5434/agentpod";
+process.env.NODE_ENV = "test";
+
+import { test, expect, beforeAll, afterAll } from "bun:test";
+import { Hono } from "hono";
+
+// src/ imports — DB URL is already set above
+import { rawSql } from "../db/drizzle";
+import { createTestUser } from "../../tests/helpers/database";
+import { ensurePgMigrations } from "../../tests/helpers/pg-migrations";
+import { mintEnrollmentToken, enrollNode } from "../services/enrollment";
+import { gatewayRoutes } from "./gateway";
+import { stationTerminalRoutes } from "./station-terminal";
+import { stationRoutes } from "./stations";
+import { websocket } from "../ws";
+import type { AuthUser } from "../auth/middleware";
+import type { StationRow } from "../services/station-registry";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const TEST_USER = "test-user-sterm-001";
+const STATION_KEY = "sterm-station";
+const FAKE_SESSION_ID = "pty-session-abc123";
+
+// ─── Minimal test app ─────────────────────────────────────────────────────────
+
+// Mirrors station-observe.test.ts: fake auth middleware + real gateway + routes.
+const testApp = new Hono()
+  .use("/api/*", async (c, next) => {
+    const userId = c.req.header("X-Test-User-Id");
+    if (userId && userId !== "anonymous") {
+      c.set("user", { id: userId, authType: "api_key" } satisfies AuthUser);
+    } else {
+      // No header → anonymous; the terminal route rejects this with 1008.
+      c.set("user", { id: "anonymous", authType: "api_key" } satisfies AuthUser);
+    }
+    return next();
+  })
+  .route("/public/nodes", gatewayRoutes)
+  .route("/api", stationTerminalRoutes)
+  .route("/api", stationRoutes);
+
+// ─── Setup & Teardown ─────────────────────────────────────────────────────────
+
+beforeAll(async () => {
+  await ensurePgMigrations();
+  await createTestUser({
+    id: TEST_USER,
+    email: "sterm-test@example.com",
+    name: "Station Terminal Test User",
+  });
+});
+
+afterAll(async () => {
+  try {
+    await rawSql`DELETE FROM stations          WHERE user_id = ${TEST_USER}`;
+    await rawSql`DELETE FROM nodes             WHERE user_id = ${TEST_USER}`;
+    await rawSql`DELETE FROM enrollment_tokens WHERE user_id = ${TEST_USER}`;
+    await rawSql`DELETE FROM "user"            WHERE id = ${TEST_USER}`;
+  } catch {
+    // Ignore cleanup errors
+  }
+});
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Connect a fake node WS to the gateway and wire up handlers.
+ *
+ * @param streamChunks  base64 chunks to emit after term.attach (default: ["aGVsbG8="])
+ * @param capturedNodeMsgs  array to append raw messages received by the node
+ * @param attachIdRef  single-element array; [0] is set to the attach req id once known
+ */
+async function connectFakeNode(
+  serverPort: number,
+  nodeId: string,
+  nodeSecret: string,
+  opts: {
+    streamChunks?: string[];
+    capturedNodeMsgs?: string[];
+    attachIdRef?: [string | null];
+    holdStream?: boolean; // if true, don't close the stream with eof
+  } = {}
+): Promise<WebSocket> {
+  const ws = new WebSocket(
+    `ws://localhost:${serverPort}/public/nodes/gateway`,
+    {
+      headers: { Authorization: `Bearer ${nodeId}:${nodeSecret}` },
+    } as RequestInit & { headers: Record<string, string> }
+  );
+
+  await new Promise<void>((res, rej) => {
+    ws.onopen = () => res();
+    ws.onerror = () => rej(new Error("Node WS connection error"));
+  });
+
+  ws.onmessage = (e) => {
+    const raw = String(e.data);
+    const msg = JSON.parse(raw);
+
+    // Capture everything the node receives (for assertion in unauthenticated test)
+    if (opts.capturedNodeMsgs) {
+      opts.capturedNodeMsgs.push(raw);
+    }
+
+    if (msg.type === "req") {
+      switch (msg.verb) {
+        case "detect":
+          ws.send(
+            JSON.stringify({
+              type: "res",
+              id: msg.id,
+              ok: true,
+              data: [
+                {
+                  key: STATION_KEY,
+                  harness: "opencode",
+                  kind: "leaf",
+                  displayName: "Station Terminal Test",
+                  parentKey: null,
+                  workspacePath: "/workspace/sterm",
+                  capabilities: ["health"],
+                },
+              ],
+            })
+          );
+          break;
+
+        case "term.open":
+          ws.send(
+            JSON.stringify({
+              type: "res",
+              id: msg.id,
+              ok: true,
+              data: { sessionId: FAKE_SESSION_ID },
+            })
+          );
+          break;
+
+        case "term.attach":
+          if (opts.attachIdRef) {
+            opts.attachIdRef[0] = msg.id;
+          }
+          if (!opts.holdStream) {
+            // Emit chunks then eof after a short delay.
+            const chunks = opts.streamChunks ?? ["aGVsbG8="]; // base64("hello")
+            setTimeout(() => {
+              chunks.forEach((chunk, i) => {
+                ws.send(
+                  JSON.stringify({
+                    type: "stream",
+                    id: msg.id,
+                    seq: i,
+                    chunk,
+                    eof: false,
+                    enc: "base64",
+                  })
+                );
+              });
+              // eof frame
+              ws.send(
+                JSON.stringify({
+                  type: "stream",
+                  id: msg.id,
+                  seq: chunks.length,
+                  chunk: null,
+                  eof: true,
+                })
+              );
+            }, 50);
+          }
+          break;
+      }
+    }
+  };
+
+  // Allow onOpen → connectionManager.register to settle
+  await new Promise((r) => setTimeout(r, 150));
+  return ws;
+}
+
+/** Adopt the test station via the HTTP route. */
+async function adoptStation(
+  baseUrl: string,
+  nodeId: string
+): Promise<StationRow> {
+  const res = await fetch(`${baseUrl}/api/nodes/${nodeId}/stations/adopt`, {
+    method: "POST",
+    headers: {
+      "X-Test-User-Id": TEST_USER,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ keys: [STATION_KEY] }),
+  });
+  expect(res.status).toBe(200);
+  const rows = (await res.json()) as StationRow[];
+  expect(rows).toHaveLength(1);
+  return rows[0]!;
+}
+
+// ─── Tests ────────────────────────────────────────────────────────────────────
+
+test(
+  "authenticated WS → hub sends term.open + term.attach; stream chunk arrives as {t:'data'}",
+  async () => {
+    const server = Bun.serve({ fetch: testApp.fetch, websocket, port: 0 });
+    const baseUrl = `http://localhost:${server.port}`;
+
+    try {
+      const { token } = await mintEnrollmentToken(TEST_USER);
+      const { nodeId, nodeSecret } = await enrollNode(token, {
+        hostname: "sterm-open-host",
+        os: "linux",
+        arch: "amd64",
+        cpuCount: 2,
+      });
+
+      const fakeNode = await connectFakeNode(server.port!, nodeId, nodeSecret, {
+        streamChunks: ["aGVsbG8="], // base64("hello")
+      });
+
+      const station = await adoptStation(baseUrl, nodeId);
+
+      // Connect an authenticated client WS and collect messages.
+      const receivedData: string[] = [];
+      const sessionDone = new Promise<void>((resolve) => {
+        const clientWs = new WebSocket(
+          `ws://localhost:${server.port}/api/stations/${station.id}/terminal`,
+          {
+            headers: { "X-Test-User-Id": TEST_USER },
+          } as RequestInit & { headers: Record<string, string> }
+        );
+        clientWs.onmessage = (e) => {
+          const msg = JSON.parse(String(e.data));
+          if (msg.t === "data") receivedData.push(msg.data);
+          if (msg.t === "exit") resolve();
+        };
+        clientWs.onclose = () => resolve();
+        clientWs.onerror = () => resolve();
+      });
+
+      await sessionDone;
+
+      // The chunk "aGVsbG8=" must have been forwarded from the node stream.
+      expect(receivedData).toContain("aGVsbG8=");
+
+      fakeNode.close();
+      await new Promise((r) => setTimeout(r, 100));
+    } finally {
+      server.stop(true);
+    }
+  },
+  20_000
+);
+
+test(
+  "client {t:'input'} is forwarded to the node as an input frame with the attach id",
+  async () => {
+    const server = Bun.serve({ fetch: testApp.fetch, websocket, port: 0 });
+    const baseUrl = `http://localhost:${server.port}`;
+
+    try {
+      const { token } = await mintEnrollmentToken(TEST_USER);
+      const { nodeId, nodeSecret } = await enrollNode(token, {
+        hostname: "sterm-input-host",
+        os: "linux",
+        arch: "amd64",
+        cpuCount: 2,
+      });
+
+      const attachIdRef: [string | null] = [null];
+      const capturedNodeMsgs: string[] = [];
+
+      // Custom fake node: hold the attach stream open so we can send input.
+      const fakeNode = await connectFakeNode(server.port!, nodeId, nodeSecret, {
+        holdStream: true,
+        attachIdRef,
+        capturedNodeMsgs,
+      });
+
+      const station = await adoptStation(baseUrl, nodeId);
+
+      // Connect client
+      let clientWs: WebSocket;
+      await new Promise<void>((resolve, reject) => {
+        clientWs = new WebSocket(
+          `ws://localhost:${server.port}/api/stations/${station.id}/terminal`,
+          {
+            headers: { "X-Test-User-Id": TEST_USER },
+          } as RequestInit & { headers: Record<string, string> }
+        );
+        clientWs.onopen = () => resolve();
+        clientWs.onerror = () => reject(new Error("Client WS error"));
+      });
+
+      // Wait for the attach handshake to complete on the node side.
+      await new Promise((r) => setTimeout(r, 300));
+      expect(attachIdRef[0]).not.toBeNull(); // term.attach must have been sent
+
+      // Send input from the client.
+      clientWs!.send(JSON.stringify({ t: "input", data: "ls\n" }));
+      await new Promise((r) => setTimeout(r, 200));
+
+      // Find the input frame in the messages the node received.
+      const inputFrames = capturedNodeMsgs
+        .map((raw) => {
+          try {
+            return JSON.parse(raw);
+          } catch {
+            return null;
+          }
+        })
+        .filter((m) => m?.type === "input");
+
+      expect(inputFrames.length).toBeGreaterThan(0);
+      const frame = inputFrames[0];
+      expect(frame.type).toBe("input");
+      expect(frame.data).toBe("ls\n");
+      // The id must match the attach stream id so the node routes it to the right PTY.
+      expect(frame.id).toBe(attachIdRef[0]);
+
+      clientWs!.close();
+      fakeNode.close();
+      await new Promise((r) => setTimeout(r, 100));
+    } finally {
+      server.stop(true);
+    }
+  },
+  20_000
+);
+
+test(
+  "unauthenticated upgrade is rejected — WS closes, no term.open sent to node",
+  async () => {
+    const server = Bun.serve({ fetch: testApp.fetch, websocket, port: 0 });
+    const baseUrl = `http://localhost:${server.port}`;
+
+    try {
+      const { token } = await mintEnrollmentToken(TEST_USER);
+      const { nodeId, nodeSecret } = await enrollNode(token, {
+        hostname: "sterm-unauth-host",
+        os: "linux",
+        arch: "amd64",
+        cpuCount: 2,
+      });
+
+      // Track everything the node receives.
+      const nodeReceivedMsgs: string[] = [];
+      const fakeNode = await connectFakeNode(server.port!, nodeId, nodeSecret, {
+        capturedNodeMsgs: nodeReceivedMsgs,
+      });
+
+      const station = await adoptStation(baseUrl, nodeId);
+
+      // Connect WITHOUT X-Test-User-Id header → anonymous → should be rejected.
+      const { closeCode } = await new Promise<{ closeCode: number }>((resolve) => {
+        const clientWs = new WebSocket(
+          `ws://localhost:${server.port}/api/stations/${station.id}/terminal`
+          // no X-Test-User-Id header
+        );
+        clientWs.onclose = (e) => resolve({ closeCode: e.code });
+        // Some Bun versions fire onerror without onclose for policy violations
+        clientWs.onerror = () => resolve({ closeCode: 1006 });
+      });
+
+      // Server must have closed the connection (not left it hanging).
+      // Acceptable codes: 1008 (policy violation), 1006 (abnormal), 1000 (normal),
+      // or 1011 (internal error), depending on how Bun surfaces the close.
+      expect([1008, 1006, 1000, 1011].includes(closeCode)).toBe(true);
+
+      // Allow any pending async work to complete.
+      await new Promise((r) => setTimeout(r, 200));
+
+      // No term.open req should have been sent to the node.
+      const termOpenSent = nodeReceivedMsgs.some((raw) => {
+        try {
+          const m = JSON.parse(raw);
+          return m?.type === "req" && m?.verb === "term.open";
+        } catch {
+          return false;
+        }
+      });
+      expect(termOpenSent).toBe(false);
+
+      fakeNode.close();
+      await new Promise((r) => setTimeout(r, 100));
+    } finally {
+      server.stop(true);
+    }
+  },
+  20_000
+);

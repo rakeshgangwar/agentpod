@@ -14,7 +14,7 @@
  * after timeoutMs so callers can use a simple await without try/catch.
  */
 
-import type { ResponseMsg, StreamMsg } from "@agentpod/contract";
+import type { ResponseMsg, StreamMsg, InputMsg, ResizeMsg } from "@agentpod/contract";
 import { connectionManager } from "./connection-manager";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -90,14 +90,15 @@ export function request(
  * Send a streaming RPC to the node; deliver each chunk via onChunk.
  *
  * The handler is dropped automatically on the first message with eof:true.
- * Returns {cancel()} which sends a {type:"cancel"} to the node and drops the handler.
+ * Returns {cancel(), id} — id is the correlation id of the stream request,
+ * needed by callers that must forward input/resize frames to the same request.
  */
 export function stream(
   nodeId: string,
   verb: string,
   params: unknown,
   onChunk: StreamHandler
-): { cancel(): void } {
+): { cancel(): void; id: string } {
   const id = crypto.randomUUID();
   let active = true;
 
@@ -118,6 +119,7 @@ export function stream(
   }
 
   return {
+    id,
     cancel() {
       if (!active) return;
       active = false;
@@ -126,6 +128,20 @@ export function stream(
       }
     },
   };
+}
+
+/**
+ * Send an input, resize, or cancel frame directly to a node (terminal interactivity).
+ *
+ * Fire-and-forget — no correlation tracking.  Used by the console↔hub terminal
+ * bridge to forward keystrokes and resize events to the node PTY session.
+ * Returns false if the node is offline.
+ */
+export function sendFrame(
+  nodeId: string,
+  frame: InputMsg | ResizeMsg | { type: "cancel"; id: string }
+): boolean {
+  return connectionManager.send(nodeId, frame);
 }
 
 /**
