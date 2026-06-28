@@ -61,7 +61,7 @@ func (o *openclawDescriptor) Detect() ([]Station, error) {
 		return []Station{}, nil
 	}
 
-	caps := []string{"health", "logs", "fs.read", "lifecycle"}
+	caps := []string{"health", "logs", "fs.read", "lifecycle", "cleanup"}
 
 	// Root workspace: prefer <home>/workspace if it exists, else fall back to <home>.
 	rootWs := o.resolveRootWorkspace()
@@ -391,6 +391,29 @@ func (o *openclawDescriptor) TailLogs(ctx context.Context, key string, follow bo
 			}
 		}
 	}
+}
+
+// CleanPlan returns the cleanable items for the OpenClaw station.
+// Cleanable: "logs" subdirectory within the workspace + *.log files at root.
+func (o *openclawDescriptor) CleanPlan(key string) ([]CleanItem, error) {
+	workspace, err := o.workspaceFor(key)
+	if err != nil {
+		return nil, err
+	}
+	return cleanPlanCommon(workspace, []string{"logs"})
+}
+
+// CleanApply removes selected cleanable paths from the OpenClaw workspace.
+func (o *openclawDescriptor) CleanApply(key string, paths []string) (int64, error) {
+	workspace, err := o.workspaceFor(key)
+	if err != nil {
+		return 0, err
+	}
+	plan, err := o.CleanPlan(key)
+	if err != nil {
+		return 0, err
+	}
+	return cleanApplyCommon(workspace, paths, plan)
 }
 
 // isLogFile reports whether name has a log-ish extension (.log or .txt).

@@ -44,6 +44,12 @@ func NewHandler(reg *Registry) gateway.Handler {
 		case "logs.tail":
 			return handleLogsTail(ctx, reg, params, emit)
 
+		case "cleanup.plan":
+			return handleCleanupPlan(reg, params)
+
+		case "cleanup.apply":
+			return handleCleanupApply(reg, params)
+
 		default:
 			return nil, false, fmt.Errorf("descriptor: unknown verb %q", verb)
 		}
@@ -176,4 +182,61 @@ func handleLogsTail(
 		return nil, true, err
 	}
 	return nil, true, nil
+}
+
+func handleCleanupPlan(reg *Registry, params json.RawMessage) (any, bool, error) {
+	var p struct {
+		Key string `json:"key"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, false, fmt.Errorf("cleanup.plan: bad params: %w", err)
+	}
+	d, err := reg.For(p.Key)
+	if err != nil {
+		return nil, false, err
+	}
+	c, ok := d.(Cleaner)
+	if !ok {
+		return nil, false, fmt.Errorf("cleanup.plan: station %q does not support cleanup", p.Key)
+	}
+	items, err := c.CleanPlan(p.Key)
+	if err != nil {
+		return nil, false, err
+	}
+	if items == nil {
+		items = []CleanItem{}
+	}
+	var total int64
+	for _, item := range items {
+		total += item.Size
+	}
+	return map[string]any{
+		"items":      items,
+		"totalBytes": total,
+	}, false, nil
+}
+
+func handleCleanupApply(reg *Registry, params json.RawMessage) (any, bool, error) {
+	var p struct {
+		Key   string   `json:"key"`
+		Paths []string `json:"paths"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, false, fmt.Errorf("cleanup.apply: bad params: %w", err)
+	}
+	d, err := reg.For(p.Key)
+	if err != nil {
+		return nil, false, err
+	}
+	c, ok := d.(Cleaner)
+	if !ok {
+		return nil, false, fmt.Errorf("cleanup.apply: station %q does not support cleanup", p.Key)
+	}
+	removed, err := c.CleanApply(p.Key, p.Paths)
+	if err != nil {
+		return nil, false, err
+	}
+	return map[string]any{
+		"removedBytes": removed,
+	}, false, nil
 }

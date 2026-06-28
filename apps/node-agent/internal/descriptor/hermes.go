@@ -61,7 +61,7 @@ func (h *hermesDescriptor) Detect() ([]Station, error) {
 		return []Station{}, nil
 	}
 
-	caps := []string{"health", "logs", "fs.read", "lifecycle"}
+	caps := []string{"health", "logs", "fs.read", "lifecycle", "cleanup"}
 	homeCopy := h.home
 
 	stations := []Station{
@@ -398,6 +398,34 @@ func emitLogFiles(paths []string, emit func([]byte) error) error {
 		}
 	}
 	return nil
+}
+
+// CleanPlan returns the cleanable items for the Hermes station.
+// Cleanable items: the "logs" subdirectory within the station workspace
+// (if it exists), plus any *.log files directly in the workspace root.
+// All Path values are relative to the station's workspace.
+func (h *hermesDescriptor) CleanPlan(key string) ([]CleanItem, error) {
+	workspace, err := h.workspaceFor(key)
+	if err != nil {
+		return nil, err
+	}
+	return cleanPlanCommon(workspace, []string{"logs"})
+}
+
+// CleanApply removes the requested paths from the Hermes station workspace.
+// Each path is (a) re-jailed to the workspace and (b) verified against the
+// current plan set. Paths that fail either check are silently skipped.
+// Returns the total bytes removed.
+func (h *hermesDescriptor) CleanApply(key string, paths []string) (int64, error) {
+	workspace, err := h.workspaceFor(key)
+	if err != nil {
+		return 0, err
+	}
+	plan, err := h.CleanPlan(key)
+	if err != nil {
+		return 0, err
+	}
+	return cleanApplyCommon(workspace, paths, plan)
 }
 
 // emitLogFileFrom reads from offset and emits new bytes. Returns bytes read.

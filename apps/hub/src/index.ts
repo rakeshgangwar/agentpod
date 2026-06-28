@@ -60,6 +60,7 @@ import { stationActivityRoutes } from './routes/station-activity.ts';
 // Station write routes (fs.write/mkdir/move/delete — capability-gated, audited)
 import { stationWriteRoutes } from './routes/station-writes.ts';
 import { stationLifecycleRoutes } from './routes/station-lifecycle.ts';
+import { stationCleanupRoutes } from './routes/station-cleanup.ts';
 // Middleware
 import { activityLoggerMiddleware } from './middleware/activity-logger.ts';
 // Sync services
@@ -163,7 +164,8 @@ const app = new Hono()
   .route('/api', stationActivityRoutes)                    // GET /api/stations/:id/activity
   // Station write routes (fs.write/mkdir/move/delete — capability-gated, audited)
   .route('/api', stationWriteRoutes)                       // POST /api/stations/:id/fs/{write,mkdir,move,delete}
-  .route('/api', stationLifecycleRoutes);                  // POST /api/stations/:id/lifecycle
+  .route('/api', stationLifecycleRoutes)                   // POST /api/stations/:id/lifecycle
+  .route('/api', stationCleanupRoutes);                    // POST /api/stations/:id/cleanup/{plan,apply}
 
 app.onError((err, c) => {
   const requestId = c.req.header('x-request-id') || crypto.randomUUID();

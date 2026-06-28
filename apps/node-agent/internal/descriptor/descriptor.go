@@ -63,6 +63,30 @@ type Lifecycle interface {
 	Start(key string) error
 }
 
+// CleanItem is a single item returned by CleanPlan.
+// Path is RELATIVE to the station's workspace root so the UI shows clean paths.
+type CleanItem struct {
+	Path string `json:"path"`
+	Size int64  `json:"size"`
+	Kind string `json:"kind"` // "logs" | "cache" | "tmp"
+}
+
+// Cleaner is an OPTIONAL interface that a Descriptor may implement to support
+// disk cleanup. The "cleanup" capability is advertised in Detect output ONLY
+// when the descriptor implements this interface.
+//
+// CleanPlan returns candidate items (relative paths + sizes); the caller
+// presents them for user selection.
+//
+// CleanApply receives the user-selected relative paths, validates each one
+// (re-jail to workspace + intersect with the current plan set), removes the
+// accepted ones, and returns the total bytes freed.  Paths that fail either
+// check are silently skipped (never removed).
+type Cleaner interface {
+	CleanPlan(key string) ([]CleanItem, error)
+	CleanApply(key string, paths []string) (int64, error)
+}
+
 // stopProcess sends SIGTERM to pid, polls up to grace for exit, then SIGKILLs.
 // Returns nil once the process is gone or if it was already absent.
 //

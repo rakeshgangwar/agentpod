@@ -82,7 +82,7 @@ func (c *claudeCodeDescriptor) Detect() ([]Station, error) {
 		return nil, err
 	}
 
-	caps := []string{"health", "logs", "fs.read"}
+	caps := []string{"health", "logs", "fs.read", "cleanup"}
 	var stations []Station
 
 	for _, projPath := range paths {
@@ -398,6 +398,29 @@ func (c *claudeCodeDescriptor) TailLogs(ctx context.Context, key string, follow 
 			}
 		}
 	}
+}
+
+// CleanPlan returns the cleanable items for the Claude Code station.
+// Cleanable: ".cache" and "tmp" subdirectories + *.log files at workspace root.
+func (c *claudeCodeDescriptor) CleanPlan(key string) ([]CleanItem, error) {
+	projPath, err := c.projectPathForKey(key)
+	if err != nil {
+		return nil, err
+	}
+	return cleanPlanCommon(projPath, []string{".cache", "tmp"})
+}
+
+// CleanApply removes selected cleanable paths from the Claude Code workspace.
+func (c *claudeCodeDescriptor) CleanApply(key string, paths []string) (int64, error) {
+	projPath, err := c.projectPathForKey(key)
+	if err != nil {
+		return 0, err
+	}
+	plan, err := c.CleanPlan(key)
+	if err != nil {
+		return 0, err
+	}
+	return cleanApplyCommon(projPath, paths, plan)
 }
 
 // collectJsonlFiles walks dir and returns paths of all .jsonl files.
