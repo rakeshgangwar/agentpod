@@ -211,15 +211,26 @@ export type AppType = typeof app;
 // Export app for testing
 export { app };
 
-// Start sync services for running sandboxes
-console.log('Starting sync services for running sandboxes...');
-startSyncForRunningSandboxes().catch((error) => {
-  console.error('Failed to start sync services:', error);
-});
+// Start sync services for running sandboxes.
+// OpenCode-era sandbox sync (pulls in native deps like ssh2). The fleet console
+// does not use it; gate behind ENABLE_OPENCODE_SYNC so it can be turned off on
+// deployments without OpenCode sandboxes.
+if (process.env.ENABLE_OPENCODE_SYNC !== 'false') {
+  console.log('Starting sync services for running sandboxes...');
+  startSyncForRunningSandboxes().catch((error) => {
+    console.error('Failed to start sync services:', error);
+  });
+} else {
+  console.log('OpenCode sandbox sync disabled (ENABLE_OPENCODE_SYNC=false)');
+}
 
-// Start activity archival service (runs daily at 3 AM)
-console.log('Starting activity archival service...');
-startArchivalService();
+// Start activity archival service (runs daily at 3 AM).
+if (process.env.ENABLE_ACTIVITY_ARCHIVAL !== 'false') {
+  console.log('Starting activity archival service...');
+  startArchivalService();
+} else {
+  console.log('Activity archival disabled (ENABLE_ACTIVITY_ARCHIVAL=false)');
+}
 
 // Handle graceful shutdown
 process.on('SIGINT', () => {
