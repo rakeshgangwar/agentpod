@@ -6,6 +6,7 @@ export const Station = z.object({
   key: z.string().min(1), harness: z.string().min(1), kind: StationKind,
   displayName: z.string(), parentKey: z.string().nullable(),
   workspacePath: z.string().nullable(), capabilities: z.array(Capability),
+  matrixId: z.string().nullable().optional(),
 });
 export type Station = z.infer<typeof Station>;
 export const DetectedStation = Station.extend({ adopted: z.boolean() });
