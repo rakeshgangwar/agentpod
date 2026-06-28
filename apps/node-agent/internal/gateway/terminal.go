@@ -8,6 +8,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/rakeshgangwar/agentpod/node-agent/internal/fsops"
 	"github.com/rakeshgangwar/agentpod/node-agent/internal/terminal"
 )
 
@@ -70,6 +71,14 @@ func (h *terminalHandler) Handle(
 		return h.handleTermAttach(ctx, params, emit)
 	case "term.close":
 		return h.handleTermClose(params)
+	case "fs.write":
+		return h.handleFsWrite(params)
+	case "fs.mkdir":
+		return h.handleFsMkdir(params)
+	case "fs.move":
+		return h.handleFsMove(params)
+	case "fs.delete":
+		return h.handleFsDelete(params)
 	default:
 		return h.inner.Handle(ctx, verb, params, emit)
 	}
@@ -182,6 +191,93 @@ func (h *terminalHandler) handleTermClose(params json.RawMessage) (any, bool, er
 		return nil, false, fmt.Errorf("term.close: %w", err)
 	}
 
+	return map[string]any{"ok": true}, false, nil
+}
+
+// handleFsWrite resolves the workspace for key and writes content to path,
+// returning {bytesWritten, backupPath?}.
+func (h *terminalHandler) handleFsWrite(params json.RawMessage) (any, bool, error) {
+	var p struct {
+		Key      string `json:"key"`
+		Path     string `json:"path"`
+		Content  string `json:"content"`
+		Encoding string `json:"encoding"`
+		Backup   bool   `json:"backup"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, false, fmt.Errorf("fs.write: bad params: %w", err)
+	}
+	workspace, err := h.resolver.Workspace(p.Key)
+	if err != nil {
+		return nil, false, fmt.Errorf("fs.write: workspace: %w", err)
+	}
+	n, backupPath, err := fsops.Write(workspace, p.Path, p.Content, p.Encoding, p.Backup)
+	if err != nil {
+		return nil, false, fmt.Errorf("fs.write: %w", err)
+	}
+	result := map[string]any{"bytesWritten": n}
+	if backupPath != "" {
+		result["backupPath"] = backupPath
+	}
+	return result, false, nil
+}
+
+// handleFsMkdir resolves the workspace for key and creates the directory at path.
+func (h *terminalHandler) handleFsMkdir(params json.RawMessage) (any, bool, error) {
+	var p struct {
+		Key  string `json:"key"`
+		Path string `json:"path"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, false, fmt.Errorf("fs.mkdir: bad params: %w", err)
+	}
+	workspace, err := h.resolver.Workspace(p.Key)
+	if err != nil {
+		return nil, false, fmt.Errorf("fs.mkdir: workspace: %w", err)
+	}
+	if err := fsops.Mkdir(workspace, p.Path); err != nil {
+		return nil, false, fmt.Errorf("fs.mkdir: %w", err)
+	}
+	return map[string]any{"ok": true}, false, nil
+}
+
+// handleFsMove resolves the workspace for key and renames from to to.
+func (h *terminalHandler) handleFsMove(params json.RawMessage) (any, bool, error) {
+	var p struct {
+		Key  string `json:"key"`
+		From string `json:"from"`
+		To   string `json:"to"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, false, fmt.Errorf("fs.move: bad params: %w", err)
+	}
+	workspace, err := h.resolver.Workspace(p.Key)
+	if err != nil {
+		return nil, false, fmt.Errorf("fs.move: workspace: %w", err)
+	}
+	if err := fsops.Move(workspace, p.From, p.To); err != nil {
+		return nil, false, fmt.Errorf("fs.move: %w", err)
+	}
+	return map[string]any{"ok": true}, false, nil
+}
+
+// handleFsDelete resolves the workspace for key and deletes path.
+func (h *terminalHandler) handleFsDelete(params json.RawMessage) (any, bool, error) {
+	var p struct {
+		Key       string `json:"key"`
+		Path      string `json:"path"`
+		Recursive bool   `json:"recursive"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, false, fmt.Errorf("fs.delete: bad params: %w", err)
+	}
+	workspace, err := h.resolver.Workspace(p.Key)
+	if err != nil {
+		return nil, false, fmt.Errorf("fs.delete: workspace: %w", err)
+	}
+	if err := fsops.Delete(workspace, p.Path, p.Recursive); err != nil {
+		return nil, false, fmt.Errorf("fs.delete: %w", err)
+	}
 	return map[string]any{"ok": true}, false, nil
 }
 
