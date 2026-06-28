@@ -110,12 +110,25 @@ func (o *openCodeDescriptor) Detect() ([]Station, error) {
 	}
 
 	caps := []string{"health", "logs", "fs.read", "fs.write", "terminal", "cleanup"}
+	seen := make(map[string]bool)
 	var stations []Station
 
 	for _, projPath := range paths {
 		if _, err := os.Stat(projPath); os.IsNotExist(err) {
 			continue // project directory was deleted
 		}
+		// Deduplicate by resolved absolute workspace path so that multiple DB
+		// rows pointing at the same directory (e.g. periscope-workspace) or a
+		// DB-row/dir-fallback overlap never produce duplicate stations.
+		resolved, err := filepath.EvalSymlinks(projPath)
+		if err != nil {
+			resolved = projPath
+		}
+		if seen[resolved] {
+			continue
+		}
+		seen[resolved] = true
+
 		key := openCodeProjectKey(projPath)
 		wsCopy := projPath
 		stations = append(stations, Station{

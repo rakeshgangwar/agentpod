@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -367,5 +368,82 @@ func TestOpenCodeTailLogs_NoLogDir_EmitsNothing(t *testing.T) {
 	}
 	if count != 0 {
 		t.Errorf("expected 0 chunks when log dir absent, got %d", count)
+	}
+}
+
+// --- DB primary path + deduplication ---
+
+// TestOpenCodeDetect_DBPrimary exercises the projectPathsFromDB (primary) code
+// path and Fix 1 (dedup by workspace path). It creates a minimal opencode.db
+// via the sqlite3 CLI and asserts:
+//   - the "global" row is excluded
+//   - a row whose worktree is an existing temp dir appears exactly once
+//   - two rows sharing the same worktree are collapsed to a single station
+//
+// If sqlite3 is not on PATH the test is skipped (matches graceful-fallback
+// semantics — the suite must not fail on machines without sqlite3).
+func TestOpenCodeDetect_DBPrimary(t *testing.T) {
+	if _, err := exec.LookPath("sqlite3"); err != nil {
+		t.Skip("sqlite3 not on PATH; skipping DB primary path test")
+	}
+
+	root := t.TempDir()
+	dataDir := filepath.Join(root, "opencode")
+
+	// project/ dir must exist for Detect() to proceed.
+	projsDir := filepath.Join(dataDir, "project")
+	if err := os.MkdirAll(projsDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll projsDir: %v", err)
+	}
+
+	// A real workspace directory that will be referenced by two DB rows.
+	realWorkspace := filepath.Join(root, "periscope-workspace")
+	if err := os.MkdirAll(realWorkspace, 0o755); err != nil {
+		t.Fatalf("MkdirAll realWorkspace: %v", err)
+	}
+
+	// Build opencode.db with the same schema the production query expects:
+	// table "project", columns "id" and "worktree".
+	// Rows inserted:
+	//   global  → must be excluded by WHERE id != 'global'
+	//   proj1   → realWorkspace (must appear)
+	//   proj2   → realWorkspace again (must be deduped; Fix 1)
+	dbPath := filepath.Join(dataDir, "opencode.db")
+	setupSQL := strings.Join([]string{
+		`CREATE TABLE project (id TEXT PRIMARY KEY, worktree TEXT NOT NULL);`,
+		`INSERT INTO project VALUES ('global', '/some/global/path');`,
+		`INSERT INTO project VALUES ('proj1', '` + realWorkspace + `');`,
+		`INSERT INTO project VALUES ('proj2', '` + realWorkspace + `');`,
+	}, "\n")
+
+	cmd := exec.Command("sqlite3", dbPath, setupSQL)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("sqlite3 db setup failed: %v\n%s", err, out)
+	}
+
+	d := NewOpenCode(dataDir)
+	stations, err := d.Detect()
+	if err != nil {
+		t.Fatalf("Detect: %v", err)
+	}
+
+	// global excluded; proj1 and proj2 share the same worktree → 1 station.
+	if len(stations) != 1 {
+		t.Fatalf("expected exactly 1 station (global excluded, duplicate collapsed), got %d: %+v", len(stations), stations)
+	}
+
+	s := stations[0]
+	if s.WorkspacePath == nil || *s.WorkspacePath != realWorkspace {
+		t.Errorf("workspacePath: want %q, got %v", realWorkspace, s.WorkspacePath)
+	}
+	wantKey := expectedOpenCodeKey(realWorkspace)
+	if s.Key != wantKey {
+		t.Errorf("key: want %q, got %q", wantKey, s.Key)
+	}
+	if s.Harness != "opencode" {
+		t.Errorf("harness: want opencode, got %q", s.Harness)
+	}
+	if s.Kind != "leaf" {
+		t.Errorf("kind: want leaf, got %q", s.Kind)
 	}
 }
