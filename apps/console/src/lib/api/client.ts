@@ -125,6 +125,23 @@ export const lifecycle = (stationId: string, action: "start" | "stop" | "restart
     body: JSON.stringify({ action }),
   });
 
+// ─── Activity / audit-log endpoints ──────────────────────────────────────────
+
+export type StationAuditRow = {
+  id: string;
+  userId: string;
+  nodeId: string;
+  stationKey: string;
+  verb: string;
+  paramsSummary: string | null;
+  result: string;
+  error: string | null;
+  createdAt: string | Date;
+};
+
+export const activity = (stationId: string) =>
+  http<StationAuditRow[]>(`/api/stations/${stationId}/activity`);
+
 // ─── Cleanup endpoints ────────────────────────────────────────────────────────
 
 export type CleanupItem = { path: string; size: number; kind: string };

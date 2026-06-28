@@ -7,13 +7,14 @@
   import ConfigEditor from "$lib/components/stations/ConfigEditor.svelte";
   import Terminal from "$lib/components/stations/Terminal.svelte";
   import CleanupPanel from "$lib/components/stations/CleanupPanel.svelte";
+  import ActivityPanel from "$lib/components/stations/ActivityPanel.svelte";
   import { listStations } from "$lib/api/client";
   import type { StationRow } from "$lib/api/client";
 
   const nodeId = $derived($page.params.id as string);
   const stationId = $derived($page.params.stationId as string);
 
-  type Tab = "health" | "logs" | "files" | "terminal" | "cleanup";
+  type Tab = "health" | "logs" | "files" | "terminal" | "cleanup" | "activity";
   let activeTab = $state<Tab>("health");
 
   let station = $state<StationRow | null>(null);
@@ -94,6 +95,13 @@
         Cleanup
       </button>
     {/if}
+    <button
+      type="button"
+      class="tab-btn {activeTab === 'activity' ? 'active' : ''}"
+      onclick={() => (activeTab = "activity")}
+    >
+      Activity
+    </button>
   </nav>
 
   <!-- Panel content -->
@@ -119,6 +127,10 @@
     {:else if activeTab === "cleanup" && hasCleanup}
       <div class="cleanup-wrap">
         <CleanupPanel {stationId} />
+      </div>
+    {:else if activeTab === "activity"}
+      <div class="activity-wrap">
+        <ActivityPanel {stationId} />
       </div>
     {/if}
   </div>
@@ -228,6 +240,10 @@
   }
 
   .cleanup-wrap {
+    min-height: 200px;
+  }
+
+  .activity-wrap {
     min-height: 200px;
   }
 </style>
