@@ -43,6 +43,7 @@ export const stationActivityRoutes = new Hono().get(
       .from(stationAudit)
       .where(
         and(
+          eq(stationAudit.userId, user.id),
           eq(stationAudit.nodeId, station.nodeId),
           eq(stationAudit.stationKey, station.stationKey)
         )

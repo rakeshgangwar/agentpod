@@ -115,7 +115,7 @@ export const stationTerminalRoutes = new Hono().get(
         if (!openResult.ok) {
           ws.send(JSON.stringify({ t: "exit" }));
           ws.close(1011, openResult.error ?? "term.open failed");
-          await auditDone("error", openResult.error);
+          await auditDone("error", openResult.error).catch(() => {});
           auditDone = null;
           return;
         }
