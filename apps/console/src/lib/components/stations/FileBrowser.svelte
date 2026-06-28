@@ -13,7 +13,9 @@
     FilePlus,
     FolderPlus,
     Pencil,
+    MoreHorizontal,
   } from "@lucide/svelte";
+  import { Button } from "$lib/components/ui/button";
   import TypeToConfirmDialog from "$lib/components/ui/TypeToConfirmDialog.svelte";
   import ConfirmDialog from "$lib/components/ui/ConfirmDialog.svelte";
 
@@ -249,35 +251,37 @@
   }
 </script>
 
-<div class="flex h-full min-h-[300px] border border-border rounded-md overflow-hidden">
+<div class="flex h-full min-h-[300px] border border-border rounded-md overflow-hidden bg-background">
   <!-- ── Tree pane ── -->
-  <div class="w-60 shrink-0 overflow-y-auto border-r border-border bg-muted/20 flex flex-col">
+  <div class="w-60 shrink-0 overflow-y-auto border-r border-border bg-muted/10 flex flex-col">
     <!-- Write toolbar (always rendered when canWrite so tests can find buttons) -->
     {#if canWrite}
-      <div class="flex shrink-0 items-center gap-1 border-b border-border px-2 py-1">
-        <button
-          type="button"
-          class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[12px] font-medium hover:bg-muted/60"
+      <div class="flex shrink-0 items-center gap-1 border-b border-border/60 px-2 py-1.5 bg-muted/5">
+        <Button
+          variant="ghost"
+          size="sm"
+          class="h-7 gap-1 px-2 text-[12px] font-medium text-muted-foreground hover:text-foreground"
           onclick={() => { newItemMode = "file"; newItemName = ""; }}
           title="New File"
         >
           <FilePlus class="h-3.5 w-3.5" />
           New File
-        </button>
-        <button
-          type="button"
-          class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[12px] font-medium hover:bg-muted/60"
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          class="h-7 gap-1 px-2 text-[12px] font-medium text-muted-foreground hover:text-foreground"
           onclick={() => { newItemMode = "dir"; newItemName = ""; }}
           title="New Folder"
         >
           <FolderPlus class="h-3.5 w-3.5" />
           New Folder
-        </button>
+        </Button>
       </div>
 
       <!-- Inline create input -->
       {#if newItemMode !== null}
-        <div class="shrink-0 px-2 py-1 border-b border-border">
+        <div class="shrink-0 px-2 py-1.5 border-b border-border/60 bg-muted/5">
           <input
             type="text"
             class="h-7 w-full rounded border border-input bg-background px-2 text-[13px] font-mono outline-none focus:border-ring"
@@ -304,13 +308,13 @@
             <!-- Row wrapper: holds the entry button + optional action buttons -->
             <div
               class="group flex items-center w-full rounded-sm
-                {entry.path === selectedPath ? 'bg-accent text-accent-foreground' : 'hover:bg-muted/50 text-foreground'}"
-              style:padding-left="{depth * 16 + 8}px"
+                {entry.path === selectedPath ? 'bg-primary/10 text-primary' : 'hover:bg-muted/30 text-foreground'}"
+              style:padding-left="{depth * 16 + 4}px"
             >
               <!-- Main entry button -->
               <button
                 type="button"
-                class="flex flex-1 items-center gap-1 py-1 text-[13px] font-mono text-left pr-1"
+                class="flex flex-1 items-center gap-1.5 py-1.5 text-[13px] font-mono text-left pr-1 pl-1 min-w-0"
                 onclick={() => handleEntryClick(entry)}
               >
                 {#if entry.type === "dir"}
@@ -333,7 +337,7 @@
                 {:else}
                   <span class="w-4 shrink-0"></span>
                   <span class="flex items-center justify-center w-4 shrink-0">
-                    <FileText class="h-3.5 w-3.5 text-muted-foreground" />
+                    <FileText class="h-3.5 w-3.5 text-muted-foreground/70" />
                   </span>
                 {/if}
                 <span class="truncate">{entry.name}</span>
@@ -350,29 +354,31 @@
                     autofocus
                   />
                 {:else}
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
                     aria-label="Rename {entry.name}"
-                    class="mr-0.5 flex shrink-0 items-center justify-center rounded p-0.5 text-muted-foreground opacity-0 hover:bg-muted/60 hover:text-foreground focus:opacity-100 group-hover:opacity-100"
-                    onclick={(e) => {
+                    class="mr-0.5 h-6 w-6 shrink-0 text-muted-foreground opacity-0 hover:text-foreground focus:opacity-100 group-hover:opacity-100"
+                    onclick={(e: MouseEvent) => {
                       e.stopPropagation();
                       renameTarget = entry;
                       renameName = entry.name;
                     }}
                   >
                     <Pencil class="h-3 w-3" />
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
                     aria-label="Delete {entry.name}"
-                    class="mr-1 flex shrink-0 items-center justify-center rounded p-0.5 text-muted-foreground opacity-0 hover:bg-destructive/10 hover:text-destructive focus:opacity-100 group-hover:opacity-100"
-                    onclick={(e) => {
+                    class="mr-1 h-6 w-6 shrink-0 text-muted-foreground opacity-0 hover:text-destructive focus:opacity-100 group-hover:opacity-100"
+                    onclick={(e: MouseEvent) => {
                       e.stopPropagation();
                       deleteTarget = entry;
                     }}
                   >
                     <Trash2 class="h-3 w-3" />
-                  </button>
+                  </Button>
                 {/if}
               {/if}
             </div>
@@ -396,7 +402,7 @@
   {#if selectedPath !== null}
     <div class="flex flex-col flex-1 overflow-hidden">
       <!-- Pane header -->
-      <div class="flex items-center gap-3 px-3 py-1.5 border-b border-border bg-muted/20 text-xs font-mono shrink-0">
+      <div class="flex items-center gap-3 px-3 py-2 border-b border-border/60 bg-muted/5 text-xs font-mono shrink-0">
         <span class="text-foreground truncate">{selectedPath}</span>
         {#if fileTruncated && !editMode}
           <span class="shrink-0 rounded border border-destructive/30 bg-destructive/10 px-1.5 py-0.5 text-[11px] text-destructive">
@@ -405,21 +411,23 @@
         {/if}
         {#if canWrite && fileContent !== null && !editMode}
           <div class="ml-auto flex shrink-0 items-center gap-1.5">
-            <button
-              type="button"
-              class="rounded border border-input bg-background px-2 py-0.5 text-[11px] font-sans hover:bg-muted/60"
+            <Button
+              variant="outline"
+              size="sm"
+              class="h-7 px-2 text-[11px] font-sans"
               onclick={startEdit}
             >
               Edit
-            </button>
+            </Button>
             {#if onOpenConfigEditor}
-              <button
-                type="button"
-                class="rounded border border-input bg-background px-2 py-0.5 text-[11px] font-sans hover:bg-muted/60"
+              <Button
+                variant="outline"
+                size="sm"
+                class="h-7 px-2 text-[11px] font-sans"
                 onclick={() => onOpenConfigEditor!(selectedPath!)}
               >
                 Edit (diff)
-              </button>
+              </Button>
             {/if}
           </div>
         {/if}
@@ -428,21 +436,23 @@
             {#if saveError}
               <span class="text-[11px] text-destructive">{saveError}</span>
             {/if}
-            <button
-              type="button"
-              class="rounded border border-input bg-background px-2 py-0.5 text-[11px] font-sans hover:bg-muted/60"
+            <Button
+              variant="outline"
+              size="sm"
+              class="h-7 px-2 text-[11px] font-sans"
               onclick={cancelEdit}
             >
               Cancel
-            </button>
-            <button
-              type="button"
-              class="rounded border border-primary bg-primary px-2 py-0.5 text-[11px] font-sans text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              class="h-7 px-2 text-[11px] font-sans"
               disabled={isSaving}
               onclick={() => (showSaveConfirm = true)}
             >
               {isSaving ? "Saving…" : "Save"}
-            </button>
+            </Button>
           </div>
         {/if}
       </div>
@@ -458,10 +468,7 @@
           bind:value={editContent}
         ></textarea>
       {:else if fileContent !== null}
-        <!-- Code preview: plain <pre> for testability.
-             vite-plugin-svelte@5 + vite@6 fails CSS preprocessing in jsdom
-             for components that have <style> blocks (code-block.svelte).
-             The station page wraps this in CodeBlock for Shiki highlighting. -->
+        <!-- Code preview: plain <pre> for testability. -->
         <pre
           class="flex-1 overflow-auto m-0 p-3 font-mono text-[13px] leading-relaxed whitespace-pre-wrap break-all bg-transparent text-foreground"
         >{fileContent}</pre>

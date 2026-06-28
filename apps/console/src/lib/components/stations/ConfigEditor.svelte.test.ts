@@ -1,6 +1,17 @@
 import { test, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, waitFor, fireEvent, cleanup } from "@testing-library/svelte";
 import * as api from "$lib/api/client";
+
+// Mock the MonacoEditor with a textarea stub so jsdom tests can drive the buffer.
+// The stub renders a plain textarea that calls onchange on input — matching
+// the interface expected by ConfigEditor.
+vi.mock("$lib/components/ui/monaco-editor", async () => {
+  const { default: MonacoEditorStub } = await import(
+    "../ui/monaco-editor/monaco-editor.stub.svelte"
+  );
+  return { MonacoEditor: MonacoEditorStub };
+});
+
 // Static import so Svelte compiles the component during file collection,
 // avoiding a long compilation delay inside the first waitFor window.
 import ConfigEditor from "./ConfigEditor.svelte";
@@ -8,7 +19,7 @@ import ConfigEditor from "./ConfigEditor.svelte";
 beforeEach(() => vi.restoreAllMocks());
 afterEach(cleanup);
 
-test("ConfigEditor: loads file content into textarea and Save is disabled when unchanged", async () => {
+test("ConfigEditor: loads file content into editor and Save is disabled when unchanged", async () => {
   vi.spyOn(api, "readFile").mockResolvedValue({ content: "line1\nline2\n", truncated: false });
 
   const { getByRole } = render(ConfigEditor, {
