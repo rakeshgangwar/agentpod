@@ -1,5 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { ProvisionRequest, ProvisionedRuntime } from "./runtime";
+import { RuntimeHarness } from "./runtime";
 
 describe("ProvisionRequest", () => {
   it("applies default resourceTier=small when omitted", () => {
@@ -16,6 +17,22 @@ describe("ProvisionRequest", () => {
   });
 });
 
+describe("ProvisionRequest harness", () => {
+  it("applies default harness=none when omitted", () => {
+    const result = ProvisionRequest.parse({ provider: "docker", name: "x" });
+    expect(result.harness).toBe("none");
+  });
+
+  it("accepts harness=opencode", () => {
+    const result = ProvisionRequest.parse({ provider: "docker", name: "x", harness: "opencode" });
+    expect(result.harness).toBe("opencode");
+  });
+
+  it("throws for an invalid harness value", () => {
+    expect(() => ProvisionRequest.parse({ provider: "docker", name: "x", harness: "bogus" })).toThrow();
+  });
+});
+
 describe("ProvisionedRuntime", () => {
   const valid = {
     id: "rt-1",
@@ -26,6 +43,7 @@ describe("ProvisionedRuntime", () => {
     nodeId: "node-1",
     name: "box1",
     resourceTier: "small",
+    harness: "opencode",
     createdAt: "2026-06-29T00:00:00.000Z",
     updatedAt: "2026-06-29T00:00:00.000Z",
   };
@@ -36,6 +54,7 @@ describe("ProvisionedRuntime", () => {
     expect(result.provider).toBe("docker");
     expect(result.status).toBe("provisioning");
     expect(result.resourceTier).toBe("small");
+    expect(result.harness).toBe("opencode");
   });
 
   it("accepts null for externalId and nodeId", () => {
