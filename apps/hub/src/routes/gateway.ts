@@ -17,6 +17,7 @@ import { setNodeStatus } from "../services/node-registry";
 import { connectionManager } from "../services/connection-manager";
 import { handleNodeMessage, dropNode } from "../services/broker";
 import { upgradeWebSocket } from "../ws";
+import { autoAdoptProvisionedHarness } from "../services/runtime-autoadopt";
 
 // Node connects with `Authorization: Bearer <nodeId>:<nodeSecret>`.
 export const gatewayRoutes = new Hono().get(
@@ -42,6 +43,19 @@ export const gatewayRoutes = new Hono().get(
         authed = nodeId;
         connectionManager.register(nodeId, (m) => ws.send(JSON.stringify(m)));
         await setNodeStatus(nodeId, "online");
+
+        // Auto-adopt provisioned harness station once the node can answer detect.
+        // Fire-and-forget with retries — never blocks or throws into the gateway.
+        void (async () => {
+          for (const delay of [1500, 4000, 9000]) {
+            await new Promise((res) => setTimeout(res, delay));
+            try {
+              await autoAdoptProvisionedHarness(nodeId);
+            } catch {
+              // autoAdoptProvisionedHarness never throws, but guard anyway.
+            }
+          }
+        })();
       },
 
       async onMessage(evt, _ws) {
