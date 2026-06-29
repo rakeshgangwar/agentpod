@@ -1,4 +1,4 @@
-import type { NodeSummary, DetectedStation, StationHealth, FsEntry } from "@agentpod/contract";
+import type { NodeSummary, DetectedStation, StationHealth, FsEntry, ProvisionedRuntime } from "@agentpod/contract";
 
 /** Resolves the hub base URL at call time so it reflects the runtime connection. */
 function hubUrl(): string {
@@ -16,6 +16,29 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
 // ─── Node endpoints ───────────────────────────────────────────────────────────
 
 export const listNodes = () => http<NodeSummary[]>("/api/nodes");
+
+// ─── Runtime endpoints ────────────────────────────────────────────────────────
+
+export const provisionRuntime = (req: { provider: string; name: string; resourceTier: string }) =>
+  http<ProvisionedRuntime>("/api/runtimes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+
+export const listRuntimes = () => http<ProvisionedRuntime[]>("/api/runtimes");
+
+export const listRuntimeProviders = () =>
+  http<{ providers: string[] }>("/api/runtimes/providers");
+
+export const destroyRuntime = (id: string) =>
+  http<void>(`/api/runtimes/${id}`, { method: "DELETE" });
+
+export const startRuntime = (id: string) =>
+  http<void>(`/api/runtimes/${id}/start`, { method: "POST" });
+
+export const stopRuntime = (id: string) =>
+  http<void>(`/api/runtimes/${id}/stop`, { method: "POST" });
 export const createEnrollmentToken = () =>
   http<{ token: string; expiresAt: string }>("/api/enrollment-tokens", { method: "POST" });
 

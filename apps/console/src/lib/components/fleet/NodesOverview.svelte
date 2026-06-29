@@ -1,13 +1,15 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { listNodes, createEnrollmentToken } from "$lib/api/client";
-  import type { NodeSummary } from "@agentpod/contract";
+  import { listNodes, createEnrollmentToken, listRuntimes, listRuntimeProviders } from "$lib/api/client";
+  import type { NodeSummary, ProvisionedRuntime } from "@agentpod/contract";
   import * as Card from "$lib/components/ui/card";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import ServerIcon from "@lucide/svelte/icons/server";
   import PlusIcon from "@lucide/svelte/icons/plus";
+  import Loader2Icon from "@lucide/svelte/icons/loader-2";
+  import NewRuntimeDialog from "./NewRuntimeDialog.svelte";
 
   let nodes = $state<NodeSummary[]>([]);
   let isLoading = $state(true);
@@ -16,20 +18,58 @@
   let isMinting = $state(false);
   let mintError = $state<string | null>(null);
 
+  // Runtime provisioning state
+  let runtimes = $state<ProvisionedRuntime[]>([]);
+  let providers = $state<string[]>(["docker", "cloudflare"]);
+  let showNewRuntimeDialog = $state(false);
+
+  // Provisioning runtimes: status==="provisioning" with no matching online node yet
+  let provisioningRuntimes = $derived(
+    runtimes.filter(
+      (r) =>
+        r.status === "provisioning" &&
+        !nodes.some((n) => n.id === r.nodeId && n.status === "online")
+    )
+  );
+
   function resolvedHubUrl(): string {
     const stored =
       typeof window !== "undefined" ? window.localStorage.getItem("agentpod.apiUrl") : null;
     return stored ?? import.meta.env.PUBLIC_HUB_URL ?? "http://localhost:3001";
   }
 
-  onMount(async () => {
+  async function loadData() {
     try {
-      nodes = await listNodes();
-    } catch (e) {
-      error = e instanceof Error ? e.message : "Failed to load nodes";
+      const [nodesResult, runtimesResult] = await Promise.allSettled([
+        listNodes(),
+        listRuntimes(),
+      ]);
+      if (nodesResult.status === "fulfilled") {
+        nodes = nodesResult.value;
+      } else {
+        error =
+          nodesResult.reason instanceof Error
+            ? nodesResult.reason.message
+            : "Failed to load nodes";
+      }
+      if (runtimesResult.status === "fulfilled") {
+        runtimes = runtimesResult.value;
+      }
+      // runtimes failing is non-fatal — keep the previous value
     } finally {
       isLoading = false;
     }
+  }
+
+  onMount(async () => {
+    // Fetch enabled providers; fall back to defaults on failure
+    try {
+      const res = await listRuntimeProviders();
+      if (res.providers.length > 0) providers = res.providers;
+    } catch {
+      // keep fallback ["docker", "cloudflare"]
+    }
+    await loadData();
   });
 
   async function handleCreateToken() {
@@ -44,6 +84,12 @@
       isMinting = false;
     }
   }
+
+  async function handleRuntimeCreated() {
+    isLoading = true;
+    showNewRuntimeDialog = false;
+    await loadData();
+  }
 </script>
 
 <section class="space-y-6">
@@ -53,11 +99,25 @@
       <h2 class="text-2xl font-bold tracking-tight">Fleet Overview</h2>
       <p class="text-sm text-muted-foreground font-mono">// connected nodes</p>
     </div>
-    <div class="flex flex-col items-start sm:items-end gap-1">
-      <Button onclick={handleCreateToken} disabled={isMinting} class="font-mono text-xs uppercase tracking-wider w-full sm:w-auto">
-        <PlusIcon class="h-4 w-4 mr-2" />
-        {isMinting ? "Creating…" : "Create enrollment token"}
-      </Button>
+    <div class="flex flex-col items-start sm:items-end gap-2">
+      <div class="flex gap-2 flex-wrap justify-end">
+        <Button
+          onclick={() => (showNewRuntimeDialog = true)}
+          variant="outline"
+          class="font-mono text-xs uppercase tracking-wider w-full sm:w-auto"
+        >
+          <PlusIcon class="h-4 w-4 mr-2" />
+          New runtime
+        </Button>
+        <Button
+          onclick={handleCreateToken}
+          disabled={isMinting}
+          class="font-mono text-xs uppercase tracking-wider w-full sm:w-auto"
+        >
+          <PlusIcon class="h-4 w-4 mr-2" />
+          {isMinting ? "Creating…" : "Create enrollment token"}
+        </Button>
+      </div>
       {#if mintError}<p class="text-xs text-destructive">{mintError}</p>{/if}
     </div>
   </div>
@@ -86,8 +146,8 @@
       <p class="text-sm font-mono text-destructive">{error}</p>
     </div>
 
-  <!-- Empty state -->
-  {:else if nodes.length === 0}
+  <!-- Empty state: no nodes and no provisioning runtimes -->
+  {:else if nodes.length === 0 && provisioningRuntimes.length === 0}
     <div class="cyber-card p-12 text-center">
       <ServerIcon class="w-12 h-12 mx-auto mb-4 text-muted-foreground/40" />
       <h3 class="text-lg font-semibold mb-1">No nodes yet</h3>
@@ -96,11 +156,37 @@
       </p>
     </div>
 
-  <!-- Node cards grid -->
+  <!-- Node cards + provisioning cards grid -->
   {:else}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <!-- Provisioning cards (runtimes that are still spinning up) -->
+      {#each provisioningRuntimes as rt (rt.id)}
+        <Card.Root class="h-full border-[var(--cyber-cyan)]/30 bg-[var(--cyber-cyan)]/5">
+          <Card.Header>
+            <div class="flex items-start justify-between gap-2">
+              <Card.Title class="font-mono text-sm leading-tight truncate">
+                {rt.name}
+              </Card.Title>
+              <Badge variant="secondary" class="shrink-0 gap-1.5">
+                <Loader2Icon class="h-3 w-3 animate-spin" />
+                provisioning
+              </Badge>
+            </div>
+          </Card.Header>
+          <Card.Content class="space-y-1">
+            <p class="text-sm font-mono text-muted-foreground">
+              {rt.provider} · {rt.resourceTier}
+            </p>
+          </Card.Content>
+        </Card.Root>
+      {/each}
+
+      <!-- Online / offline node cards -->
       {#each nodes as node (node.id)}
-        <a href="/nodes/{node.id}" class="block group focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cyber-cyan)] rounded-xl">
+        <a
+          href="/nodes/{node.id}"
+          class="block group focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cyber-cyan)] rounded-xl"
+        >
           <Card.Root class="h-full transition-colors group-hover:border-[var(--cyber-cyan)]/50">
             <Card.Header>
               <div class="flex items-start justify-between gap-2">
@@ -131,3 +217,11 @@
     </div>
   {/if}
 </section>
+
+<!-- New runtime provisioning dialog -->
+<NewRuntimeDialog
+  open={showNewRuntimeDialog}
+  {providers}
+  onClose={() => (showNewRuntimeDialog = false)}
+  onCreated={handleRuntimeCreated}
+/>
