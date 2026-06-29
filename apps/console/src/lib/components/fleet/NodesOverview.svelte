@@ -154,7 +154,7 @@
   {#if lastToken}
     <div class="cyber-card p-4 space-y-2">
       <p class="text-xs font-mono text-muted-foreground">// run this on the target node to connect it</p>
-      <code class="block text-sm font-mono break-all text-[var(--cyber-cyan)]">
+      <code class="block text-sm font-mono break-all text-primary">
         curl -fsSL https://github.com/rakeshgangwar/agentpod/releases/latest/download/install.sh | sudo bash -s -- {resolvedHubUrl()} {lastToken}
       </code>
     </div>
@@ -183,7 +183,7 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       <!-- Provisioning cards (runtimes that are still spinning up) -->
       {#each provisioningRuntimes as rt (rt.id)}
-        <Card.Root class="h-full border-[var(--cyber-cyan)]/30 bg-[var(--cyber-cyan)]/5">
+        <Card.Root class="h-full border-primary/30 bg-primary/5">
           <Card.Header>
             <div class="flex items-start justify-between gap-2">
               <Card.Title class="font-mono text-sm leading-tight truncate">
@@ -202,7 +202,7 @@
             {#if rt.harness && rt.harness !== "none"}
               <Badge
                 variant="outline"
-                class="font-mono text-[10px] border-[var(--cyber-cyan)]/40 text-[var(--cyber-cyan)]"
+                class="font-mono text-[10px] border-primary/40 text-primary"
               >
                 {rt.harness}
               </Badge>
@@ -215,9 +215,9 @@
       {#each nodes as node (node.id)}
         <a
           href="/nodes/{node.id}"
-          class="block group focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cyber-cyan)] rounded-xl"
+          class="block group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-xl"
         >
-          <Card.Root class="h-full transition-colors group-hover:border-[var(--cyber-cyan)]/50">
+          <Card.Root class="h-full transition-colors group-hover:border-primary/50">
             <Card.Header>
               <div class="flex items-start justify-between gap-2">
                 <Card.Title class="font-mono text-sm leading-tight truncate">
@@ -226,7 +226,7 @@
                 <Badge
                   variant={node.status === "online" ? "default" : "secondary"}
                   class={node.status === "online"
-                    ? "shrink-0 bg-[var(--cyber-emerald)] text-black border-transparent"
+                    ? "shrink-0 bg-chart-2 text-black border-transparent"
                     : "shrink-0"}
                 >
                   {node.status}
@@ -243,7 +243,7 @@
               {#if node.provisioned}
                 <Badge
                   variant="outline"
-                  class="font-mono text-[10px] border-[var(--cyber-cyan)]/40 text-[var(--cyber-cyan)]"
+                  class="font-mono text-[10px] border-primary/40 text-primary"
                 >
                   provisioned · {node.provisioned.provider}
                 </Badge>

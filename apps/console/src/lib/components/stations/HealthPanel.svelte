@@ -116,7 +116,7 @@
             <Badge
               variant={health.running ? "default" : "secondary"}
               class={health.running
-                ? "bg-[var(--cyber-emerald)] text-[var(--cyber-emerald-foreground)] border-transparent"
+                ? "bg-chart-2 text-chart-2 border-transparent"
                 : ""}
             >
               {health.running ? "Running" : "Stopped"}
@@ -177,7 +177,7 @@
                 href="https://matrix.to/#/{matrixId}"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="text-[var(--cyber-cyan)] hover:underline break-all"
+                class="text-primary hover:underline break-all"
               >{matrixId}</a>
             </dd>
           </div>

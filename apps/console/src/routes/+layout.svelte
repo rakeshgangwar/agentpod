@@ -80,12 +80,12 @@
         <div class="text-center animate-fade-in-up">
           <div class="relative">
             <!-- Outer ring -->
-            <div class="w-16 h-16 rounded-full border-2 border-[var(--cyber-cyan)]/20 mx-auto"></div>
+            <div class="w-16 h-16 rounded-full border-2 border-primary/20 mx-auto"></div>
             <!-- Spinning ring -->
-            <div class="absolute inset-0 w-16 h-16 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] mx-auto animate-spin"></div>
+            <div class="absolute inset-0 w-16 h-16 rounded-full border-2 border-transparent border-t-[var(--primary)] mx-auto animate-spin"></div>
             <!-- Center dot -->
             <div class="absolute inset-0 flex items-center justify-center">
-              <div class="w-2 h-2 rounded-full bg-[var(--cyber-cyan)] animate-pulse-dot"></div>
+              <div class="w-2 h-2 rounded-full bg-primary animate-pulse-dot"></div>
             </div>
           </div>
           <p class="mt-6 text-sm font-mono text-muted-foreground tracking-wider uppercase">

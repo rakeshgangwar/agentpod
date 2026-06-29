@@ -137,13 +137,13 @@
 
   function getSquadColor(squad: AgentSquad): string {
     switch (squad) {
-      case "orchestration": return "var(--cyber-cyan)";
-      case "development": return "var(--cyber-emerald)";
-      case "product": return "var(--cyber-amber)";
-      case "operations": return "var(--cyber-red)";
-      case "security": return "var(--cyber-red)";
-      case "data": return "var(--cyber-cyan)";
-      default: return "var(--cyber-cyan)";
+      case "orchestration": return "var(--primary)";
+      case "development": return "var(--chart-2)";
+      case "product": return "var(--chart-4)";
+      case "operations": return "var(--destructive)";
+      case "security": return "var(--destructive)";
+      case "data": return "var(--primary)";
+      default: return "var(--primary)";
     }
   }
 </script>
@@ -165,7 +165,7 @@
         variant="ghost" 
         size="icon"
         onclick={() => goto("/admin/agents")}
-        class="h-8 w-8 border border-border/30 hover:border-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]"
+        class="h-8 w-8 border border-border/30 hover:border-primary hover:text-primary"
         title="Back to Agents"
       >
         <ArrowLeftIcon class="h-4 w-4" />
@@ -176,7 +176,7 @@
         variant="ghost" 
         size="icon"
         onclick={() => goto("/")}
-        class="h-8 w-8 border border-border/30 hover:border-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]"
+        class="h-8 w-8 border border-border/30 hover:border-primary hover:text-primary"
         title="Home"
       >
         <HomeIcon class="h-4 w-4" />
@@ -190,14 +190,14 @@
       {#if isLoading}
         <div class="flex items-center justify-center py-12">
           <div class="relative w-8 h-8">
-            <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
-            <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
+            <div class="absolute inset-0 rounded-full border-2 border-primary/20"></div>
+            <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--primary)] animate-spin"></div>
           </div>
           <span class="ml-3 text-muted-foreground font-mono text-sm">Loading agent...</span>
         </div>
       {:else if error}
         <div class="cyber-card corner-accent p-6 text-center">
-          <p class="text-[var(--cyber-red)] font-mono text-sm">{error}</p>
+          <p class="text-destructive font-mono text-sm">{error}</p>
           <Button
             variant="outline"
             onclick={() => goto("/admin/agents")}
@@ -213,7 +213,7 @@
               {#if agent.emoji}
                 <span class="text-3xl">{agent.emoji}</span>
               {:else}
-                <div class="w-10 h-10 rounded-full bg-[var(--cyber-cyan)]/20 flex items-center justify-center text-[var(--cyber-cyan)] font-mono text-lg">
+                <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-mono text-lg">
                   {agent.name[0]}
                 </div>
               {/if}
@@ -393,8 +393,8 @@
 
           <div class="cyber-card corner-accent p-6 space-y-6">
             <div class="flex items-center gap-3 pb-4 border-b border-border/30">
-              <div class="w-10 h-10 rounded-full bg-[var(--cyber-emerald)]/20 flex items-center justify-center">
-                <BotIcon class="h-5 w-5 text-[var(--cyber-emerald)]" />
+              <div class="w-10 h-10 rounded-full bg-chart-2/20 flex items-center justify-center">
+                <BotIcon class="h-5 w-5 text-chart-2" />
               </div>
               <div>
                 <h2 class="text-lg font-bold font-mono">Agent Definition</h2>
@@ -420,7 +420,7 @@
         {#if agent.config && Object.keys(agent.config).length > 0}
           <div class="cyber-card corner-accent p-6 space-y-4">
             <div class="flex items-center gap-3 pb-4 border-b border-border/30">
-              <div class="w-10 h-10 rounded-full bg-[var(--cyber-amber)]/20 flex items-center justify-center text-[var(--cyber-amber)] font-mono text-xs">
+              <div class="w-10 h-10 rounded-full bg-chart-4/20 flex items-center justify-center text-chart-4 font-mono text-xs">
                 &#123;&#125;
               </div>
               <div>
@@ -442,7 +442,7 @@
               <p>Slug: <span class="text-foreground">{agent.slug}</span></p>
               <p>Installs: <span class="text-foreground">{agent.installCount}</span></p>
               {#if agent.ratingAvg !== null}
-                <p>Rating: <span class="text-[var(--cyber-amber)]">⭐ {agent.ratingAvg.toFixed(1)} ({agent.ratingCount} reviews)</span></p>
+                <p>Rating: <span class="text-chart-4">⭐ {agent.ratingAvg.toFixed(1)} ({agent.ratingCount} reviews)</span></p>
               {/if}
               {#if agent.publisherName}
                 <p>Publisher: <span class="text-foreground">{agent.publisherName}</span></p>
@@ -454,7 +454,7 @@
             <Button
               onclick={handleSave}
               disabled={isSaving}
-              class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)] px-6"
+              class="font-mono text-xs uppercase tracking-wider bg-primary hover:bg-primary/90 text-primary-foreground px-6"
             >
               {#if isSaving}
                 <span class="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>

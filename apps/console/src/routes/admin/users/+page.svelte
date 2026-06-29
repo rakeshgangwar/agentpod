@@ -297,7 +297,7 @@
         variant="ghost" 
         size="icon"
         onclick={() => goto("/")}
-        class="h-8 w-8 border border-border/30 hover:border-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]"
+        class="h-8 w-8 border border-border/30 hover:border-primary hover:text-primary"
         title="Home"
       >
         <HomeIcon class="h-4 w-4" />
@@ -319,15 +319,15 @@
             <p class="text-xs text-muted-foreground font-mono uppercase tracking-wider">Total Users</p>
           </div>
           <div class="cyber-card corner-accent p-4 text-center">
-            <p class="text-2xl font-bold font-mono text-[var(--cyber-cyan)]">{stats.adminUsers}</p>
+            <p class="text-2xl font-bold font-mono text-primary">{stats.adminUsers}</p>
             <p class="text-xs text-muted-foreground font-mono uppercase tracking-wider">Admins</p>
           </div>
           <div class="cyber-card corner-accent p-4 text-center">
-            <p class="text-2xl font-bold font-mono text-[var(--cyber-red)]">{stats.bannedUsers}</p>
+            <p class="text-2xl font-bold font-mono text-destructive">{stats.bannedUsers}</p>
             <p class="text-xs text-muted-foreground font-mono uppercase tracking-wider">Banned</p>
           </div>
           <div class="cyber-card corner-accent p-4 text-center">
-            <p class="text-2xl font-bold font-mono text-[var(--cyber-emerald)]">{stats.usersThisWeek}</p>
+            <p class="text-2xl font-bold font-mono text-chart-2">{stats.usersThisWeek}</p>
             <p class="text-xs text-muted-foreground font-mono uppercase tracking-wider">This Week</p>
           </div>
         </div>
@@ -344,7 +344,7 @@
               size="sm"
               onclick={handleToggleSignup}
               disabled={signupLoading}
-              class="font-mono text-xs gap-2 {signupEnabled ? 'text-[var(--cyber-emerald)]' : 'text-[var(--cyber-red)]'}"
+              class="font-mono text-xs gap-2 {signupEnabled ? 'text-chart-2' : 'text-destructive'}"
             >
               {#if signupLoading}
                 <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
@@ -363,7 +363,7 @@
           <!-- Create User Button -->
           <Button
             onclick={openCreateUserDialog}
-            class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)]"
+            class="font-mono text-xs uppercase tracking-wider bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             <PlusIcon class="h-4 w-4 mr-2" />
             Create User
@@ -383,7 +383,7 @@
                 placeholder="Search by email or name..."
                 bind:value={searchQuery}
                 onkeydown={(e) => e.key === "Enter" && handleSearch()}
-                class="pl-10 font-mono text-sm bg-background/50 border-border/50 focus:border-[var(--cyber-cyan)]"
+                class="pl-10 font-mono text-sm bg-background/50 border-border/50 focus:border-primary"
               />
             </div>
           </div>
@@ -435,7 +435,7 @@
           <!-- Search Button -->
           <Button
             onclick={handleSearch}
-            class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)]"
+            class="font-mono text-xs uppercase tracking-wider bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             <SearchIcon class="h-4 w-4 mr-2" />
             Search
@@ -458,14 +458,14 @@
         {#if isLoading}
           <div class="flex items-center justify-center py-12">
             <div class="relative w-8 h-8">
-              <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
-              <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
+              <div class="absolute inset-0 rounded-full border-2 border-primary/20"></div>
+              <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--primary)] animate-spin"></div>
             </div>
             <span class="ml-3 text-muted-foreground font-mono text-sm">Loading users...</span>
           </div>
         {:else if error}
           <div class="p-6 text-center">
-            <p class="text-[var(--cyber-red)] font-mono text-sm">{error}</p>
+            <p class="text-destructive font-mono text-sm">{error}</p>
             <Button
               variant="outline"
               onclick={loadData}
@@ -499,12 +499,12 @@
                     <td class="px-4 py-3">
                       <button
                         onclick={() => goto(`/admin/users/${user.id}`)}
-                        class="flex items-center gap-3 text-left hover:text-[var(--cyber-cyan)] transition-colors"
+                        class="flex items-center gap-3 text-left hover:text-primary transition-colors"
                       >
                         {#if user.image}
                           <img src={user.image} alt={user.name} class="w-8 h-8 rounded-full" />
                         {:else}
-                          <div class="w-8 h-8 rounded-full bg-[var(--cyber-cyan)]/20 flex items-center justify-center text-[var(--cyber-cyan)] font-mono text-xs">
+                          <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-mono text-xs">
                             {user.name?.[0] || user.email[0]}
                           </div>
                         {/if}
@@ -521,7 +521,7 @@
                         onclick={() => openRoleDialog(user)}
                         class="px-2 py-1 rounded font-mono text-xs uppercase tracking-wider border transition-colors
                                {user.role === 'admin'
-                                 ? 'bg-[var(--cyber-cyan)]/10 text-[var(--cyber-cyan)] border-[var(--cyber-cyan)]/30 hover:bg-[var(--cyber-cyan)]/20'
+                                 ? 'bg-primary/10 text-primary border-primary/30 hover:bg-primary/20'
                                  : 'bg-muted/20 text-muted-foreground border-border/30 hover:bg-muted/30'}"
                       >
                         {user.role}
@@ -549,7 +549,7 @@
                     <td class="px-4 py-3 font-mono text-sm">
                       {user.sandboxCount}
                       {#if user.runningSandboxCount > 0}
-                        <span class="text-[var(--cyber-emerald)]">({user.runningSandboxCount} running)</span>
+                        <span class="text-chart-2">({user.runningSandboxCount} running)</span>
                       {/if}
                     </td>
 
@@ -568,7 +568,7 @@
                             size="sm"
                             onclick={() => handleUnban(user)}
                             disabled={actionLoading}
-                            class="font-mono text-xs text-[var(--cyber-emerald)] hover:text-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/10"
+                            class="font-mono text-xs text-chart-2 hover:text-chart-2 hover:bg-chart-2/10"
                           >
                             <CheckIcon class="h-4 w-4 mr-1" />
                             Unban
@@ -579,7 +579,7 @@
                             size="sm"
                             onclick={() => openBanDialog(user)}
                             disabled={actionLoading}
-                            class="font-mono text-xs text-[var(--cyber-red)] hover:text-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/10"
+                            class="font-mono text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
                           >
                             <BanIcon class="h-4 w-4 mr-1" />
                             Ban
@@ -589,7 +589,7 @@
                           variant="outline"
                           size="sm"
                           onclick={() => goto(`/admin/users/${user.id}`)}
-                          class="font-mono text-xs uppercase tracking-wider border-border/50 hover:border-[var(--cyber-cyan)]"
+                          class="font-mono text-xs uppercase tracking-wider border-border/50 hover:border-primary"
                         >
                           View
                         </Button>
@@ -640,23 +640,23 @@
 
 <!-- Ban Dialog -->
 <Dialog.Root bind:open={showBanDialog}>
-  <Dialog.Content class="sm:max-w-md cyber-card border-[var(--cyber-red)]/30">
+  <Dialog.Content class="sm:max-w-md cyber-card border-destructive/30">
     <Dialog.Header>
-      <Dialog.Title class="font-mono text-[var(--cyber-red)]">[ban_user]</Dialog.Title>
+      <Dialog.Title class="font-mono text-destructive">[ban_user]</Dialog.Title>
       <Dialog.Description class="font-mono text-xs">
         Ban {selectedUser?.email}? They will be logged out and unable to access the platform.
       </Dialog.Description>
     </Dialog.Header>
     <div class="py-4">
-      <label for="ban-reason" class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-red)] block mb-2">
+      <label for="ban-reason" class="font-mono text-xs uppercase tracking-wider text-destructive block mb-2">
         Reason (required)
       </label>
       <textarea
         id="ban-reason"
         bind:value={banReason}
         placeholder="Enter the reason for banning this user..."
-        class="w-full h-24 p-3 text-sm font-mono border border-[var(--cyber-red)]/30 rounded bg-background/50 resize-none
-               focus:border-[var(--cyber-red)] focus:ring-1 focus:ring-[var(--cyber-red)] focus:outline-none"
+        class="w-full h-24 p-3 text-sm font-mono border border-destructive/30 rounded bg-background/50 resize-none
+               focus:border-destructive focus:ring-1 focus:ring-destructive focus:outline-none"
       ></textarea>
     </div>
     <Dialog.Footer>
@@ -670,7 +670,7 @@
       <Button
         onclick={handleBan}
         disabled={actionLoading || !banReason.trim()}
-        class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/90 text-[var(--cyber-red-foreground)] disabled:opacity-50"
+        class="font-mono text-xs uppercase tracking-wider bg-destructive hover:bg-destructive/90 text-destructive-foreground disabled:opacity-50"
       >
         {#if actionLoading}
           <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>
@@ -683,16 +683,16 @@
 
 <!-- Role Dialog -->
 <Dialog.Root bind:open={showRoleDialog}>
-  <Dialog.Content class="sm:max-w-md cyber-card border-[var(--cyber-cyan)]/30">
+  <Dialog.Content class="sm:max-w-md cyber-card border-primary/30">
     <Dialog.Header>
-      <Dialog.Title class="font-mono text-[var(--cyber-cyan)]">[change_role]</Dialog.Title>
+      <Dialog.Title class="font-mono text-primary">[change_role]</Dialog.Title>
       <Dialog.Description class="font-mono text-xs">
         Change role for {selectedUser?.email}
       </Dialog.Description>
     </Dialog.Header>
     <div class="py-4">
       <!-- svelte-ignore a11y_label_has_associated_control - Select component handles its own accessibility -->
-      <label class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)] block mb-2">
+      <label class="font-mono text-xs uppercase tracking-wider text-primary block mb-2">
         New Role
       </label>
       <Select.Root
@@ -711,7 +711,7 @@
         </Select.Content>
       </Select.Root>
       {#if newRole === "admin"}
-        <p class="mt-2 text-xs text-[var(--cyber-amber)] font-mono">
+        <p class="mt-2 text-xs text-chart-4 font-mono">
           Warning: Admins have full access to manage all users and system settings.
         </p>
       {/if}
@@ -727,7 +727,7 @@
       <Button
         onclick={handleRoleChange}
         disabled={actionLoading || newRole === selectedUser?.role}
-        class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)] disabled:opacity-50"
+        class="font-mono text-xs uppercase tracking-wider bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50"
       >
         {#if actionLoading}
           <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>
@@ -740,9 +740,9 @@
 
 <!-- Create User Dialog -->
 <Dialog.Root bind:open={showCreateUserDialog}>
-  <Dialog.Content class="sm:max-w-md cyber-card border-[var(--cyber-cyan)]/30">
+  <Dialog.Content class="sm:max-w-md cyber-card border-primary/30">
     <Dialog.Header>
-      <Dialog.Title class="font-mono text-[var(--cyber-cyan)]">[create_user]</Dialog.Title>
+      <Dialog.Title class="font-mono text-primary">[create_user]</Dialog.Title>
       <Dialog.Description class="font-mono text-xs">
         Create a new user account (bypasses signup restrictions)
       </Dialog.Description>
@@ -758,7 +758,7 @@
           placeholder="John Doe"
           bind:value={newUserName}
           required
-          class="font-mono text-sm bg-background/50 border-border/50 focus:border-[var(--cyber-cyan)]"
+          class="font-mono text-sm bg-background/50 border-border/50 focus:border-primary"
         />
       </div>
       <div class="space-y-2">
@@ -771,7 +771,7 @@
           placeholder="user@example.com"
           bind:value={newUserEmail}
           required
-          class="font-mono text-sm bg-background/50 border-border/50 focus:border-[var(--cyber-cyan)]"
+          class="font-mono text-sm bg-background/50 border-border/50 focus:border-primary"
         />
       </div>
       <div class="space-y-2">
@@ -785,7 +785,7 @@
           bind:value={newUserPassword}
           required
           minlength={8}
-          class="font-mono text-sm bg-background/50 border-border/50 focus:border-[var(--cyber-cyan)]"
+          class="font-mono text-sm bg-background/50 border-border/50 focus:border-primary"
         />
         <p class="text-xs text-muted-foreground font-mono">Minimum 8 characters</p>
       </div>
@@ -809,7 +809,7 @@
           </Select.Content>
         </Select.Root>
         {#if newUserRole === "admin"}
-          <p class="text-xs text-[var(--cyber-amber)] font-mono">
+          <p class="text-xs text-chart-4 font-mono">
             Warning: Admins have full access to manage all users and system settings.
           </p>
         {/if}
@@ -826,7 +826,7 @@
       <Button
         onclick={handleCreateUser}
         disabled={createUserLoading || !newUserEmail.trim() || !newUserPassword || !newUserName.trim()}
-        class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)] disabled:opacity-50"
+        class="font-mono text-xs uppercase tracking-wider bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50"
       >
         {#if createUserLoading}
           <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>

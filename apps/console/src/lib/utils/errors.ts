@@ -305,12 +305,12 @@ export function getErrorColorClass(category: ErrorCategory): string {
     case "auth":
     case "permission":
     case "resource_limit":
-      return "text-[var(--cyber-orange)]"; // Warning-style for actionable errors
+      return "text-chart-1"; // Warning-style for actionable errors
     case "network":
     case "timeout":
-      return "text-[var(--cyber-yellow)]"; // Info-style for transient errors
+      return "text-chart-4"; // Info-style for transient errors
     default:
-      return "text-[var(--cyber-red)]"; // Error-style for others
+      return "text-destructive"; // Error-style for others
   }
 }
 
@@ -322,11 +322,11 @@ export function getErrorBorderClass(category: ErrorCategory): string {
     case "auth":
     case "permission":
     case "resource_limit":
-      return "border-[var(--cyber-orange)]/50 bg-[var(--cyber-orange)]/5";
+      return "border-chart-1/50 bg-chart-1/5";
     case "network":
     case "timeout":
-      return "border-[var(--cyber-yellow)]/50 bg-[var(--cyber-yellow)]/5";
+      return "border-chart-4/50 bg-chart-4/5";
     default:
-      return "border-[var(--cyber-red)]/50 bg-[var(--cyber-red)]/5";
+      return "border-destructive/50 bg-destructive/5";
   }
 }

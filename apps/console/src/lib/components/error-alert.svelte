@@ -57,24 +57,24 @@
       case "permission":
       case "resource_limit":
         return {
-          border: "border-[var(--cyber-orange)]/50",
-          bg: "bg-[var(--cyber-orange)]/5",
-          text: "text-[var(--cyber-orange)]",
+          border: "border-chart-1/50",
+          bg: "bg-chart-1/5",
+          text: "text-chart-1",
           label: cat === "resource_limit" ? "limit" : cat === "permission" ? "denied" : "auth",
         };
       case "network":
       case "timeout":
         return {
-          border: "border-[var(--cyber-yellow)]/50",
-          bg: "bg-[var(--cyber-yellow)]/5",
-          text: "text-[var(--cyber-yellow)]",
+          border: "border-chart-4/50",
+          bg: "bg-chart-4/5",
+          text: "text-chart-4",
           label: cat === "timeout" ? "timeout" : "network",
         };
       default:
         return {
-          border: "border-[var(--cyber-red)]/50",
-          bg: "bg-[var(--cyber-red)]/5",
-          text: "text-[var(--cyber-red)]",
+          border: "border-destructive/50",
+          bg: "bg-destructive/5",
+          text: "text-destructive",
           label: "error",
         };
     }

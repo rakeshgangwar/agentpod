@@ -126,10 +126,10 @@
         <div class="text-center space-y-4">
           <!-- Logo/Icon -->
           <div class="mx-auto w-16 h-16 relative">
-            <div class="absolute inset-0 bg-[var(--cyber-cyan)]/10 rounded-lg rotate-45"></div>
+            <div class="absolute inset-0 bg-primary/10 rounded-lg rotate-45"></div>
             <div class="absolute inset-0 flex items-center justify-center">
               <svg
-                class="w-8 h-8 text-[var(--cyber-cyan)]"
+                class="w-8 h-8 text-primary"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -178,7 +178,7 @@
                 bind:value={apiUrl}
                 required
                 class="font-mono text-sm bg-background/50 border-border/50 
-                       focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)]/50
+                       focus:border-primary focus:ring-1 focus:ring-primary/50
                        placeholder:text-muted-foreground/50"
               />
               <p class="text-xs font-mono text-muted-foreground/70">
@@ -187,8 +187,8 @@
             </div>
             
             {#if connectionError}
-              <div class="p-3 rounded border border-[var(--cyber-red)]/50 bg-[var(--cyber-red)]/5">
-                <div class="flex items-center gap-2 text-[var(--cyber-red)]">
+              <div class="p-3 rounded border border-destructive/50 bg-destructive/5">
+                <div class="flex items-center gap-2 text-destructive">
                   <span class="font-mono text-xs uppercase tracking-wider">[error]</span>
                   <span class="text-sm">{connectionError}</span>
                 </div>
@@ -198,7 +198,7 @@
             <Button 
               type="submit" 
               class="w-full h-11 font-mono text-xs uppercase tracking-wider
-                     bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)]
+                     bg-primary hover:bg-primary/90 text-primary-foreground
                      disabled:opacity-50 disabled:cursor-not-allowed" 
               disabled={isConnecting || !apiUrl}
             >
@@ -219,15 +219,15 @@
             <!-- Connection Info -->
             <div class="p-3 rounded border border-border/30 bg-background/30">
               <div class="flex items-center gap-2 text-sm font-mono">
-                <Circle class="h-2.5 w-2.5 text-[var(--cyber-emerald)] fill-current" />
+                <Circle class="h-2.5 w-2.5 text-chart-2 fill-current" />
                 <span class="text-muted-foreground">connected:</span>
                 <span class="text-foreground truncate">{connection.apiUrl}</span>
               </div>
             </div>
             
             {#if auth.error}
-              <div class="p-3 rounded border border-[var(--cyber-red)]/50 bg-[var(--cyber-red)]/5">
-                <div class="flex items-center gap-2 text-[var(--cyber-red)]">
+              <div class="p-3 rounded border border-destructive/50 bg-destructive/5">
+                <div class="flex items-center gap-2 text-destructive">
                   <span class="font-mono text-xs uppercase tracking-wider">[error]</span>
                   <span class="text-sm">{auth.error}</span>
                 </div>
@@ -249,7 +249,7 @@
                     required
                     disabled={auth.isLoading}
                     class="font-mono text-sm bg-background/50 border-border/50 
-                           focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)]/50"
+                           focus:border-primary focus:ring-1 focus:ring-primary/50"
                   />
                 </div>
               {/if}
@@ -266,7 +266,7 @@
                   required
                   disabled={auth.isLoading}
                   class="font-mono text-sm bg-background/50 border-border/50 
-                         focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)]/50"
+                         focus:border-primary focus:ring-1 focus:ring-primary/50"
                 />
               </div>
               
@@ -283,7 +283,7 @@
                   minlength={8}
                   disabled={auth.isLoading}
                   class="font-mono text-sm bg-background/50 border-border/50 
-                         focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)]/50"
+                         focus:border-primary focus:ring-1 focus:ring-primary/50"
                 />
                 {#if authMode === "signup"}
                   <p class="text-xs font-mono text-muted-foreground/70">
@@ -295,7 +295,7 @@
               <Button 
                 type="submit" 
                 class="w-full h-11 font-mono text-xs uppercase tracking-wider
-                       bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)]
+                       bg-primary hover:bg-primary/90 text-primary-foreground
                        disabled:opacity-50" 
                 disabled={auth.isLoading}
               >
@@ -318,7 +318,7 @@
                   <span class="text-muted-foreground">No account? </span>
                   <button 
                     type="button"
-                    class="text-[var(--cyber-cyan)] hover:underline"
+                    class="text-primary hover:underline"
                     onclick={toggleAuthMode}
                   >
                     Create one
@@ -327,7 +327,7 @@
                   <span class="text-muted-foreground">Have an account? </span>
                   <button 
                     type="button"
-                    class="text-[var(--cyber-cyan)] hover:underline"
+                    class="text-primary hover:underline"
                     onclick={toggleAuthMode}
                   >
                     Sign in
@@ -361,7 +361,7 @@
       <!-- Footer -->
       <div class="px-6 sm:px-8 py-4 border-t border-border/30 bg-background/30">
         <div class="flex items-center justify-center gap-2 text-xs font-mono text-muted-foreground">
-          <span class="w-1.5 h-1.5 rounded-full bg-[var(--cyber-cyan)] animate-pulse-dot"></span>
+          <span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse-dot"></span>
           <span>AgentPod v0.1.0</span>
         </div>
       </div>

@@ -139,13 +139,13 @@
 
   function getSquadColor(squad: AgentSquad): string {
     switch (squad) {
-      case "orchestration": return "var(--cyber-cyan)";
-      case "development": return "var(--cyber-emerald)";
-      case "product": return "var(--cyber-amber)";
-      case "operations": return "var(--cyber-red)";
-      case "security": return "var(--cyber-red)";
-      case "data": return "var(--cyber-cyan)";
-      default: return "var(--cyber-cyan)";
+      case "orchestration": return "var(--primary)";
+      case "development": return "var(--chart-2)";
+      case "product": return "var(--chart-4)";
+      case "operations": return "var(--destructive)";
+      case "security": return "var(--destructive)";
+      case "data": return "var(--primary)";
+      default: return "var(--primary)";
     }
   }
 </script>
@@ -167,7 +167,7 @@
         variant="ghost" 
         size="icon"
         onclick={() => goto("/")}
-        class="h-8 w-8 border border-border/30 hover:border-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]"
+        class="h-8 w-8 border border-border/30 hover:border-primary hover:text-primary"
         title="Home"
       >
         <HomeIcon class="h-4 w-4" />
@@ -186,15 +186,15 @@
           <p class="text-xs text-muted-foreground font-mono uppercase tracking-wider">Total Agents</p>
         </div>
         <div class="cyber-card corner-accent p-4 text-center">
-          <p class="text-2xl font-bold font-mono text-[var(--cyber-emerald)]">{activeAgents}</p>
+          <p class="text-2xl font-bold font-mono text-chart-2">{activeAgents}</p>
           <p class="text-xs text-muted-foreground font-mono uppercase tracking-wider">Active</p>
         </div>
         <div class="cyber-card corner-accent p-4 text-center">
-          <p class="text-2xl font-bold font-mono text-[var(--cyber-cyan)]">{defaultAgents}</p>
+          <p class="text-2xl font-bold font-mono text-primary">{defaultAgents}</p>
           <p class="text-xs text-muted-foreground font-mono uppercase tracking-wider">Default</p>
         </div>
         <div class="cyber-card corner-accent p-4 text-center">
-          <p class="text-2xl font-bold font-mono text-[var(--cyber-amber)]">{uniqueSquads}</p>
+          <p class="text-2xl font-bold font-mono text-chart-4">{uniqueSquads}</p>
           <p class="text-xs text-muted-foreground font-mono uppercase tracking-wider">Squads</p>
         </div>
       </div>
@@ -209,7 +209,7 @@
                 placeholder="Search by name or role..."
                 bind:value={searchQuery}
                 onkeydown={(e) => e.key === "Enter" && handleSearch()}
-                class="pl-10 font-mono text-sm bg-background/50 border-border/50 focus:border-[var(--cyber-cyan)]"
+                class="pl-10 font-mono text-sm bg-background/50 border-border/50 focus:border-primary"
               />
             </div>
           </div>
@@ -240,7 +240,7 @@
 
           <Button
             onclick={handleSearch}
-            class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)]"
+            class="font-mono text-xs uppercase tracking-wider bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             <SearchIcon class="h-4 w-4 mr-2" />
             Search
@@ -261,14 +261,14 @@
         {#if isLoading}
           <div class="flex items-center justify-center py-12">
             <div class="relative w-8 h-8">
-              <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
-              <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
+              <div class="absolute inset-0 rounded-full border-2 border-primary/20"></div>
+              <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--primary)] animate-spin"></div>
             </div>
             <span class="ml-3 text-muted-foreground font-mono text-sm">Loading agents...</span>
           </div>
         {:else if error}
           <div class="p-6 text-center">
-            <p class="text-[var(--cyber-red)] font-mono text-sm">{error}</p>
+            <p class="text-destructive font-mono text-sm">{error}</p>
             <Button
               variant="outline"
               onclick={loadData}
@@ -301,12 +301,12 @@
                     <td class="px-4 py-3">
                       <button
                         onclick={() => goto(`/admin/agents/${agent.id}`)}
-                        class="flex items-center gap-3 text-left hover:text-[var(--cyber-cyan)] transition-colors"
+                        class="flex items-center gap-3 text-left hover:text-primary transition-colors"
                       >
                         {#if agent.emoji}
                           <span class="text-2xl">{agent.emoji}</span>
                         {:else}
-                          <div class="w-8 h-8 rounded-full bg-[var(--cyber-cyan)]/20 flex items-center justify-center text-[var(--cyber-cyan)] font-mono text-xs">
+                          <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-mono text-xs">
                             {agent.name[0]}
                           </div>
                         {/if}
@@ -336,7 +336,7 @@
                         size="sm"
                         onclick={() => toggleStatus(agent)}
                         disabled={actionLoading[agent.id]}
-                        class="font-mono text-xs gap-2 {agent.status === 'active' ? 'text-[var(--cyber-emerald)]' : 'text-[var(--cyber-red)]'}"
+                        class="font-mono text-xs gap-2 {agent.status === 'active' ? 'text-chart-2' : 'text-destructive'}"
                       >
                         {#if actionLoading[agent.id]}
                           <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
@@ -355,7 +355,7 @@
                         size="sm"
                         onclick={() => toggleDefault(agent)}
                         disabled={actionLoading[`${agent.id}-default`]}
-                        class="font-mono text-xs gap-2 {agent.isDefault ? 'text-[var(--cyber-cyan)]' : 'text-muted-foreground'}"
+                        class="font-mono text-xs gap-2 {agent.isDefault ? 'text-primary' : 'text-muted-foreground'}"
                       >
                         {#if actionLoading[`${agent.id}-default`]}
                           <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
@@ -375,7 +375,7 @@
                             {agent.installCount} installs
                           </span>
                           {#if agent.ratingAvg !== null}
-                            <span class="font-mono text-xs text-[var(--cyber-amber)]">
+                            <span class="font-mono text-xs text-chart-4">
                               ⭐ {agent.ratingAvg.toFixed(1)}
                             </span>
                           {/if}
@@ -384,7 +384,7 @@
                           variant="outline"
                           size="sm"
                           onclick={() => goto(`/admin/agents/${agent.id}`)}
-                          class="font-mono text-xs uppercase tracking-wider border-border/50 hover:border-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]"
+                          class="font-mono text-xs uppercase tracking-wider border-border/50 hover:border-primary hover:text-primary"
                         >
                           <EditIcon class="h-4 w-4 mr-1" />
                           Edit

@@ -83,10 +83,10 @@
       <div class="flex items-center gap-3">
         <div
           class="w-8 h-8 rounded-sm flex items-center justify-center shrink-0
-                 bg-[var(--cyber-cyan,hsl(180_100%_50%))]/10
-                 border border-[var(--cyber-cyan,hsl(180_100%_50%))]/30"
+                 bg-primary/10
+                 border border-primary/30"
         >
-          <Server class="w-4 h-4 text-[var(--cyber-cyan,hsl(180_100%_50%))]" />
+          <Server class="w-4 h-4 text-primary" />
         </div>
         <span class="hidden lg:block text-sm font-mono font-bold tracking-wider truncate">
           AgentPod

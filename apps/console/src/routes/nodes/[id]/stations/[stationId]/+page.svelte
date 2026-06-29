@@ -86,7 +86,7 @@
       variant="ghost"
       size="icon"
       href="/nodes/{nodeId}"
-      class="h-8 w-8 border border-border/30 hover:border-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]"
+      class="h-8 w-8 border border-border/30 hover:border-primary hover:text-primary"
     >
       <ArrowLeftIcon class="h-4 w-4" />
     </Button>

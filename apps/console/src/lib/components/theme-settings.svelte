@@ -88,7 +88,7 @@
 <div class="space-y-8">
   <!-- Mode Selector -->
   <div class="space-y-3">
-    <Label class="text-xs font-mono uppercase tracking-wider text-[var(--cyber-cyan)]">Color Mode</Label>
+    <Label class="text-xs font-mono uppercase tracking-wider text-primary">Color Mode</Label>
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
       {#each modeOptions as option}
         <button
@@ -96,8 +96,8 @@
           onclick={() => handleModeChange(option.value)}
           class="flex flex-col items-center gap-2 p-3 rounded border transition-all font-mono
             {themeStore.mode === option.value
-              ? 'border-[var(--cyber-cyan)] bg-[var(--cyber-cyan)]/10 text-[var(--cyber-cyan)]'
-              : 'border-border/30 bg-background/50 hover:border-[var(--cyber-cyan)]/30 hover:bg-[var(--cyber-cyan)]/5'}"
+              ? 'border-primary bg-primary/10 text-primary'
+              : 'border-border/30 bg-background/50 hover:border-primary/30 hover:bg-primary/5'}"
         >
           <option.icon class="h-5 w-5" />
           <span class="text-xs font-medium">{option.label}</span>
@@ -122,7 +122,7 @@
         value="colors"
         class="font-mono text-[10px] uppercase tracking-wider py-1.5 rounded transition-all
                !border-transparent !shadow-none !h-auto
-               data-[state=active]:!bg-[var(--cyber-cyan)]/10 data-[state=active]:!text-[var(--cyber-cyan)]
+               data-[state=active]:!bg-primary/10 data-[state=active]:!text-primary
                data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50"
       >
         Color Schemes
@@ -131,7 +131,7 @@
         value="fonts"
         class="font-mono text-[10px] uppercase tracking-wider py-1.5 rounded transition-all
                !border-transparent !shadow-none !h-auto
-               data-[state=active]:!bg-[var(--cyber-cyan)]/10 data-[state=active]:!text-[var(--cyber-cyan)]
+               data-[state=active]:!bg-primary/10 data-[state=active]:!text-primary
                data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50"
       >
         Font Pairings
@@ -149,7 +149,7 @@
             if (v) selectedColorCategory = v as ColorSchemeCategory | "all";
           }}
         >
-          <Select.Trigger class="w-48 font-mono text-sm bg-background/50 border-border/50 focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)]">
+          <Select.Trigger class="w-48 font-mono text-sm bg-background/50 border-border/50 focus:border-primary focus:ring-1 focus:ring-primary">
             {selectedColorCategory === "all" ? "All Categories" : getColorCategoryLabel(selectedColorCategory)}
           </Select.Trigger>
           <Select.Content class="font-mono">
@@ -174,8 +174,8 @@
             onclick={() => handleColorSchemeChange(scheme.id)}
             class="relative flex flex-col rounded border overflow-hidden transition-all
               {isSelected
-                ? 'border-[var(--cyber-cyan)] ring-1 ring-[var(--cyber-cyan)]/30 shadow-[0_0_12px_var(--cyber-cyan)/15]'
-                : 'border-border/30 hover:border-[var(--cyber-cyan)]/50'}"
+                ? 'border-primary ring-1 ring-primary/30 shadow-[0_0_12px_var(--primary)/15]'
+                : 'border-border/30 hover:border-primary/50'}"
           >
             <!-- Color Preview - show both light and dark -->
             <div class="h-10 w-full flex">
@@ -206,7 +206,7 @@
 
             <!-- Selected Indicator -->
             {#if isSelected}
-              <div class="absolute top-1 right-1 h-5 w-5 rounded-full bg-[var(--cyber-cyan)] flex items-center justify-center shadow-[0_0_8px_var(--cyber-cyan)]">
+              <div class="absolute top-1 right-1 h-5 w-5 rounded-full bg-primary flex items-center justify-center shadow-[0_0_8px_var(--primary)]">
                 <CheckIcon class="h-3 w-3 text-black" />
               </div>
             {/if}
@@ -217,10 +217,10 @@
       <!-- Current Color Scheme Info -->
       {#if themeStore.currentColorScheme}
         {@const currentColors = themeStore.getColorSchemePreview(themeStore.colorSchemeId)}
-        <div class="p-3 rounded border border-[var(--cyber-cyan)]/30 bg-[var(--cyber-cyan)]/5">
+        <div class="p-3 rounded border border-primary/30 bg-primary/5">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm font-mono font-medium text-[var(--cyber-cyan)]">{themeStore.currentColorScheme.label}</p>
+              <p class="text-sm font-mono font-medium text-primary">{themeStore.currentColorScheme.label}</p>
               <p class="text-xs text-muted-foreground font-mono capitalize">
                 {themeStore.currentColorScheme.category} · Shiki: {themeStore.shikiThemes.light}/{themeStore.shikiThemes.dark}
               </p>
@@ -258,7 +258,7 @@
             if (v) selectedFontCategory = v as FontPairingCategory | "all";
           }}
         >
-          <Select.Trigger class="w-48 font-mono text-sm bg-background/50 border-border/50 focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)]">
+          <Select.Trigger class="w-48 font-mono text-sm bg-background/50 border-border/50 focus:border-primary focus:ring-1 focus:ring-primary">
             {selectedFontCategory === "all" ? "All Categories" : getFontCategoryLabel(selectedFontCategory)}
           </Select.Trigger>
           <Select.Content class="font-mono">
@@ -282,8 +282,8 @@
             onclick={() => handleFontPairingChange(pairing.id)}
             class="relative p-4 rounded border text-left transition-all
               {isSelected
-                ? 'border-[var(--cyber-cyan)] ring-1 ring-[var(--cyber-cyan)]/30 shadow-[0_0_12px_var(--cyber-cyan)/15] bg-[var(--cyber-cyan)]/5'
-                : 'border-border/30 hover:border-[var(--cyber-cyan)]/50 bg-background/50'}"
+                ? 'border-primary ring-1 ring-primary/30 shadow-[0_0_12px_var(--primary)/15] bg-primary/5'
+                : 'border-border/30 hover:border-primary/50 bg-background/50'}"
           >
             <!-- Font Preview -->
             <div class="space-y-2">
@@ -322,7 +322,7 @@
 
             <!-- Selected Indicator -->
             {#if isSelected}
-              <div class="absolute top-2 right-2 h-5 w-5 rounded-full bg-[var(--cyber-cyan)] flex items-center justify-center shadow-[0_0_8px_var(--cyber-cyan)]">
+              <div class="absolute top-2 right-2 h-5 w-5 rounded-full bg-primary flex items-center justify-center shadow-[0_0_8px_var(--primary)]">
                 <CheckIcon class="h-3 w-3 text-black" />
               </div>
             {/if}
@@ -332,10 +332,10 @@
 
       <!-- Current Font Pairing Info -->
       {#if themeStore.currentFontPairing}
-        <div class="p-3 rounded border border-[var(--cyber-cyan)]/30 bg-[var(--cyber-cyan)]/5">
+        <div class="p-3 rounded border border-primary/30 bg-primary/5">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm font-mono font-medium text-[var(--cyber-cyan)]">{themeStore.currentFontPairing.label}</p>
+              <p class="text-sm font-mono font-medium text-primary">{themeStore.currentFontPairing.label}</p>
               <p class="text-xs text-muted-foreground font-mono capitalize">
                 {themeStore.currentFontPairing.category}
               </p>
@@ -354,10 +354,10 @@
   <!-- Saved Custom Themes -->
   {#if themeStore.customThemes.length > 0}
     <div class="space-y-3">
-      <Label class="text-xs font-mono uppercase tracking-wider text-[var(--cyber-cyan)]">Saved Combinations</Label>
+      <Label class="text-xs font-mono uppercase tracking-wider text-primary">Saved Combinations</Label>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {#each themeStore.customThemes as customTheme}
-          <div class="flex items-center justify-between p-3 rounded border border-border/30 bg-background/50 hover:border-[var(--cyber-cyan)]/30 transition-colors">
+          <div class="flex items-center justify-between p-3 rounded border border-border/30 bg-background/50 hover:border-primary/30 transition-colors">
             <button
               type="button"
               onclick={() => handleApplyCustomTheme(customTheme)}
@@ -372,7 +372,7 @@
               variant="ghost"
               size="icon"
               onclick={() => handleDeleteCustomTheme(customTheme.id)}
-              class="h-8 w-8 text-muted-foreground hover:text-[var(--cyber-red)]"
+              class="h-8 w-8 text-muted-foreground hover:text-destructive"
             >
               <Trash2Icon class="h-4 w-4" />
             </Button>
@@ -384,18 +384,18 @@
 
   <!-- Save Current Combination -->
   <div class="space-y-3">
-    <Label class="text-xs font-mono uppercase tracking-wider text-[var(--cyber-cyan)]">Save Current Combination</Label>
+    <Label class="text-xs font-mono uppercase tracking-wider text-primary">Save Current Combination</Label>
     {#if showSaveDialog}
       <div class="flex items-center gap-2">
         <Input
           bind:value={customThemeName}
           placeholder="My custom theme..."
-          class="flex-1 font-mono bg-background/50 border-border/50 focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)]"
+          class="flex-1 font-mono bg-background/50 border-border/50 focus:border-primary focus:ring-1 focus:ring-primary"
         />
         <Button
           onclick={handleSaveCustomTheme}
           disabled={!customThemeName.trim()}
-          class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)]"
+          class="font-mono text-xs uppercase tracking-wider bg-primary hover:bg-primary/90 text-primary-foreground"
         >
           Save
         </Button>
@@ -411,7 +411,7 @@
       <Button
         variant="outline"
         onclick={() => showSaveDialog = true}
-        class="w-full font-mono text-xs uppercase tracking-wider border-border/50 hover:border-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]"
+        class="w-full font-mono text-xs uppercase tracking-wider border-border/50 hover:border-primary hover:text-primary"
       >
         <SaveIcon class="h-4 w-4 mr-2" />
         Save "{themeStore.currentColorScheme?.label}" + "{themeStore.currentFontPairing?.label}"

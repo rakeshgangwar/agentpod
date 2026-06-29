@@ -159,7 +159,7 @@
           <div class="min-w-0 flex-1 flex items-center gap-3">
             <!-- Icon in expanded mode -->
             {#if icon}
-              <div class="flex items-center justify-center shrink-0 text-[var(--cyber-cyan)]">
+              <div class="flex items-center justify-center shrink-0 text-primary">
                 {#if isAnimatedIcon(icon)}
                   <LottieIcon src={icon.path} size={24} loop autoplay />
                 {:else if isEmojiIcon(icon)}
@@ -272,8 +272,8 @@
           {#if collapsible}
             <button
               onclick={toggleCollapse}
-              class="hidden sm:block p-1.5 rounded border border-border/30 hover:border-[var(--cyber-cyan)]/50 
-                     hover:bg-[var(--cyber-cyan)]/5 transition-colors"
+              class="hidden sm:block p-1.5 rounded border border-border/30 hover:border-primary/50 
+                     hover:bg-primary/5 transition-colors"
               title={isCollapsed ? "Expand header" : "Collapse header"}
             >
               {#if isCollapsed}
@@ -296,7 +296,7 @@
             <!-- Icon or fallback to title -->
             {#if icon}
               <div 
-                class="flex items-center justify-center w-8 h-8 rounded border border-[var(--cyber-cyan)]/30 bg-[var(--cyber-cyan)]/5"
+                class="flex items-center justify-center w-8 h-8 rounded border border-primary/30 bg-primary/5"
                 title={title}
               >
                 {#if isAnimatedIcon(icon)}
@@ -305,11 +305,11 @@
                   <span class="text-lg">{icon}</span>
                 {:else if isComponentIcon(icon)}
                   {@const IconComponent = icon}
-                  <IconComponent class="h-5 w-5 text-[var(--cyber-cyan)]" />
+                  <IconComponent class="h-5 w-5 text-primary" />
                 {/if}
               </div>
             {:else}
-              <span class="font-mono text-sm font-medium truncate text-[var(--cyber-cyan)] max-w-[120px]">{title}</span>
+              <span class="font-mono text-sm font-medium truncate text-primary max-w-[120px]">{title}</span>
             {/if}
             {#if status}
               <div class="status-indicator {getStatusClass(status.variant)} shrink-0 text-xs">
@@ -327,8 +327,8 @@
           {/if}
           <button
             onclick={toggleCollapse}
-            class="p-1.5 rounded border border-border/30 hover:border-[var(--cyber-cyan)]/50 
-                   hover:bg-[var(--cyber-cyan)]/5 transition-colors"
+            class="p-1.5 rounded border border-border/30 hover:border-primary/50 
+                   hover:bg-primary/5 transition-colors"
             title={isCollapsed ? "Expand header" : "Collapse header"}
           >
             {#if isCollapsed}

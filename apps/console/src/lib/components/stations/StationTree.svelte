@@ -77,7 +77,7 @@
         <div class="flex items-center gap-1 shrink-0 ml-auto">
           <Badge
             variant="outline"
-            class="font-mono text-[10px] text-[var(--cyber-cyan)] border-[var(--cyber-cyan)]/40"
+            class="font-mono text-[10px] text-primary border-primary/40"
           >
             {station.harness}
           </Badge>

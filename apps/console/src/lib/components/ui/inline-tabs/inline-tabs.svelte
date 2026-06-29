@@ -26,8 +26,8 @@
       },
       active: {
         true: {
-          trigger: "bg-[var(--cyber-cyan)]/10 text-[var(--cyber-cyan)]",
-          badge: "bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)]",
+          trigger: "bg-primary/10 text-primary",
+          badge: "bg-primary/20 text-primary",
         },
         false: {
           trigger: "text-muted-foreground hover:bg-muted/50",

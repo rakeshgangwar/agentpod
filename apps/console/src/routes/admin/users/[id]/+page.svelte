@@ -144,7 +144,7 @@
           variant="ghost"
           size="icon"
           onclick={() => goto("/")}
-          class="h-8 w-8 border border-border/30 hover:border-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]"
+          class="h-8 w-8 border border-border/30 hover:border-primary hover:text-primary"
           title="Home"
         >
           <HomeIcon class="h-4 w-4" />
@@ -153,7 +153,7 @@
           variant="ghost"
           size="icon"
           onclick={() => goto("/admin")}
-          class="h-8 w-8 border border-border/30 hover:border-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]"
+          class="h-8 w-8 border border-border/30 hover:border-primary hover:text-primary"
           title="Back to Admin"
         >
           <ArrowLeftIcon class="h-4 w-4" />
@@ -171,14 +171,14 @@
       {#if isLoading}
         <div class="flex items-center justify-center py-12">
           <div class="relative w-8 h-8">
-            <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
-            <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
+            <div class="absolute inset-0 rounded-full border-2 border-primary/20"></div>
+            <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--primary)] animate-spin"></div>
           </div>
           <span class="ml-3 text-muted-foreground font-mono text-sm">Loading user...</span>
         </div>
       {:else if error}
         <div class="cyber-card corner-accent p-6 text-center">
-          <p class="text-[var(--cyber-red)] font-mono text-sm">{error}</p>
+          <p class="text-destructive font-mono text-sm">{error}</p>
           <Button
             variant="outline"
             onclick={loadUser}
@@ -196,7 +196,7 @@
               {#if user.image}
                 <img src={user.image} alt={user.name} class="w-14 h-14 rounded-full" />
               {:else}
-                <div class="w-14 h-14 rounded-full bg-[var(--cyber-cyan)]/20 flex items-center justify-center text-[var(--cyber-cyan)] font-mono text-xl">
+                <div class="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center text-primary font-mono text-xl">
                   {user.name?.[0] || user.email[0]}
                 </div>
               {/if}
@@ -207,7 +207,7 @@
                   <span
                     class="px-2 py-0.5 rounded font-mono text-xs uppercase tracking-wider
                            {user.role === 'admin'
-                             ? 'bg-[var(--cyber-cyan)]/10 text-[var(--cyber-cyan)] border border-[var(--cyber-cyan)]/30'
+                             ? 'bg-primary/10 text-primary border border-primary/30'
                              : 'bg-muted/20 text-muted-foreground border border-border/30'}"
                   >
                     {user.role}
@@ -236,7 +236,7 @@
                   showRoleDialog = true;
                 }}
                 data-testid="change-role"
-                class="font-mono text-xs uppercase tracking-wider border-border/50 hover:border-[var(--cyber-cyan)]"
+                class="font-mono text-xs uppercase tracking-wider border-border/50 hover:border-primary"
               >
                 <ShieldIcon class="h-4 w-4 mr-2" />
                 Change Role
@@ -246,7 +246,7 @@
                   variant="outline"
                   onclick={handleUnban}
                   disabled={actionLoading}
-                  class="font-mono text-xs uppercase tracking-wider border-[var(--cyber-emerald)]/50 text-[var(--cyber-emerald)] hover:bg-[var(--cyber-emerald)]/10"
+                  class="font-mono text-xs uppercase tracking-wider border-chart-2/50 text-chart-2 hover:bg-chart-2/10"
                 >
                   <CheckIcon class="h-4 w-4 mr-2" />
                   Unban
@@ -256,7 +256,7 @@
                   variant="outline"
                   onclick={() => (showBanDialog = true)}
                   data-testid="ban-user"
-                  class="font-mono text-xs uppercase tracking-wider border-[var(--cyber-red)]/50 text-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/10"
+                  class="font-mono text-xs uppercase tracking-wider border-destructive/50 text-destructive hover:bg-destructive/10"
                 >
                   <BanIcon class="h-4 w-4 mr-2" />
                   Ban User
@@ -266,8 +266,8 @@
           </div>
 
           {#if user.banned && user.bannedReason}
-            <div class="mt-4 p-3 border border-[var(--cyber-red)]/30 rounded bg-[var(--cyber-red)]/10">
-              <p class="font-mono text-xs text-[var(--cyber-red)] uppercase tracking-wider mb-1">Ban Reason</p>
+            <div class="mt-4 p-3 border border-destructive/30 rounded bg-destructive/10">
+              <p class="font-mono text-xs text-destructive uppercase tracking-wider mb-1">Ban Reason</p>
               <p class="font-mono text-sm">{user.bannedReason}</p>
               {#if user.bannedAt}
                 <p class="font-mono text-xs text-muted-foreground mt-1">Banned on {formatDate(user.bannedAt)}</p>
@@ -298,22 +298,22 @@
 
 <!-- Ban Dialog -->
 <Dialog.Root bind:open={showBanDialog}>
-  <Dialog.Content class="sm:max-w-md cyber-card border-[var(--cyber-red)]/30">
+  <Dialog.Content class="sm:max-w-md cyber-card border-destructive/30">
     <Dialog.Header>
-      <Dialog.Title class="font-mono text-[var(--cyber-red)]">[ban_user]</Dialog.Title>
+      <Dialog.Title class="font-mono text-destructive">[ban_user]</Dialog.Title>
       <Dialog.Description class="font-mono text-xs">
         Ban {user?.email}? They will be logged out and unable to access the platform.
       </Dialog.Description>
     </Dialog.Header>
     <div class="py-4">
-      <Label class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-red)]">
+      <Label class="font-mono text-xs uppercase tracking-wider text-destructive">
         Reason (required)
       </Label>
       <textarea
         bind:value={banReason}
         placeholder="Enter the reason for banning this user..."
-        class="w-full h-24 p-3 text-sm font-mono border border-[var(--cyber-red)]/30 rounded bg-background/50 resize-none mt-2
-               focus:border-[var(--cyber-red)] focus:ring-1 focus:ring-[var(--cyber-red)] focus:outline-none"
+        class="w-full h-24 p-3 text-sm font-mono border border-destructive/30 rounded bg-background/50 resize-none mt-2
+               focus:border-destructive focus:ring-1 focus:ring-destructive focus:outline-none"
       ></textarea>
     </div>
     <Dialog.Footer>
@@ -327,7 +327,7 @@
       <Button
         onclick={handleBan}
         disabled={actionLoading || !banReason.trim()}
-        class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/90 text-[var(--cyber-red-foreground)] disabled:opacity-50"
+        class="font-mono text-xs uppercase tracking-wider bg-destructive hover:bg-destructive/90 text-destructive-foreground disabled:opacity-50"
       >
         {#if actionLoading}
           <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>
@@ -340,15 +340,15 @@
 
 <!-- Role Dialog -->
 <Dialog.Root bind:open={showRoleDialog}>
-  <Dialog.Content class="sm:max-w-md cyber-card border-[var(--cyber-cyan)]/30">
+  <Dialog.Content class="sm:max-w-md cyber-card border-primary/30">
     <Dialog.Header>
-      <Dialog.Title class="font-mono text-[var(--cyber-cyan)]">[change_role]</Dialog.Title>
+      <Dialog.Title class="font-mono text-primary">[change_role]</Dialog.Title>
       <Dialog.Description class="font-mono text-xs">
         Change role for {user?.email}
       </Dialog.Description>
     </Dialog.Header>
     <div class="py-4">
-      <Label class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
+      <Label class="font-mono text-xs uppercase tracking-wider text-primary">
         New Role
       </Label>
       <Select.Root
@@ -367,7 +367,7 @@
         </Select.Content>
       </Select.Root>
       {#if newRole === "admin"}
-        <p class="mt-2 text-xs text-[var(--cyber-amber)] font-mono">
+        <p class="mt-2 text-xs text-chart-4 font-mono">
           Warning: Admins have full access to manage all users and system settings.
         </p>
       {/if}
@@ -383,7 +383,7 @@
       <Button
         onclick={handleRoleChange}
         disabled={actionLoading || newRole === user?.role}
-        class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)] disabled:opacity-50"
+        class="font-mono text-xs uppercase tracking-wider bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50"
       >
         {#if actionLoading}
           <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>

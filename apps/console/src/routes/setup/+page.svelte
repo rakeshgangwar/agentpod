@@ -15,8 +15,8 @@
   <div class="text-center animate-fade-in-up">
     <!-- Cyber loading spinner -->
     <div class="relative mx-auto w-12 h-12">
-      <div class="absolute inset-0 rounded-full border-2 border-[var(--cyber-cyan)]/20"></div>
-      <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--cyber-cyan)] animate-spin"></div>
+      <div class="absolute inset-0 rounded-full border-2 border-primary/20"></div>
+      <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--primary)] animate-spin"></div>
     </div>
     <p class="mt-4 text-sm font-mono text-muted-foreground">
       Redirecting<span class="typing-cursor"></span>

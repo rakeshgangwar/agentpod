@@ -42,7 +42,7 @@
 <div class="space-y-6">
   <!-- Mode Selector -->
   <div class="space-y-3">
-    <Label class="text-xs font-mono uppercase tracking-wider text-[var(--cyber-cyan)]">Color Mode</Label>
+    <Label class="text-xs font-mono uppercase tracking-wider text-primary">Color Mode</Label>
     <div class="grid grid-cols-3 gap-2">
       {#each modeOptions as option}
         <button
@@ -50,8 +50,8 @@
           onclick={() => handleModeChange(option.value)}
           class="flex flex-col items-center gap-2 p-3 rounded border transition-all font-mono
             {themeStore.mode === option.value
-              ? 'border-[var(--cyber-cyan)] bg-[var(--cyber-cyan)]/10 text-[var(--cyber-cyan)]'
-              : 'border-border/30 bg-background/50 hover:border-[var(--cyber-cyan)]/30 hover:bg-[var(--cyber-cyan)]/5'}"
+              ? 'border-primary bg-primary/10 text-primary'
+              : 'border-border/30 bg-background/50 hover:border-primary/30 hover:bg-primary/5'}"
         >
           <option.icon class="h-5 w-5" />
           <span class="text-xs font-medium">{option.label}</span>
@@ -69,7 +69,7 @@
 
   <!-- Category Filter -->
   <div class="space-y-3">
-    <Label class="text-xs font-mono uppercase tracking-wider text-[var(--cyber-cyan)]">Theme Category</Label>
+    <Label class="text-xs font-mono uppercase tracking-wider text-primary">Theme Category</Label>
     <Select.Root
       type="single"
       value={selectedCategory}
@@ -77,7 +77,7 @@
         if (v) selectedCategory = v as ThemeCategory | "all";
       }}
     >
-      <Select.Trigger class="w-full font-mono text-sm bg-background/50 border-border/50 focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)]">
+      <Select.Trigger class="w-full font-mono text-sm bg-background/50 border-border/50 focus:border-primary focus:ring-1 focus:ring-primary">
         {selectedCategory === "all" ? "All Categories" : getCategoryLabel(selectedCategory)}
       </Select.Trigger>
       <Select.Content class="font-mono">
@@ -92,7 +92,7 @@
   <!-- Theme Grid -->
   <div class="space-y-3">
     <div class="flex items-center justify-between">
-      <Label class="text-xs font-mono uppercase tracking-wider text-[var(--cyber-cyan)]">Theme Preset</Label>
+      <Label class="text-xs font-mono uppercase tracking-wider text-primary">Theme Preset</Label>
       <span class="text-xs text-muted-foreground font-mono">
         {filteredPresets.length} themes
       </span>
@@ -107,8 +107,8 @@
           onclick={() => handlePresetChange(preset.id)}
           class="relative flex flex-col rounded border overflow-hidden transition-all
             {isSelected
-              ? 'border-[var(--cyber-cyan)] ring-1 ring-[var(--cyber-cyan)]/30 shadow-[0_0_12px_var(--cyber-cyan)/15]'
-              : 'border-border/30 hover:border-[var(--cyber-cyan)]/50'}"
+              ? 'border-primary ring-1 ring-primary/30 shadow-[0_0_12px_var(--primary)/15]'
+              : 'border-border/30 hover:border-primary/50'}"
         >
           <!-- Color Preview -->
           <div
@@ -128,7 +128,7 @@
 
           <!-- Selected Indicator -->
           {#if isSelected}
-            <div class="absolute top-1 right-1 h-5 w-5 rounded-full bg-[var(--cyber-cyan)] flex items-center justify-center shadow-[0_0_8px_var(--cyber-cyan)]">
+            <div class="absolute top-1 right-1 h-5 w-5 rounded-full bg-primary flex items-center justify-center shadow-[0_0_8px_var(--primary)]">
               <CheckIcon class="h-3 w-3 text-black" />
             </div>
           {/if}
@@ -140,10 +140,10 @@
   <!-- Current Theme Info -->
   {#if themeStore.currentPreset}
     {@const currentColors = themeStore.getColorSchemePreview(themeStore.presetId)}
-    <div class="p-3 rounded border border-[var(--cyber-cyan)]/30 bg-[var(--cyber-cyan)]/5">
+    <div class="p-3 rounded border border-primary/30 bg-primary/5">
       <div class="flex items-center justify-between">
         <div>
-          <p class="text-sm font-mono font-medium text-[var(--cyber-cyan)]">{themeStore.currentPreset.label}</p>
+          <p class="text-sm font-mono font-medium text-primary">{themeStore.currentPreset.label}</p>
           <p class="text-xs text-muted-foreground font-mono capitalize">
             {themeStore.currentPreset.category} theme
           </p>

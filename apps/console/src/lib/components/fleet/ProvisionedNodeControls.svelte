@@ -76,7 +76,7 @@
   <!-- Provisioned badge -->
   <Badge
     variant="outline"
-    class="font-mono text-xs border-[var(--cyber-cyan)]/50 text-[var(--cyber-cyan)]"
+    class="font-mono text-xs border-primary/50 text-primary"
   >
     provisioned · {provisioned.provider}
   </Badge>

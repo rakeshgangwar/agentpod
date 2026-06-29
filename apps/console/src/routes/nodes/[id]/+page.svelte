@@ -55,14 +55,14 @@
     </a>
     <div class="flex-1 min-w-0">
       <h1 class="text-xl font-bold font-mono tracking-tight">
-        Node: <span class="text-[var(--cyber-cyan)]">{node?.hostname ?? id}</span>
+        Node: <span class="text-primary">{node?.hostname ?? id}</span>
       </h1>
       {#if node}
         <div class="flex flex-wrap items-center gap-2 mt-1">
           <Badge
             variant={node.status === "online" ? "default" : "secondary"}
             class={node.status === "online"
-              ? "bg-[var(--cyber-emerald)] text-black border-transparent"
+              ? "bg-chart-2 text-black border-transparent"
               : ""}
           >
             {node.status}
@@ -118,14 +118,14 @@
     {:else}
       <div class="flex flex-col gap-2 md:grid md:grid-cols-2 lg:grid-cols-3">
         {#each stations.detected as s (s.key)}
-          <Card.Root class="transition-colors hover:border-[var(--cyber-cyan)]/40">
+          <Card.Root class="transition-colors hover:border-primary/40">
             <Card.Content class="flex items-center justify-between gap-3 p-4">
               <div class="flex flex-col gap-1 min-w-0">
                 <span class="text-sm font-semibold truncate">{s.displayName}</span>
                 <div class="flex items-center gap-1.5 flex-wrap">
                   <Badge
                     variant="outline"
-                    class="font-mono text-[10px] text-[var(--cyber-cyan)] border-[var(--cyber-cyan)]/40"
+                    class="font-mono text-[10px] text-primary border-primary/40"
                   >
                     {s.harness}
                   </Badge>

@@ -106,9 +106,9 @@
   };
 
   const statusBadgeClass: Record<string, string> = {
-    connecting: "text-[var(--cyber-amber)] border-[var(--cyber-amber)]/50",
+    connecting: "text-chart-4 border-chart-4/50",
     connected:
-      "bg-[var(--cyber-emerald)] text-[var(--cyber-emerald-foreground)] border-transparent",
+      "bg-chart-2 text-chart-2 border-transparent",
     disconnected: "",
   };
 </script>

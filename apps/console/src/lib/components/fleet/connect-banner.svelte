@@ -20,14 +20,14 @@
 </script>
 
 <div
-  class="rounded border border-[var(--cyber-cyan)]/30 bg-gradient-to-r from-[var(--cyber-cyan)]/5 to-[var(--cyber-cyan)]/10 p-6"
+  class="rounded border border-primary/30 bg-gradient-to-r from-primary/5 to-primary/10 p-6"
   data-testid="connect-banner"
 >
   <div class="flex items-start gap-5">
     <!-- Icon -->
     <div class="flex-shrink-0">
       <div
-        class="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--cyber-cyan)]/10 border border-[var(--cyber-cyan)]/30 shadow-[0_0_16px_var(--cyber-cyan)/15]"
+        class="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 border border-primary/30 shadow-[0_0_16px_var(--primary)/15]"
       >
         <!-- Server / node icon -->
         <svg
@@ -40,7 +40,7 @@
           stroke-width="1.5"
           stroke-linecap="round"
           stroke-linejoin="round"
-          class="text-[var(--cyber-cyan)]"
+          class="text-primary"
         >
           <rect width="20" height="8" x="2" y="2" rx="2" ry="2" />
           <rect width="20" height="8" x="2" y="14" rx="2" ry="2" />
@@ -52,7 +52,7 @@
 
     <!-- Content -->
     <div class="flex-1 min-w-0">
-      <h3 class="font-mono font-semibold text-[var(--cyber-cyan)] text-base">
+      <h3 class="font-mono font-semibold text-primary text-base">
         [fleet] Connect your first node
       </h3>
       <p class="mt-2 text-sm text-muted-foreground font-mono leading-relaxed">
@@ -69,7 +69,7 @@
       <div class="mt-4 flex items-center gap-3">
         <Button
           size="sm"
-          class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)]"
+          class="font-mono text-xs uppercase tracking-wider bg-primary hover:bg-primary/90 text-primary-foreground"
           onclick={onCreateToken}
         >
           Create enrollment token

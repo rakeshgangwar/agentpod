@@ -208,7 +208,7 @@
                   "w-full text-left flex items-center gap-3 px-4 py-2.5 text-sm transition-colors",
                   "hover:bg-muted/50",
                   highlightIndex === idx &&
-                    "bg-[var(--cyber-cyan)]/10 text-[var(--cyber-cyan)]"
+                    "bg-primary/10 text-primary"
                 )}
                 onclick={() => item.run()}
                 onmouseenter={() => (highlightIndex = idx)}
@@ -235,7 +235,7 @@
                   "w-full text-left flex items-center gap-3 px-4 py-2.5 text-sm transition-colors",
                   "hover:bg-muted/50",
                   highlightIndex === idx &&
-                    "bg-[var(--cyber-cyan)]/10 text-[var(--cyber-cyan)]"
+                    "bg-primary/10 text-primary"
                 )}
                 onclick={() => item.run()}
                 onmouseenter={() => (highlightIndex = idx)}

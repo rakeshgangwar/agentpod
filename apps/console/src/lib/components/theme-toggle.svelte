@@ -57,7 +57,7 @@
     top: 3px;
     width: 28px;
     height: calc(100% - 6px);
-    background: var(--cyber-cyan);
+    background: var(--primary);
     opacity: 0.2;
     border-radius: 6px;
     transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -87,11 +87,11 @@
   }
 
   .theme-toggle-button.active {
-    color: var(--cyber-cyan);
+    color: var(--primary);
   }
 
   /* Add glow effect on active - only in dark mode where it's visible */
   :global(.dark) .theme-toggle-button.active :global(svg) {
-    filter: drop-shadow(0 0 4px var(--cyber-cyan));
+    filter: drop-shadow(0 0 4px var(--primary));
   }
 </style>

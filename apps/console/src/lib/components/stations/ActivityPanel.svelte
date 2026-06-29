@@ -54,7 +54,7 @@
 
   function resultClass(result: string): string {
     if (result === "ok")
-      return "bg-[var(--cyber-emerald)] text-[var(--cyber-emerald-foreground)] border-transparent";
+      return "bg-chart-2 text-chart-2 border-transparent";
     return "";
   }
 </script>

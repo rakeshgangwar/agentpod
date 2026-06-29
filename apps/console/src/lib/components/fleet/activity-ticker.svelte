@@ -92,12 +92,12 @@
     <!-- Label -->
     <div
       class="absolute left-0 top-0 bottom-0 z-10 flex items-center px-3"
-      style="background: var(--cyber-cyan); border-radius: var(--radius) 0 0 var(--radius);"
+      style="background: var(--primary); border-radius: var(--radius) 0 0 var(--radius);"
     >
       <!-- Arrow chevron tip -->
       <div
         class="absolute top-0 bottom-0 w-4"
-        style="right: -8px; background: var(--cyber-cyan); clip-path: polygon(0 0, 100% 50%, 0 100%);"
+        style="right: -8px; background: var(--primary); clip-path: polygon(0 0, 100% 50%, 0 100%);"
       ></div>
       <span class="font-mono text-[10px] font-bold tracking-widest text-black relative z-10">
         ACTIVITY
@@ -117,7 +117,7 @@
             class="font-mono text-[12px] px-3"
             style="color: hsl(var(--foreground) / 0.8);"
           >{item}</span>
-          <span style="color: var(--cyber-cyan); opacity: 0.4; font-size: 8px;">•</span>
+          <span style="color: var(--primary); opacity: 0.4; font-size: 8px;">•</span>
         {/each}
       </div>
     </div>

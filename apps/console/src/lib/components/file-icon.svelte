@@ -51,7 +51,7 @@
 {#if isDirectory}
   <!-- Use Lucide icons for directories (material-file-icons doesn't have folder icons) -->
   <span
-    class="file-icon inline-flex items-center justify-center flex-shrink-0 {sizeClasses[size]} {className} text-[var(--cyber-amber)]"
+    class="file-icon inline-flex items-center justify-center flex-shrink-0 {sizeClasses[size]} {className} text-chart-4"
     title={isExpanded ? "folder-open" : "folder"}
   >
     {#if isExpanded}
