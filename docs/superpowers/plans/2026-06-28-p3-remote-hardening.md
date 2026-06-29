@@ -4,7 +4,7 @@
 
 **Goal:** Run AgentPod for the real fleet over the public internet (no SSH tunnel) — hub hosted behind nginx at `hub.agentpod.dev`, console at `app.agentpod.dev`, node-agents dialing `wss://` as systemd services — and surface each station's Matrix identity.
 
-**Architecture:** Same-site subdomains (`app.`/`hub.` of `agentpod.dev`) make the Better Auth cookie work cross-subdomain, closing #71 without `SameSite=None`/bearer. The node-agent (already dial-out) gains TLS + reconnect + a service unit. Descriptors read each agent's Matrix mxid (never its token) into `Station.matrixId`, shown in the console with a `matrix.to` deep-link. Folds in #70 (logs tailing) and #89 (origin-list unification). The hub deploys onto the existing Matrix box (`178.105.68.68`) additively — its own Postgres + nginx vhost, never touching Synapse.
+**Architecture:** Same-site subdomains (`app.`/`hub.` of `agentpod.dev`) make the Better Auth cookie work cross-subdomain, closing #71 without `SameSite=None`/bearer. The node-agent (already dial-out) gains TLS + reconnect + a service unit. Descriptors read each agent's Matrix mxid (never its token) into `Station.matrixId`, shown in the console with a `matrix.to` deep-link. Folds in #70 (logs tailing) and #89 (origin-list unification). The hub deploys onto the existing Matrix box (`<HUB_HOST>`) additively — its own Postgres + nginx vhost, never touching Synapse.
 
 **Tech Stack:** TS + zod (contract); Go (node-agent); Bun + Hono + Drizzle + Better Auth + Postgres (hub); SvelteKit + Svelte 5 (console); nginx + systemd + certbot (deploy).
 
@@ -217,11 +217,11 @@ func TestMatrixIDNeverReturnsToken(t *testing.T) {
 **Interfaces — Produces:**
 - `hub.agentpod.dev.conf` — nginx server block: `server_name hub.agentpod.dev;`, TLS (certbot), `location /` → `proxy_pass http://127.0.0.1:3001;` with **WS upgrade** headers (`proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_read_timeout 3600s;`) and `X-Forwarded-*`.
 - `agentpod-hub.service` — runs `bun run start` from the hub dir, `Restart=always`, `Environment=DATABASE_URL=… PORT=3001 COOKIE_DOMAIN=.agentpod.dev COOKIE_SECURE=true ALLOWED_ORIGINS=https://app.agentpod.dev PUBLIC_URL=https://hub.agentpod.dev`.
-- `README-deploy.md` — the exact, additive sequence (every server step gated): create DNS A-records (`hub`,`app`→178.105.68.68); `apt install postgresql` + create `agentpod` DB + `CREATE EXTENSION vector` (or pgvector pkg); copy the hub build + the service unit; run Drizzle migrations; drop in the nginx vhost, `nginx -t`, `certbot --nginx -d hub.agentpod.dev -d app.agentpod.dev`, reload; build the console with `PUBLIC_HUB_URL=https://hub.agentpod.dev` and serve `app.agentpod.dev` from nginx. **Never** edit the `id.agentpod.dev` vhost or Synapse's sqlite.
+- `README-deploy.md` — the exact, additive sequence (every server step gated): create DNS A-records (`hub`,`app`→<HUB_HOST>); `apt install postgresql` + create `agentpod` DB + `CREATE EXTENSION vector` (or pgvector pkg); copy the hub build + the service unit; run Drizzle migrations; drop in the nginx vhost, `nginx -t`, `certbot --nginx -d hub.agentpod.dev -d app.agentpod.dev`, reload; build the console with `PUBLIC_HUB_URL=https://hub.agentpod.dev` and serve `app.agentpod.dev` from nginx. **Never** edit the `id.agentpod.dev` vhost or Synapse's sqlite.
 
 - [ ] **Step 1: Author artifacts** — write the nginx conf, the systemd unit, and the runbook with exact commands + the additive/safety guardrails.
 - [ ] **Step 2: Lint** — `nginx -t` against the conf in a local nginx container if available; `systemd-analyze verify` the unit; shellcheck any snippets.
-- [ ] **Step 3: Execute deploy (operator-gated)** — run the runbook on `178.105.68.68`, confirming `nginx -t` before each reload and that Synapse + `id.agentpod.dev` stay up throughout.
+- [ ] **Step 3: Execute deploy (operator-gated)** — run the runbook on `<HUB_HOST>`, confirming `nginx -t` before each reload and that Synapse + `id.agentpod.dev` stay up throughout.
 - [ ] **Step 4: Validate** — `curl https://hub.agentpod.dev/health` returns ok over TLS; `https://app.agentpod.dev` serves the console; `id.agentpod.dev` (Matrix) still responds.
 - [ ] **Step 5: Commit** — `chore(deploy): hub nginx vhost + systemd unit + runbook (P3)`
 

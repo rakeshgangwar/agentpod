@@ -26,7 +26,7 @@ First tagged release of AgentPod **as the fleet/facilities console** for agent r
 - [ ] **`CHANGELOG.md`** (new) — v0.1.0 highlights (the §0 "In" list) + known limitations (§0 "Out").
 - [~] **Docs hygiene** — `docs/` has ~191 files, many OpenCode-era. Confirm OpenCode docs are under `docs/archive/` (the README claims so); move any stragglers. Not a blocker.
 
-## 3. Deployment mechanics (prod: `178.105.68.68`, `hub.agentpod.dev` / `app.agentpod.dev`)
+## 3. Deployment mechanics (prod: `<HUB_HOST>`, `hub.agentpod.dev` / `app.agentpod.dev`)
 
 **Constraints (from P3):** additive only · **never touch Synapse / the `id.agentpod.dev` vhost** · `nginx -t` before every reload · operator-gated remote steps.
 
