@@ -8,7 +8,9 @@ First tagged release of AgentPod **as the fleet/facilities console** for agent r
 
 **In:** attach-first node-agent (dial-out WSS, reconnect, systemd) · inventory/health/logs/filesystem · write ops + durable terminal · config edit (backup/diff) · lifecycle + cleanup · per-harness descriptors (Hermes, OpenClaw, Claude Code, Codex, **OpenCode**) · remote/hosted (subdomain cookies) + Matrix identity (level A) · **provisioning** (Docker + Cloudflare drivers; Docker dogfood-proven; harness-preloaded OpenCode + auto-adopt) · unified responsive console (fleet-first IA, Cmd-K palette, activity ticker, connect banner).
 
-**Out / deferred (documented as known limitations):** Phase 2 cleanup (#135–139: hub OpenCode backend, `docker/`, `cloudflare/worker`, Tauri removal, `config/`) · Cloudflare provisioning **live-unverified** · provisioning repo-clone / credential-injection · multi-tenant.
+**Single-operator (tenant-of-one).** v0.1.0 targets the operator's own fleet, one admin account. The data model carries owner/tenant scope (multi-tenant *ready*), but multi-tenancy — org management, tenant-isolation enforcement, signup/onboarding for others, billing/quotas — is **out of v0.1.0** and a deliberate post-release effort.
+
+**Out / deferred (documented as known limitations):** **multi-tenancy** (single-operator only — see above) · Phase 2 cleanup (#135–139: hub OpenCode backend, `docker/`, `cloudflare/worker`, Tauri removal, `config/`) · Cloudflare provisioning **live-unverified** · provisioning repo-clone / credential-injection.
 
 ## 1. Pre-release code gates
 
