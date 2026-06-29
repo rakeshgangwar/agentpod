@@ -13,11 +13,6 @@ import { user, session, type User, type UserRole } from "../db/schema/auth";
 import { sandboxes } from "../db/schema/sandboxes";
 import { eq, desc, sql, like, or, and, count, inArray } from "drizzle-orm";
 import { createLogger } from "../utils/logger";
-import { 
-  getUserResourceLimits, 
-  getUserResourceUsage,
-  type UserResourceLimits,
-} from "./user-resource-limits";
 
 const log = createLogger("admin-users");
 
@@ -41,8 +36,6 @@ export interface AdminUserView {
   // Stats
   sandboxCount: number;
   runningSandboxCount: number;
-  // Limits (optional, loaded on detail view)
-  limits?: UserResourceLimits;
 }
 
 export interface ListUsersOptions {
@@ -191,10 +184,15 @@ export async function getUserById(userId: string): Promise<AdminUserView | null>
   if (!row) return null;
 
   // Get sandbox counts
-  const usage = await getUserResourceUsage(userId);
+  const [totalResult] = await db
+    .select({ count: count() })
+    .from(sandboxes)
+    .where(eq(sandboxes.userId, userId));
 
-  // Get limits
-  const limits = await getUserResourceLimits(userId);
+  const [runningResult] = await db
+    .select({ count: count() })
+    .from(sandboxes)
+    .where(and(eq(sandboxes.userId, userId), eq(sandboxes.status, "running")));
 
   return {
     id: row.id,
@@ -208,9 +206,8 @@ export async function getUserById(userId: string): Promise<AdminUserView | null>
     bannedAt: row.bannedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
-    sandboxCount: usage.sandboxCount,
-    runningSandboxCount: usage.runningSandboxCount,
-    limits,
+    sandboxCount: totalResult?.count ?? 0,
+    runningSandboxCount: runningResult?.count ?? 0,
   };
 }
 

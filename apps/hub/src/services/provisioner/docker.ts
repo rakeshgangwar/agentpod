@@ -10,8 +10,8 @@
  */
 
 import type { RuntimeProvisioner, ProvisionSpec } from "./types";
-import { DockerOrchestrator } from "../orchestrator/docker";
-import type { ResourceLimits } from "../orchestrator/types";
+import { DockerOrchestrator } from "./docker-orchestrator";
+import type { ResourceLimits } from "./docker-orchestrator";
 
 // ─── Resource tier mapping ────────────────────────────────────────────────────
 

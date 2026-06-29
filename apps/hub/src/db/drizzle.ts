@@ -12,7 +12,6 @@ import * as schema from "./schema";
 import { createLogger } from "../utils/logger";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ensureAgentCatalog } from "../services/agent-catalog-service";
 
 const log = createLogger("database");
 
@@ -194,12 +193,6 @@ export async function initDatabase(): Promise<void> {
 
   // Create vector index (after migrations have created the tables)
   await createVectorIndex();
-
-  // Seed reference data (idempotent)
-  await seedReferenceData();
-
-  // Seed agent catalog (idempotent)
-  await ensureAgentCatalog();
 
   log.info("Database initialized successfully");
 }

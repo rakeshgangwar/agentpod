@@ -4,7 +4,6 @@ import { logger } from 'hono/logger';
 import { config, allowedOrigins, isAllowedOrigin } from './config.ts';
 import { validateConfig } from './utils/validate-config.ts';
 import { initDatabase } from './db/drizzle.ts';
-import { ensureSsoViews } from './db/sso-views.ts';
 import { auth } from './auth/drizzle-auth.ts';
 import { authMiddleware } from './auth/middleware.ts';
 import { securityHeadersMiddleware } from './middleware/security-headers.ts';
@@ -12,42 +11,15 @@ import { rateLimitMiddleware } from './middleware/rate-limit.ts';
 import { csrfMiddleware } from './middleware/csrf.ts';
 import { createLogger } from './utils/logger.ts';
 import { healthRoutes } from './routes/health.ts';
-import { userRoutes } from './routes/users.ts';
-import { resourceTiersRouter } from './routes/resource-tiers.ts';
-import { flavorsRouter } from './routes/flavors.ts';
-import { addonsRouter } from './routes/addons.ts';
-import { dockerRouter } from './routes/docker.ts';
-import { providerRoutes } from './routes/providers.ts';
-import { preferencesRoutes } from './routes/preferences.ts';
-import { activityRoutes } from './routes/activity.ts';
-import { accountRoutes } from './routes/account.ts';
-// v2 Routes (direct Docker orchestrator)
-import { sandboxRoutes, sandboxHealthRoutes, pendingActionsRoutes } from './routes/sandboxes.ts';
-import { repoRoutes } from './routes/repos.ts';
-import { chatRoutes } from './routes/chat.ts';
-// Terminal WebSocket routes
-import { terminalRoutes, cleanupTerminalSessions } from './routes/terminal.ts';
 // Node gateway WebSocket routes
 import { gatewayRoutes } from './routes/gateway.ts';
 // Shared Bun WebSocket handler (terminal + gateway share one instance)
 import { websocket } from './ws.ts';
-// Onboarding system routes
-import { knowledgeRoutes } from './routes/knowledge.ts';
-import { onboardingRoutes } from './routes/onboarding.ts';
-import { mcpKnowledgeRoutes } from './routes/mcp-knowledge.ts';
 // Admin routes
 import { adminRouter } from './routes/admin.ts';
 import { banCheckMiddleware, signupCheckMiddleware } from './auth/admin-middleware.ts';
-// Preview routes
-import { previewRoutes, publicPreviewRoutes } from './routes/preview.ts';
-// Cloudflare sandbox integration
-import { agentRoutes } from './routes/agents.ts';
+// Cloudflare webhook integration
 import { cloudflareWebhookRoutes } from './routes/cloudflare-webhook.ts';
-import { workflowRoutes, workflowExecutionRoutes } from './routes/workflows.ts';
-import { sessionForkRoutes } from './routes/session-forks.ts';
-// MetaMCP integration
-import { mcpServerRoutes, mcpNamespaceRoutes, mcpEndpointRoutes, mcpStatusRoutes, mcpApiKeyRoutes, mcpPublicStatusRoutes } from './routes/mcp-servers.ts';
-import { mcpOauthRoutes } from './routes/mcp-oauth.ts';
 // Node fleet enrollment & registry
 import { nodeEnrollRoutes, nodeRoutes } from './routes/nodes.ts';
 import { enrollmentTokenRoutes } from './routes/enrollment-tokens.ts';
@@ -67,9 +39,6 @@ import { stationLifecycleRoutes } from './routes/station-lifecycle.ts';
 import { stationCleanupRoutes } from './routes/station-cleanup.ts';
 // Middleware
 import { activityLoggerMiddleware } from './middleware/activity-logger.ts';
-// Sync services
-import { startSyncForRunningSandboxes, stopAllSync } from './services/sync/opencode-sync.ts';
-import { startArchivalService, stopArchivalService } from './services/sync/activity-archival.ts';
 import { registerEnabledProvisioners } from './services/provisioner/bootstrap.ts';
 import { enabledProviders } from './services/provisioner/registry.ts';
 
@@ -77,9 +46,6 @@ validateConfig();
 
 console.log('Initializing database...');
 await initDatabase();
-
-console.log('Setting up SSO views for MetaMCP integration...');
-await ensureSsoViews();
 
 const errorLogger = createLogger('error-handler');
 
@@ -105,7 +71,6 @@ const app = new Hono()
   .use('*', securityHeadersMiddleware)
   .use('*', rateLimitMiddleware)
   .route('/', healthRoutes)
-  .route('/mcp/status', mcpPublicStatusRoutes)
   // Public node enrollment (no session — node authenticates with a one-time token in the body)
   .route('/public/nodes', nodeEnrollRoutes)  // POST /public/nodes/enroll
   // Public node gateway (no session — node authenticates with long-term credentials)
@@ -120,45 +85,10 @@ const app = new Hono()
   .use('/api/*', banCheckMiddleware) // Block banned users
   .use('/api/*', csrfMiddleware)
   .use('/api/*', activityLoggerMiddleware)
-  // User configuration endpoints
-  .route('/api/users', userRoutes) // User OpenCode config
-  .route('/api/users/me/preferences', preferencesRoutes) // User preferences (sync)
-  .route('/api/users/me/activity', activityRoutes) // User activity log
-  .route('/api/account', accountRoutes) // Account management (delete, export)
-  // LLM Provider configuration endpoints
-  .route('/api/providers', providerRoutes) // LLM provider management
-  // Modular container configuration endpoints
-  .route('/api/resource-tiers', resourceTiersRouter) // Resource tiers (CPU, memory, storage)
-  .route('/api/flavors', flavorsRouter) // Container flavors (language environments)
-  .route('/api/addons', addonsRouter) // Container addons (optional features)
-  .route('/api/docker', dockerRouter) // Docker image management
-  // v2 API routes (direct Docker orchestrator)
-  .route('/api/v2/sandboxes', sandboxRoutes) // Sandbox management
-  .route('/api/v2/sandboxes', chatRoutes) // Chat history (persisted)
-  .route('/api/v2/sandboxes', terminalRoutes) // Terminal WebSocket (interactive shell)
-  .route('/api/v2/repos', repoRoutes) // Git repository management
-  .route('/api/v2/health', sandboxHealthRoutes) // Health checks (includes /docker)
-  .route('/api/v2/pending-actions', pendingActionsRoutes) // Global pending actions
-  .route('/api/v2/sandboxes/:id/preview', previewRoutes) // Preview port management
-  .route('/p', publicPreviewRoutes) // Public preview redirect
-  // Onboarding system endpoints
-  .route('/api/knowledge', knowledgeRoutes) // Knowledge documents
-  .route('/api/onboarding', onboardingRoutes) // Onboarding sessions
-  .route('/api/mcp/knowledge', mcpKnowledgeRoutes)
   // Admin endpoints (require admin role)
   .route('/api/admin', adminRouter)
-  // Cloudflare sandbox integration
-  .route('/api/v2/agents', agentRoutes)
+  // Cloudflare webhook integration
   .route('/api/v2/cloudflare', cloudflareWebhookRoutes)
-  .route('/api/v2/workflow-executions', workflowExecutionRoutes)
-  .route('/api/workflows', workflowRoutes)
-  .route('/api/v2/sandboxes', sessionForkRoutes)
-  .route('/api/mcp/servers', mcpServerRoutes)
-  .route('/api/mcp/namespaces', mcpNamespaceRoutes)
-  .route('/api/mcp/endpoints', mcpEndpointRoutes)
-  .route('/api/mcp/status', mcpStatusRoutes)
-  .route('/api/mcp/keys', mcpApiKeyRoutes)
-  .route('/api/mcp/oauth', mcpOauthRoutes)
   // Node fleet management (authenticated)
   .route('/api/enrollment-tokens', enrollmentTokenRoutes)  // POST /api/enrollment-tokens
   .route('/api/nodes', nodeRoutes)                         // GET /api/nodes
@@ -220,27 +150,6 @@ export type AppType = typeof app;
 // Export app for testing
 export { app };
 
-// Start sync services for running sandboxes.
-// OpenCode-era sandbox sync (pulls in native deps like ssh2). The fleet console
-// does not use it; gate behind ENABLE_OPENCODE_SYNC so it can be turned off on
-// deployments without OpenCode sandboxes.
-if (process.env.ENABLE_OPENCODE_SYNC !== 'false') {
-  console.log('Starting sync services for running sandboxes...');
-  startSyncForRunningSandboxes().catch((error) => {
-    console.error('Failed to start sync services:', error);
-  });
-} else {
-  console.log('OpenCode sandbox sync disabled (ENABLE_OPENCODE_SYNC=false)');
-}
-
-// Start activity archival service (runs daily at 3 AM).
-if (process.env.ENABLE_ACTIVITY_ARCHIVAL !== 'false') {
-  console.log('Starting activity archival service...');
-  startArchivalService();
-} else {
-  console.log('Activity archival disabled (ENABLE_ACTIVITY_ARCHIVAL=false)');
-}
-
 // Register runtime provisioner drivers (Docker/Cloudflare) for enabled providers.
 // Without this, provisioning returns 400 ("provider not registered").
 registerEnabledProvisioners();
@@ -249,17 +158,11 @@ console.log('Provisioners registered:', enabledProviders().join(', ') || '(none 
 // Handle graceful shutdown
 process.on('SIGINT', () => {
   console.log('Shutting down...');
-  cleanupTerminalSessions();
-  stopAllSync();
-  stopArchivalService();
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
   console.log('Shutting down...');
-  cleanupTerminalSessions();
-  stopAllSync();
-  stopArchivalService();
   process.exit(0);
 });
 
@@ -268,7 +171,7 @@ const port = config.port;
 
 console.log(`
 ╔═══════════════════════════════════════════════════════════════╗
-║              Management API - Portable Command Center         ║
+║              AgentPod Fleet Console — Hub API                 ║
 ╠═══════════════════════════════════════════════════════════════╣
 ║  Port:        ${String(port).padEnd(46)}║
 ║  Environment: ${config.nodeEnv.padEnd(46)}║
@@ -282,111 +185,35 @@ console.log(`
 ║  - GET  /api/auth/session             Get current session     ║
 ║  - POST /api/auth/sign-out            Sign out                ║
 ╠═══════════════════════════════════════════════════════════════╣
-║  LLM Provider Endpoints:                                      ║
-║  - GET  /api/providers                List all providers      ║
-║  - GET  /api/providers/configured     Configured providers    ║
-║  - GET  /api/providers/default        Get default provider    ║
-║  - POST /api/providers/:id/configure  Configure API key       ║
-║  - POST /api/providers/:id/oauth/init Start OAuth device flow ║
-║  - POST /api/providers/:id/set-default Set as default         ║
-║  - DELETE /api/providers/:id          Remove credentials      ║
-╠═══════════════════════════════════════════════════════════════╣
-║  Modular Container Endpoints:                                 ║
-║  - GET  /api/resource-tiers           List resource tiers     ║
-║  - GET  /api/resource-tiers/default   Get default tier        ║
-║  - GET  /api/flavors                  List language flavors   ║
-║  - GET  /api/flavors/default          Get default flavor      ║
-║  - GET  /api/addons                   List all addons         ║
-║  - GET  /api/addons/by-category/:c    Get addons by category  ║
-║  - POST /api/addons/validate          Validate addon config   ║
-╠═══════════════════════════════════════════════════════════════╣
-║  v2 Sandbox Endpoints (Direct Docker):                        ║
-║  - GET  /api/v2/sandboxes             List sandboxes          ║
-║  - POST /api/v2/sandboxes             Create sandbox          ║
-║  - GET  /api/v2/sandboxes/:id         Get sandbox             ║
-║  - DELETE /api/v2/sandboxes/:id       Delete sandbox          ║
-║  - POST /api/v2/sandboxes/:id/start   Start sandbox           ║
-║  - POST /api/v2/sandboxes/:id/stop    Stop sandbox            ║
-║  - POST /api/v2/sandboxes/:id/exec    Execute command         ║
-║  - GET  /api/v2/sandboxes/:id/logs    Get logs                ║
-║  - GET  /api/v2/sandboxes/:id/stats   Get resource stats      ║
-║  - WS   /api/v2/sandboxes/:id/terminal  Interactive terminal  ║
-╠═══════════════════════════════════════════════════════════════╣
-║  v2 OpenCode Endpoints (per sandbox):                         ║
-║  - GET  /api/v2/sandboxes/:id/opencode/session   List sessions║
-║  - POST /api/v2/sandboxes/:id/opencode/session   Create       ║
-║  - POST .../session/:sid/message                 Send message ║
-║  - GET  /api/v2/sandboxes/:id/opencode/event     SSE stream   ║
-║  - GET  /api/v2/sandboxes/:id/opencode/file      List files   ║
-╠═══════════════════════════════════════════════════════════════╣
-║  v2 Chat History Endpoints (persisted):                       ║
-║  - GET  .../chat/sessions             List sessions           ║
-║  - GET  .../chat/sessions/:sid        Get session + messages  ║
-║  - GET  .../chat/sessions/:sid/messages  Paginated messages   ║
-║  - POST .../chat/sessions/:sid/sync   Force sync              ║
-║  - DELETE .../chat/sessions/:sid      Archive session         ║
-║  - POST /api/v2/sandboxes/:id/chat/sync  Full sync            ║
-╠═══════════════════════════════════════════════════════════════╣
-║  v2 Repository Endpoints:                                     ║
-║  - GET  /api/v2/repos                 List repositories       ║
-║  - POST /api/v2/repos                 Create repository       ║
-║  - POST /api/v2/repos/clone           Clone from URL          ║
-║  - GET  /api/v2/repos/:name/files     List files              ║
-║  - GET  /api/v2/repos/:name/status    Git status              ║
-║  - POST /api/v2/repos/:name/commit    Create commit           ║
-║  - GET  /api/v2/health/docker         Docker health check     ║
-╠═══════════════════════════════════════════════════════════════╣
-║  User Preferences Endpoints:                                  ║
-║  - GET  /api/users/me/preferences     Get preferences         ║
-║  - PUT  /api/users/me/preferences     Replace preferences     ║
-║  - PATCH /api/users/me/preferences    Partial update          ║
-║  - GET  /api/users/me/preferences/version  Get version        ║
-║  - GET  /api/users/me/preferences/sync     Check sync status  ║
-║  - DELETE /api/users/me/preferences   Reset to defaults       ║
-╠═══════════════════════════════════════════════════════════════╣
-║  User Activity Endpoints:                                     ║
-║  - GET  /api/users/me/activity        List activity logs      ║
-║  - GET  /api/users/me/activity/stats  Get activity stats      ║
-║  - GET  /api/users/me/activity/export Export as JSON/CSV      ║
-╠═══════════════════════════════════════════════════════════════╣
-║  Account Management Endpoints:                                ║
-║  - GET  /api/account                  Get account info        ║
-║  - DELETE /api/account                Delete account          ║
-║  - GET  /api/account/data-export      Export all user data    ║
-╠═══════════════════════════════════════════════════════════════╣
-║  Onboarding System Endpoints:                                 ║
-║  - GET  /api/knowledge                Search knowledge docs   ║
-║  - GET  /api/knowledge/:id            Get document            ║
-║  - GET  /api/knowledge/categories     List categories         ║
-║  - GET  /api/knowledge/stats          Get statistics          ║
-║  - POST /api/knowledge/search         Advanced search         ║
-║  - GET  /api/onboarding               List sessions           ║
-║  - POST /api/onboarding               Create session          ║
-║  - GET  /api/onboarding/:id           Get session             ║
-║  - POST /api/onboarding/:id/start     Start onboarding        ║
-║  - POST /api/onboarding/:id/complete  Complete onboarding     ║
-║  - GET  /api/onboarding/models/recommend  Model recommendations║
-╠═══════════════════════════════════════════════════════════════╣
-║  MCP Knowledge Server (for onboarding agent):                 ║
-║  - POST /api/mcp/knowledge              MCP tool endpoint     ║
-║    - tools/list: List available tools                         ║
-║    - tools/call: search_knowledge, get_project_template,      ║
-║                  get_agent_pattern, list_project_types, etc.  ║
-╠═══════════════════════════════════════════════════════════════╣
 ║  Admin Endpoints (require admin role):                        ║
 ║  - GET  /api/admin/users                List all users        ║
 ║  - GET  /api/admin/users/:id            Get user details      ║
 ║  - POST /api/admin/users/:id/ban        Ban user              ║
 ║  - POST /api/admin/users/:id/unban      Unban user            ║
 ║  - PUT  /api/admin/users/:id/role       Update user role      ║
-║  - GET  /api/admin/users/:id/limits     Get user limits       ║
-║  - PUT  /api/admin/users/:id/limits     Update user limits    ║
-║  - GET  /api/admin/users/:id/sandboxes  List user sandboxes   ║
-║  - GET  /api/admin/sandboxes            List all sandboxes    ║
-║  - DELETE /api/admin/sandboxes/:id      Force delete sandbox  ║
-║  - POST /api/admin/sandboxes/:id/stop   Force stop sandbox    ║
-║  - GET  /api/admin/stats                System statistics     ║
 ║  - GET  /api/admin/audit-log            Admin audit log       ║
+╠═══════════════════════════════════════════════════════════════╣
+║  Node Fleet Endpoints:                                        ║
+║  - POST /public/nodes/enroll          Enroll node             ║
+║  - GET  /public/nodes/gateway         Node gateway (WSS)      ║
+║  - GET  /api/nodes                    List nodes              ║
+║  - GET  /api/enrollment-tokens        List tokens             ║
+║  - POST /api/enrollment-tokens        Create token            ║
+╠═══════════════════════════════════════════════════════════════╣
+║  Runtime Endpoints:                                           ║
+║  - GET  /api/runtimes                 List runtimes           ║
+║  - POST /api/runtimes                 Provision runtime       ║
+║  - DELETE /api/runtimes/:id           Destroy runtime         ║
+╠═══════════════════════════════════════════════════════════════╣
+║  Station Endpoints:                                           ║
+║  - GET  /api/stations                 List stations           ║
+║  - GET  /api/stations/:id             Get station             ║
+║  - WS   /api/stations/:id/terminal    Station terminal        ║
+║  - GET  /api/stations/:id/activity    Station audit log       ║
+║  - GET  /api/activity                 Fleet-wide activity     ║
+║  - POST /api/stations/:id/fs/write    Write file              ║
+║  - POST /api/stations/:id/lifecycle   Lifecycle control       ║
+║  - POST /api/stations/:id/cleanup     Cleanup (plan/apply)    ║
 ╚═══════════════════════════════════════════════════════════════╝
 `);
 

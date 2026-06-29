@@ -6,7 +6,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning: [S
 
 ---
 
-## [0.1.0] - YYYY-MM-DD
+## [0.1.0] - 2026-06-29
 
 First tagged release of AgentPod **as a fleet/facilities console for agent runtimes**. The OpenCode era is frozen at [`v0.0.4-opencode`](#legacy-v004-opencode).
 
@@ -36,7 +36,7 @@ First tagged release of AgentPod **as a fleet/facilities console for agent runti
 - Each descriptor wraps the harness's native CLI/API for detection, enumeration, path resolution, lifecycle, and logs — no hub logic in descriptors.
 
 **Remote / hosted + Matrix identity**
-- Subdomain cookie sharing (`Domain=.<your-domain>; Secure`) so `app.` and `hub.` subdomains share a session.
+- Subdomain cookie sharing (`Domain=.<your-domain>; Secure`) so the console (`console.`) and hub (`hub.`) subdomains share a session — the console deploys on Cloudflare Pages, the hub on a VPS, both under one registrable domain.
 - Hermes stations: Matrix ID display + `matrix.to` deep-link in the station detail panel.
 
 **Provisioning**

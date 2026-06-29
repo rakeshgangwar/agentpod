@@ -9,8 +9,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { DockerRuntimeProvisioner } from "./docker";
-import type { DockerOrchestrator } from "../orchestrator/docker";
-import type { SandboxConfig, Sandbox } from "../orchestrator/types";
+import type { DockerOrchestrator, SandboxConfig, Sandbox } from "./docker-orchestrator";
 
 // ─── Fake container id returned by the fake orchestrator ─────────────────────
 
