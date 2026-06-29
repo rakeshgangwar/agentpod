@@ -5,7 +5,6 @@
  * Management API using the auth token from Tauri storage.
  */
 
-import { authGetToken, getConnectionStatus } from "./tauri";
 import type {
   AdminUserView,
   AdminStats,
@@ -26,12 +25,14 @@ import type { Sandbox } from "./tauri";
 /**
  * Get the base URL for API calls
  */
-async function getApiBaseUrl(): Promise<string> {
-  const status = await getConnectionStatus();
-  if (!status.connected || !status.apiUrl) {
-    throw new Error("Not connected to Management API");
-  }
-  return status.apiUrl;
+function getApiBaseUrl(): string {
+  // Mirror api/client.ts: resolve the hub URL from the saved connection or the
+  // build-time PUBLIC_HUB_URL. (Previously used Tauri getConnectionStatus, which
+  // is undefined in the web build — calling it threw "reading 'invoke'" and broke
+  // every admin API call, so the admin guard denied access even to real admins.)
+  const stored =
+    typeof window !== "undefined" ? window.localStorage.getItem("agentpod.apiUrl") : null;
+  return stored ?? import.meta.env.PUBLIC_HUB_URL ?? "http://localhost:3001";
 }
 
 /**
@@ -41,17 +42,13 @@ async function apiRequest<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const baseUrl = await getApiBaseUrl();
-  const token = await authGetToken();
-  
+  const baseUrl = getApiBaseUrl();
+
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string> || {}),
   };
-  
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
+  // Auth is via the session cookie (credentials: "include"), same as api/client.ts.
 
   const response = await fetch(`${baseUrl}${path}`, {
     ...options,
