@@ -87,6 +87,14 @@ export function getProvisioner(provider: string): RuntimeProvisioner {
   return instance;
 }
 
+/**
+ * Look up a registered provisioner WITHOUT the enabled-flag gate (for lifecycle
+ * ops on already-created runtimes). Returns undefined if not registered.
+ */
+export function getProvisionerUnguarded(provider: string): RuntimeProvisioner | undefined {
+  return _registry.get(provider as RuntimeProviderName);
+}
+
 // ─── Test helper ──────────────────────────────────────────────────────────────
 
 /**

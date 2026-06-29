@@ -20,6 +20,7 @@ import { provisionedRuntimes } from "../db/schema/nodes";
 import { mintEnrollmentToken } from "./enrollment";
 import {
   getProvisioner,
+  getProvisionerUnguarded,
   enabledProviders,
   isProviderEnabled,
 } from "./provisioner/registry";
@@ -94,10 +95,20 @@ export async function createRuntime(
 
   // Mint a short-lived enrollment token linked to this runtime.
   // The node-agent container will use it to self-enroll and flip the runtime online.
-  const { token: enrollToken } = await mintEnrollmentToken(userId, {
-    provisionedRuntimeId: id,
-    ttlMs: 30 * 60 * 1000, // 30-minute window for the container to boot and enroll
-  });
+  let enrollToken: string;
+  try {
+    const result = await mintEnrollmentToken(userId, {
+      provisionedRuntimeId: id,
+      ttlMs: 30 * 60 * 1000, // 30-minute window for the container to boot and enroll
+    });
+    enrollToken = result.token;
+  } catch (err) {
+    await db
+      .update(provisionedRuntimes)
+      .set({ status: "error", updatedAt: new Date() })
+      .where(eq(provisionedRuntimes.id, id));
+    throw Object.assign(err as Error, { status: 502 });
+  }
 
   let provisioner: ReturnType<typeof getProvisioner>;
   try {
@@ -188,12 +199,16 @@ export async function destroyRuntime(userId: string, id: string): Promise<void> 
   }
 
   if (row.externalId) {
-    const provisioner = getProvisioner(row.provider);
-    try {
-      await provisioner.destroy(row.externalId);
-    } catch (err) {
-      throw Object.assign(err as Error, { status: 502 });
+    const provisioner = getProvisionerUnguarded(row.provider);
+    if (provisioner) {
+      try {
+        await provisioner.destroy(row.externalId);
+      } catch (err) {
+        throw Object.assign(err as Error, { status: 502 });
+      }
     }
+    // If no provisioner is registered (driver removed), skip the driver call
+    // but still mark the row destroyed — don't leave it dangling.
   }
 
   await db
@@ -217,7 +232,13 @@ export async function startRuntime(userId: string, id: string): Promise<void> {
     throw Object.assign(new Error("runtime not found"), { status: 404 });
   }
 
-  const provisioner = getProvisioner(row.provider);
+  const provisioner = getProvisionerUnguarded(row.provider);
+  if (!provisioner) {
+    throw Object.assign(
+      new Error(`provider not available: ${row.provider}`),
+      { status: 502 }
+    );
+  }
   if (!provisioner.start) {
     throw Object.assign(
       new Error(`provider ${row.provider} does not support start`),
@@ -252,7 +273,13 @@ export async function stopRuntime(userId: string, id: string): Promise<void> {
     throw Object.assign(new Error("runtime not found"), { status: 404 });
   }
 
-  const provisioner = getProvisioner(row.provider);
+  const provisioner = getProvisionerUnguarded(row.provider);
+  if (!provisioner) {
+    throw Object.assign(
+      new Error(`provider not available: ${row.provider}`),
+      { status: 502 }
+    );
+  }
   if (!provisioner.stop) {
     throw Object.assign(
       new Error(`provider ${row.provider} does not support stop`),

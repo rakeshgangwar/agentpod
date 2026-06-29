@@ -289,3 +289,68 @@ test("unauthenticated request → 401", async () => {
   });
   expect(res.status).toBe(401);
 }, 15_000);
+
+test("DELETE /api/runtimes/:id with provider flag OFF → still destroys row (no 500)", async () => {
+  // Create the runtime while ENABLE_DOCKER_PROVISIONING is still "true"
+  const createRes = await createRuntime(TEST_USER, "flag-off-box");
+  expect(createRes.status).toBe(201);
+  const created = (await createRes.json()) as { id: string; externalId: string };
+
+  const { id, externalId } = created;
+
+  // Disable the provider flag (provisioner is still registered in the map)
+  const originalFlag = process.env.ENABLE_DOCKER_PROVISIONING;
+  process.env.ENABLE_DOCKER_PROVISIONING = "false";
+
+  try {
+    const delRes = await testApp.request(`/api/runtimes/${id}`, {
+      method: "DELETE",
+      headers: { "X-Test-User-Id": TEST_USER },
+    });
+    // Must not be 500 — lifecycle op should succeed even though flag is off
+    expect(delRes.status).toBe(204);
+
+    // Fake destroy() was still called (provisioner still registered)
+    expect(fakeCalls.destroy).toContain(externalId);
+
+    // DB row must be marked destroyed
+    const [row] = await db
+      .select()
+      .from(provisionedRuntimes)
+      .where(eq(provisionedRuntimes.id, id));
+    expect(row!.status).toBe("destroyed");
+  } finally {
+    // Always restore the flag so subsequent tests are not affected
+    process.env.ENABLE_DOCKER_PROVISIONING = originalFlag;
+  }
+}, 30_000);
+
+test("DELETE /api/runtimes/:id with unregistered provisioner → row still marked destroyed", async () => {
+  // Create a runtime while the fake provisioner is registered
+  const createRes = await createRuntime(TEST_USER, "unregistered-box");
+  expect(createRes.status).toBe(201);
+  const created = (await createRes.json()) as { id: string; externalId: string };
+
+  const { id } = created;
+
+  // Clear the registry entirely so no provisioner is found for "docker"
+  resetProvisioners();
+
+  try {
+    const delRes = await testApp.request(`/api/runtimes/${id}`, {
+      method: "DELETE",
+      headers: { "X-Test-User-Id": TEST_USER },
+    });
+    // Driver is absent — but the row must still be cleaned up (no crash)
+    expect(delRes.status).toBe(204);
+
+    const [row] = await db
+      .select()
+      .from(provisionedRuntimes)
+      .where(eq(provisionedRuntimes.id, id));
+    expect(row!.status).toBe("destroyed");
+  } finally {
+    // Re-register the fake so later tests continue to work
+    registerProvisioner(fakeDockerProvisioner);
+  }
+}, 30_000);
