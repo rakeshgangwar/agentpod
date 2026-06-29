@@ -110,9 +110,7 @@ export const auth = betterAuth({
   // Trusted Origins (for CORS)
   // ==========================================================================
   trustedOrigins: [
-    "http://localhost:1420",  // Tauri dev
     "http://localhost:5173",  // Vite dev
-    "tauri://localhost",      // Tauri production
     config.publicUrl,         // API URL itself
   ],
 

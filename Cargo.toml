@@ -1,3 +1,0 @@
-[workspace]
-resolver = "2"
-members = ["apps/console/src-tauri", "tauri-plugin-mcp"]

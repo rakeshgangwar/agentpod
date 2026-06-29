@@ -72,9 +72,6 @@ jobs:
           node-version: 20
           cache: pnpm
 
-      # tauri-plugin-mcp is in the workspace but has no postinstall/prepare Rust
-      # step; pnpm-workspace.yaml gates build scripts to esbuild only via
-      # onlyBuiltDependencies, so --frozen-lockfile is safe without Rust.
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -126,9 +123,6 @@ jobs:
           node-version: 20
           cache: pnpm
 
-      # Same install caveat as hub: tauri-plugin-mcp build-plugin (Cargo) is not
-      # triggered by pnpm install; onlyBuiltDependencies limits lifecycle scripts
-      # to esbuild. No Rust toolchain needed.
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
