@@ -154,6 +154,7 @@ export async function initAuth(): Promise<void> {
           email: data.user.email,
           name: data.user.name ?? null,
           image: data.user.image ?? null,
+          role: (data.user as { role?: string | null }).role ?? null,
         },
       };
     }
@@ -232,6 +233,7 @@ export async function loginWithEmail(emailInput: string, password: string): Prom
           email: result.data.user.email,
           name: result.data.user.name,
           image: result.data.user.image,
+          role: (result.data.user as { role?: string | null }).role ?? null,
         },
       };
     }
@@ -277,6 +279,7 @@ export async function signUp(emailInput: string, password: string, name: string)
           email: result.data.user.email,
           name: result.data.user.name,
           image: result.data.user.image,
+          role: (result.data.user as { role?: string | null }).role ?? null,
         },
       };
     }

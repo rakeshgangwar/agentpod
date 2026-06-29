@@ -289,6 +289,138 @@ test("logout → signOut called, isAuthenticated false, tauriAuthLogout NOT call
 });
 
 // ---------------------------------------------------------------------------
+// role mapping — initAuth, loginWithEmail, signUp
+// ---------------------------------------------------------------------------
+
+test("initAuth: session with role='admin' → auth.user.role === 'admin'", async () => {
+  mockAuthClient.getSession.mockResolvedValue({
+    data: {
+      user: {
+        id: "user-admin",
+        email: "admin@example.com",
+        name: "Admin",
+        image: null,
+        role: "admin",
+      },
+      session: {},
+    },
+  });
+
+  const { setAuthApiUrl, initAuth, auth } = await freshAuthStore();
+  setAuthApiUrl("http://localhost:3001");
+  await initAuth();
+
+  expect(auth.user?.role).toBe("admin");
+});
+
+test("initAuth: session without role → auth.user.role is null", async () => {
+  mockAuthClient.getSession.mockResolvedValue({
+    data: {
+      user: {
+        id: "user-norole",
+        email: "norole@example.com",
+        name: "NoRole",
+        image: null,
+        // role intentionally omitted
+      },
+      session: {},
+    },
+  });
+
+  const { setAuthApiUrl, initAuth, auth } = await freshAuthStore();
+  setAuthApiUrl("http://localhost:3001");
+  await initAuth();
+
+  expect(auth.user?.role).toBeNull();
+});
+
+test("loginWithEmail: response with role='admin' → auth.user.role === 'admin'", async () => {
+  mockAuthClient.signIn.email.mockResolvedValue({
+    data: {
+      user: {
+        id: "user-login-admin",
+        email: "admin@example.com",
+        name: "Admin",
+        image: null,
+        role: "admin",
+      },
+      token: "tok",
+    },
+    error: null,
+  });
+
+  const { setAuthApiUrl, loginWithEmail, auth } = await freshAuthStore();
+  setAuthApiUrl("http://localhost:3001");
+  await loginWithEmail("admin@example.com", "pass");
+
+  expect(auth.user?.role).toBe("admin");
+});
+
+test("loginWithEmail: response without role → auth.user.role is null (no crash)", async () => {
+  mockAuthClient.signIn.email.mockResolvedValue({
+    data: {
+      user: {
+        id: "user-login-norole",
+        email: "user@example.com",
+        name: "User",
+        image: null,
+      },
+      token: "tok",
+    },
+    error: null,
+  });
+
+  const { setAuthApiUrl, loginWithEmail, auth } = await freshAuthStore();
+  setAuthApiUrl("http://localhost:3001");
+  await loginWithEmail("user@example.com", "pass");
+
+  expect(auth.user?.role).toBeNull();
+});
+
+test("signUp: response with role='admin' → auth.user.role === 'admin'", async () => {
+  mockAuthClient.signUp.email.mockResolvedValue({
+    data: {
+      user: {
+        id: "user-signup-admin",
+        email: "first@example.com",
+        name: "First",
+        image: null,
+        role: "admin",
+      },
+      token: "tok",
+    },
+    error: null,
+  });
+
+  const { setAuthApiUrl, signUp, auth } = await freshAuthStore();
+  setAuthApiUrl("http://localhost:3001");
+  await signUp("first@example.com", "pass", "First");
+
+  expect(auth.user?.role).toBe("admin");
+});
+
+test("signUp: response without role → auth.user.role is null (no crash)", async () => {
+  mockAuthClient.signUp.email.mockResolvedValue({
+    data: {
+      user: {
+        id: "user-signup-norole",
+        email: "new@example.com",
+        name: "New",
+        image: null,
+      },
+      token: "tok",
+    },
+    error: null,
+  });
+
+  const { setAuthApiUrl, signUp, auth } = await freshAuthStore();
+  setAuthApiUrl("http://localhost:3001");
+  await signUp("new@example.com", "pass", "New");
+
+  expect(auth.user?.role).toBeNull();
+});
+
+// ---------------------------------------------------------------------------
 // clearAuthSession — resets session + isInitialized (used on disconnect/switch)
 // ---------------------------------------------------------------------------
 

@@ -9,7 +9,7 @@
 Make AgentPod manage the **real, remote fleet over the public internet — no SSH tunnel** — and surface each station's **Matrix identity**. The P2 verification could only reach the remote fleet via a hand-built `ssh -R` tunnel because the console↔hub↔node path was localhost-only; P3 removes that wall.
 
 **In scope:**
-1. **Hosted deployment** — hub on the Matrix box (`178.105.68.68`) behind nginx at `hub.agentpod.dev` (TLS); console at `app.agentpod.dev`; node-agents dial `wss://hub.agentpod.dev` directly.
+1. **Hosted deployment** — hub on the Matrix box (`<HUB_HOST>`) behind nginx at `hub.agentpod.dev` (TLS); console at `app.agentpod.dev`; node-agents dial `wss://hub.agentpod.dev` directly.
 2. **Cross-site auth (#71)** — solved by the same-site subdomain topology + cookie config.
 3. **node-agent WAN robustness** — TLS dial, reconnect/backoff/heartbeat, and a systemd unit + install script so agents run as services and survive reboots.
 4. **Matrix identity mapping (level A)** — each station carries its agent's Matrix mxid (read from the agent's own config), shown in the console with a `matrix.to` deep-link.
@@ -23,11 +23,11 @@ Make AgentPod manage the **real, remote fleet over the public internet — no SS
 
 ## 2. Architecture & Topology
 
-- **Hub:** a `bun` process listening on `127.0.0.1:3001` on `178.105.68.68`, fronted by the existing **nginx** as a new server block **`hub.agentpod.dev`** — TLS via the same certbot/Let's Encrypt setup that serves `id.agentpod.dev`, with WebSocket upgrade headers proxied (`Upgrade`/`Connection`, long read timeouts for the gateway + terminal WS). Runs under a **systemd unit** (`agentpod-hub.service`).
+- **Hub:** a `bun` process listening on `127.0.0.1:3001` on `<HUB_HOST>`, fronted by the existing **nginx** as a new server block **`hub.agentpod.dev`** — TLS via the same certbot/Let's Encrypt setup that serves `id.agentpod.dev`, with WebSocket upgrade headers proxied (`Upgrade`/`Connection`, long read timeouts for the gateway + terminal WS). Runs under a **systemd unit** (`agentpod-hub.service`).
 - **Database:** install **PostgreSQL + pgvector** locally on the box for the hub (`DATABASE_URL=postgres://…@localhost:5432/agentpod`). Synapse's sqlite is independent and untouched. 7.6 GiB RAM is shared with Synapse — acceptable for a single fleet; Postgres tuned conservatively (small shared_buffers).
 - **Console:** the static SPA (`adapter-static` build) served at **`app.agentpod.dev`** by nginx on the same box (one TLS setup, no separate build pipeline). Built with `PUBLIC_HUB_URL=https://hub.agentpod.dev`.
 - **node-agents:** dial **`wss://hub.agentpod.dev/public/nodes/gateway`** and enroll against `https://hub.agentpod.dev`. Already dial-out/attach-first — this is a URL + TLS change, not an architecture change.
-- **DNS:** `hub.agentpod.dev` and `app.agentpod.dev` A-records → `178.105.68.68` (Cloudflare DNS; proxied or DNS-only — DNS-only is simplest so nginx terminates TLS and the WS isn't subject to CF's WS quirks).
+- **DNS:** `hub.agentpod.dev` and `app.agentpod.dev` A-records → `<HUB_HOST>` (Cloudflare DNS; proxied or DNS-only — DNS-only is simplest so nginx terminates TLS and the WS isn't subject to CF's WS quirks).
 
 ## 3. Auth — resolves #71
 

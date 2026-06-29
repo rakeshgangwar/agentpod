@@ -1,7 +1,7 @@
 # P3 — Hub Deploy Runbook (production, operator-gated)
 
 Deploys the AgentPod hub + console onto the existing Matrix box
-(`178.105.68.68`, Ubuntu 24.04, nginx + Synapse). **Every step is additive.**
+(`<HUB_HOST>`, Ubuntu 24.04, nginx + Synapse). **Every step is additive.**
 
 > ⚠️ **SAFETY — read first**
 > - This is the live `id.agentpod.dev` Matrix homeserver. Do **NOT** edit the
@@ -20,7 +20,7 @@ Assumes the repo is checked out at `/opt/agentpod` on the box and the
 ---
 
 ## 0. DNS (Cloudflare, do first — certs need it resolving)
-Add two A-records → `178.105.68.68`:
+Add two A-records → `<HUB_HOST>`:
 - `hub.agentpod.dev`  (DNS-only / grey-cloud recommended so nginx terminates TLS and WS isn't subject to CF proxy quirks)
 - `app.agentpod.dev`
 Wait for propagation (`dig +short hub.agentpod.dev` → the IP).

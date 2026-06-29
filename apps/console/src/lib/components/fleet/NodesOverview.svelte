@@ -155,7 +155,7 @@
     <div class="cyber-card p-4 space-y-2">
       <p class="text-xs font-mono text-muted-foreground">// run this on the target node to connect it</p>
       <code class="block text-sm font-mono break-all text-[var(--cyber-cyan)]">
-        agentpod-node enroll --hub {resolvedHubUrl()} --token {lastToken}
+        curl -fsSL https://github.com/rakeshgangwar/agentpod/releases/latest/download/install.sh | sudo bash -s -- {resolvedHubUrl()} {lastToken}
       </code>
     </div>
   {/if}

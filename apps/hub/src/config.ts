@@ -182,10 +182,11 @@ export type Config = typeof config;
  * Add more at runtime via the ALLOWED_ORIGINS env var (comma-separated).
  */
 const _DEFAULT_ALLOWED_ORIGINS = [
-  'http://localhost:1420',    // SvelteKit + Tauri dev
-  'http://localhost:5173',    // Vite dev
-  'tauri://localhost',        // Tauri production
-  'https://app.agentpod.dev', // Production console
+  'http://localhost:1420',         // SvelteKit + Tauri dev
+  'http://localhost:5173',         // Vite dev
+  'tauri://localhost',             // Tauri production
+  'https://console.agentpod.dev',  // Production console (Cloudflare Pages; same-site w/ hub.agentpod.dev)
+  'https://app.agentpod.dev',      // legacy console origin (transitional)
 ] as const;
 
 /**
