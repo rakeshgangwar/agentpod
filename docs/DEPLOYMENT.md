@@ -20,7 +20,7 @@ On the target box:
 | **Postgres + pgvector** | Hub's database. See step 2. |
 | **bun** | Runs the hub (`curl -fsSL https://bun.sh/install \| bash`) |
 | **pnpm** | Builds the console (`corepack enable && corepack prepare pnpm@latest --activate`) |
-| **Go** | Builds the node-agent binary (only if building locally; otherwise cross-compile) |
+| **Go** | Only required when building the node-agent from source. The curl installer downloads prebuilt binaries — no Go needed on target hosts. |
 | **nginx + certbot** | Existing reverse proxy; certbot for TLS |
 
 The hub repo is assumed checked out at `/opt/agentpod` on the box (adjust paths as needed).
@@ -264,7 +264,7 @@ On the co-hosted Matrix box, also confirm: `curl -sI https://id.<your-domain>` s
 1. Open `https://console.<your-domain>` in a browser (the custom domain — not `*.pages.dev`); sign up (first user auto-becomes admin; signup closes immediately after).
 2. Confirm the session cookie is `Domain=.<your-domain>; Secure; SameSite=Lax` in DevTools.
 3. Navigate to **Settings → Nodes** and generate an enrollment token.
-4. Enroll a real host (see [docs/OPERATING.md](./OPERATING.md)).
+4. Enroll a real host (curl one-liner — see [docs/OPERATING.md](./OPERATING.md) Option A).
 5. Check startup log for `"Provisioners registered: docker…"`.
 
 ---
@@ -294,4 +294,9 @@ systemctl status agentpod-hub --no-pager
 
 If the console changed: rebuild locally with `PUBLIC_HUB_URL=https://hub.<your-domain> pnpm --filter @agentpod/console build` and redeploy `apps/console/build/` to Cloudflare Pages (Wrangler or push to the connected branch).
 
-Node-agent upgrades: re-run `scripts/install-node-agent.sh` on each host (script is idempotent).
+Node-agent upgrades: re-run the curl installer on each host (idempotent):
+```bash
+curl -fsSL https://github.com/rakeshgangwar/agentpod/releases/latest/download/install.sh \
+  | sudo bash -s -- https://hub.<your-domain> <TOKEN>
+```
+Or, from a repo checkout: `sudo bash apps/node-agent/scripts/install-node-agent.sh https://hub.<your-domain> <TOKEN>`.

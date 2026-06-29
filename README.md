@@ -57,17 +57,18 @@ PUBLIC_HUB_URL=https://<your-hub> pnpm build   # emits apps/console/build/
 > The console must be served from a subdomain of the hub's registrable domain (e.g. `console.<your-domain>` when the hub is `hub.<your-domain>`). This keeps them **same-site** so the Better Auth session cookie is sent. Opening a raw `*.pages.dev` URL breaks auth — always use the custom domain. For local development any static server works (`npx serve build`).
 
 
-**3. Build + enroll a node-agent**
+**3. Enroll a node-agent**
 
 ```bash
-# Build the binary (requires Go):
-cd apps/node-agent
-go build -o agentpod-node ./cmd/agentpod-node
-
-# On the target host, enroll and run as a systemd service:
-sudo bash scripts/install-node-agent.sh https://<your-hub> <token-from-console>
+# On the target host — downloads the prebuilt binary and installs a systemd service:
+curl -fsSL https://github.com/rakeshgangwar/agentpod/releases/latest/download/install.sh \
+  | sudo bash -s -- https://<your-hub> <token-from-console>
 systemctl status agentpod-node   # node appears online in the console
 ```
+
+> Binaries are published for linux/darwin × amd64/arm64 on every `v*` tag by `.github/workflows/release-node-agent.yml`.
+>
+> **From source (repo checkout):** `cd apps/node-agent && go build -o agentpod-node ./cmd/agentpod-node`, then `sudo bash scripts/install-node-agent.sh https://<your-hub> <token>`.
 
 See [docs/OPERATING.md](./docs/OPERATING.md) for enrolling nodes, adopting stations, driving terminals/files/logs, and provisioning runtimes.
 

@@ -26,6 +26,7 @@ First tagged release of AgentPod **as the fleet/facilities console** for agent r
 - [x] **`docs/DEPLOYMENT.md`** (new) — full prod deploy incl. provisioning env + node-agent image build; console on Cloudflare Pages. *(`515f565`/`3b423aa`)*
 - [x] **`docs/OPERATING.md`** (new) — day-2 ops: enroll/adopt/drive/provision/destroy. *(`515f565`)*
 - [x] **`CHANGELOG.md`** (new) — v0.1.0 Added + Known limitations. *(`515f565`)*
+- [x] **node-agent release pipeline + curl installer** — `.github/workflows/release-node-agent.yml` publishes prebuilt binaries (linux/darwin × amd64/arm64) + `install.sh` as GitHub Release assets on every `v*` tag. Tagging `v0.1.0` will publish the binaries and make the curl one-liner work: `curl -fsSL https://github.com/rakeshgangwar/agentpod/releases/latest/download/install.sh | sudo bash -s -- <HUB_URL> <TOKEN>`. Console enroll command and all docs updated to lead with this path. *(issue #150)*
 - [~] **Docs hygiene** — `docs/` has ~191 files, many OpenCode-era. Confirm OpenCode docs are under `docs/archive/` (the README claims so); move any stragglers. Not a blocker.
 
 ## 3. Deployment mechanics (prod: `<HUB_HOST>`, `hub.agentpod.dev` / `console.agentpod.dev` (Cloudflare Pages))

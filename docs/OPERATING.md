@@ -10,27 +10,33 @@ Day-2 operations: enrolling nodes, adopting stations, driving capability panels,
 
 A **node** is any host running the AgentPod node-agent — a VPS, a laptop, a provisioned container. The node-agent dials *out* to the hub over WSS; no inbound ports are required.
 
-### Option A — install script (recommended)
+### Option A — curl installer (recommended — no Go / no repo needed)
 
-On the target host (Linux, requires root):
+On the target host (Linux or macOS, requires root/sudo):
 
 ```bash
-# Copy the binary + service from the repo, or build locally:
-#   cd apps/node-agent && go build -o agentpod-node ./cmd/agentpod-node
-#   scp agentpod-node user@host:/tmp/
+curl -fsSL https://github.com/rakeshgangwar/agentpod/releases/latest/download/install.sh \
+  | sudo bash -s -- https://hub.<your-domain> <enrollment-token-from-console>
+```
 
+The installer downloads the prebuilt binary for your platform (linux/darwin × amd64/arm64) from the latest GitHub Release, then:
+1. Installs it to `/usr/local/bin/agentpod-node`.
+2. Runs `agentpod-node enroll --hub <HUB_URL> --token <TOKEN>` — writes config to `/root/.config/agentpod-node/config.json`.
+3. Installs and enables the systemd unit `agentpod-node.service`.
+
+The installer is idempotent: re-running upgrades the binary and re-enrolls. Binaries are published on every `v*` tag by `.github/workflows/release-node-agent.yml`.
+
+### Option A′ — from a repo checkout (build from source)
+
+If you have the repo checked out and Go available:
+
+```bash
 sudo bash /path/to/agentpod/apps/node-agent/scripts/install-node-agent.sh \
     https://hub.<your-domain> \
     <enrollment-token-from-console>
 ```
 
-The script:
-1. Resolves or builds the `agentpod-node` binary.
-2. Installs it to `/usr/local/bin/agentpod-node`.
-3. Runs `agentpod-node enroll --hub <HUB_URL> --token <TOKEN>` — writes config to `~/.config/agentpod-node/config.json` (or `/root/.config/...` when run as root).
-4. Installs and enables the systemd unit `agentpod-node.service`.
-
-The script is idempotent: re-running upgrades the binary and re-enrolls.
+This script resolves or builds the `agentpod-node` binary locally before installing. Idempotent.
 
 ### Option B — manual enroll + run
 
