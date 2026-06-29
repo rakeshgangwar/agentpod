@@ -35,7 +35,9 @@
       label: "New runtime",
       group: "actions",
       run: () => {
-        window.dispatchEvent(new CustomEvent("agentpod:new-runtime"));
+        // Navigate to the fleet home with an action hint; the home reads
+        // ?action= on mount to auto-open the New-runtime dialog.
+        goto("/?action=new-runtime");
         commandPalette.close();
       },
     },
@@ -43,7 +45,7 @@
       label: "Create enrollment token",
       group: "actions",
       run: () => {
-        window.dispatchEvent(new CustomEvent("agentpod:create-token"));
+        goto("/?action=create-token");
         commandPalette.close();
       },
     },
@@ -83,7 +85,7 @@
   let filteredItems = $derived<PaletteItem[]>(
     search.trim()
       ? allItems.filter((item) =>
-          item.label.toLowerCase().includes(search.toLowerCase())
+          item.label.toLowerCase().includes(search.trim().toLowerCase())
         )
       : allItems
   );
