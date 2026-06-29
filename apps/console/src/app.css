@@ -1767,3 +1767,15 @@ article,
     box-shadow: 0 0 0 8px rgba(245, 158, 11, 0);
   }
 }
+
+/* Fleet activity ticker */
+.ticker-scroll-content {
+  animation: ticker-scroll var(--ticker-duration, 30s) linear infinite;
+}
+.ticker-scroll-content.ticker-paused {
+  animation-play-state: paused;
+}
+@keyframes ticker-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}

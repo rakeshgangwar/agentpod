@@ -10,6 +10,7 @@
   import PlusIcon from "@lucide/svelte/icons/plus";
   import Loader2Icon from "@lucide/svelte/icons/loader-2";
   import NewRuntimeDialog from "./NewRuntimeDialog.svelte";
+  import ActivityTicker from "./activity-ticker.svelte";
 
   let nodes = $state<NodeSummary[]>([]);
   let isLoading = $state(true);
@@ -121,6 +122,9 @@
       {#if mintError}<p class="text-xs text-destructive">{mintError}</p>{/if}
     </div>
   </div>
+
+  <!-- Fleet activity ticker (self-hides when there is no recent activity) -->
+  <ActivityTicker />
 
   <!-- Enrollment command block -->
   {#if lastToken}
