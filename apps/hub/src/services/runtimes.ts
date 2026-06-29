@@ -16,7 +16,7 @@
 
 import { and, eq } from "drizzle-orm";
 import { db } from "../db/drizzle";
-import { provisionedRuntimes } from "../db/schema/nodes";
+import { provisionedRuntimes, nodes } from "../db/schema/nodes";
 import { mintEnrollmentToken } from "./enrollment";
 import {
   getProvisioner,
@@ -236,6 +236,15 @@ export async function destroyRuntime(userId: string, id: string): Promise<void> 
     .update(provisionedRuntimes)
     .set({ status: "destroyed", updatedAt: new Date() })
     .where(eq(provisionedRuntimes.id, id));
+
+  // Remove the provisioned node so it disappears from the fleet — a destroyed
+  // runtime must not linger as a ghost "offline" node. stations cascade-delete,
+  // and provisioned_runtimes.node_id is FK-nulled (onDelete: set null), so the
+  // runtime row remains for history with a null node_id. station_audit rows are
+  // kept (no FK) but won't surface in the UI once their stations are gone.
+  if (row.nodeId) {
+    await db.delete(nodes).where(eq(nodes.id, row.nodeId));
+  }
 }
 
 /**

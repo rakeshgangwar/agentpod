@@ -29,7 +29,8 @@ import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 
 import { db, rawSql } from "../db/drizzle";
-import { provisionedRuntimes, enrollmentTokens } from "../db/schema/nodes";
+import { provisionedRuntimes, enrollmentTokens, nodes } from "../db/schema/nodes";
+import { stations } from "../db/schema/stations";
 import { createTestUser } from "../../tests/helpers/database";
 import { ensurePgMigrations } from "../../tests/helpers/pg-migrations";
 import { registerProvisioner, resetProvisioners } from "../services/provisioner/registry";
@@ -254,6 +255,39 @@ test("DELETE /api/runtimes/:id → fake destroy() called, status destroyed", asy
     .from(provisionedRuntimes)
     .where(eq(provisionedRuntimes.id, id));
   expect(row!.status).toBe("destroyed");
+}, 30_000);
+
+test("DELETE /api/runtimes/:id removes the provisioned node + its stations (no ghost in the fleet)", async () => {
+  const createRes = await createRuntime(TEST_USER, "ghost-check");
+  expect(createRes.status).toBe(201);
+  const created = (await createRes.json()) as { id: string };
+
+  // Simulate the provisioned container having enrolled: insert a node + station,
+  // link the runtime to it (as the gateway's enrollNode would).
+  const nodeId = "node_ghost_test_001";
+  await db.insert(nodes).values({
+    id: nodeId, userId: TEST_USER, name: "ghost", hostname: "ghostbox",
+    os: "linux", arch: "amd64", secretHash: "x",
+  });
+  await db.insert(stations).values({
+    id: "st_ghost_001", userId: TEST_USER, nodeId, harness: "opencode",
+    stationKey: "opencode:ws", kind: "workspace", displayName: "/workspace",
+  });
+  await db.update(provisionedRuntimes).set({ nodeId }).where(eq(provisionedRuntimes.id, created.id));
+
+  const delRes = await testApp.request(`/api/runtimes/${created.id}`, {
+    method: "DELETE",
+    headers: { "X-Test-User-Id": TEST_USER },
+  });
+  expect(delRes.status).toBe(204);
+
+  // The node is gone (no ghost in the fleet); its station cascade-deleted;
+  // the runtime row is kept for history with a null node_id.
+  expect((await db.select().from(nodes).where(eq(nodes.id, nodeId))).length).toBe(0);
+  expect((await db.select().from(stations).where(eq(stations.nodeId, nodeId))).length).toBe(0);
+  const [rt] = await db.select().from(provisionedRuntimes).where(eq(provisionedRuntimes.id, created.id));
+  expect(rt!.status).toBe("destroyed");
+  expect(rt!.nodeId).toBeNull();
 }, 30_000);
 
 test("DELETE /api/runtimes/:id with another user's id → 404", async () => {
