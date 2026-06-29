@@ -147,11 +147,11 @@ test("Destroy: type hostname enables confirm button → calls destroyRuntime(run
   });
 });
 
-test("Destroy failure: shows inline error, does NOT navigate", async () => {
+test("Destroy failure: shows inline error, dialog closes, does NOT navigate", async () => {
   vi.spyOn(api, "destroyRuntime").mockRejectedValue(new Error("destroy failed: quota"));
   const gotoSpy = vi.spyOn(nav, "goto").mockResolvedValue(undefined);
 
-  const { getAllByRole, getByPlaceholderText, getByText } = render(ProvisionedNodeControls, {
+  const { getAllByRole, getByPlaceholderText, queryByPlaceholderText, getByText } = render(ProvisionedNodeControls, {
     props: { node: dockerNode, onRefresh: vi.fn() },
   });
 
@@ -170,7 +170,11 @@ test("Destroy failure: shows inline error, does NOT navigate", async () => {
   fireEvent.click(btns[btns.length - 1]);
 
   await waitFor(() => {
+    // (a) error text is visible on the page
     expect(getByText(/destroy failed/i)).toBeTruthy();
+    // (b) dialog is closed — confirm input no longer in the DOM
+    expect(queryByPlaceholderText("box1.local")).toBeNull();
+    // (c) navigation did NOT happen
     expect(gotoSpy).not.toHaveBeenCalled();
   });
 });

@@ -36,6 +36,7 @@
       destroyDialogOpen = false;
       await goto("/");
     } catch (err) {
+      destroyDialogOpen = false;
       destroyError = err instanceof Error ? err.message : "Destroy failed";
     } finally {
       destroyInFlight = false;

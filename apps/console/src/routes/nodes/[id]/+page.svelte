@@ -67,14 +67,6 @@
           >
             {node.status}
           </Badge>
-          {#if node.provisioned}
-            <Badge
-              variant="outline"
-              class="font-mono text-xs border-[var(--cyber-cyan)]/50 text-[var(--cyber-cyan)]"
-            >
-              provisioned · {node.provisioned.provider}
-            </Badge>
-          {/if}
         </div>
 
         <!-- Provisioned runtime controls (destroy / stop / start) -->
