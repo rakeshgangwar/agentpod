@@ -76,30 +76,16 @@ function makeProvisioner(fake: FakeDockerOrchestrator): DockerRuntimeProvisioner
   return new DockerRuntimeProvisioner(fake as unknown as DockerOrchestrator);
 }
 
+// Use a sentinel image that differs from the NODE_AGENT_IMAGE fallback — this
+// proves the driver reads spec.image, not the env var.
 const BASE_SPEC = {
   runtimeId: "rt_1",
   name: "box1",
+  image: "agentpod-node-opencode:local",
   resourceTier: "small" as const,
   hubUrl: "http://h:3001",
   enrollToken: "enr_x",
 };
-
-// ─── Env snapshot ─────────────────────────────────────────────────────────────
-
-let savedNodeAgentImage: string | undefined;
-
-beforeEach(() => {
-  savedNodeAgentImage = process.env.NODE_AGENT_IMAGE;
-  delete process.env.NODE_AGENT_IMAGE;
-});
-
-afterEach(() => {
-  if (savedNodeAgentImage !== undefined) {
-    process.env.NODE_AGENT_IMAGE = savedNodeAgentImage;
-  } else {
-    delete process.env.NODE_AGENT_IMAGE;
-  }
-});
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
@@ -132,17 +118,21 @@ describe("DockerRuntimeProvisioner", () => {
       expect(result.externalId).not.toBe(FAKE_CONTAINER_ID);
     });
 
-    it("uses the default node-agent image when NODE_AGENT_IMAGE is unset", async () => {
+    it("passes spec.image to the createSandbox config (driver is image-agnostic)", async () => {
       const fake = new FakeDockerOrchestrator();
       await makeProvisioner(fake).provision(BASE_SPEC);
-      expect(fake.capturedConfig!.image).toBe("agentpod-node:local");
+      // The sentinel "agentpod-node-opencode:local" must reach the orchestrator,
+      // proving the driver uses spec.image and does NOT read NODE_AGENT_IMAGE.
+      expect(fake.capturedConfig!.image).toBe(BASE_SPEC.image);
     });
 
-    it("respects NODE_AGENT_IMAGE env override", async () => {
+    it("ignores NODE_AGENT_IMAGE env; always uses spec.image", async () => {
       process.env.NODE_AGENT_IMAGE = "my-registry/agentpod-node:v2";
       const fake = new FakeDockerOrchestrator();
       await makeProvisioner(fake).provision(BASE_SPEC);
-      expect(fake.capturedConfig!.image).toBe("my-registry/agentpod-node:v2");
+      // env override is irrelevant — spec.image wins
+      expect(fake.capturedConfig!.image).toBe(BASE_SPEC.image);
+      delete process.env.NODE_AGENT_IMAGE;
     });
 
     it("sets AGENTPOD_HUB_URL in env", async () => {

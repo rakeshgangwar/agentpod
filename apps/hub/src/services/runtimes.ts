@@ -32,6 +32,22 @@ import type { RuntimeProviderName } from "./provisioner/types";
 const prefixedId = (prefix: string) =>
   `${prefix}_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`;
 
+/**
+ * Resolve the container image for a given harness.
+ * Image resolution lives in the service layer so drivers are image-agnostic —
+ * they receive the resolved image via ProvisionSpec.image.
+ *
+ * Env overrides allow operators to pin specific image tags per harness:
+ *   NODE_AGENT_OPENCODE_IMAGE — opencode harness (default: agentpod-node-opencode:local)
+ *   NODE_AGENT_IMAGE          — generic / no harness (default: agentpod-node:local)
+ */
+function imageForHarness(harness: string): string {
+  if (harness === "opencode") {
+    return process.env.NODE_AGENT_OPENCODE_IMAGE ?? "agentpod-node-opencode:local";
+  }
+  return process.env.NODE_AGENT_IMAGE ?? "agentpod-node:local";
+}
+
 type RuntimeRow = typeof provisionedRuntimes.$inferSelect;
 
 function toContract(row: RuntimeRow): ProvisionedRuntime {
@@ -44,6 +60,7 @@ function toContract(row: RuntimeRow): ProvisionedRuntime {
     nodeId: row.nodeId ?? null,
     name: row.name,
     resourceTier: row.resourceTier as ProvisionedRuntime["resourceTier"],
+    harness: (row.harness ?? "none") as ProvisionedRuntime["harness"],
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -64,7 +81,7 @@ function toContract(row: RuntimeRow): ProvisionedRuntime {
  */
 export async function createRuntime(
   userId: string,
-  req: { provider: string; name: string; resourceTier: string },
+  req: { provider: string; name: string; resourceTier: string; harness?: string },
   hubUrl: string
 ): Promise<ProvisionedRuntime> {
   const provider = req.provider;
@@ -80,6 +97,8 @@ export async function createRuntime(
   const id = prefixedId("rt");
   const now = new Date();
 
+  const harness = req.harness ?? "none";
+
   await db.insert(provisionedRuntimes).values({
     id,
     userId,
@@ -87,6 +106,7 @@ export async function createRuntime(
     status: "provisioning",
     name: req.name,
     resourceTier: req.resourceTier ?? "small",
+    harness,
     externalId: null,
     nodeId: null,
     createdAt: now,
@@ -129,6 +149,7 @@ export async function createRuntime(
       resourceTier: (req.resourceTier ?? "small") as "small" | "medium" | "large",
       hubUrl,
       enrollToken,
+      image: imageForHarness(harness),
     });
 
     await db

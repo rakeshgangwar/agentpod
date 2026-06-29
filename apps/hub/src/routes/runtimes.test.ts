@@ -325,6 +325,74 @@ test("DELETE /api/runtimes/:id with provider flag OFF → still destroys row (no
   }
 }, 30_000);
 
+// ─── Task 3 (P4B): harness + image-by-harness ────────────────────────────────
+
+test(
+  "POST /api/runtimes with harness:'opencode' → persists harness, resolves opencode image, returns harness in body",
+  async () => {
+    const res = await testApp.request("/api/runtimes", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Test-User-Id": TEST_USER,
+        "Host": "localhost:3001",
+      },
+      body: JSON.stringify({ provider: "docker", name: "opencode-box", harness: "opencode" }),
+    });
+    expect(res.status).toBe(201);
+
+    const body = (await res.json()) as { id: string; harness: string };
+
+    // Returned ProvisionedRuntime includes harness field
+    expect(body.harness).toBe("opencode");
+
+    // DB row persists harness
+    const [row] = await db
+      .select()
+      .from(provisionedRuntimes)
+      .where(eq(provisionedRuntimes.id, body.id));
+    expect(row!.harness).toBe("opencode");
+
+    // Provision spec image resolves to the opencode-specific image
+    expect(fakeCalls.provision).toHaveLength(1);
+    const spec = fakeCalls.provision[0]!;
+    const expectedImage = process.env.NODE_AGENT_OPENCODE_IMAGE ?? "agentpod-node-opencode:local";
+    expect((spec as typeof spec & { image: string }).image).toBe(expectedImage);
+  },
+  30_000
+);
+
+test(
+  "POST /api/runtimes without harness → defaults to 'none', resolves generic image",
+  async () => {
+    const res = await testApp.request("/api/runtimes", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Test-User-Id": TEST_USER,
+        "Host": "localhost:3001",
+      },
+      body: JSON.stringify({ provider: "docker", name: "generic-box" }),
+    });
+    expect(res.status).toBe(201);
+
+    const body = (await res.json()) as { id: string; harness: string };
+    expect(body.harness).toBe("none");
+
+    const [row] = await db
+      .select()
+      .from(provisionedRuntimes)
+      .where(eq(provisionedRuntimes.id, body.id));
+    expect(row!.harness).toBe("none");
+
+    expect(fakeCalls.provision).toHaveLength(1);
+    const spec = fakeCalls.provision[0]!;
+    const expectedImage = process.env.NODE_AGENT_IMAGE ?? "agentpod-node:local";
+    expect((spec as typeof spec & { image: string }).image).toBe(expectedImage);
+  },
+  30_000
+);
+
 test("DELETE /api/runtimes/:id with unregistered provisioner → row still marked destroyed", async () => {
   // Create a runtime while the fake provisioner is registered
   const createRes = await createRuntime(TEST_USER, "unregistered-box");

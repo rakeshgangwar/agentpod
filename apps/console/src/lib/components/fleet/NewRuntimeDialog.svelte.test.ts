@@ -30,6 +30,7 @@ const mockRuntime = {
   nodeId: null,
   name: "my-box",
   resourceTier: "small" as const,
+  harness: "none" as const,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };
@@ -103,9 +104,50 @@ test("filling name and clicking Create calls provisionRuntime with correct value
       provider: "docker",
       name: "my-box",
       resourceTier: "small",
+      harness: "none",
     });
     expect(onCreated).toHaveBeenCalledOnce();
     expect(onClose).toHaveBeenCalledOnce();
+  });
+});
+
+test("harness select renders with Generic (none) as default", () => {
+  const { getByText } = render(NewRuntimeDialog, {
+    props: {
+      open: true,
+      providers: ["docker"],
+      onClose: vi.fn(),
+    },
+  });
+
+  // The harness trigger shows the default label "Generic"
+  expect(getByText("Generic")).toBeTruthy();
+});
+
+test("provisionRuntime is called with harness field (default none) when creating", async () => {
+  vi.spyOn(api, "provisionRuntime").mockResolvedValue(mockRuntime);
+  const onClose = vi.fn();
+
+  const { getByRole, getByPlaceholderText } = render(NewRuntimeDialog, {
+    props: {
+      open: true,
+      providers: ["docker"],
+      onClose,
+    },
+  });
+
+  const nameInput = getByPlaceholderText("Runtime name");
+  fireEvent.input(nameInput, { target: { value: "test-box" } });
+
+  const createBtn = getByRole("button", { name: /^create$/i }) as HTMLButtonElement;
+  await waitFor(() => expect(createBtn.disabled).toBe(false));
+
+  fireEvent.click(createBtn);
+
+  await waitFor(() => {
+    const call = (api.provisionRuntime as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(call).toHaveProperty("harness");
+    expect(call.harness).toBe("none");
   });
 });
 

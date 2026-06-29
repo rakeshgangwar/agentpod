@@ -1,0 +1,1 @@
+ALTER TABLE "provisioned_runtimes" ADD COLUMN "harness" text DEFAULT 'none' NOT NULL;

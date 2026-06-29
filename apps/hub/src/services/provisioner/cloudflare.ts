@@ -94,11 +94,14 @@ export class CloudflareRuntimeProvisioner implements RuntimeProvisioner {
    * Body sent to POST /sandbox:
    *   { id: runtimeId, image, env: { AGENTPOD_HUB_URL, AGENTPOD_ENROLL_TOKEN } }
    *
+   * Image comes from spec.image — resolved by the service layer (imageForHarness).
+   * This driver is intentionally image-agnostic.
+   *
    * NOTE: enrollToken is in the request body (as required to boot the node-agent)
    * but this method never logs it.
    */
   async provision(spec: ProvisionSpec): Promise<{ externalId: string }> {
-    const image = process.env.NODE_AGENT_IMAGE ?? "agentpod-node:local";
+    const image = spec.image;
 
     const response = await this.workerFetch("/sandbox", {
       method: "POST",

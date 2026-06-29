@@ -28,6 +28,7 @@ export const provisionedRuntimes = pgTable("provisioned_runtimes", {
   nodeId: text("node_id").references(() => nodes.id, { onDelete: "set null" }),
   name: text("name").notNull(),
   resourceTier: text("resource_tier").notNull().default("small"),
+  harness: text("harness").notNull().default("none"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (t) => [index("provisioned_runtimes_user_id_idx").on(t.userId)]);
