@@ -18,14 +18,14 @@ First tagged release of AgentPod **as the fleet/facilities console** for agent r
 - [x] **#114** — map session `role` into the auth store so the Admin nav appears for admins. *Fixed `e762518`: role mapped in initAuth/login/signUp.*
 - [~] **#90** — surface FileBrowser tree-mutation errors (UX polish).
 - [~] **#134** — regression test for `registerEnabledProvisioners` (locks the provisioner-startup wiring).
-- [ ] Full suites green on `develop`: `cd packages/contract && bun test` · `cd apps/hub && bun test` (Postgres :5434) · `cd apps/node-agent && go test ./... -race` · `cd apps/console && pnpm check && pnpm test && pnpm build`.
+- [x] Full suites green on `develop`: contract **25** · hub provisioner/runtimes/activity-fleet **64** · node-agent `go -race` ok · console **131** + `check` 0 errors + `build` clean. *(verified 2026-06-29)*
 
 ## 2. Docs
 
-- [ ] **README.md** — replace the "being redesigned" banner with the shipped product: what AgentPod is (fleet/facilities console), the three tiers (Go node-agent → Bun/Hono hub → Svelte console), a 5-line quickstart (run hub, build console, enroll a node), link the design spec + this release doc. Keep the `v0.0.4-opencode` note.
-- [ ] **`docs/DEPLOYMENT.md`** (new, or extend `deploy/README-deploy.md`) — the full prod deploy (see §3) incl. the **P4 provisioning env** + the node-agent image build. Supersede the P3-only runbook.
-- [ ] **`docs/OPERATING.md`** (new) — operator guide: enroll a node (`scripts/install-node-agent.sh` + `agentpod-node.service`), adopt stations, drive fs/logs/terminal, provision a runtime (New runtime / Cmd-K), destroy. Note the harnesses detected.
-- [ ] **`CHANGELOG.md`** (new) — v0.1.0 highlights (the §0 "In" list) + known limitations (§0 "Out").
+- [x] **README.md** — repositioned to the shipped product (three tiers, harnesses, quickstart, single-operator status, `v0.0.4-opencode` note). *(`515f565`)*
+- [x] **`docs/DEPLOYMENT.md`** (new) — full prod deploy incl. provisioning env + node-agent image build; console on Cloudflare Pages. *(`515f565`/`3b423aa`)*
+- [x] **`docs/OPERATING.md`** (new) — day-2 ops: enroll/adopt/drive/provision/destroy. *(`515f565`)*
+- [x] **`CHANGELOG.md`** (new) — v0.1.0 Added + Known limitations. *(`515f565`)*
 - [~] **Docs hygiene** — `docs/` has ~191 files, many OpenCode-era. Confirm OpenCode docs are under `docs/archive/` (the README claims so); move any stragglers. Not a blocker.
 
 ## 3. Deployment mechanics (prod: `<HUB_HOST>`, `hub.agentpod.dev` / `console.agentpod.dev` (Cloudflare Pages))
