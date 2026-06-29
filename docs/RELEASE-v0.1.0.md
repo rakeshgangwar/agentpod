@@ -28,7 +28,7 @@ First tagged release of AgentPod **as the fleet/facilities console** for agent r
 - [ ] **`CHANGELOG.md`** (new) — v0.1.0 highlights (the §0 "In" list) + known limitations (§0 "Out").
 - [~] **Docs hygiene** — `docs/` has ~191 files, many OpenCode-era. Confirm OpenCode docs are under `docs/archive/` (the README claims so); move any stragglers. Not a blocker.
 
-## 3. Deployment mechanics (prod: `<HUB_HOST>`, `hub.agentpod.dev` / `app.agentpod.dev`)
+## 3. Deployment mechanics (prod: `<HUB_HOST>`, `hub.agentpod.dev` / `console.agentpod.dev` (Cloudflare Pages))
 
 **Constraints (from P3):** additive only · **never touch Synapse / the `id.agentpod.dev` vhost** · `nginx -t` before every reload · operator-gated remote steps.
 
@@ -37,13 +37,13 @@ First tagged release of AgentPod **as the fleet/facilities console** for agent r
   `docker build -t agentpod-node:local -f apps/node-agent/deploy/Dockerfile apps/node-agent`
   `docker build -t agentpod-node-opencode:local -f apps/node-agent/deploy/Dockerfile.opencode apps/node-agent`
 - [ ] **Hub** — deploy the `develop` build; `EnvironmentFile=/etc/agentpod/hub.env` (systemd unit `deploy/agentpod-hub.service`) with: `DATABASE_URL`, `PORT=3001`, `BETTER_AUTH_SECRET` (**≥32 chars**), `ENCRYPTION_KEY` (**exactly 32**), `API_TOKEN`, `METAMCP_ENABLED=false`, `ENABLE_OPENCODE_SYNC=false`, `ENABLE_ACTIVITY_ARCHIVAL` (as desired), and **provisioning**: `ENABLE_DOCKER_PROVISIONING=true`, `NODE_AGENT_IMAGE=agentpod-node:local`, `NODE_AGENT_OPENCODE_IMAGE=agentpod-node-opencode:local`, `PROVISIONING_HUB_URL=https://hub.agentpod.dev` (container-reachable), `ENABLE_CLOUDFLARE_SANDBOXES` (off unless CF verified). Run drizzle migrations (hub auto-migrates on start; or `bun run db:migrate`). `systemctl restart agentpod-hub`; confirm health + startup log **"Provisioners registered: docker…"**.
-- [ ] **Console** — build static with `PUBLIC_HUB_URL=https://hub.agentpod.dev` (`pnpm build`, adapter-static); rsync `apps/console/build/` to the `app.agentpod.dev` web root. *(If the box is low on RAM, build locally + rsync — as in P3.)*
-- [ ] **nginx** — `hub.agentpod.dev` (WS upgrade headers + long timeouts) per `deploy/nginx/hub.agentpod.dev.conf`; `app.agentpod.dev` static vhost; `nginx -t` → reload.
+- [ ] **Console** — build static with `PUBLIC_HUB_URL=https://hub.agentpod.dev` (`pnpm --filter @agentpod/console build`, adapter-static, output `apps/console/build/`); deploy to **Cloudflare Pages** (Git integration or `wrangler pages deploy apps/console/build`); set the **custom domain `console.agentpod.dev`** (Pages → Custom domains); confirm **SPA fallback** (`_redirects: /* /index.html 200`) is in place. Do **not** open the raw `*.pages.dev` URL — the session cookie is not same-site there and auth breaks.
+- [ ] **nginx** — **hub vhost only** (`hub.agentpod.dev`, WS upgrade headers + long timeouts) per `deploy/nginx/hub.agentpod.dev.conf`; `nginx -t` → reload. No console vhost needed — the console is on Cloudflare Pages.
 - [ ] **Smoke the deploy** (§4).
 
 ## 4. Post-deploy verification (real fleet)
 
-- [ ] `app.agentpod.dev` loads; sign in; session cookie is `Domain=.agentpod.dev; Secure`.
+- [ ] `console.agentpod.dev` (custom domain, not `*.pages.dev`) loads; sign in; session cookie is `Domain=.agentpod.dev; Secure; SameSite=Lax`. Confirm that opening the raw `*.pages.dev` URL redirects or is documented as broken-by-design (cookie won't be sent cross-site).
 - [ ] **Enroll a real node** (a server, e.g. buddhimaan) via `scripts/install-node-agent.sh` against `wss://hub.agentpod.dev` → shows **online, no tunnel**; survives a reconnect.
 - [ ] Adopt a station; drive **terminal + fs + logs-tail + config** over the public path; confirm the **Matrix ID** + `matrix.to` deep-link on a Hermes station. *(closes #88)*
 - [ ] **Provision (Docker)** on the prod host: New runtime → OpenCode → container → auto-enroll online → auto-adopted `/workspace` station → drive → **destroy**. *(P4 prod smoke)*

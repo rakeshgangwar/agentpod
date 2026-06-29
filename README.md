@@ -45,13 +45,17 @@ cp .env.example .env   # fill in DATABASE_URL, BETTER_AUTH_SECRET, ENCRYPTION_KE
 bun run src/index.ts   # auto-migrates on first start
 ```
 
-**2. Build + serve the console**
+**2. Build + deploy the console**
 
 ```bash
 cd apps/console
 PUBLIC_HUB_URL=https://<your-hub> pnpm build   # emits apps/console/build/
-# Serve build/ with nginx (adapter-static SPA; nginx try_files $uri /index.html)
+# Deploy build/ to Cloudflare Pages at console.<your-domain>
+# (wrangler pages deploy ../console/build, or Git-integrated Pages project)
 ```
+
+> The console must be served from a subdomain of the hub's registrable domain (e.g. `console.<your-domain>` when the hub is `hub.<your-domain>`). This keeps them **same-site** so the Better Auth session cookie is sent. Opening a raw `*.pages.dev` URL breaks auth — always use the custom domain. For local development any static server works (`npx serve build`).
+
 
 **3. Build + enroll a node-agent**
 

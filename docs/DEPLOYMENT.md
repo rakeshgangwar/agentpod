@@ -3,7 +3,7 @@
 This guide covers a full production deployment of all three AgentPod tiers (node-agent images, hub, console) on a Linux host running nginx + certbot. It supersedes the P3-only runbook at `deploy/README-deploy.md`.
 
 > **Safety constraints (read first)**
-> - All steps are **additive only**. On the reference box (`hub.agentpod.dev` / `app.agentpod.dev`) the existing `id.agentpod.dev` nginx vhost (Matrix/Synapse) must **never** be touched.
+> - All steps are **additive only**. The reference box hosts `hub.<your-domain>` (+ Synapse's `id.<your-domain>`); the **console is on Cloudflare Pages at `console.<your-domain>`** and is not served from the box. The existing `id.<your-domain>` nginx vhost (Matrix/Synapse) must **never** be touched.
 > - **`nginx -t` before every `systemctl reload nginx`**. A bad reload would take any co-hosted services offline.
 > - Run steps one at a time; verify existing services stay up after each nginx reload.
 > - Use `<HUB_HOST>` / `<your-domain>` placeholders below — substitute your actual hostname.
@@ -29,16 +29,15 @@ The hub repo is assumed checked out at `/opt/agentpod` on the box (adjust paths 
 
 ## 1. DNS
 
-Add two A-records pointing to your server's IP:
+Configure two DNS records:
 
-```
-hub.<your-domain>   →  <server IP>
-app.<your-domain>   →  <server IP>
-```
+**`hub.<your-domain>`** — A-record pointing to your VPS IP. Use **DNS-only (grey cloud)** so nginx terminates TLS and WebSocket connections directly (avoids proxy timeout quirks on long-lived WS streams).
 
-Cloudflare: use DNS-only (grey cloud) so nginx terminates TLS and WebSocket connections are not subject to proxy timeout quirks.
+**`console.<your-domain>`** — add this as a **Cloudflare Pages custom domain** inside the Pages project settings (orange/proxied is fine — it's a static site). Do **not** add a separate A-record; Pages manages the routing.
 
-Wait for propagation: `dig +short hub.<your-domain>` should return the IP.
+Do **not** add an `app.<your-domain>` A-record — the console is no longer served from the VPS.
+
+Wait for propagation: `dig +short hub.<your-domain>` should return the VPS IP.
 
 ---
 
@@ -172,22 +171,44 @@ curl -s http://127.0.0.1:3001/health
 
 ---
 
-## 6. Console — build
+## 6. Console — build + deploy to Cloudflare Pages
 
-Build the static SPA pointed at your hub. If the box is low on RAM, build locally and rsync:
+Build the static SPA (build locally — the VPS does not need to run this step):
 
 ```bash
-# On the box (or locally, then rsync):
-cd /opt/agentpod
+cd /path/to/agentpod   # local checkout
 PUBLIC_HUB_URL=https://hub.<your-domain> pnpm --filter @agentpod/console build
 # Output: apps/console/build/
 ```
 
-The console is served by nginx (step 7) from `apps/console/build/`.
+**Deploy to Cloudflare Pages** (choose one method):
+
+- **Git integration (recommended):** Create a Pages project in the Cloudflare dashboard → connect your repo → set monorepo build settings:
+  - Root directory: `apps/console`
+  - Build command: `pnpm build`
+  - Build output directory: `build`
+  - Environment variable: `PUBLIC_HUB_URL=https://hub.<your-domain>`
+
+- **Direct upload (Wrangler):**
+  ```bash
+  wrangler pages deploy apps/console/build --project-name agentpod-console
+  ```
+
+**SPA fallback:** adapter-static requires a catch-all redirect so client-side routing works. Add a `_redirects` file to `apps/console/static/` (committed to the repo):
+```
+/* /index.html 200
+```
+Cloudflare Pages picks this up automatically. Alternatively, enable the "SPA" setting in the Pages project dashboard.
+
+**Custom domain:** In the Pages project → Custom domains, add `console.<your-domain>`. Cloudflare provisions TLS automatically — no certbot needed for the console.
+
+> **Same-site cookie warning:** auth only works via the custom domain `console.<your-domain>`. Opening the raw `*.pages.dev` URL is a **different registrable domain** from `hub.<your-domain>` — the session cookie (`Domain=.<your-domain>; SameSite=Lax; Secure`) will not be sent cross-site and login will silently break. **Always use the custom domain.**
 
 ---
 
-## 7. nginx vhosts
+## 7. nginx vhosts (hub only)
+
+The console is hosted on Cloudflare Pages and does **not** require an nginx vhost on the VPS. Only the hub vhost is configured here.
 
 **7a. WebSocket upgrade map** (add once to the `http{}` context):
 
@@ -197,14 +218,13 @@ map $http_upgrade $connection_upgrade { default upgrade; '' close; }
 EOF
 ```
 
-**7b. Hub + console vhosts** (copy from the repo):
+**7b. Hub vhost** (copy from the repo):
 
 ```bash
 cp /opt/agentpod/deploy/nginx/hub.agentpod.dev.conf \
    /etc/nginx/sites-available/agentpod-hub
-# If your domain is not agentpod.dev, edit the two server_name lines:
+# If your domain is not agentpod.dev, edit the server_name line:
 #   server_name hub.<your-domain>;
-#   server_name app.<your-domain>;
 ln -sf /etc/nginx/sites-available/agentpod-hub \
        /etc/nginx/sites-enabled/agentpod-hub
 nginx -t   # MUST pass before reloading
@@ -215,15 +235,16 @@ The vhost config (`deploy/nginx/hub.agentpod.dev.conf`) sets:
 - `proxy_pass http://127.0.0.1:3001` for the hub, with WS upgrade headers
 - `proxy_read_timeout 3600s` / `proxy_send_timeout 3600s` for long-lived streams
 - `client_max_body_size 64m` for large file uploads
-- Static SPA root at `apps/console/build/` with `try_files $uri /index.html`
 
 ---
 
 ## 8. TLS (certbot)
 
+Certbot covers the **hub only**. Cloudflare provides TLS for the console automatically via the Pages custom domain.
+
 ```bash
 apt-get install -y certbot python3-certbot-nginx
-certbot --nginx -d hub.<your-domain> -d app.<your-domain>
+certbot --nginx -d hub.<your-domain>
 nginx -t && systemctl reload nginx
 ```
 
@@ -231,16 +252,16 @@ Verify:
 
 ```bash
 curl -s https://hub.<your-domain>/health      # {"status":"ok",...}
-curl -sI https://app.<your-domain>            # 200, console HTML
+curl -sI https://console.<your-domain>        # 200, console HTML (via Cloudflare Pages)
 ```
 
-On the co-hosted Matrix box, also confirm: `curl -sI https://id.agentpod.dev` should still 200/redirect (Synapse untouched).
+On the co-hosted Matrix box, also confirm: `curl -sI https://id.<your-domain>` should still 200/redirect (Synapse untouched).
 
 ---
 
 ## 9. Smoke test
 
-1. Open `https://app.<your-domain>` in a browser; sign up (first user auto-becomes admin; signup closes immediately after).
+1. Open `https://console.<your-domain>` in a browser (the custom domain — not `*.pages.dev`); sign up (first user auto-becomes admin; signup closes immediately after).
 2. Confirm the session cookie is `Domain=.<your-domain>; Secure; SameSite=Lax` in DevTools.
 3. Navigate to **Settings → Nodes** and generate an enrollment token.
 4. Enroll a real host (see [docs/OPERATING.md](./OPERATING.md)).
@@ -266,11 +287,11 @@ Synapse / `id.agentpod.dev` are never modified, so rollback cannot affect Matrix
 
 ```bash
 cd /opt/agentpod && git pull
-# Rebuild console if changed:
-PUBLIC_HUB_URL=https://hub.<your-domain> pnpm --filter @agentpod/console build
 # Restart hub (auto-migrates):
 systemctl restart agentpod-hub
 systemctl status agentpod-hub --no-pager
 ```
+
+If the console changed: rebuild locally with `PUBLIC_HUB_URL=https://hub.<your-domain> pnpm --filter @agentpod/console build` and redeploy `apps/console/build/` to Cloudflare Pages (Wrangler or push to the connected branch).
 
 Node-agent upgrades: re-run `scripts/install-node-agent.sh` on each host (script is idempotent).
