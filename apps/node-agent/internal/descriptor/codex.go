@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
@@ -26,7 +27,8 @@ import (
 // If a future Codex version exposes stable project history, Detect() can be
 // updated to enumerate it.
 type codexDescriptor struct {
-	home string // absolute path to ~/.codex
+	home    string    // absolute path to ~/.codex
+	logOnce sync.Once // Detect() is polled repeatedly; log the fallback note once, not every poll
 }
 
 // NewCodex returns a Descriptor for the Codex harness.
@@ -61,16 +63,20 @@ func (c *codexDescriptor) Detect() ([]Station, error) {
 	// If nothing useful is found, log and return empty.
 	sessDir := filepath.Join(c.home, "sessions")
 	if _, err := os.Stat(sessDir); os.IsNotExist(err) {
-		log.Printf("codex: no sessions directory found at %s; "+
-			"Codex does not record per-project history in a stable format — "+
-			"leaf stations must be added via declaration", sessDir)
+		c.logOnce.Do(func() {
+			log.Printf("codex: no sessions directory found at %s; "+
+				"Codex does not record per-project history in a stable format — "+
+				"leaf stations must be added via declaration", sessDir)
+		})
 		return []Station{}, nil
 	}
 
 	// A sessions dir exists but we cannot reliably map sessions to project
 	// directories without knowing the internal Codex schema.
-	log.Printf("codex: sessions directory found at %s but project-history "+
-		"mapping is not implemented; leaf stations must be added via declaration", sessDir)
+	c.logOnce.Do(func() {
+		log.Printf("codex: sessions directory found at %s but project-history "+
+			"mapping is not implemented; leaf stations must be added via declaration", sessDir)
+	})
 	return []Station{}, nil
 }
 
