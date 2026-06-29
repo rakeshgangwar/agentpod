@@ -20,6 +20,7 @@ test("provisionedRuntimes table has required columns", () => {
   expect(cols).toContain("nodeId");
   expect(cols).toContain("name");
   expect(cols).toContain("resourceTier");
+  expect(cols).toContain("harness");
   expect(cols).toContain("createdAt");
   expect(cols).toContain("updatedAt");
 });

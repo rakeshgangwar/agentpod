@@ -155,6 +155,13 @@
       "when": 1782700125890,
       "tag": "0021_petite_boomer",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1782716030272,
+      "tag": "0022_wealthy_guardian",
+      "breakpoints": true
     }
   ]
 }
