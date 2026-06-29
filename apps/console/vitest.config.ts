@@ -4,18 +4,20 @@ import path from "node:path";
 import type { Plugin } from "vite";
 
 /**
- * Strip <style> blocks from bits-ui Svelte components before vite-plugin-svelte
+ * Strip <style> blocks from ALL Svelte components before vite-plugin-svelte
  * processes them.  bits-ui's select-viewport.svelte (and potentially others)
  * contain style blocks that call preprocessCSS internally, which fails in the
  * jsdom test environment under Vite 6 because PartialEnvironment is unavailable.
+ * Project components like lottie-icon.svelte and theme-toggle.svelte also have
+ * <style> blocks that trigger the same failure.
  * Tests never need CSS to function, so stripping these blocks is safe.
  */
-function stripNodeModuleStyles(): Plugin {
+function stripAllSvelteStyles(): Plugin {
   return {
-    name: "strip-node-module-svelte-styles",
+    name: "strip-all-svelte-styles",
     enforce: "pre",
     transform(code: string, id: string) {
-      if (id.includes("node_modules") && id.endsWith(".svelte")) {
+      if (id.endsWith(".svelte")) {
         return {
           code: code.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ""),
           map: null,
@@ -26,7 +28,7 @@ function stripNodeModuleStyles(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [stripNodeModuleStyles(), svelte({ hot: false })],
+  plugins: [stripAllSvelteStyles(), svelte({ hot: false })],
   resolve: {
     conditions: ["browser"],
     alias: {
@@ -37,6 +39,10 @@ export default defineConfig({
       "$app/navigation": path.resolve(__dirname, "./src/mocks/app-navigation.ts"),
       "$app/environment": path.resolve(__dirname, "./src/mocks/app-environment.ts"),
       "$app/stores": path.resolve(__dirname, "./src/mocks/app-stores.ts"),
+      // lottie-web uses HTMLCanvasElement.getContext at module load time which
+      // jsdom does not support. Stub it out so tests can import any component
+      // that transitively imports lottie-icon.svelte (e.g. page-header.svelte).
+      "lottie-web": path.resolve(__dirname, "./src/mocks/lottie-web.ts"),
     },
   },
   test: {

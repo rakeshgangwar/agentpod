@@ -1,33 +1,16 @@
 <script lang="ts">
-  import { page } from "$app/stores";
+  import { page } from "$app/state";
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
   import { toast } from "svelte-sonner";
   import {
     getUser,
-    getUserLimits,
-    getUserSandboxes,
-    updateUserLimits,
     banUser,
     unbanUser,
     updateUserRole,
-    forceStopSandbox,
-    forceDeleteSandbox,
   } from "$lib/api/admin";
-  import type {
-    AdminUserView,
-    UserResourceLimits,
-    UserResourceUsage,
-    UserRole,
-    UpdateUserResourceLimitsInput,
-  } from "@agentpod/types";
-  import {
-    listResourceTiers,
-    type Sandbox,
-    type ResourceTier,
-  } from "$lib/api/tauri";
+  import type { AdminUserView, UserRole } from "@agentpod/types";
   import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
   import * as Select from "$lib/components/ui/select";
   import * as Dialog from "$lib/components/ui/dialog";
@@ -41,77 +24,32 @@
   import ShieldIcon from "@lucide/svelte/icons/shield";
   import BanIcon from "@lucide/svelte/icons/ban";
   import CheckIcon from "@lucide/svelte/icons/check";
-  import SaveIcon from "@lucide/svelte/icons/save";
-  import BoxIcon from "@lucide/svelte/icons/box";
-  import SquareIcon from "@lucide/svelte/icons/square";
-  import TrashIcon from "@lucide/svelte/icons/trash-2";
 
-  // Get user ID from route params
-  let userId = $derived($page.params.id ?? "");
+  // Route param
+  let userId = $derived(page.params.id ?? "");
 
   // State
   let isLoading = $state(true);
   let user = $state<AdminUserView | null>(null);
-  let limits = $state<UserResourceLimits | null>(null);
-  let usage = $state<UserResourceUsage | null>(null);
-  let sandboxes = $state<Sandbox[]>([]);
-  let resourceTiers = $state<ResourceTier[]>([]);
   let error = $state<string | null>(null);
-
-  // Edit state
-  let editLimits = $state<UpdateUserResourceLimitsInput>({});
-  let isSavingLimits = $state(false);
 
   // Action dialogs
   let showBanDialog = $state(false);
   let showRoleDialog = $state(false);
-  let showDeleteSandboxDialog = $state(false);
   let banReason = $state("");
   let newRole = $state<UserRole>("user");
-  let sandboxToDelete = $state<Sandbox | null>(null);
   let actionLoading = $state(false);
-
-  // Active tab
-  let activeTab = $state("overview");
-
-  // Back navigation
-  function goBack() {
-    goto("/admin/users");
-  }
 
   // Load user data
   async function loadUser() {
     if (!userId) return;
-    
+
     isLoading = true;
     error = null;
 
     try {
-      const currentUserId = userId;
-      const [userResponse, limitsResponse, sandboxesResponse, tiersResponse] = await Promise.all([
-        getUser(currentUserId),
-        getUserLimits(currentUserId),
-        getUserSandboxes(currentUserId),
-        listResourceTiers(),
-      ]);
-
-      user = userResponse.user;
-      usage = userResponse.usage;
-      limits = limitsResponse.limits;
-      sandboxes = sandboxesResponse;
-      resourceTiers = tiersResponse;
-
-      // Initialize edit limits with current values
-      editLimits = {
-        maxSandboxes: limits.maxSandboxes,
-        maxConcurrentRunning: limits.maxConcurrentRunning,
-        maxTotalStorageGb: limits.maxTotalStorageGb,
-        maxTotalCpuCores: limits.maxTotalCpuCores,
-        maxTotalMemoryGb: limits.maxTotalMemoryGb,
-        allowedTierIds: [...limits.allowedTierIds],
-        maxTierId: limits.maxTierId,
-        notes: limits.notes,
-      };
+      const response = await getUser(userId);
+      user = response.user;
     } catch (e) {
       const err = e as Error;
       error = err.message || "Failed to load user";
@@ -120,28 +58,9 @@
     }
   }
 
-  // Initial load
   onMount(() => {
     loadUser();
   });
-
-  // Save limits
-  async function saveLimits() {
-    if (!limits || !userId) return;
-
-    isSavingLimits = true;
-    try {
-      const currentUserId = userId;
-      const updated = await updateUserLimits(currentUserId, editLimits);
-      limits = updated;
-      toast.success("Resource limits updated");
-    } catch (e) {
-      const err = e as Error;
-      toast.error("Failed to save limits", { description: err.message });
-    } finally {
-      isSavingLimits = false;
-    }
-  }
 
   // Ban user
   async function handleBan() {
@@ -197,45 +116,6 @@
     }
   }
 
-  // Force stop sandbox
-  async function handleForceStop(sandbox: Sandbox) {
-    actionLoading = true;
-    try {
-      await forceStopSandbox(sandbox.id);
-      toast.success(`Sandbox "${sandbox.name}" has been stopped`);
-      loadUser();
-    } catch (e) {
-      const err = e as Error;
-      toast.error("Failed to stop sandbox", { description: err.message });
-    } finally {
-      actionLoading = false;
-    }
-  }
-
-  // Force delete sandbox
-  function openDeleteSandboxDialog(sandbox: Sandbox) {
-    sandboxToDelete = sandbox;
-    showDeleteSandboxDialog = true;
-  }
-
-  async function handleForceDelete() {
-    if (!sandboxToDelete) return;
-
-    actionLoading = true;
-    try {
-      await forceDeleteSandbox(sandboxToDelete.id);
-      toast.success(`Sandbox "${sandboxToDelete.name}" has been deleted`);
-      showDeleteSandboxDialog = false;
-      sandboxToDelete = null;
-      loadUser();
-    } catch (e) {
-      const err = e as Error;
-      toast.error("Failed to delete sandbox", { description: err.message });
-    } finally {
-      actionLoading = false;
-    }
-  }
-
   // Format date
   function formatDate(dateStr: string): string {
     return new Date(dateStr).toLocaleDateString(undefined, {
@@ -246,28 +126,6 @@
       minute: "2-digit",
     });
   }
-
-  // Check if limits have changed
-  function areArraysEqual(arr1: string[] | undefined, arr2: string[] | undefined): boolean {
-    const a = arr1 || [];
-    const b = arr2 || [];
-    if (a.length !== b.length) return false;
-    const sortedA = [...a].sort();
-    const sortedB = [...b].sort();
-    return sortedA.every((val, index) => val === sortedB[index]);
-  }
-
-  let limitsChanged = $derived(
-    limits &&
-    (editLimits.maxSandboxes !== limits.maxSandboxes ||
-      editLimits.maxConcurrentRunning !== limits.maxConcurrentRunning ||
-      editLimits.maxTotalStorageGb !== limits.maxTotalStorageGb ||
-      editLimits.maxTotalCpuCores !== limits.maxTotalCpuCores ||
-      editLimits.maxTotalMemoryGb !== limits.maxTotalMemoryGb ||
-      !areArraysEqual(editLimits.allowedTierIds, limits.allowedTierIds) ||
-      editLimits.maxTierId !== limits.maxTierId ||
-      editLimits.notes !== limits.notes)
-  );
 </script>
 
 <div class="noise-overlay"></div>
@@ -294,9 +152,9 @@
         <Button
           variant="ghost"
           size="icon"
-          onclick={goBack}
+          onclick={() => goto("/admin")}
           class="h-8 w-8 border border-border/30 hover:border-[var(--cyber-cyan)] hover:text-[var(--cyber-cyan)]"
-          title="Back to Users"
+          title="Back to Admin"
         >
           <ArrowLeftIcon class="h-4 w-4" />
         </Button>
@@ -309,7 +167,7 @@
 
   <!-- Content -->
   <div class="flex-1 overflow-y-auto">
-    <div class="container mx-auto px-4 py-6 max-w-4xl space-y-6 animate-fade-in">
+    <div class="container mx-auto px-4 py-6 max-w-3xl space-y-6 animate-fade-in">
       {#if isLoading}
         <div class="flex items-center justify-center py-12">
           <div class="relative w-8 h-8">
@@ -330,42 +188,42 @@
           </Button>
         </div>
       {:else if user}
-        <!-- User Header Card -->
+        <!-- User Info Card -->
         <div class="cyber-card corner-accent p-6">
           <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-            <!-- User Info -->
+            <!-- Identity -->
             <div class="flex items-center gap-4">
               {#if user.image}
-                <img src={user.image} alt={user.name} class="w-16 h-16 rounded-full" />
+                <img src={user.image} alt={user.name} class="w-14 h-14 rounded-full" />
               {:else}
-                <div class="w-16 h-16 rounded-full bg-[var(--cyber-cyan)]/20 flex items-center justify-center text-[var(--cyber-cyan)] font-mono text-xl">
+                <div class="w-14 h-14 rounded-full bg-[var(--cyber-cyan)]/20 flex items-center justify-center text-[var(--cyber-cyan)] font-mono text-xl">
                   {user.name?.[0] || user.email[0]}
                 </div>
               {/if}
               <div>
-                <h2 class="font-mono text-lg">{user.name || "—"}</h2>
+                <h2 class="font-mono text-base">{user.name || "—"}</h2>
                 <p class="font-mono text-sm text-muted-foreground">{user.email}</p>
-                  <div class="flex items-center gap-2 mt-2">
-                    <span
-                      class="px-2 py-0.5 rounded font-mono text-xs uppercase tracking-wider
-                             {user.role === 'admin'
-                               ? 'bg-[var(--cyber-cyan)]/10 text-[var(--cyber-cyan)] border border-[var(--cyber-cyan)]/30'
-                               : 'bg-muted/20 text-muted-foreground border border-border/30'}"
-                    >
-                      {user.role}
+                <div class="flex items-center gap-2 mt-2">
+                  <span
+                    class="px-2 py-0.5 rounded font-mono text-xs uppercase tracking-wider
+                           {user.role === 'admin'
+                             ? 'bg-[var(--cyber-cyan)]/10 text-[var(--cyber-cyan)] border border-[var(--cyber-cyan)]/30'
+                             : 'bg-muted/20 text-muted-foreground border border-border/30'}"
+                  >
+                    {user.role}
+                  </span>
+                  {#if user.banned}
+                    <span class="status-indicator status-error">
+                      <span class="status-dot"></span>
+                      Banned
                     </span>
-                    {#if user.banned}
-                      <span class="status-indicator status-error">
-                        <span class="status-dot"></span>
-                        Banned
-                      </span>
-                    {:else}
-                      <span class="status-indicator status-running">
-                        <span class="status-dot"></span>
-                        Active
-                      </span>
-                    {/if}
-                  </div>
+                  {:else}
+                    <span class="status-indicator status-running">
+                      <span class="status-dot"></span>
+                      Active
+                    </span>
+                  {/if}
+                </div>
               </div>
             </div>
 
@@ -374,9 +232,10 @@
               <Button
                 variant="outline"
                 onclick={() => {
-                  newRole = user?.role || "user";
+                  newRole = user?.role ?? "user";
                   showRoleDialog = true;
                 }}
+                data-testid="change-role"
                 class="font-mono text-xs uppercase tracking-wider border-border/50 hover:border-[var(--cyber-cyan)]"
               >
                 <ShieldIcon class="h-4 w-4 mr-2" />
@@ -395,7 +254,8 @@
               {:else}
                 <Button
                   variant="outline"
-                  onclick={() => showBanDialog = true}
+                  onclick={() => (showBanDialog = true)}
+                  data-testid="ban-user"
                   class="font-mono text-xs uppercase tracking-wider border-[var(--cyber-red)]/50 text-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/10"
                 >
                   <BanIcon class="h-4 w-4 mr-2" />
@@ -416,255 +276,19 @@
           {/if}
 
           <!-- Meta Info -->
-          <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm font-mono">
+          <div class="mt-4 grid grid-cols-2 md:grid-cols-3 gap-4 text-sm font-mono border-t border-border/20 pt-4">
             <div>
               <p class="text-xs text-muted-foreground uppercase tracking-wider">User ID</p>
               <p class="text-xs break-all">{user.id}</p>
             </div>
             <div>
               <p class="text-xs text-muted-foreground uppercase tracking-wider">Joined</p>
-              <p>{formatDate(user.createdAt)}</p>
+              <p class="text-xs">{formatDate(user.createdAt)}</p>
             </div>
             <div>
               <p class="text-xs text-muted-foreground uppercase tracking-wider">Email Verified</p>
-              <p>{user.emailVerified ? "Yes" : "No"}</p>
+              <p class="text-xs">{user.emailVerified ? "Yes" : "No"}</p>
             </div>
-            <div>
-              <p class="text-xs text-muted-foreground uppercase tracking-wider">Sandboxes</p>
-              <p>{user.sandboxCount} ({user.runningSandboxCount} running)</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Tabs Card -->
-        <div class="cyber-card corner-accent overflow-hidden">
-          <!-- Tab Navigation -->
-          <div class="border-b border-border/30 bg-background/30 backdrop-blur-sm">
-            <div class="flex">
-              <button
-                onclick={() => activeTab = "overview"}
-                class="flex-1 py-3 px-4 font-mono text-xs uppercase tracking-wider transition-all border-b-2
-                       {activeTab === 'overview' 
-                         ? 'border-[var(--cyber-cyan)] text-[var(--cyber-cyan)] bg-[var(--cyber-cyan)]/5' 
-                         : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30'}"
-              >
-                Resource Limits
-              </button>
-              <button
-                onclick={() => activeTab = "sandboxes"}
-                class="flex-1 py-3 px-4 font-mono text-xs uppercase tracking-wider transition-all border-b-2
-                       {activeTab === 'sandboxes' 
-                         ? 'border-[var(--cyber-cyan)] text-[var(--cyber-cyan)] bg-[var(--cyber-cyan)]/5' 
-                         : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30'}"
-              >
-                Sandboxes
-                {#if sandboxes.length > 0}
-                  <span class="ml-1.5 text-xs bg-[var(--cyber-cyan)]/20 text-[var(--cyber-cyan)] px-1.5 py-0.5 rounded-full">
-                    {sandboxes.length}
-                  </span>
-                {/if}
-              </button>
-            </div>
-          </div>
-
-          <!-- Tab Content -->
-          <div class="p-6">
-            {#if activeTab === "overview"}
-              <!-- Resource Limits Tab Content -->
-              {#if limits && usage}
-                <div class="space-y-6">
-                  <!-- Current Usage -->
-                  <div>
-                    <h3 class="font-mono text-sm text-[var(--cyber-cyan)] uppercase tracking-wider mb-4">[current_usage]</h3>
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div class="p-3 border border-border/30 rounded bg-background/50 text-center">
-                        <p class="text-xl font-bold font-mono">{usage.sandboxCount} / {limits.maxSandboxes}</p>
-                        <p class="text-xs text-muted-foreground font-mono uppercase tracking-wider">Sandboxes</p>
-                      </div>
-                      <div class="p-3 border border-border/30 rounded bg-background/50 text-center">
-                        <p class="text-xl font-bold font-mono">{usage.runningSandboxCount} / {limits.maxConcurrentRunning}</p>
-                        <p class="text-xs text-muted-foreground font-mono uppercase tracking-wider">Running</p>
-                      </div>
-                      <div class="p-3 border border-border/30 rounded bg-background/50 text-center">
-                        <p class="text-xl font-bold font-mono">{usage.totalCpuCores} / {limits.maxTotalCpuCores}</p>
-                        <p class="text-xs text-muted-foreground font-mono uppercase tracking-wider">CPU Cores</p>
-                      </div>
-                      <div class="p-3 border border-border/30 rounded bg-background/50 text-center">
-                        <p class="text-xl font-bold font-mono">{usage.totalMemoryGb} / {limits.maxTotalMemoryGb}</p>
-                        <p class="text-xs text-muted-foreground font-mono uppercase tracking-wider">Memory (GB)</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Edit Limits -->
-                  <div>
-                    <h3 class="font-mono text-sm text-[var(--cyber-cyan)] uppercase tracking-wider mb-4">[edit_limits]</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div class="space-y-2">
-                        <Label class="font-mono text-xs uppercase tracking-wider">Max Sandboxes</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          bind:value={editLimits.maxSandboxes}
-                          class="font-mono bg-background/50 border-border/50 focus:border-[var(--cyber-cyan)]"
-                        />
-                      </div>
-                      <div class="space-y-2">
-                        <Label class="font-mono text-xs uppercase tracking-wider">Max Concurrent Running</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          bind:value={editLimits.maxConcurrentRunning}
-                          class="font-mono bg-background/50 border-border/50 focus:border-[var(--cyber-cyan)]"
-                        />
-                      </div>
-                      <div class="space-y-2">
-                        <Label class="font-mono text-xs uppercase tracking-wider">Max Total CPU Cores</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          bind:value={editLimits.maxTotalCpuCores}
-                          class="font-mono bg-background/50 border-border/50 focus:border-[var(--cyber-cyan)]"
-                        />
-                      </div>
-                      <div class="space-y-2">
-                        <Label class="font-mono text-xs uppercase tracking-wider">Max Total Memory (GB)</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          bind:value={editLimits.maxTotalMemoryGb}
-                          class="font-mono bg-background/50 border-border/50 focus:border-[var(--cyber-cyan)]"
-                        />
-                      </div>
-                      <div class="space-y-2">
-                        <Label class="font-mono text-xs uppercase tracking-wider">Max Total Storage (GB)</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          bind:value={editLimits.maxTotalStorageGb}
-                          class="font-mono bg-background/50 border-border/50 focus:border-[var(--cyber-cyan)]"
-                        />
-                      </div>
-                      <div class="space-y-2">
-                        <Label class="font-mono text-xs uppercase tracking-wider">Max Tier ID</Label>
-                        <Input
-                          type="text"
-                          bind:value={editLimits.maxTierId}
-                          class="font-mono bg-background/50 border-border/50 focus:border-[var(--cyber-cyan)]"
-                        />
-                      </div>
-                      <div class="md:col-span-2">
-                        <h3 class="font-mono text-xs text-[var(--cyber-cyan)] uppercase tracking-wider mb-2">[allowed_tiers]</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {#each resourceTiers as tier (tier.id)}
-                            <label class="flex items-center gap-3 p-3 border border-border/30 rounded bg-background/50 hover:border-[var(--cyber-cyan)]/50 transition-colors cursor-pointer select-none">
-                              <input
-                                type="checkbox"
-                                checked={editLimits.allowedTierIds?.includes(tier.id)}
-                                onchange={(e: Event & { currentTarget: HTMLInputElement }) => {
-                                  const checked = e.currentTarget.checked;
-                                  if (checked) {
-                                    editLimits.allowedTierIds = [...(editLimits.allowedTierIds || []), tier.id];
-                                  } else {
-                                    editLimits.allowedTierIds = (editLimits.allowedTierIds || []).filter(id => id !== tier.id);
-                                  }
-                                }}
-                                class="w-4 h-4 rounded border-border/50 text-[var(--cyber-cyan)] focus:ring-[var(--cyber-cyan)] bg-background/50"
-                              />
-                              <div class="flex-1">
-                                <span class="font-mono text-sm block">{tier.name}</span>
-                                <p class="text-xs text-muted-foreground font-mono">
-                                  {tier.resources.cpuCores} CPU, {tier.resources.memoryGb}GB RAM
-                                </p>
-                              </div>
-                            </label>
-                          {/each}
-                        </div>
-                      </div>
-                      <div class="md:col-span-2 space-y-2">
-                        <Label class="font-mono text-xs uppercase tracking-wider">Admin Notes</Label>
-                        <textarea
-                          bind:value={editLimits.notes}
-                          placeholder="Internal notes about this user's limits..."
-                          class="w-full h-20 p-3 text-sm font-mono border border-border/50 rounded bg-background/50 resize-none
-                                 focus:border-[var(--cyber-cyan)] focus:ring-1 focus:ring-[var(--cyber-cyan)] focus:outline-none"
-                        ></textarea>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Save Button -->
-                  <div class="flex justify-end">
-                    <Button
-                      onclick={saveLimits}
-                      disabled={isSavingLimits || !limitsChanged}
-                      class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-cyan)] hover:bg-[var(--cyber-cyan)]/90 text-[var(--cyber-cyan-foreground)] disabled:opacity-50"
-                    >
-                      {#if isSavingLimits}
-                        <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>
-                      {:else}
-                        <SaveIcon class="h-4 w-4 mr-2" />
-                      {/if}
-                      {isSavingLimits ? "Saving..." : "Save Changes"}
-                    </Button>
-                  </div>
-                </div>
-              {/if}
-            {:else if activeTab === "sandboxes"}
-              <!-- Sandboxes Tab Content -->
-              {#if sandboxes.length === 0}
-                <div class="py-12 text-center">
-                  <BoxIcon class="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p class="text-muted-foreground font-mono">No sandboxes</p>
-                </div>
-              {:else}
-                <div class="divide-y divide-border/20 -mx-6 -mb-6">
-                  {#each sandboxes as sandbox}
-                    <div class="px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-muted/10 transition-colors">
-                      <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded bg-[var(--cyber-cyan)]/10 flex items-center justify-center">
-                          <BoxIcon class="h-5 w-5 text-[var(--cyber-cyan)]" />
-                        </div>
-                        <div>
-                          <p class="font-mono text-sm">{sandbox.name}</p>
-                          <div class="flex items-center gap-2 mt-1">
-                            <span class="status-indicator {sandbox.status === 'running' ? 'status-running' : 'status-stopped'}">
-                              <span class="status-dot"></span>
-                              {sandbox.status}
-                            </span>
-                            <span class="text-xs text-muted-foreground font-mono">{sandbox.flavorId}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        {#if sandbox.status === "running"}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onclick={() => handleForceStop(sandbox)}
-                            disabled={actionLoading}
-                            class="font-mono text-xs uppercase tracking-wider border-[var(--cyber-amber)]/50 text-[var(--cyber-amber)] hover:bg-[var(--cyber-amber)]/10"
-                          >
-                            <SquareIcon class="h-4 w-4 mr-1" />
-                            Stop
-                          </Button>
-                        {/if}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onclick={() => openDeleteSandboxDialog(sandbox)}
-                          disabled={actionLoading}
-                          class="font-mono text-xs uppercase tracking-wider border-[var(--cyber-red)]/50 text-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/10"
-                        >
-                          <TrashIcon class="h-4 w-4 mr-1" />
-                          Delete
-                        </Button>
-                      </div>
-                    </div>
-                  {/each}
-                </div>
-              {/if}
-            {/if}
           </div>
         </div>
       {/if}
@@ -695,7 +319,7 @@
     <Dialog.Footer>
       <Button
         variant="outline"
-        onclick={() => showBanDialog = false}
+        onclick={() => (showBanDialog = false)}
         class="font-mono text-xs uppercase tracking-wider border-border/50"
       >
         Cancel
@@ -751,7 +375,7 @@
     <Dialog.Footer>
       <Button
         variant="outline"
-        onclick={() => showRoleDialog = false}
+        onclick={() => (showRoleDialog = false)}
         class="font-mono text-xs uppercase tracking-wider border-border/50"
       >
         Cancel
@@ -765,38 +389,6 @@
           <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>
         {/if}
         {actionLoading ? "Updating..." : "Update Role"}
-      </Button>
-    </Dialog.Footer>
-  </Dialog.Content>
-</Dialog.Root>
-
-<!-- Delete Sandbox Dialog -->
-<Dialog.Root bind:open={showDeleteSandboxDialog}>
-  <Dialog.Content class="sm:max-w-md cyber-card border-[var(--cyber-red)]/30">
-    <Dialog.Header>
-      <Dialog.Title class="font-mono text-[var(--cyber-red)]">[delete_sandbox]</Dialog.Title>
-      <Dialog.Description class="font-mono text-xs">
-        Are you sure you want to delete "{sandboxToDelete?.name}"?
-        This will permanently remove the container and all data.
-      </Dialog.Description>
-    </Dialog.Header>
-    <Dialog.Footer>
-      <Button
-        variant="outline"
-        onclick={() => showDeleteSandboxDialog = false}
-        class="font-mono text-xs uppercase tracking-wider border-border/50"
-      >
-        Cancel
-      </Button>
-      <Button
-        onclick={handleForceDelete}
-        disabled={actionLoading}
-        class="font-mono text-xs uppercase tracking-wider bg-[var(--cyber-red)] hover:bg-[var(--cyber-red)]/90 text-[var(--cyber-red-foreground)] disabled:opacity-50"
-      >
-        {#if actionLoading}
-          <span class="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>
-        {/if}
-        {actionLoading ? "Deleting..." : "Delete Sandbox"}
       </Button>
     </Dialog.Footer>
   </Dialog.Content>
