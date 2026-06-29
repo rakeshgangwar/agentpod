@@ -56,7 +56,7 @@ hound = { version = "3.5", optional = true }                    # WAV file I/O
 whisper-rs = { git = "https://codeberg.org/tazz4843/whisper-rs.git", default-features = false, features = ["tracing_backend"], optional = true }
 parking_lot = "0.12"             # Fast synchronization primitives (always needed)
 eyre = { version = "0.6", optional = true }                     # Error handling for voice
-hf-hub = { version = "0.4", optional = true }                   # Hugging Face model download
+hf-hub = { version = "0.5", optional = true }                   # Hugging Face model download
 # rustpotter - disabled due to candle-core 0.2.2 rand version conflict (requires rand 0.8, half uses rand 0.9)
 # Wake word detection now uses OpenWakeWord via ONNX Runtime instead
 ort = { version = "2.0.0-rc.9", optional = true }             # ONNX Runtime for wake word detection
