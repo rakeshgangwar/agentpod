@@ -44,8 +44,9 @@ export class DockerRuntimeProvisioner implements RuntimeProvisioner {
   /**
    * Create and start a node-agent container.
    *
-   * Image is read from NODE_AGENT_IMAGE env at call time (not constructor time)
-   * so that tests can override it per-invocation.
+   * Image comes from spec.image — resolved by the service layer via
+   * imageForHarness() before calling the driver.  Drivers are intentionally
+   * image-agnostic: they never read NODE_AGENT_IMAGE themselves.
    *
    * Returns spec.runtimeId as externalId because the orchestrator's lifecycle
    * methods (startSandbox / stopSandbox / deleteSandbox) resolve containers by
@@ -53,7 +54,7 @@ export class DockerRuntimeProvisioner implements RuntimeProvisioner {
    * NOT by the raw hex Docker container id.
    */
   async provision(spec: ProvisionSpec): Promise<{ externalId: string }> {
-    const image = process.env.NODE_AGENT_IMAGE ?? "agentpod-node:local";
+    const image = spec.image;
     const resources = RUNTIME_RESOURCE_TIERS[spec.resourceTier];
 
     const sandbox = await this.orchestrator.createSandbox({

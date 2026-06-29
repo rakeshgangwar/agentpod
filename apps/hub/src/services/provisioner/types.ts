@@ -22,6 +22,12 @@ export interface ProvisionSpec {
   hubUrl: string;
   /** One-time enrollment token injected as AGENTPOD_ENROLL_TOKEN. Never log. */
   enrollToken: string;
+  /**
+   * Container image to run. Resolved by the service layer via imageForHarness()
+   * so drivers are image-agnostic — they always use this value, never read
+   * NODE_AGENT_IMAGE themselves.
+   */
+  image: string;
 }
 
 /**

@@ -41,27 +41,15 @@ function makeFakeFetch(body: unknown, status = 200) {
 const BASE_SPEC = {
   runtimeId: "rt_1",
   name: "box1",
+  image: "agentpod-node:local",
   resourceTier: "small" as const,
   hubUrl: "http://h:3001",
   enrollToken: "enr_x",
 };
 
-// ─── Env snapshot ─────────────────────────────────────────────────────────────
-
-let savedNodeAgentImage: string | undefined;
-
-beforeEach(() => {
-  savedNodeAgentImage = process.env.NODE_AGENT_IMAGE;
-  delete process.env.NODE_AGENT_IMAGE;
-});
-
-afterEach(() => {
-  if (savedNodeAgentImage !== undefined) {
-    process.env.NODE_AGENT_IMAGE = savedNodeAgentImage;
-  } else {
-    delete process.env.NODE_AGENT_IMAGE;
-  }
-});
+// No env snapshot needed — the Cloudflare driver no longer reads NODE_AGENT_IMAGE;
+// image resolution happens in the service layer (imageForHarness) and is passed
+// via ProvisionSpec.image.
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
@@ -222,7 +210,7 @@ describe("CloudflareRuntimeProvisioner", () => {
       expect(result.externalId).toBe("rt_1");
     });
 
-    it("uses the default node-agent image when NODE_AGENT_IMAGE is unset", async () => {
+    it("passes spec.image to the sandbox POST body (driver is image-agnostic)", async () => {
       const { fakeFetch, calls } = makeFakeFetch({ sandboxId: "sb_rt_1" });
       const p = new CloudflareRuntimeProvisioner({
         workerUrl: "https://w.example",
@@ -233,10 +221,10 @@ describe("CloudflareRuntimeProvisioner", () => {
       await p.provision(BASE_SPEC);
 
       const body = JSON.parse(calls[0]!.init!.body as string) as Record<string, unknown>;
-      expect(body["image"]).toBe("agentpod-node:local");
+      expect(body["image"]).toBe(BASE_SPEC.image);
     });
 
-    it("respects NODE_AGENT_IMAGE env override", async () => {
+    it("ignores NODE_AGENT_IMAGE env; always uses spec.image", async () => {
       process.env.NODE_AGENT_IMAGE = "my-registry/node:v2";
       const { fakeFetch, calls } = makeFakeFetch({ sandboxId: "sb_rt_1" });
       const p = new CloudflareRuntimeProvisioner({
@@ -248,7 +236,9 @@ describe("CloudflareRuntimeProvisioner", () => {
       await p.provision(BASE_SPEC);
 
       const body = JSON.parse(calls[0]!.init!.body as string) as Record<string, unknown>;
-      expect(body["image"]).toBe("my-registry/node:v2");
+      // env override is irrelevant — spec.image wins
+      expect(body["image"]).toBe(BASE_SPEC.image);
+      delete process.env.NODE_AGENT_IMAGE;
     });
 
     it("throws when the worker returns a non-2xx status", async () => {
