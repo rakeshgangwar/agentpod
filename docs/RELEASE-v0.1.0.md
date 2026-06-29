@@ -14,8 +14,8 @@ First tagged release of AgentPod **as the fleet/facilities console** for agent r
 
 ## 1. Pre-release code gates
 
-- [ ] **#133** — provisioned containers re-run `enroll` on every start → fail on restart (one-time token). Guard enroll on existing config. *(Blocker if provisioning is in the released surface.)*
-- [ ] **#114** — map session `role` into the auth store so the Admin nav appears for admins.
+- [x] **#133** — provisioned containers re-run `enroll` on every start → fail on restart (one-time token). *Fixed `4f4f722`: `enroll` idempotent via `alreadyEnrolled` guard; entrypoints restart-safe.*
+- [x] **#114** — map session `role` into the auth store so the Admin nav appears for admins. *Fixed `e762518`: role mapped in initAuth/login/signUp.*
 - [~] **#90** — surface FileBrowser tree-mutation errors (UX polish).
 - [~] **#134** — regression test for `registerEnabledProvisioners` (locks the provisioner-startup wiring).
 - [ ] Full suites green on `develop`: `cd packages/contract && bun test` · `cd apps/hub && bun test` (Postgres :5434) · `cd apps/node-agent && go test ./... -race` · `cd apps/console && pnpm check && pnpm test && pnpm build`.
