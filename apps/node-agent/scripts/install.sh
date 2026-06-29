@@ -109,7 +109,17 @@ echo "    Installed to ${DEST_BIN}"
 # Enroll
 # ---------------------------------------------------------------------------
 echo "==> [3/5] Enrolling node with hub at ${HUB_URL}..."
-"$DEST_BIN" enroll --hub "$HUB_URL" --token "$TOKEN"
+# On macOS there's no system service manager here — the user runs
+# `agentpod-node run` themselves. macOS sudo preserves $HOME, so enrolling as
+# root would write the config into the user's dir but root-owned, and `run`
+# (as the user) then can't read it. Enroll AS the invoking user so the config
+# is user-owned and readable. On Linux the service runs as root, so root-owned
+# config is correct — keep enrolling as root there.
+if [[ "$OS" == "darwin" && -n "${SUDO_USER:-}" && "$SUDO_USER" != "root" ]]; then
+  sudo -u "$SUDO_USER" "$DEST_BIN" enroll --hub "$HUB_URL" --token "$TOKEN"
+else
+  "$DEST_BIN" enroll --hub "$HUB_URL" --token "$TOKEN"
+fi
 echo "    Enrolled."
 
 # ---------------------------------------------------------------------------
