@@ -1,10 +1,33 @@
 import { eq } from "drizzle-orm";
 import { db } from "../db/drizzle";
-import { nodes } from "../db/schema/nodes";
+import { nodes, provisionedRuntimes } from "../db/schema/nodes";
 import type { NodeSummary } from "@agentpod/contract";
 
-export async function listNodes(userId: string): Promise<NodeSummary[]> {
-  const rows = await db.select().from(nodes).where(eq(nodes.userId, userId));
+export type NodeWithProvisioning = NodeSummary & {
+  provisioned: { runtimeId: string; provider: string } | null;
+};
+
+export async function listNodes(userId: string): Promise<NodeWithProvisioning[]> {
+  // Left-join provisioned_runtimes on node_id so each node carries its
+  // provisioned-runtime info (null if the node was attached manually).
+  const rows = await db
+    .select({
+      id: nodes.id,
+      name: nodes.name,
+      hostname: nodes.hostname,
+      os: nodes.os,
+      arch: nodes.arch,
+      cpuCount: nodes.cpuCount,
+      status: nodes.status,
+      lastSeenAt: nodes.lastSeenAt,
+      createdAt: nodes.createdAt,
+      runtimeId: provisionedRuntimes.id,
+      runtimeProvider: provisionedRuntimes.provider,
+    })
+    .from(nodes)
+    .leftJoin(provisionedRuntimes, eq(provisionedRuntimes.nodeId, nodes.id))
+    .where(eq(nodes.userId, userId));
+
   return rows.map((n) => ({
     id: n.id,
     name: n.name,
@@ -15,6 +38,10 @@ export async function listNodes(userId: string): Promise<NodeSummary[]> {
     status: n.status,
     lastSeenAt: n.lastSeenAt ? n.lastSeenAt.toISOString() : null,
     createdAt: n.createdAt.toISOString(),
+    provisioned:
+      n.runtimeId && n.runtimeProvider
+        ? { runtimeId: n.runtimeId, provider: n.runtimeProvider }
+        : null,
   }));
 }
 
