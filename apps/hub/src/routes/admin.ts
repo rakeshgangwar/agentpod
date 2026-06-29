@@ -23,26 +23,14 @@ import {
   unbanUser,
   updateUserRole,
   getAdminStats,
-  getUserSandboxes,
   type ListUsersOptions,
 } from "../models/admin-users";
-import {
-  getUserResourceLimits,
-  updateUserResourceLimits,
-  getUserResourceUsage,
-  type UpdateUserResourceLimitsInput,
-} from "../models/user-resource-limits";
 import {
   getAuditLogs,
   logUserBan,
   logUserUnban,
   logRoleChange,
-  logLimitsUpdate,
-  logSandboxForceStop,
-  logSandboxForceDelete,
 } from "../models/admin-audit-log";
-import { getSandboxById, deleteSandbox } from "../models/sandbox";
-import { SandboxManager } from "../services/sandbox-manager";
 
 const log = createLogger("admin-routes");
 
@@ -76,18 +64,6 @@ const banUserSchema = z.object({
 
 const updateRoleSchema = z.object({
   role: z.enum(["user", "admin"]),
-});
-
-const updateLimitsSchema = z.object({
-  maxSandboxes: z.number().int().min(0).max(100).optional(),
-  maxConcurrentRunning: z.number().int().min(0).max(50).optional(),
-  allowedTierIds: z.array(z.string()).optional(),
-  maxTierId: z.string().optional(),
-  maxTotalStorageGb: z.number().int().min(0).max(1000).optional(),
-  maxTotalCpuCores: z.number().int().min(0).max(100).optional(),
-  maxTotalMemoryGb: z.number().int().min(0).max(256).optional(),
-  allowedAddonIds: z.array(z.string()).nullable().optional(),
-  notes: z.string().max(1000).nullable().optional(),
 });
 
 const auditLogSchema = z.object({
@@ -148,12 +124,8 @@ adminRouter.get("/users/:id", async (c) => {
     return c.json({ error: "User not found" }, 404);
   }
 
-  // Get resource usage
-  const usage = await getUserResourceUsage(userId);
-
   return c.json({
     user,
-    usage,
   });
 });
 
@@ -189,29 +161,13 @@ adminRouter.post("/users/:id/ban", zValidator("json", banUserSchema), async (c) 
     return c.json({ error: "Failed to ban user" }, 500);
   }
 
-  // Stop all running sandboxes
-  const sandboxManager = new SandboxManager();
-  const userSandboxes = await getUserSandboxes(targetUserId);
-  
-  for (const sandbox of userSandboxes) {
-    if (sandbox.status === "running") {
-      try {
-        await sandboxManager.stopSandbox(sandbox.id);
-        log.info("Stopped sandbox for banned user", { sandboxId: sandbox.id, userId: targetUserId });
-      } catch (error) {
-        log.error("Failed to stop sandbox for banned user", { sandboxId: sandbox.id, error });
-      }
-    }
-  }
-
   // Log the action
   await logUserBan(adminUser.id, targetUserId, reason, ctx.ipAddress, ctx.userAgent);
 
-  log.info("User banned", { 
-    adminUserId: adminUser.id, 
-    targetUserId, 
+  log.info("User banned", {
+    adminUserId: adminUser.id,
+    targetUserId,
     reason,
-    sandboxesStopped: userSandboxes.filter(s => s.status === "running").length,
   });
 
   return c.json({ 
@@ -304,232 +260,6 @@ adminRouter.put("/users/:id/role", zValidator("json", updateRoleSchema), async (
     message: `User role updated to '${newRole}'`,
     user: await getUserById(targetUserId),
   });
-});
-
-// =============================================================================
-// Resource Limits Routes
-// =============================================================================
-
-/**
- * GET /admin/users/:id/limits
- * Get user's resource limits
- */
-adminRouter.get("/users/:id/limits", async (c) => {
-  const userId = c.req.param("id");
-
-  // Check if user exists
-  const user = await getUserById(userId);
-  if (!user) {
-    return c.json({ error: "User not found" }, 404);
-  }
-
-  const limits = await getUserResourceLimits(userId);
-  const usage = await getUserResourceUsage(userId);
-
-  return c.json({
-    limits,
-    usage,
-  });
-});
-
-/**
- * PUT /admin/users/:id/limits
- * Update user's resource limits
- */
-adminRouter.put("/users/:id/limits", zValidator("json", updateLimitsSchema), async (c) => {
-  const targetUserId = c.req.param("id");
-  const updates = c.req.valid("json") as UpdateUserResourceLimitsInput;
-  const adminUser = c.get("user");
-  const ctx = getRequestContext(c);
-
-  // Check if user exists
-  const user = await getUserById(targetUserId);
-  if (!user) {
-    return c.json({ error: "User not found" }, 404);
-  }
-
-  // Update limits
-  const newLimits = await updateUserResourceLimits(targetUserId, updates);
-
-  // Log the action
-  await logLimitsUpdate(
-    adminUser.id, 
-    targetUserId, 
-    updates as Record<string, unknown>, 
-    ctx.ipAddress, 
-    ctx.userAgent
-  );
-
-  log.info("User limits updated", { 
-    adminUserId: adminUser.id, 
-    targetUserId,
-    changes: updates,
-  });
-
-  return c.json({
-    success: true,
-    message: "Resource limits updated",
-    limits: newLimits,
-  });
-});
-
-// =============================================================================
-// User Sandboxes Routes
-// =============================================================================
-
-/**
- * GET /admin/users/:id/sandboxes
- * List user's sandboxes
- */
-adminRouter.get("/users/:id/sandboxes", async (c) => {
-  const userId = c.req.param("id");
-
-  // Check if user exists
-  const user = await getUserById(userId);
-  if (!user) {
-    return c.json({ error: "User not found" }, 404);
-  }
-
-  const sandboxes = await getUserSandboxes(userId);
-
-  return c.json({ sandboxes });
-});
-
-// =============================================================================
-// System-wide Sandbox Routes
-// =============================================================================
-
-/**
- * GET /admin/sandboxes
- * List all sandboxes (with pagination)
- */
-adminRouter.get("/sandboxes", zValidator("query", z.object({
-  limit: z.string().optional().transform(v => v ? parseInt(v, 10) : 50),
-  offset: z.string().optional().transform(v => v ? parseInt(v, 10) : 0),
-  status: z.string().optional(),
-  userId: z.string().optional(),
-})), async (c) => {
-  const query = c.req.valid("query");
-  
-  // Import here to avoid circular dependency
-  const { listAllSandboxes } = await import("../models/sandbox");
-  
-  const allSandboxes = await listAllSandboxes();
-  
-  // Filter
-  let filtered = allSandboxes;
-  if (query.status) {
-    filtered = filtered.filter(s => s.status === query.status);
-  }
-  if (query.userId) {
-    filtered = filtered.filter(s => s.userId === query.userId);
-  }
-  
-  // Paginate
-  const total = filtered.length;
-  const sandboxes = filtered.slice(query.offset, query.offset + query.limit);
-
-  return c.json({
-    sandboxes,
-    total,
-    limit: query.limit,
-    offset: query.offset,
-  });
-});
-
-/**
- * DELETE /admin/sandboxes/:id
- * Force delete a sandbox
- */
-adminRouter.delete("/sandboxes/:id", async (c) => {
-  const sandboxId = c.req.param("id");
-  const adminUser = c.get("user");
-  const ctx = getRequestContext(c);
-
-  const sandbox = await getSandboxById(sandboxId);
-  if (!sandbox) {
-    return c.json({ error: "Sandbox not found" }, 404);
-  }
-
-  // Stop if running
-  if (sandbox.status === "running") {
-    const sandboxManager = new SandboxManager();
-    try {
-      await sandboxManager.stopSandbox(sandboxId);
-    } catch (error) {
-      log.error("Failed to stop sandbox before deletion", { sandboxId, error });
-    }
-  }
-
-  // Delete sandbox
-  const deleted = await deleteSandbox(sandboxId);
-  if (!deleted) {
-    return c.json({ error: "Failed to delete sandbox" }, 500);
-  }
-
-  // Log the action
-  await logSandboxForceDelete(
-    adminUser.id,
-    sandbox.userId,
-    sandboxId,
-    sandbox.name,
-    ctx.ipAddress,
-    ctx.userAgent
-  );
-
-  log.info("Sandbox force deleted by admin", { 
-    adminUserId: adminUser.id, 
-    sandboxId,
-    sandboxOwner: sandbox.userId,
-  });
-
-  return c.json({ success: true, message: "Sandbox deleted" });
-});
-
-/**
- * POST /admin/sandboxes/:id/stop
- * Force stop a sandbox
- */
-adminRouter.post("/sandboxes/:id/stop", async (c) => {
-  const sandboxId = c.req.param("id");
-  const adminUser = c.get("user");
-  const ctx = getRequestContext(c);
-
-  const sandbox = await getSandboxById(sandboxId);
-  if (!sandbox) {
-    return c.json({ error: "Sandbox not found" }, 404);
-  }
-
-  if (sandbox.status !== "running") {
-    return c.json({ error: "Sandbox is not running" }, 400);
-  }
-
-  // Stop sandbox
-  const sandboxManager = new SandboxManager();
-  try {
-    await sandboxManager.stopSandbox(sandboxId);
-  } catch (error) {
-    log.error("Failed to stop sandbox", { sandboxId, error });
-    return c.json({ error: "Failed to stop sandbox" }, 500);
-  }
-
-  // Log the action
-  await logSandboxForceStop(
-    adminUser.id,
-    sandbox.userId,
-    sandboxId,
-    sandbox.name,
-    ctx.ipAddress,
-    ctx.userAgent
-  );
-
-  log.info("Sandbox force stopped by admin", { 
-    adminUserId: adminUser.id, 
-    sandboxId,
-    sandboxOwner: sandbox.userId,
-  });
-
-  return c.json({ success: true, message: "Sandbox stopped" });
 });
 
 // =============================================================================
@@ -691,7 +421,7 @@ adminRouter.post("/users", zValidator("json", createUserSchema), async (c) => {
   // Create the user using Better Auth's internal methods
   // We need to hash the password and insert directly
   const { db } = await import("../db/drizzle");
-  const { user: userTable, userResourceLimits, DEFAULT_RESOURCE_LIMITS } = await import("../db/schema");
+  const { user: userTable } = await import("../db/schema");
   const { logUserCreate } = await import("../models/admin-audit-log");
   
   // Hash password using Better Auth's method
@@ -725,22 +455,6 @@ adminRouter.post("/users", zValidator("json", createUserSchema), async (c) => {
       password: hashedPassword,
       createdAt: new Date(),
       updatedAt: new Date(),
-    });
-    
-    // Create default resource limits
-    await db.insert(userResourceLimits).values({
-      id: crypto.randomUUID(),
-      userId: newUserId,
-      maxSandboxes: DEFAULT_RESOURCE_LIMITS.maxSandboxes,
-      maxConcurrentRunning: DEFAULT_RESOURCE_LIMITS.maxConcurrentRunning,
-      allowedTierIds: JSON.stringify(DEFAULT_RESOURCE_LIMITS.allowedTierIds),
-      maxTierId: DEFAULT_RESOURCE_LIMITS.maxTierId,
-      maxTotalStorageGb: DEFAULT_RESOURCE_LIMITS.maxTotalStorageGb,
-      maxTotalCpuCores: DEFAULT_RESOURCE_LIMITS.maxTotalCpuCores,
-      maxTotalMemoryGb: DEFAULT_RESOURCE_LIMITS.maxTotalMemoryGb,
-      allowedAddonIds: DEFAULT_RESOURCE_LIMITS.allowedAddonIds
-        ? JSON.stringify(DEFAULT_RESOURCE_LIMITS.allowedAddonIds)
-        : null,
     });
     
     // Log the action

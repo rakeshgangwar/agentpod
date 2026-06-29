@@ -3,25 +3,23 @@
  *
  * Replaces SQLite with PostgreSQL via Drizzle ORM.
  * Used when DATABASE_URL is set (PostgreSQL mode).
- * 
+ *
  * Features:
  * - GitHub OAuth (primary authentication method)
  * - Email/Password (optional)
  * - Admin plugin for user management
  * - First user becomes admin automatically
- * - Default resource limits created for new users
  */
 
 import { betterAuth } from "better-auth";
 import { bearer, admin, customSession } from "better-auth/plugins";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "../db/drizzle";
-import { user as userTable, userResourceLimits, DEFAULT_RESOURCE_LIMITS } from "../db/schema";
+import { user as userTable } from "../db/schema";
 import { config, allowedOrigins, sessionCookieOptions } from "../config";
 import { createLogger } from "../utils/logger";
 import { count, eq } from "drizzle-orm";
 import { disableSignup } from "../models/system-settings";
-import { ensureDefaultAgents } from "../services/default-agents-service";
 
 const log = createLogger("auth");
 
@@ -196,57 +194,17 @@ export const auth = betterAuth({
           return { data: userData };
         },
         after: async (createdUser) => {
-          // Create default resource limits for the new user
-          try {
-            await db.insert(userResourceLimits).values({
-              id: crypto.randomUUID(),
-              userId: createdUser.id,
-              maxSandboxes: DEFAULT_RESOURCE_LIMITS.maxSandboxes,
-              maxConcurrentRunning: DEFAULT_RESOURCE_LIMITS.maxConcurrentRunning,
-              allowedTierIds: JSON.stringify(DEFAULT_RESOURCE_LIMITS.allowedTierIds),
-              maxTierId: DEFAULT_RESOURCE_LIMITS.maxTierId,
-              maxTotalStorageGb: DEFAULT_RESOURCE_LIMITS.maxTotalStorageGb,
-              maxTotalCpuCores: DEFAULT_RESOURCE_LIMITS.maxTotalCpuCores,
-              maxTotalMemoryGb: DEFAULT_RESOURCE_LIMITS.maxTotalMemoryGb,
-              allowedAddonIds: DEFAULT_RESOURCE_LIMITS.allowedAddonIds 
-                ? JSON.stringify(DEFAULT_RESOURCE_LIMITS.allowedAddonIds)
-                : null,
-            });
-            log.info("Created default resource limits for user", { userId: createdUser.id });
-          } catch (error) {
-            log.error("Failed to create default resource limits", { 
-              userId: createdUser.id, 
-              error 
-            });
-          }
-          
-          try {
-            const { created: agentsCreated } = await ensureDefaultAgents(createdUser.id);
-            
-            if (agentsCreated > 0) {
-              log.info("Created default agents for user", { 
-                userId: createdUser.id, 
-                agents: agentsCreated,
-              });
-            }
-          } catch (error) {
-            log.error("Failed to create default agents", { 
-              userId: createdUser.id, 
-              error 
-            });
-          }
-          
           // If this is the first user (now admin), disable public signup
           if (createdUser.role === "admin") {
             try {
               await disableSignup(createdUser.id);
-              log.info("Public signup disabled after first user creation", { 
-                userId: createdUser.id 
+              log.info("Public signup disabled after first user creation", {
+                userId: createdUser.id
               });
             } catch (error) {
-              log.error("Failed to disable signup after first user", { 
-                userId: createdUser.id, 
-                error 
+              log.error("Failed to disable signup after first user", {
+                userId: createdUser.id,
+                error
               });
               // Don't throw - user creation should still succeed
             }
