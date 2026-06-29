@@ -177,6 +177,19 @@ export type StationAuditRow = {
 export const activity = (stationId: string) =>
   http<StationAuditRow[]>(`/api/stations/${stationId}/activity`);
 
+// ─── Fleet activity endpoints ─────────────────────────────────────────────────
+
+export interface AuditRow {
+  id: string;
+  stationKey: string;
+  verb: string;
+  result: string;
+  paramsSummary?: unknown;
+  createdAt: string;
+}
+
+export const listFleetActivity = () => http<AuditRow[]>("/api/activity");
+
 // ─── Cleanup endpoints ────────────────────────────────────────────────────────
 
 export type CleanupItem = { path: string; size: number; kind: string };

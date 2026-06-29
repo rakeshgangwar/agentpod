@@ -144,6 +144,16 @@ test("provisioned node shows 'provisioned · docker' badge; unprovisioned node d
   expect(queryAllByText(/provisioned · docker/i)).toHaveLength(1);
 });
 
+test("shows ConnectBanner heading when nodes is empty", async () => {
+  vi.spyOn(api, "listNodes").mockResolvedValue([]);
+
+  const { getByText } = render(NodesOverview);
+
+  await waitFor(() => {
+    expect(getByText(/connect your first node/i)).toBeTruthy();
+  });
+});
+
 test("clicking 'Create enrollment token' calls createEnrollmentToken and shows the token command", async () => {
   vi.spyOn(api, "listNodes").mockResolvedValue([]);
   vi.spyOn(api, "createEnrollmentToken").mockResolvedValue({

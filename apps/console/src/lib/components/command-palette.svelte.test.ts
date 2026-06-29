@@ -1,0 +1,144 @@
+/**
+ * command-palette.svelte.test.ts
+ *
+ * TDD tests for the Cmd-K fleet command palette.
+ * RED → implement command-palette.svelte → GREEN.
+ *
+ * Asserts:
+ *  - commandPalette.open() → search input + static actions render
+ *  - listNodes() mock → node item appears; filtering "zzz" hides it
+ *  - clicking a node item calls goto("/nodes/<id>")
+ */
+
+import { test, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, waitFor, fireEvent, cleanup } from "@testing-library/svelte";
+
+// ---------------------------------------------------------------------------
+// SvelteKit stubs
+// ---------------------------------------------------------------------------
+
+vi.mock("$app/navigation", () => ({
+  goto: vi.fn(),
+}));
+
+vi.mock("$app/state", () => ({
+  page: { url: { pathname: "/" } },
+}));
+
+// ---------------------------------------------------------------------------
+// API mock
+// ---------------------------------------------------------------------------
+
+vi.mock("$lib/api/client", () => ({
+  listNodes: vi.fn(),
+}));
+
+// ---------------------------------------------------------------------------
+// Imports (after mocks)
+// ---------------------------------------------------------------------------
+
+import * as api from "$lib/api/client";
+import * as nav from "$app/navigation";
+import { commandPalette } from "$lib/stores/command-palette.svelte";
+import CommandPalette from "./command-palette.svelte";
+
+// ---------------------------------------------------------------------------
+// Setup
+// ---------------------------------------------------------------------------
+
+beforeEach(() => {
+  vi.restoreAllMocks();
+  commandPalette.close();
+});
+
+afterEach(cleanup);
+
+const mockNodes = [{ id: "node_1", hostname: "box1" }];
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+test("when open: renders a search input and static actions", async () => {
+  vi.mocked(api.listNodes).mockResolvedValue([]);
+
+  commandPalette.open();
+  const { getByRole, getByText } = render(CommandPalette);
+
+  await waitFor(() => {
+    // Search input
+    expect(getByRole("textbox")).toBeTruthy();
+    // Static actions
+    expect(getByText("New runtime")).toBeTruthy();
+    expect(getByText("Settings")).toBeTruthy();
+  });
+});
+
+test("when closed: palette is not visible", async () => {
+  vi.mocked(api.listNodes).mockResolvedValue([]);
+
+  commandPalette.close();
+  const { queryByRole } = render(CommandPalette);
+
+  // The dialog content should not be in the DOM when closed
+  expect(queryByRole("textbox")).toBeNull();
+});
+
+test("node from listNodes appears as an item after open", async () => {
+  vi.mocked(api.listNodes).mockResolvedValue(mockNodes as never);
+
+  commandPalette.open();
+  const { getByText } = render(CommandPalette);
+
+  await waitFor(() => {
+    expect(getByText("box1")).toBeTruthy();
+  });
+});
+
+test("typing 'zzz' filters out the node item", async () => {
+  vi.mocked(api.listNodes).mockResolvedValue(mockNodes as never);
+
+  commandPalette.open();
+  const { getByRole, queryByText } = render(CommandPalette);
+
+  await waitFor(() => {
+    expect(getByRole("textbox")).toBeTruthy();
+  });
+
+  const input = getByRole("textbox");
+  await fireEvent.input(input, { target: { value: "zzz" } });
+
+  expect(queryByText("box1")).toBeNull();
+});
+
+test("clicking a node item calls goto('/nodes/node_1')", async () => {
+  vi.mocked(api.listNodes).mockResolvedValue(mockNodes as never);
+  const gotoSpy = vi.mocked(nav.goto);
+
+  commandPalette.open();
+  const { getByText } = render(CommandPalette);
+
+  await waitFor(() => {
+    expect(getByText("box1")).toBeTruthy();
+  });
+
+  fireEvent.click(getByText("box1"));
+
+  expect(gotoSpy).toHaveBeenCalledWith("/nodes/node_1");
+});
+
+test("clicking Settings calls goto('/settings')", async () => {
+  vi.mocked(api.listNodes).mockResolvedValue([]);
+  const gotoSpy = vi.mocked(nav.goto);
+
+  commandPalette.open();
+  const { getByText } = render(CommandPalette);
+
+  await waitFor(() => {
+    expect(getByText("Settings")).toBeTruthy();
+  });
+
+  fireEvent.click(getByText("Settings"));
+
+  expect(gotoSpy).toHaveBeenCalledWith("/settings");
+});

@@ -59,6 +59,8 @@ import { stationRoutes } from './routes/stations.ts';
 import { stationTerminalRoutes } from './routes/station-terminal.ts';
 // Station activity endpoint (audit log, fleet console)
 import { stationActivityRoutes } from './routes/station-activity.ts';
+// Fleet-wide activity log (all stations for the authenticated user)
+import { fleetActivityRoutes } from './routes/activity-fleet.ts';
 // Station write routes (fs.write/mkdir/move/delete — capability-gated, audited)
 import { stationWriteRoutes } from './routes/station-writes.ts';
 import { stationLifecycleRoutes } from './routes/station-lifecycle.ts';
@@ -167,6 +169,8 @@ const app = new Hono()
   .route('/api', stationTerminalRoutes)                    // WS /api/stations/:id/terminal
   // Station activity log (audit rows, fleet console)
   .route('/api', stationActivityRoutes)                    // GET /api/stations/:id/activity
+  // Fleet-wide activity log (all stations for the authenticated user)
+  .route('/api', fleetActivityRoutes)                      // GET /api/activity
   // Station write routes (fs.write/mkdir/move/delete — capability-gated, audited)
   .route('/api', stationWriteRoutes)                       // POST /api/stations/:id/fs/{write,mkdir,move,delete}
   .route('/api', stationLifecycleRoutes)                   // POST /api/stations/:id/lifecycle

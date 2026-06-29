@@ -1,15 +1,18 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { page } from "$app/state";
+  import { replaceState } from "$app/navigation";
   import { listNodes, createEnrollmentToken, listRuntimes, listRuntimeProviders } from "$lib/api/client";
   import type { NodeSummary, ProvisionedRuntime } from "@agentpod/contract";
   import * as Card from "$lib/components/ui/card";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Skeleton } from "$lib/components/ui/skeleton";
-  import ServerIcon from "@lucide/svelte/icons/server";
   import PlusIcon from "@lucide/svelte/icons/plus";
   import Loader2Icon from "@lucide/svelte/icons/loader-2";
   import NewRuntimeDialog from "./NewRuntimeDialog.svelte";
+  import ActivityTicker from "./activity-ticker.svelte";
+  import ConnectBanner from "./connect-banner.svelte";
 
   let nodes = $state<NodeSummary[]>([]);
   let isLoading = $state(true);
@@ -70,6 +73,21 @@
       // keep fallback ["docker", "cloudflare"]
     }
     await loadData();
+
+    // ?action auto-open (runs once; guards against missing searchParams in test env)
+    const action = (page.url as { searchParams?: URLSearchParams } | undefined)?.searchParams?.get("action") ?? null;
+    if (action === "new-runtime") {
+      showNewRuntimeDialog = true;
+    } else if (action === "create-token") {
+      handleCreateToken();
+    }
+    if (action) {
+      try {
+        replaceState("/", {});
+      } catch {
+        // non-critical in environments where history is unavailable
+      }
+    }
   });
 
   async function handleCreateToken() {
@@ -109,18 +127,28 @@
           <PlusIcon class="h-4 w-4 mr-2" />
           New runtime
         </Button>
-        <Button
-          onclick={handleCreateToken}
-          disabled={isMinting}
-          class="font-mono text-xs uppercase tracking-wider w-full sm:w-auto"
-        >
-          <PlusIcon class="h-4 w-4 mr-2" />
-          {isMinting ? "Creating…" : "Create enrollment token"}
-        </Button>
+        <!--
+          Show the "Create enrollment token" header button only when nodes are present
+          (or while loading). When nodes=0 the ConnectBanner below supplies the same CTA
+          to avoid duplicate accessible buttons.
+        -->
+        {#if isLoading || nodes.length > 0 || provisioningRuntimes.length > 0}
+          <Button
+            onclick={handleCreateToken}
+            disabled={isMinting}
+            class="font-mono text-xs uppercase tracking-wider w-full sm:w-auto"
+          >
+            <PlusIcon class="h-4 w-4 mr-2" />
+            {isMinting ? "Creating…" : "Create enrollment token"}
+          </Button>
+        {/if}
       </div>
       {#if mintError}<p class="text-xs text-destructive">{mintError}</p>{/if}
     </div>
   </div>
+
+  <!-- Fleet activity ticker (self-hides when there is no recent activity) -->
+  <ActivityTicker />
 
   <!-- Enrollment command block -->
   {#if lastToken}
@@ -146,15 +174,9 @@
       <p class="text-sm font-mono text-destructive">{error}</p>
     </div>
 
-  <!-- Empty state: no nodes and no provisioning runtimes -->
+  <!-- Empty state: no nodes and no provisioning runtimes → connect banner -->
   {:else if nodes.length === 0 && provisioningRuntimes.length === 0}
-    <div class="cyber-card p-12 text-center">
-      <ServerIcon class="w-12 h-12 mx-auto mb-4 text-muted-foreground/40" />
-      <h3 class="text-lg font-semibold mb-1">No nodes yet</h3>
-      <p class="text-sm text-muted-foreground">
-        Create an enrollment token to connect one.
-      </p>
-    </div>
+    <ConnectBanner onCreateToken={handleCreateToken} />
 
   <!-- Node cards + provisioning cards grid -->
   {:else}
