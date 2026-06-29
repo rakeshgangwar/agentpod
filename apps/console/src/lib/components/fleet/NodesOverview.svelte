@@ -210,6 +210,14 @@
               <p class="text-xs font-mono text-muted-foreground/70">
                 {node.os}
               </p>
+              {#if node.provisioned}
+                <Badge
+                  variant="outline"
+                  class="font-mono text-[10px] border-[var(--cyber-cyan)]/40 text-[var(--cyber-cyan)]"
+                >
+                  provisioned · {node.provisioned.provider}
+                </Badge>
+              {/if}
             </Card.Content>
           </Card.Root>
         </a>

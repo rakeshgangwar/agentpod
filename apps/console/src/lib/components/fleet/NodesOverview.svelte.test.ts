@@ -116,6 +116,34 @@ test("mint failure shows inline mintError without replacing the node grid", asyn
   });
 });
 
+test("provisioned node shows 'provisioned · docker' badge; unprovisioned node does not", async () => {
+  const provisionedNode = {
+    ...mockNodes[0],
+    id: "node_p1",
+    hostname: "provisioned.local",
+    provisioned: { runtimeId: "rt_1", provider: "docker" },
+  };
+  const unprovisionedNode = {
+    ...mockNodes[1],
+    id: "node_p2",
+    hostname: "manual.local",
+    provisioned: null,
+  };
+  vi.spyOn(api, "listNodes").mockResolvedValue([provisionedNode, unprovisionedNode]);
+
+  const { getAllByText, queryAllByText } = render(NodesOverview);
+
+  await waitFor(() => {
+    // The provisioned node shows the badge
+    const badges = getAllByText(/provisioned · docker/i);
+    expect(badges.length).toBeGreaterThan(0);
+  });
+
+  // The unprovisioned node does NOT show a provisioned badge
+  // (there's exactly 1 badge — the provisioned one; not 2)
+  expect(queryAllByText(/provisioned · docker/i)).toHaveLength(1);
+});
+
 test("clicking 'Create enrollment token' calls createEnrollmentToken and shows the token command", async () => {
   vi.spyOn(api, "listNodes").mockResolvedValue([]);
   vi.spyOn(api, "createEnrollmentToken").mockResolvedValue({

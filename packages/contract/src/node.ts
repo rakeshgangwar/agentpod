@@ -19,5 +19,6 @@ export const NodeSummary = z.object({
   id: z.string(), name: z.string(), hostname: z.string(), os: z.string(),
   arch: z.string(), cpuCount: z.number().int(),
   status: NodeStatus, lastSeenAt: z.string().nullable(), createdAt: z.string(),
+  provisioned: z.object({ runtimeId: z.string(), provider: z.string() }).nullable().optional(),
 });
 export type NodeSummary = z.infer<typeof NodeSummary>;

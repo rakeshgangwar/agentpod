@@ -2,7 +2,10 @@
   import { onMount } from "svelte";
   import { page } from "$app/stores";
   import { stations, loadDetected, adopt, loadAdopted } from "$lib/stores/stations.svelte";
+  import { listNodes } from "$lib/api/client";
+  import type { NodeSummary } from "@agentpod/contract";
   import StationTree from "$lib/components/stations/StationTree.svelte";
+  import ProvisionedNodeControls from "$lib/components/fleet/ProvisionedNodeControls.svelte";
   import * as Card from "$lib/components/ui/card";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
@@ -12,9 +15,21 @@
   // params.id is always defined for this route
   const id = $derived($page.params.id as string);
 
+  let node = $state<NodeSummary | null>(null);
+
+  async function loadNode() {
+    try {
+      const all = await listNodes();
+      node = all.find((n) => n.id === id) ?? null;
+    } catch {
+      // non-fatal: node info is best-effort; stations still load
+    }
+  }
+
   onMount(() => {
     loadDetected(id);
     loadAdopted(id);
+    loadNode();
   });
 
   async function handleAdopt(key: string) {
@@ -34,14 +49,41 @@
 
 <div class="space-y-6 p-4 md:p-6">
   <!-- Page header -->
-  <div class="flex items-center gap-3">
-    <a href="/" class="text-muted-foreground hover:text-foreground transition-colors" aria-label="Back to fleet">
+  <div class="flex items-start gap-3">
+    <a href="/" class="text-muted-foreground hover:text-foreground transition-colors mt-1" aria-label="Back to fleet">
       <ArrowLeftIcon class="w-4 h-4" />
     </a>
-    <div>
+    <div class="flex-1 min-w-0">
       <h1 class="text-xl font-bold font-mono tracking-tight">
-        Node: <span class="text-[var(--cyber-cyan)]">{id}</span>
+        Node: <span class="text-[var(--cyber-cyan)]">{node?.hostname ?? id}</span>
       </h1>
+      {#if node}
+        <div class="flex flex-wrap items-center gap-2 mt-1">
+          <Badge
+            variant={node.status === "online" ? "default" : "secondary"}
+            class={node.status === "online"
+              ? "bg-[var(--cyber-emerald)] text-black border-transparent"
+              : ""}
+          >
+            {node.status}
+          </Badge>
+          {#if node.provisioned}
+            <Badge
+              variant="outline"
+              class="font-mono text-xs border-[var(--cyber-cyan)]/50 text-[var(--cyber-cyan)]"
+            >
+              provisioned · {node.provisioned.provider}
+            </Badge>
+          {/if}
+        </div>
+
+        <!-- Provisioned runtime controls (destroy / stop / start) -->
+        {#if node.provisioned}
+          <div class="mt-3">
+            <ProvisionedNodeControls {node} onRefresh={loadNode} />
+          </div>
+        {/if}
+      {/if}
     </div>
   </div>
 
