@@ -15,11 +15,16 @@
   let { open, providers, onClose, onCreated }: Props = $props();
 
   const tiers = ["small", "medium", "large"];
+  const harnessOptions = [
+    { value: "none", label: "Generic" },
+    { value: "opencode", label: "OpenCode" },
+  ];
 
-  // provider/name/tier are reset each time the dialog opens via $effect
+  // provider/name/tier/harness are reset each time the dialog opens via $effect
   let provider = $state("");
   let name = $state("");
   let resourceTier = $state("small");
+  let harness = $state("none");
   let isCreating = $state(false);
   let error = $state<string | null>(null);
 
@@ -29,6 +34,7 @@
       name = "";
       error = null;
       resourceTier = "small";
+      harness = "none";
       provider = providers[0] ?? "docker";
     }
   });
@@ -43,7 +49,7 @@
     isCreating = true;
     error = null;
     try {
-      await provisionRuntime({ provider, name: trimmedName, resourceTier });
+      await provisionRuntime({ provider, name: trimmedName, resourceTier, harness });
       onCreated?.();
       onClose();
     } catch (e) {
@@ -113,6 +119,27 @@
             <Select.Content>
               {#each tiers as t (t)}
                 <Select.Item value={t}>{t}</Select.Item>
+              {/each}
+            </Select.Content>
+          </Select.Root>
+        </div>
+
+        <!-- Harness select -->
+        <div class="space-y-1.5">
+          <label class="text-sm font-medium font-mono" for="runtime-harness">Harness</label>
+          <Select.Root
+            type="single"
+            value={harness}
+            onValueChange={(v: string | string[]) => {
+              harness = Array.isArray(v) ? (v[0] ?? "none") : v;
+            }}
+          >
+            <Select.Trigger class="w-full" id="runtime-harness">
+              {harnessOptions.find((h) => h.value === harness)?.label ?? "Generic"}
+            </Select.Trigger>
+            <Select.Content>
+              {#each harnessOptions as opt (opt.value)}
+                <Select.Item value={opt.value}>{opt.label}</Select.Item>
               {/each}
             </Select.Content>
           </Select.Root>

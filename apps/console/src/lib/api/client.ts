@@ -19,11 +19,16 @@ export const listNodes = () => http<NodeSummary[]>("/api/nodes");
 
 // ─── Runtime endpoints ────────────────────────────────────────────────────────
 
-export const provisionRuntime = (req: { provider: string; name: string; resourceTier: string }) =>
+export const provisionRuntime = (req: {
+  provider: string;
+  name: string;
+  resourceTier: string;
+  harness?: string;
+}) =>
   http<ProvisionedRuntime>("/api/runtimes", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(req),
+    body: JSON.stringify({ ...req, harness: req.harness ?? "none" }),
   });
 
 export const listRuntimes = () => http<ProvisionedRuntime[]>("/api/runtimes");

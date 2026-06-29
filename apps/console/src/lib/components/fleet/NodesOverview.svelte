@@ -177,6 +177,14 @@
             <p class="text-sm font-mono text-muted-foreground">
               {rt.provider} · {rt.resourceTier}
             </p>
+            {#if rt.harness && rt.harness !== "none"}
+              <Badge
+                variant="outline"
+                class="font-mono text-[10px] border-[var(--cyber-cyan)]/40 text-[var(--cyber-cyan)]"
+              >
+                {rt.harness}
+              </Badge>
+            {/if}
           </Card.Content>
         </Card.Root>
       {/each}
