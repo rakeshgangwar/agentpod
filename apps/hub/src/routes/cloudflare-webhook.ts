@@ -4,8 +4,6 @@ import { z } from "zod";
 import { createLogger } from "../utils/logger";
 import { db } from "../db/drizzle";
 import { cloudflareSandboxes } from "../db/schema/cloudflare";
-import { sandboxes } from "../db/schema/sandboxes";
-import { workflowExecutions } from "../db/schema/workflows";
 import { eq } from "drizzle-orm";
 
 const log = createLogger("cloudflare-webhook");
@@ -146,7 +144,7 @@ async function handleSandboxCreated(data: { sandboxId: string; userId?: string }
 
 async function handleSandboxHibernated(data: { sandboxId: string }) {
   const now = new Date();
-  
+
   await db
     .update(cloudflareSandboxes)
     .set({
@@ -155,20 +153,12 @@ async function handleSandboxHibernated(data: { sandboxId: string }) {
     })
     .where(eq(cloudflareSandboxes.id, data.sandboxId));
 
-  await db
-    .update(sandboxes)
-    .set({
-      status: "sleeping",
-      updatedAt: now,
-    })
-    .where(eq(sandboxes.id, data.sandboxId));
-
   log.info("Sandbox hibernated", { sandboxId: data.sandboxId });
 }
 
 async function handleSandboxWoken(data: { sandboxId: string }) {
   const now = new Date();
-  
+
   await db
     .update(cloudflareSandboxes)
     .set({
@@ -177,15 +167,6 @@ async function handleSandboxWoken(data: { sandboxId: string }) {
       updatedAt: now,
     })
     .where(eq(cloudflareSandboxes.id, data.sandboxId));
-
-  await db
-    .update(sandboxes)
-    .set({
-      status: "running",
-      lastAccessedAt: now,
-      updatedAt: now,
-    })
-    .where(eq(sandboxes.id, data.sandboxId));
 
   log.info("Sandbox woken", { sandboxId: data.sandboxId });
 }
@@ -211,7 +192,7 @@ async function handleSandboxError(data: { sandboxId: string; error?: string }) {
 
 async function handleSessionMessage(data: { sandboxId: string; sessionId?: string }) {
   const now = new Date();
-  
+
   await db
     .update(cloudflareSandboxes)
     .set({
@@ -219,14 +200,6 @@ async function handleSessionMessage(data: { sandboxId: string; sessionId?: strin
       updatedAt: now,
     })
     .where(eq(cloudflareSandboxes.id, data.sandboxId));
-
-  await db
-    .update(sandboxes)
-    .set({
-      lastAccessedAt: now,
-      updatedAt: now,
-    })
-    .where(eq(sandboxes.id, data.sandboxId));
 
   log.debug("Session message received", { sandboxId: data.sandboxId, sessionId: data.sessionId });
 }
@@ -243,110 +216,20 @@ async function handleWorkspaceSynced(data: { sandboxId: string }) {
   log.info("Workspace synced", { sandboxId: data.sandboxId });
 }
 
-async function handleWorkflowExecutionStarted(data: { 
-  executionId?: string; 
-  workflowId?: string;
-}) {
-  if (!data.executionId) return;
-
-  await db
-    .update(workflowExecutions)
-    .set({
-      status: "running",
-    })
-    .where(eq(workflowExecutions.id, data.executionId));
-
-  log.info("Workflow execution started", { 
-    executionId: data.executionId, 
-    workflowId: data.workflowId,
-  });
+// Workflow event handlers are no-ops: the workflowExecutions table was removed
+// as part of the OpenCode schema retirement (P2b T3).
+async function handleWorkflowExecutionStarted(data: { executionId?: string; workflowId?: string }) {
+  log.debug("Workflow execution event ignored (OpenCode retired)", { executionId: data.executionId });
 }
 
-async function handleWorkflowStepCompleted(data: { 
-  executionId?: string;
-  stepId?: string;
-  stepName?: string;
-  result?: Record<string, unknown>;
-}) {
-  if (!data.executionId) return;
-
-  const [execution] = await db
-    .select()
-    .from(workflowExecutions)
-    .where(eq(workflowExecutions.id, data.executionId))
-    .limit(1);
-
-  if (!execution) {
-    log.warn("Step completed for unknown execution", { executionId: data.executionId });
-    return;
-  }
-
-  const completedSteps = (execution.completedSteps as string[]) || [];
-  if (data.stepId && !completedSteps.includes(data.stepId)) {
-    completedSteps.push(data.stepId);
-  }
-
-  await db
-    .update(workflowExecutions)
-    .set({
-      currentStep: data.stepId,
-      completedSteps,
-    })
-    .where(eq(workflowExecutions.id, data.executionId));
-
-  log.debug("Workflow step completed", { 
-    executionId: data.executionId, 
-    stepId: data.stepId,
-    stepName: data.stepName,
-  });
+async function handleWorkflowStepCompleted(data: { executionId?: string; stepId?: string; stepName?: string }) {
+  log.debug("Workflow step event ignored (OpenCode retired)", { executionId: data.executionId, stepId: data.stepId });
 }
 
-async function handleWorkflowExecutionCompleted(data: { 
-  executionId?: string;
-  workflowId?: string;
-  result?: Record<string, unknown>;
-  durationMs?: number;
-}) {
-  if (!data.executionId) return;
-
-  await db
-    .update(workflowExecutions)
-    .set({
-      status: "completed",
-      result: data.result,
-      completedAt: new Date(),
-      durationMs: data.durationMs,
-    })
-    .where(eq(workflowExecutions.id, data.executionId));
-
-  log.info("Workflow execution completed", { 
-    executionId: data.executionId, 
-    workflowId: data.workflowId,
-    durationMs: data.durationMs,
-  });
+async function handleWorkflowExecutionCompleted(data: { executionId?: string; workflowId?: string; durationMs?: number }) {
+  log.debug("Workflow execution event ignored (OpenCode retired)", { executionId: data.executionId });
 }
 
-async function handleWorkflowExecutionFailed(data: { 
-  executionId?: string;
-  workflowId?: string;
-  error?: string;
-  durationMs?: number;
-}) {
-  if (!data.executionId) return;
-
-  await db
-    .update(workflowExecutions)
-    .set({
-      status: "errored",
-      error: data.error,
-      completedAt: new Date(),
-      durationMs: data.durationMs,
-    })
-    .where(eq(workflowExecutions.id, data.executionId));
-
-  log.error("Workflow execution failed", { 
-    executionId: data.executionId, 
-    workflowId: data.workflowId,
-    error: data.error,
-  });
+async function handleWorkflowExecutionFailed(data: { executionId?: string; workflowId?: string; error?: string }) {
+  log.debug("Workflow execution event ignored (OpenCode retired)", { executionId: data.executionId });
 }

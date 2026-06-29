@@ -162,6 +162,13 @@
       "when": 1782716030272,
       "tag": "0022_wealthy_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1782747542570,
+      "tag": "0023_wet_captain_america",
+      "breakpoints": true
     }
   ]
 }

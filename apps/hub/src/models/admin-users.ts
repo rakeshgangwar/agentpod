@@ -10,8 +10,7 @@
 
 import { db } from "../db/drizzle";
 import { user, session, type User, type UserRole } from "../db/schema/auth";
-import { sandboxes } from "../db/schema/sandboxes";
-import { eq, desc, sql, like, or, and, count, inArray } from "drizzle-orm";
+import { eq, sql, like, or, and, count } from "drizzle-orm";
 import { createLogger } from "../utils/logger";
 
 const log = createLogger("admin-users");
@@ -129,25 +128,6 @@ export async function listUsers(
     .limit(limit)
     .offset(offset);
 
-  // Get sandbox counts for each user
-  const userIds = rows.map(r => r.id);
-  
-  const sandboxCounts = userIds.length > 0
-    ? await db
-        .select({
-          userId: sandboxes.userId,
-          total: count(),
-          running: sql<number>`SUM(CASE WHEN ${sandboxes.status} = 'running' THEN 1 ELSE 0 END)`,
-        })
-        .from(sandboxes)
-        .where(inArray(sandboxes.userId, userIds))
-        .groupBy(sandboxes.userId)
-    : [];
-
-  const sandboxCountMap = new Map(
-    sandboxCounts.map(sc => [sc.userId, { total: sc.total, running: sc.running }])
-  );
-
   // Map to AdminUserView
   const users: AdminUserView[] = rows.map(row => ({
     id: row.id,
@@ -161,8 +141,8 @@ export async function listUsers(
     bannedAt: row.bannedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
-    sandboxCount: sandboxCountMap.get(row.id)?.total ?? 0,
-    runningSandboxCount: sandboxCountMap.get(row.id)?.running ?? 0,
+    sandboxCount: 0,
+    runningSandboxCount: 0,
   }));
 
   return { users, total };
@@ -183,17 +163,6 @@ export async function getUserById(userId: string): Promise<AdminUserView | null>
 
   if (!row) return null;
 
-  // Get sandbox counts
-  const [totalResult] = await db
-    .select({ count: count() })
-    .from(sandboxes)
-    .where(eq(sandboxes.userId, userId));
-
-  const [runningResult] = await db
-    .select({ count: count() })
-    .from(sandboxes)
-    .where(and(eq(sandboxes.userId, userId), eq(sandboxes.status, "running")));
-
   return {
     id: row.id,
     email: row.email,
@@ -206,8 +175,8 @@ export async function getUserById(userId: string): Promise<AdminUserView | null>
     bannedAt: row.bannedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
-    sandboxCount: totalResult?.count ?? 0,
-    runningSandboxCount: runningResult?.count ?? 0,
+    sandboxCount: 0,
+    runningSandboxCount: 0,
   };
 }
 
@@ -348,17 +317,6 @@ export async function getAdminStats(): Promise<AdminStats> {
     .from(user)
     .where(eq(user.banned, true));
 
-  // Total sandboxes
-  const [totalSandboxesResult] = await db
-    .select({ count: count() })
-    .from(sandboxes);
-
-  // Running sandboxes
-  const [runningSandboxesResult] = await db
-    .select({ count: count() })
-    .from(sandboxes)
-    .where(eq(sandboxes.status, "running"));
-
   // Users this week
   const oneWeekAgo = new Date();
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
@@ -372,27 +330,10 @@ export async function getAdminStats(): Promise<AdminStats> {
     totalUsers: totalUsersResult?.count ?? 0,
     adminUsers: adminUsersResult?.count ?? 0,
     bannedUsers: bannedUsersResult?.count ?? 0,
-    totalSandboxes: totalSandboxesResult?.count ?? 0,
-    runningSandboxes: runningSandboxesResult?.count ?? 0,
+    totalSandboxes: 0,
+    runningSandboxes: 0,
     usersThisWeek: usersThisWeekResult?.count ?? 0,
   };
-}
-
-// =============================================================================
-// User Sandboxes
-// =============================================================================
-
-/**
- * Get all sandboxes for a user (admin view)
- */
-export async function getUserSandboxes(userId: string) {
-  const rows = await db
-    .select()
-    .from(sandboxes)
-    .where(eq(sandboxes.userId, userId))
-    .orderBy(desc(sandboxes.createdAt));
-
-  return rows;
 }
 
 /**
