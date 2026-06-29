@@ -47,7 +47,10 @@ export class DockerRuntimeProvisioner implements RuntimeProvisioner {
    * Image is read from NODE_AGENT_IMAGE env at call time (not constructor time)
    * so that tests can override it per-invocation.
    *
-   * Returns the Docker container ID (sandbox.containerId) as externalId.
+   * Returns spec.runtimeId as externalId because the orchestrator's lifecycle
+   * methods (startSandbox / stopSandbox / deleteSandbox) resolve containers by
+   * the sandbox config.id (name: "agentpod-<id>" or label agentpod.sandbox.id),
+   * NOT by the raw hex Docker container id.
    */
   async provision(spec: ProvisionSpec): Promise<{ externalId: string }> {
     const image = process.env.NODE_AGENT_IMAGE ?? "agentpod-node:local";
@@ -72,7 +75,11 @@ export class DockerRuntimeProvisioner implements RuntimeProvisioner {
       resources,
     });
 
-    return { externalId: sandbox.containerId };
+    // Use runtimeId (= config.id) so that destroy/start/stop can pass it
+    // directly to deleteSandbox/startSandbox/stopSandbox, which look up the
+    // container by name "agentpod-<id>" or label agentpod.sandbox.id=<id>.
+    void sandbox; // containerId is intentionally not used as the lifecycle key
+    return { externalId: spec.runtimeId };
   }
 
   /**

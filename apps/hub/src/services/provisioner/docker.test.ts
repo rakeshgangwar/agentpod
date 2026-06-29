@@ -116,10 +116,20 @@ describe("DockerRuntimeProvisioner", () => {
       expect(fake.countCalls("createSandbox")).toBe(1);
     });
 
-    it("returns externalId equal to the fake container id", async () => {
+    it("passes spec.runtimeId as the SandboxConfig id (orchestrator lookup key)", async () => {
+      const fake = new FakeDockerOrchestrator();
+      await makeProvisioner(fake).provision(BASE_SPEC);
+      expect(fake.capturedConfig!.id).toBe(BASE_SPEC.runtimeId);
+    });
+
+    it("returns externalId equal to spec.runtimeId (not the hex container id)", async () => {
       const fake = new FakeDockerOrchestrator();
       const result = await makeProvisioner(fake).provision(BASE_SPEC);
-      expect(result.externalId).toBe(FAKE_CONTAINER_ID);
+      // The orchestrator resolves containers by name "agentpod-<id>" or
+      // label agentpod.sandbox.id=<id>, keyed on the sandbox config.id = runtimeId.
+      // destroy/start/stop forward externalId directly to those methods.
+      expect(result.externalId).toBe(BASE_SPEC.runtimeId);
+      expect(result.externalId).not.toBe(FAKE_CONTAINER_ID);
     });
 
     it("uses the default node-agent image when NODE_AGENT_IMAGE is unset", async () => {
