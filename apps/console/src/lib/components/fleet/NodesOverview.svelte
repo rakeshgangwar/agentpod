@@ -8,7 +8,6 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Skeleton } from "$lib/components/ui/skeleton";
-  import ServerIcon from "@lucide/svelte/icons/server";
   import PlusIcon from "@lucide/svelte/icons/plus";
   import Loader2Icon from "@lucide/svelte/icons/loader-2";
   import NewRuntimeDialog from "./NewRuntimeDialog.svelte";

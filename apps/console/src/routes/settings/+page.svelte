@@ -9,8 +9,7 @@
   } from "@tauri-apps/plugin-notification";
   import { connection, disconnect, testConnection } from "$lib/stores/connection.svelte";
   import { auth } from "$lib/stores/auth.svelte";
-  import { sandboxes, fetchSandboxes } from "$lib/stores/sandboxes.svelte";
-  import { 
+  import {
     settings, 
     initSettings, 
     loadProviders,
@@ -87,15 +86,12 @@
     }
   });
 
-  // Initialize settings, providers, sandboxes, and check admin status (runs once)
+  // Initialize settings, providers, and check admin status (runs once)
   $effect(() => {
     if (connection.isConnected && !settingsInitialized) {
       settingsInitialized = true;
       initSettings();
       loadProviders();
-      if (sandboxes.list.length === 0) {
-        fetchSandboxes();
-      }
       // Check admin status
       checkIsAdmin().then(result => {
         isAdmin = result;
@@ -1149,40 +1145,8 @@ export default {
             </div>
           </div>
 
-          <!-- Statistics -->
-          <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-2">
-            <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
-              <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
-                [statistics]
-              </h3>
-            </div>
-            <div class="p-4 space-y-4">
-              <p class="text-xs text-muted-foreground font-mono">
-                Overview of your sandboxes
-              </p>
-              <div class="grid grid-cols-2 gap-3">
-                <div class="text-center p-3 bg-background/50 rounded border border-border/30">
-                  <p class="text-2xl font-bold font-mono">{sandboxes.count}</p>
-                  <p class="text-xs text-muted-foreground font-mono uppercase tracking-wider">Total</p>
-                </div>
-                <div class="text-center p-3 rounded border text-[var(--cyber-emerald)] bg-[color-mix(in_oklch,var(--cyber-emerald)_10%,transparent)] border-[color-mix(in_oklch,var(--cyber-emerald)_30%,transparent)]">
-                  <p class="text-2xl font-bold font-mono">{sandboxes.running.length}</p>
-                  <p class="text-xs text-muted-foreground font-mono uppercase tracking-wider">Running</p>
-                </div>
-                <div class="text-center p-3 bg-background/50 rounded border border-border/30">
-                  <p class="text-2xl font-bold font-mono">{sandboxes.stopped.length}</p>
-                  <p class="text-xs text-muted-foreground font-mono uppercase tracking-wider">Stopped</p>
-                </div>
-                <div class="text-center p-3 rounded border text-[var(--cyber-amber)] bg-[color-mix(in_oklch,var(--cyber-amber)_10%,transparent)] border-[color-mix(in_oklch,var(--cyber-amber)_30%,transparent)]">
-                  <p class="text-2xl font-bold font-mono">{sandboxes.starting.length + sandboxes.stopping.length}</p>
-                  <p class="text-xs text-muted-foreground font-mono uppercase tracking-wider">Transitioning</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <!-- Backup & Restore -->
-          <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-3">
+          <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-2">
             <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
               <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
                 [backup_restore]
@@ -1266,7 +1230,7 @@ export default {
           </div>
 
           <!-- App Info -->
-          <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-4">
+          <div class="cyber-card corner-accent overflow-hidden animate-fade-in-up stagger-3">
             <div class="py-3 px-4 border-b border-border/30 bg-background/30 backdrop-blur-sm">
               <h3 class="font-mono text-xs uppercase tracking-wider text-[var(--cyber-cyan)]">
                 [about_agentpod]

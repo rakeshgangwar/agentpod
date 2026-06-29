@@ -7,8 +7,6 @@
   import Server from "@lucide/svelte/icons/server";
   import Settings from "@lucide/svelte/icons/settings";
   import ShieldIcon from "@lucide/svelte/icons/shield";
-  import FolderKanban from "@lucide/svelte/icons/folder-kanban";
-
   interface NavItem {
     href: string;
     label: string;
@@ -123,19 +121,6 @@
       {/each}
     </nav>
 
-    <!-- Footer: Legacy link -->
-    <div class="p-3 border-t border-border/30 shrink-0">
-      <a
-        href="/projects"
-        class="flex items-center gap-2 px-2 py-1.5 rounded-sm
-               text-muted-foreground/50 hover:text-muted-foreground
-               font-mono text-xs transition-colors"
-        title="Legacy (OpenCode projects)"
-      >
-        <FolderKanban class="h-3.5 w-3.5 shrink-0" />
-        <span class="hidden lg:block">Legacy</span>
-      </a>
-    </div>
   </aside>
 
   <!-- =========================================================
