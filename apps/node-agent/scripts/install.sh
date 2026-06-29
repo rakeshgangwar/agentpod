@@ -105,6 +105,10 @@ fi
 chmod 0755 "$DEST_BIN"
 echo "    Installed to ${DEST_BIN}"
 
+# Short alias: `apn` -> agentpod-node, so you can type `apn run`, `apn enroll`, …
+ln -sf "$DEST_BIN" /usr/local/bin/apn
+echo "    Alias: apn -> ${DEST_BIN}"
+
 # ---------------------------------------------------------------------------
 # Enroll
 # ---------------------------------------------------------------------------
@@ -158,7 +162,7 @@ elif [[ "$OS" == "darwin" ]]; then
   echo "Done. agentpod-node is installed and enrolled."
   echo ""
   echo "NOTE: macOS does not use systemd. To run the agent persistently:"
-  echo "  Option 1 — run interactively:  agentpod-node run"
+  echo "  Option 1 — run interactively:  apn run    (alias for agentpod-node)"
   echo "  Option 2 — set up a launchd plist (LaunchDaemon or LaunchAgent)."
   echo "             Example plist skeleton:"
   echo "               /Library/LaunchDaemons/dev.agentpod.node.plist"

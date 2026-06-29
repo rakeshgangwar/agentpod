@@ -85,7 +85,9 @@ fi
 echo "==> [2/4] Installing binary to ${BINARY_DEST}..."
 mkdir -p "$BIN_DIR"
 install -m 0755 "$SRC_BINARY" "$BINARY_DEST"
-echo "    Installed."
+# Short alias: `apn` -> agentpod-node (so you can type `apn run`, `apn enroll`, …)
+ln -sf "$BINARY_DEST" "${BIN_DIR}/apn"
+echo "    Installed (alias: apn -> ${BINARY_DEST})."
 
 # ---------------------------------------------------------------------------
 # Step 3: Enroll the node

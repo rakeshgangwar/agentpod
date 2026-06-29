@@ -40,12 +40,14 @@ This script resolves or builds the `agentpod-node` binary locally before install
 
 ### Option B — manual enroll + run
 
+> The installers also create a short alias **`apn`** → `agentpod-node`, so `apn run`, `apn enroll`, etc. work interchangeably with the full name.
+
 ```bash
 # 1. Enroll once (writes config):
-agentpod-node enroll --hub https://hub.<your-domain> --token <TOKEN>
+apn enroll --hub https://hub.<your-domain> --token <TOKEN>
 
 # 2. Run (reads config automatically):
-agentpod-node run
+apn run
 # Or, install the systemd unit and let systemd manage it:
 #   cp apps/node-agent/deploy/agentpod-node.service /etc/systemd/system/
 #   systemctl daemon-reload && systemctl enable --now agentpod-node
