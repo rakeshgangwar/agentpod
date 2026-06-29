@@ -105,7 +105,12 @@ export async function connect(apiUrl: string, _apiKey?: string): Promise<boolean
 export async function initConnection(): Promise<void> {
   if (isInitialized && connectionStatus.connected) return;
 
-  const storedUrl = getStoredApiUrl();
+  // Fall back to the build-time PUBLIC_HUB_URL so a hosted deployment (empty
+  // localStorage on first visit) auto-connects and configures the auth client.
+  // Without this the auth client never gets a base URL, initAuth() bails, and
+  // the login guard can't run — an anonymous visitor sees the shell + 401s
+  // instead of being redirected to /login. Mirrors api/client's fallback.
+  const storedUrl = getStoredApiUrl() ?? import.meta.env.PUBLIC_HUB_URL ?? null;
   if (!storedUrl) {
     isInitialized = true;
     return;

@@ -20,6 +20,7 @@ const LS_KEY = "agentpod.apiUrl";
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  vi.unstubAllEnvs();
   localStorage.clear();
   // Reset connection state via disconnect so each test starts fresh
   await disconnect();
@@ -133,7 +134,8 @@ test("initConnection with url in localStorage but health fails → stays disconn
   expect(setAuthApiUrl).not.toHaveBeenCalled();
 });
 
-test("initConnection with no url in localStorage → stays disconnected, no fetch called", async () => {
+test("initConnection with no url in localStorage and no PUBLIC_HUB_URL → stays disconnected, no fetch called", async () => {
+  vi.stubEnv("PUBLIC_HUB_URL", "");
   const fetchMock = vi.fn();
   vi.stubGlobal("fetch", fetchMock);
 
@@ -141,4 +143,20 @@ test("initConnection with no url in localStorage → stays disconnected, no fetc
 
   expect(connection.isConnected).toBe(false);
   expect(fetchMock).not.toHaveBeenCalled();
+});
+
+// Regression: a hosted deploy (empty localStorage on first visit) must fall back
+// to the build-time PUBLIC_HUB_URL so the auth client gets configured and the
+// login guard can run — otherwise an anonymous visitor sees the shell + 401s.
+test("initConnection with no localStorage url but PUBLIC_HUB_URL set → connects via it + configures auth client", async () => {
+  vi.stubEnv("PUBLIC_HUB_URL", "https://hub.agentpod.dev");
+  const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+  vi.stubGlobal("fetch", fetchMock);
+
+  await initConnection();
+
+  expect(fetchMock).toHaveBeenCalledWith("https://hub.agentpod.dev/health");
+  expect(connection.isConnected).toBe(true);
+  expect(connection.apiUrl).toBe("https://hub.agentpod.dev");
+  expect(setAuthApiUrl).toHaveBeenCalledWith("https://hub.agentpod.dev");
 });
