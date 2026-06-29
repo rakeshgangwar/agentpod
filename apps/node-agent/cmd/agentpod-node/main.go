@@ -10,11 +10,13 @@ func main() {
   switch os.Args[1] {
   case "enroll":
     fs := flag.NewFlagSet("enroll", flag.ExitOnError)
-    hub := fs.String("hub", "", "hub base URL"); token := fs.String("token", "", "enrollment token")
+    flagHub := fs.String("hub", "", "hub base URL"); flagToken := fs.String("token", "", "enrollment token")
     fs.Parse(os.Args[2:])
-    id, sec, err := enroll.Enroll(*hub, *token, host.Info())
+    hub, token, err := resolveEnrollArgs(*flagHub, *flagToken, os.Getenv)
     if err != nil { fmt.Fprintln(os.Stderr, err); os.Exit(1) }
-    if err := config.Save(config.DefaultPath(), config.Config{Hub: *hub, NodeID: id, NodeSecret: sec}); err != nil {
+    id, sec, err := enroll.Enroll(hub, token, host.Info())
+    if err != nil { fmt.Fprintln(os.Stderr, err); os.Exit(1) }
+    if err := config.Save(config.DefaultPath(), config.Config{Hub: hub, NodeID: id, NodeSecret: sec}); err != nil {
       fmt.Fprintln(os.Stderr, err); os.Exit(1) }
     fmt.Println("enrolled:", id)
   case "run":
