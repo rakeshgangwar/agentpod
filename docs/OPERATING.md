@@ -12,12 +12,20 @@ A **node** is any host running the AgentPod node-agent — a VPS, a laptop, a pr
 
 ### Option A — curl installer (recommended — no Go / no repo needed)
 
-On the target host (Linux or macOS, requires root/sudo):
+On the target host (Linux or macOS). **System-wide** (root; installs a systemd service):
 
 ```bash
 curl -fsSL https://github.com/rakeshgangwar/agentpod/releases/latest/download/install.sh \
   | sudo bash -s -- https://hub.<your-domain> <enrollment-token-from-console>
 ```
+
+**Rootless** — for key-only hosts where the login user has no `sudo` password. Pass `--user`; it installs into `~/.local/bin`, enrolls as you, and (if a user systemd manager is available) sets up a `systemd --user` service, otherwise prints run instructions (`apn run` / `tmux`):
+
+```bash
+curl -fsSL https://github.com/rakeshgangwar/agentpod/releases/latest/download/install.sh \
+  | bash -s -- --user https://hub.<your-domain> <enrollment-token-from-console>
+```
+(If not root and `sudo` is absent, the installer auto-falls back to this rootless mode. For a `systemd --user` service to survive logout/reboot, run `sudo loginctl enable-linger <user>` once.)
 
 The installer downloads the prebuilt binary for your platform (linux/darwin × amd64/arm64) from the latest GitHub Release, then:
 1. Installs it to `/usr/local/bin/agentpod-node`.
