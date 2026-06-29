@@ -48,6 +48,7 @@ Delete (not repurposed):
 - Components: `project-animated-icon`, `project-icon-picker`, `sandbox-not-running`, `session-forks/`, `workflow/` (and `quick-task-modal`, `news-ticker`, `onboarding-banner`, `lottie-icon` are **transformed**, not deleted — §2–4).
 - Stores: `sandboxes`, `session-activity`, `session-forks`, `session-status`, `project-icons`, `workflows` (and `quick-task` → replaced by `command-palette`).
 - **Un-wire:** `+layout.svelte` (QuickTaskModal/quickTask → command palette); the legacy import in `settings/+page.svelte`; the **"Legacy" nav link** in `app-shell` (its `/projects` target is gone).
+- **Repo-root cruft:** delete the orphaned `management-api/` directory — a leftover from the Turborepo restructure (the API became `apps/hub`); it's not a workspace member, isn't referenced anywhere, and holds only two stale OpenCode-era test files (`agent-auth.test.ts`, `agent-session.test.ts`). (Verify no other root-level orphans in the plan.)
 
 **Keep (hard boundary):** `page-header`, all `ui/*`, `app-shell`, `stores/{auth,connection,settings}`, `api/client`, routes `nodes`/`login`/`admin`/`settings`/`setup`, and all P4/fleet code.
 
