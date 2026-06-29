@@ -10,7 +10,13 @@ function hubUrl(): string {
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${hubUrl()}${path}`, { credentials: "include", ...init });
   if (!res.ok) throw new Error(`${init?.method ?? "GET"} ${path} → ${res.status}`);
-  return res.json() as Promise<T>;
+  // 204 No Content (and other empty bodies, e.g. DELETE/start/stop) have nothing
+  // to parse — calling res.json() on them throws "Unexpected end of JSON input".
+  if (res.status === 204 || res.headers.get("content-length") === "0") {
+    return undefined as T;
+  }
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 // ─── Node endpoints ───────────────────────────────────────────────────────────

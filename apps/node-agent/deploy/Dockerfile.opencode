@@ -9,8 +9,10 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /agentpod-node ./cmd/agentpod-node
 # Stage 2: Runtime — bun base (Debian) for opencode + sqlite3 for DB seeding
 FROM oven/bun:1-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates git sqlite3 \
+    ca-certificates git sqlite3 procps \
     && rm -rf /var/lib/apt/lists/*
+# procps provides `pgrep`, used by the OpenCode descriptor's running-process
+# health check; without it the station Health panel shows "process check unavailable".
 
 # Install the opencode CLI (pinned to fleet version 0.5.5)
 RUN bun add -g opencode-ai@0.5.5

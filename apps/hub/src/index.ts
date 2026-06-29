@@ -68,6 +68,8 @@ import { activityLoggerMiddleware } from './middleware/activity-logger.ts';
 // Sync services
 import { startSyncForRunningSandboxes, stopAllSync } from './services/sync/opencode-sync.ts';
 import { startArchivalService, stopArchivalService } from './services/sync/activity-archival.ts';
+import { registerEnabledProvisioners } from './services/provisioner/bootstrap.ts';
+import { enabledProviders } from './services/provisioner/registry.ts';
 
 validateConfig();
 
@@ -234,6 +236,11 @@ if (process.env.ENABLE_ACTIVITY_ARCHIVAL !== 'false') {
 } else {
   console.log('Activity archival disabled (ENABLE_ACTIVITY_ARCHIVAL=false)');
 }
+
+// Register runtime provisioner drivers (Docker/Cloudflare) for enabled providers.
+// Without this, provisioning returns 400 ("provider not registered").
+registerEnabledProvisioners();
+console.log('Provisioners registered:', enabledProviders().join(', ') || '(none enabled)');
 
 // Handle graceful shutdown
 process.on('SIGINT', () => {
