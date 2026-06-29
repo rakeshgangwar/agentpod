@@ -45,7 +45,7 @@ First tagged release of AgentPod **as the fleet/facilities console** for agent r
 ## 4. Post-deploy verification (real fleet)
 
 - [ ] `console.agentpod.dev` (custom domain, not `*.pages.dev`) loads; sign in; session cookie is `Domain=.agentpod.dev; Secure; SameSite=Lax`. Confirm that opening the raw `*.pages.dev` URL redirects or is documented as broken-by-design (cookie won't be sent cross-site).
-- [ ] **Enroll a real node** (a server, e.g. buddhimaan) via `scripts/install-node-agent.sh` against `wss://hub.agentpod.dev` → shows **online, no tunnel**; survives a reconnect.
+- [ ] **Enroll a real node** (a server, e.g. buddhimaan) via the **curl one-liner** (`curl -fsSL …/releases/latest/download/install.sh | sudo bash -s -- https://hub.agentpod.dev <TOKEN>`) → downloads the prebuilt binary, enrolls against `wss://hub.agentpod.dev`, shows **online, no tunnel**; survives a reconnect. *(requires the `v0.1.0` release assets to exist — §5)*
 - [ ] Adopt a station; drive **terminal + fs + logs-tail + config** over the public path; confirm the **Matrix ID** + `matrix.to` deep-link on a Hermes station. *(closes #88)*
 - [ ] **Provision (Docker)** on the prod host: New runtime → OpenCode → container → auto-enroll online → auto-adopted `/workspace` station → drive → **destroy**. *(P4 prod smoke)*
 - [ ] Cmd-K palette, activity ticker, connect banner render; legacy routes (`/projects`,`/workflows`) are gone.
