@@ -16,8 +16,6 @@ import type {
   AuditLogResponse,
   UserRole,
 } from "@agentpod/types";
-import type { Sandbox } from "./tauri";
-
 // =============================================================================
 // API Client Helper
 // =============================================================================
@@ -190,72 +188,6 @@ export async function updateUserLimits(
     }
   );
   return response.limits;
-}
-
-// =============================================================================
-// Sandbox Management
-// =============================================================================
-
-/**
- * Get user's sandboxes (admin only)
- */
-export async function getUserSandboxes(userId: string): Promise<Sandbox[]> {
-  const response = await apiRequest<{ sandboxes: Sandbox[] }>(
-    `/api/admin/users/${userId}/sandboxes`
-  );
-  return response.sandboxes;
-}
-
-/**
- * List all sandboxes options
- */
-export interface ListAllSandboxesOptions {
-  userId?: string;
-  status?: string;
-  limit?: number;
-  offset?: number;
-}
-
-/**
- * List all sandboxes (admin only)
- */
-export async function listAllSandboxes(options: ListAllSandboxesOptions = {}): Promise<{
-  sandboxes: Sandbox[];
-  total: number;
-}> {
-  const params = new URLSearchParams();
-  
-  if (options.userId) params.set("userId", options.userId);
-  if (options.status) params.set("status", options.status);
-  if (options.limit) params.set("limit", String(options.limit));
-  if (options.offset) params.set("offset", String(options.offset));
-
-  const queryString = params.toString();
-  const path = queryString ? `/api/admin/sandboxes?${queryString}` : "/api/admin/sandboxes";
-  
-  return apiRequest<{ sandboxes: Sandbox[]; total: number }>(path);
-}
-
-/**
- * Force delete a sandbox (admin only)
- */
-export async function forceDeleteSandbox(sandboxId: string): Promise<void> {
-  await apiRequest<void>(`/api/admin/sandboxes/${sandboxId}`, {
-    method: "DELETE",
-  });
-}
-
-/**
- * Force stop a sandbox (admin only)
- */
-export async function forceStopSandbox(sandboxId: string): Promise<Sandbox> {
-  const response = await apiRequest<{ sandbox: Sandbox }>(
-    `/api/admin/sandboxes/${sandboxId}/stop`,
-    {
-      method: "POST",
-    }
-  );
-  return response.sandbox;
 }
 
 // =============================================================================

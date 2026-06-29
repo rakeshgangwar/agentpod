@@ -2,8 +2,6 @@
  * auth.svelte.test.ts
  *
  * TDD tests for the web-based auth store (Better Auth cookie session, no Tauri).
- * Run RED first (current Tauri implementation calls authGetStatus which is mocked
- * away here, causing initAuth to fail/warn), then implement → GREEN.
  */
 
 import { vi, test, expect, beforeEach } from "vitest";
@@ -26,13 +24,6 @@ vi.mock("better-auth/svelte", () => ({
   createAuthClient: vi.fn(() => mockAuthClient),
 }));
 
-// Mock the Tauri api — none of these should be called after the refactor
-vi.mock("$lib/api/tauri", () => ({
-  authStoreSession: vi.fn().mockResolvedValue(undefined),
-  authLogout: vi.fn().mockResolvedValue(undefined),
-  authGetStatus: vi.fn().mockResolvedValue({ authenticated: false, user: null }),
-}));
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -43,11 +34,6 @@ async function freshAuthStore() {
   // Re-apply mocks after reset so dynamic import picks them up
   vi.mock("better-auth/svelte", () => ({
     createAuthClient: vi.fn(() => mockAuthClient),
-  }));
-  vi.mock("$lib/api/tauri", () => ({
-    authStoreSession: vi.fn().mockResolvedValue(undefined),
-    authLogout: vi.fn().mockResolvedValue(undefined),
-    authGetStatus: vi.fn().mockResolvedValue({ authenticated: false, user: null }),
   }));
   return import("./auth.svelte");
 }
@@ -179,10 +165,10 @@ test("initAuth called twice → getSession called only once", async () => {
 });
 
 // ---------------------------------------------------------------------------
-// loginWithEmail — success, NO Tauri authStoreSession
+// loginWithEmail — success
 // ---------------------------------------------------------------------------
 
-test("loginWithEmail success → isAuthenticated true, authStoreSession NOT called", async () => {
+test("loginWithEmail success → isAuthenticated true", async () => {
   mockAuthClient.signIn.email.mockResolvedValue({
     data: {
       user: {
@@ -199,15 +185,11 @@ test("loginWithEmail success → isAuthenticated true, authStoreSession NOT call
   const { setAuthApiUrl, loginWithEmail, auth } = await freshAuthStore();
   setAuthApiUrl("http://localhost:3001");
 
-  // Import tauri mock to assert it was NOT called
-  const tauri = await import("$lib/api/tauri");
   const result = await loginWithEmail("bob@example.com", "secret");
 
   expect(result).toBe(true);
   expect(auth.isAuthenticated).toBe(true);
   expect(auth.user?.email).toBe("bob@example.com");
-  // The cookie is the session — Tauri storage must NOT be called
-  expect(tauri.authStoreSession).not.toHaveBeenCalled();
 });
 
 // ---------------------------------------------------------------------------
@@ -230,10 +212,10 @@ test("loginWithEmail with error response → returns false, stays unauthenticate
 });
 
 // ---------------------------------------------------------------------------
-// signUp — success, NO Tauri authStoreSession
+// signUp — success
 // ---------------------------------------------------------------------------
 
-test("signUp success → isAuthenticated true, authStoreSession NOT called", async () => {
+test("signUp success → isAuthenticated true", async () => {
   mockAuthClient.signUp.email.mockResolvedValue({
     data: {
       user: {
@@ -250,20 +232,18 @@ test("signUp success → isAuthenticated true, authStoreSession NOT called", asy
   const { setAuthApiUrl, signUp, auth } = await freshAuthStore();
   setAuthApiUrl("http://localhost:3001");
 
-  const tauri = await import("$lib/api/tauri");
   const result = await signUp("carol@example.com", "password1", "Carol");
 
   expect(result).toBe(true);
   expect(auth.isAuthenticated).toBe(true);
   expect(auth.user?.name).toBe("Carol");
-  expect(tauri.authStoreSession).not.toHaveBeenCalled();
 });
 
 // ---------------------------------------------------------------------------
-// logout — calls signOut, clears session, does NOT call tauriAuthLogout
+// logout — calls signOut, clears session
 // ---------------------------------------------------------------------------
 
-test("logout → signOut called, isAuthenticated false, tauriAuthLogout NOT called", async () => {
+test("logout → signOut called, isAuthenticated false", async () => {
   // Establish a session first via loginWithEmail
   mockAuthClient.signIn.email.mockResolvedValue({
     data: {
@@ -280,12 +260,10 @@ test("logout → signOut called, isAuthenticated false, tauriAuthLogout NOT call
   await loginWithEmail("dave@example.com", "pass");
   expect(auth.isAuthenticated).toBe(true);
 
-  const tauri = await import("$lib/api/tauri");
   await logout();
 
   expect(mockAuthClient.signOut).toHaveBeenCalledOnce();
   expect(auth.isAuthenticated).toBe(false);
-  expect(tauri.authLogout).not.toHaveBeenCalled();
 });
 
 // ---------------------------------------------------------------------------

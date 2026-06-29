@@ -5,18 +5,15 @@
   import { page } from "$app/state";
   import { initConnection } from "$lib/stores/connection.svelte";
   import { auth, initAuth } from "$lib/stores/auth.svelte";
-  import { initSettings } from "$lib/stores/settings.svelte";
   import { themeStore } from "$lib/themes/store.svelte";
   import { commandPalette } from "$lib/stores/command-palette.svelte";
   import { Toaster } from "$lib/components/ui/sonner";
   import * as Tooltip from "$lib/components/ui/tooltip";
   import AppShell from "$lib/components/app-shell.svelte";
   import CommandPalette from "$lib/components/command-palette.svelte";
-  import { dev } from "$app/environment";
 
   let { children } = $props();
   let isInitializing = $state(true);
-  let mcpCleanup: (() => Promise<void>) | null = null;
 
   // Reactive current path (tracks SvelteKit client navigations — using
   // window.location.pathname imperatively goes stale across goto()).
@@ -46,44 +43,17 @@
 
   onMount(async () => {
     themeStore.initialize();
-    
-    await initSettings();
+
     await initConnection(); // must run before initAuth — sets the auth client base URL
     await initAuth();
     isInitializing = false;
 
     window.addEventListener("keydown", handleGlobalKeydown);
-
-    console.log("[LAYOUT] dev mode:", dev);
-    if (dev && typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
-      initMcpDebugTools().catch(e => console.warn("[MCP-DEBUG] Failed to initialize:", e));
-    }
   });
-  
-  async function initMcpDebugTools() {
-    try {
-      console.log("[MCP-DEBUG] Starting import...");
-      const mcpModule = await import("tauri-plugin-mcp");
-      console.log("[MCP-DEBUG] Module imported:", Object.keys(mcpModule));
-      const html2canvasModule = await import("html2canvas");
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).html2canvas = html2canvasModule.default;
-      console.log("[MCP-DEBUG] Calling initMcpDebug...");
-      await mcpModule.initMcpDebug();
-      console.log("[MCP-DEBUG] initMcpDebug completed");
-      mcpCleanup = mcpModule.cleanupMcpDebug;
-    } catch (e) {
-      console.error("[MCP-DEBUG] Error during initialization:", e);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).__MCP_INIT_ERROR__ = String(e);
-      throw e;
-    }
-  }
 
   onDestroy(() => {
     if (typeof window !== "undefined") {
       window.removeEventListener("keydown", handleGlobalKeydown);
-      mcpCleanup?.();
     }
   });
 
