@@ -1,0 +1,1 @@
+ALTER TABLE "stations" ADD COLUMN "matrix_id" text;

@@ -2,8 +2,8 @@
  * @agentpod/types - Shared TypeScript types for the Agentpod platform
  * 
  * This package provides type definitions shared across:
- * - apps/frontend (Tauri desktop app)
- * - apps/api (Management API)
+ * - apps/console (Tauri desktop app)
+ * - apps/hub (Management API)
  * - Future: mobile apps, web client
  * 
  * Usage:
@@ -40,3 +40,9 @@ export * from "./agents";
 
 // Workflow builder types
 export * from "./workflow";
+
+// Session forking types
+export * from "./session-fork";
+
+// MCP server types (MetaMCP integration)
+export * from "./mcp";

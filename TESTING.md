@@ -6,16 +6,16 @@ This document outlines the testing strategy, conventions, and best practices for
 
 ```bash
 # API tests
-cd apps/api && bun test              # Run all tests
-cd apps/api && bun test:unit         # Run unit tests only
-cd apps/api && bun test:integration  # Run integration tests only
-cd apps/api && bun test:coverage     # Run with coverage
+cd apps/hub && bun test              # Run all tests
+cd apps/hub && bun test:unit         # Run unit tests only
+cd apps/hub && bun test:integration  # Run integration tests only
+cd apps/hub && bun test:coverage     # Run with coverage
 
 # Rust tests (Tauri backend)
-cd apps/frontend/src-tauri && cargo test
+cd apps/console/src-tauri && cargo test
 
 # Frontend tests (Svelte)
-cd apps/frontend && pnpm test
+cd apps/console && pnpm test
 
 # E2E tests
 pnpm test:e2e
@@ -35,7 +35,7 @@ We follow **strict TDD** - tests are written before implementation code.
 
 ```bash
 # 1. Create test file first
-touch apps/api/tests/unit/services/my-service.test.ts
+touch apps/hub/tests/unit/services/my-service.test.ts
 
 # 2. Write failing test
 # 3. Run test to confirm it fails
@@ -51,7 +51,7 @@ bun test tests/unit/services/my-service.test.ts
 ### Directory Layout
 
 ```
-apps/api/
+apps/hub/
 ├── tests/
 │   ├── setup.ts              # Global test setup
 │   ├── helpers/
@@ -73,7 +73,7 @@ apps/api/
 │       ├── routes/           # API route tests
 │       └── workflows/        # Multi-route workflows
 
-apps/frontend/
+apps/console/
 ├── tests/
 │   ├── setup.ts
 │   ├── mocks/
@@ -83,7 +83,7 @@ apps/frontend/
 │   │   └── lib/              # Utility tests
 │   └── components/           # Component tests
 
-apps/frontend/src-tauri/
+apps/console/src-tauri/
 ├── src/
 │   ├── commands/
 │   │   └── *_test.rs         # Command tests (in-file)
@@ -494,7 +494,7 @@ jobs:
       - uses: oven-sh/setup-bun@v1
       - run: bun install
       - run: bun test:coverage
-        working-directory: apps/api
+        working-directory: apps/hub
       - uses: codecov/codecov-action@v3
 
   rust-tests:
@@ -503,7 +503,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo test
-        working-directory: apps/frontend/src-tauri
+        working-directory: apps/console/src-tauri
 
   e2e-tests:
     runs-on: ubuntu-latest

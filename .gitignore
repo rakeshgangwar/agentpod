@@ -47,3 +47,9 @@ config/traefik/dynamic/preview-*.yml
 
 # Reference documentation (large, imported from external source)
 docs/reference/agentic-space/
+
+# SDD scratch (any package)
+**/.superpowers/
+
+# Playwright MCP scratch artifacts
+.playwright-mcp/

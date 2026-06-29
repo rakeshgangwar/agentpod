@@ -6,8 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "turbo run dev",
-    "dev:frontend": "turbo run dev --filter=@agentpod/frontend",
-    "dev:api": "turbo run dev --filter=@agentpod/api",
+    "dev:console": "turbo run dev --filter=@agentpod/console",
+    "dev:hub": "turbo run dev --filter=@agentpod/hub",
     "dev:landing": "turbo run dev --filter=@agentpod/landing",
     "build": "turbo run build",
     "check": "turbo run check",
@@ -17,7 +17,7 @@
     "test:integration": "turbo run test:integration",
     "lint": "turbo run lint",
     "clean": "turbo run clean && rm -rf node_modules .turbo",
-    "tauri": "pnpm --filter @agentpod/frontend tauri"
+    "tauri": "pnpm --filter @agentpod/console tauri"
   },
   "devDependencies": {
     "turbo": "^2.5.0",

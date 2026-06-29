@@ -1,0 +1,244 @@
+import { test, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, waitFor, fireEvent, cleanup } from "@testing-library/svelte";
+import * as api from "$lib/api/client";
+import type { StationHealth } from "@agentpod/contract";
+// Static import ensures module is compiled during file collection, so the
+// first test doesn't pay the compilation cost inside its waitFor window.
+import HealthPanel from "./HealthPanel.svelte";
+
+beforeEach(() => vi.restoreAllMocks());
+afterEach(cleanup);
+
+const healthFull: StationHealth = {
+  running: true,
+  pid: 12345,
+  cpuPct: 3.5,
+  memBytes: 104857600,
+  diskBytes: 1073741824,
+  uptimeSec: 3600,
+  lastActivity: "2026-06-27T10:00:00Z",
+  note: "All systems go",
+};
+
+const healthNulls: StationHealth = {
+  running: false,
+  pid: null,
+  cpuPct: null,
+  memBytes: null,
+  diskBytes: null,
+  uptimeSec: null,
+  lastActivity: null,
+  note: null,
+};
+
+test("HealthPanel renders running state and numeric pid", async () => {
+  vi.spyOn(api, "stationHealth").mockResolvedValue(healthFull);
+
+  const { getByText } = render(HealthPanel, { props: { stationId: "station_1" } });
+
+  await waitFor(() => {
+    // running should appear (e.g. "Running" badge text)
+    expect(getByText(/running/i)).toBeTruthy();
+    // pid should appear
+    expect(getByText(/12345/)).toBeTruthy();
+  });
+
+  expect(api.stationHealth).toHaveBeenCalledWith("station_1");
+});
+
+test("HealthPanel shows — for null fields", async () => {
+  vi.spyOn(api, "stationHealth").mockResolvedValue(healthNulls);
+
+  const { getAllByText } = render(HealthPanel, { props: { stationId: "station_2" } });
+
+  await waitFor(() => {
+    // Should have multiple "—" placeholders for null fields
+    const dashes = getAllByText("—");
+    expect(dashes.length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+test("HealthPanel shows loading then data", async () => {
+  let resolve!: (v: StationHealth) => void;
+  const pending = new Promise<StationHealth>((r) => (resolve = r));
+  vi.spyOn(api, "stationHealth").mockReturnValue(pending);
+
+  const { getByText, queryByText } = render(HealthPanel, { props: { stationId: "station_3" } });
+
+  // loading state
+  expect(getByText(/loading/i)).toBeTruthy();
+
+  resolve(healthFull);
+  await waitFor(() => {
+    expect(queryByText(/loading/i)).toBeNull();
+    expect(getByText(/12345/)).toBeTruthy();
+  });
+});
+
+// ─── Lifecycle controls ───────────────────────────────────────────────────────
+
+test("HealthPanel: no lifecycle buttons rendered when canLifecycle is false (default)", async () => {
+  vi.spyOn(api, "stationHealth").mockResolvedValue(healthFull);
+
+  const { queryByRole, getByText } = render(HealthPanel, {
+    props: { stationId: "station_lc" },
+  });
+
+  // Wait for health data to appear so we know the panel is fully rendered
+  await waitFor(() => expect(getByText(/12345/)).toBeTruthy());
+
+  expect(queryByRole("button", { name: /^start$/i })).toBeNull();
+  expect(queryByRole("button", { name: /^stop$/i })).toBeNull();
+  expect(queryByRole("button", { name: /^restart$/i })).toBeNull();
+});
+
+test("HealthPanel: lifecycle buttons visible when canLifecycle is true", async () => {
+  vi.spyOn(api, "stationHealth").mockResolvedValue(healthFull);
+
+  const { getByRole } = render(HealthPanel, {
+    props: { stationId: "station_lc", canLifecycle: true },
+  });
+
+  await waitFor(() => {
+    expect(getByRole("button", { name: /^start$/i })).toBeTruthy();
+    expect(getByRole("button", { name: /^stop$/i })).toBeTruthy();
+    expect(getByRole("button", { name: /^restart$/i })).toBeTruthy();
+  });
+});
+
+test("HealthPanel: Start calls lifecycle immediately without a dialog", async () => {
+  vi.spyOn(api, "stationHealth").mockResolvedValue(healthFull);
+  vi.spyOn(api, "lifecycle").mockResolvedValue(healthFull);
+
+  const { getByRole, queryByRole } = render(HealthPanel, {
+    props: { stationId: "station_lc", canLifecycle: true },
+  });
+
+  await waitFor(() => expect(getByRole("button", { name: /^start$/i })).toBeTruthy());
+
+  fireEvent.click(getByRole("button", { name: /^start$/i }));
+
+  await waitFor(() =>
+    expect(api.lifecycle).toHaveBeenCalledWith("station_lc", "start"),
+  );
+  // No dialog should be shown
+  expect(queryByRole("dialog")).toBeNull();
+});
+
+test("HealthPanel: Stop opens type-to-confirm dialog; confirming calls lifecycle stop", async () => {
+  vi.spyOn(api, "stationHealth").mockResolvedValue(healthFull);
+  vi.spyOn(api, "lifecycle").mockResolvedValue(healthFull);
+
+  const { getByRole, getByPlaceholderText } = render(HealthPanel, {
+    props: { stationId: "station_lc", canLifecycle: true },
+  });
+
+  await waitFor(() => expect(getByRole("button", { name: /^stop$/i })).toBeTruthy());
+
+  fireEvent.click(getByRole("button", { name: /^stop$/i }));
+
+  // Dialog should open
+  await waitFor(() => expect(getByRole("dialog")).toBeTruthy());
+
+  // lifecycle must NOT be called before confirming
+  expect(api.lifecycle).not.toHaveBeenCalled();
+
+  // Type the confirm phrase (= stationId)
+  fireEvent.input(getByPlaceholderText("station_lc"), {
+    target: { value: "station_lc" },
+  });
+
+  // Confirm button unlocks
+  await waitFor(() => {
+    const btn = getByRole("button", { name: /^confirm$/i }) as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
+  });
+
+  fireEvent.click(getByRole("button", { name: /^confirm$/i }));
+
+  await waitFor(() =>
+    expect(api.lifecycle).toHaveBeenCalledWith("station_lc", "stop"),
+  );
+});
+
+test("HealthPanel: Restart opens type-to-confirm dialog; confirming calls lifecycle restart", async () => {
+  vi.spyOn(api, "stationHealth").mockResolvedValue(healthFull);
+  vi.spyOn(api, "lifecycle").mockResolvedValue(healthFull);
+
+  const { getByRole, getByPlaceholderText } = render(HealthPanel, {
+    props: { stationId: "station_lc", canLifecycle: true },
+  });
+
+  await waitFor(() => expect(getByRole("button", { name: /^restart$/i })).toBeTruthy());
+
+  fireEvent.click(getByRole("button", { name: /^restart$/i }));
+
+  await waitFor(() => expect(getByRole("dialog")).toBeTruthy());
+
+  fireEvent.input(getByPlaceholderText("station_lc"), {
+    target: { value: "station_lc" },
+  });
+
+  await waitFor(() => {
+    const btn = getByRole("button", { name: /^confirm$/i }) as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
+  });
+
+  fireEvent.click(getByRole("button", { name: /^confirm$/i }));
+
+  await waitFor(() =>
+    expect(api.lifecycle).toHaveBeenCalledWith("station_lc", "restart"),
+  );
+});
+
+// ─── Matrix ID display ────────────────────────────────────────────────────────
+
+test("HealthPanel: renders Matrix row with matrix.to link when matrixId is set", async () => {
+  vi.spyOn(api, "stationHealth").mockResolvedValue(healthFull);
+
+  const { getByRole, getByText } = render(HealthPanel, {
+    props: {
+      stationId: "station_mx",
+      matrixId: "@analyst-echo:id.agentpod.dev",
+    },
+  });
+
+  await waitFor(() => expect(getByText(/12345/)).toBeTruthy());
+
+  // The Matrix row label should appear
+  expect(getByText(/matrix/i)).toBeTruthy();
+
+  // A link pointing to the matrix.to deep-link must exist
+  const link = getByRole("link", { name: /@analyst-echo:id\.agentpod\.dev/ });
+  expect(link).toBeTruthy();
+  expect(link.getAttribute("href")).toBe(
+    "https://matrix.to/#/@analyst-echo:id.agentpod.dev",
+  );
+  expect(link.getAttribute("rel")).toContain("noopener");
+});
+
+test("HealthPanel: no Matrix row when matrixId is null", async () => {
+  vi.spyOn(api, "stationHealth").mockResolvedValue(healthFull);
+
+  const { queryByText, getByText } = render(HealthPanel, {
+    props: { stationId: "station_no_mx", matrixId: null },
+  });
+
+  await waitFor(() => expect(getByText(/12345/)).toBeTruthy());
+
+  // No Matrix row or matrix.to link should be present
+  expect(queryByText(/matrix/i)).toBeNull();
+  expect(queryByText(/matrix\.to/)).toBeNull();
+});
+
+test("HealthPanel: no Matrix row when matrixId prop is omitted", async () => {
+  vi.spyOn(api, "stationHealth").mockResolvedValue(healthFull);
+
+  const { queryByText, getByText } = render(HealthPanel, {
+    props: { stationId: "station_no_mx2" },
+  });
+
+  await waitFor(() => expect(getByText(/12345/)).toBeTruthy());
+
+  expect(queryByText(/matrix/i)).toBeNull();
+});

@@ -1,0 +1,47 @@
+[Unit]
+Description=AgentPod hub (Bun + Hono fleet control plane)
+Documentation=https://github.com/rakeshgangwar/agentpod
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+# Runs the hub bound to 127.0.0.1:3001; nginx (hub.agentpod.dev) fronts it
+# with TLS. The hub self-runs Drizzle migrations on startup, so deploying a
+# new version + restarting this unit applies pending migrations automatically.
+Type=simple
+WorkingDirectory=/opt/agentpod/apps/hub
+
+# Use the absolute bun path from the deploy user's install (see README:
+# `which bun` → typically /root/.bun/bin/bun or /usr/local/bin/bun).
+ExecStart=/root/.bun/bin/bun run src/index.ts
+
+# --- Environment ----------------------------------------------------------
+# Keep secrets out of the unit: put DATABASE_URL + auth secrets in
+# /etc/agentpod/hub.env (chmod 600) and load it here.
+EnvironmentFile=/etc/agentpod/hub.env
+# Non-secret defaults (can also live in hub.env):
+Environment=PORT=3001
+Environment=NODE_ENV=production
+Environment=PUBLIC_URL=https://hub.agentpod.dev
+Environment=COOKIE_DOMAIN=.agentpod.dev
+Environment=COOKIE_SECURE=true
+Environment=ALLOWED_ORIGINS=https://app.agentpod.dev
+
+Restart=always
+RestartSec=5
+
+# --- Hardening (network service — safe to sandbox the FS) ------------------
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=agentpod-hub
+
+[Install]
+WantedBy=multi-user.target

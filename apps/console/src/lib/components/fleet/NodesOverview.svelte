@@ -1,0 +1,265 @@
+<script lang="ts">
+  import { onMount } from "svelte";
+  import { page } from "$app/state";
+  import { replaceState } from "$app/navigation";
+  import { listNodes, createEnrollmentToken, listRuntimes, listRuntimeProviders } from "$lib/api/client";
+  import type { NodeSummary, ProvisionedRuntime } from "@agentpod/contract";
+  import * as Card from "$lib/components/ui/card";
+  import { Badge } from "$lib/components/ui/badge";
+  import { Button } from "$lib/components/ui/button";
+  import { Skeleton } from "$lib/components/ui/skeleton";
+  import PlusIcon from "@lucide/svelte/icons/plus";
+  import Loader2Icon from "@lucide/svelte/icons/loader-2";
+  import NewRuntimeDialog from "./NewRuntimeDialog.svelte";
+  import ActivityTicker from "./activity-ticker.svelte";
+  import ConnectBanner from "./connect-banner.svelte";
+
+  let nodes = $state<NodeSummary[]>([]);
+  let isLoading = $state(true);
+  let error = $state<string | null>(null);
+  let lastToken = $state<string | null>(null);
+  let isMinting = $state(false);
+  let mintError = $state<string | null>(null);
+
+  // Runtime provisioning state
+  let runtimes = $state<ProvisionedRuntime[]>([]);
+  let providers = $state<string[]>(["docker", "cloudflare"]);
+  let showNewRuntimeDialog = $state(false);
+
+  // Provisioning runtimes: status==="provisioning" with no matching online node yet
+  let provisioningRuntimes = $derived(
+    runtimes.filter(
+      (r) =>
+        r.status === "provisioning" &&
+        !nodes.some((n) => n.id === r.nodeId && n.status === "online")
+    )
+  );
+
+  function resolvedHubUrl(): string {
+    const stored =
+      typeof window !== "undefined" ? window.localStorage.getItem("agentpod.apiUrl") : null;
+    return stored ?? import.meta.env.PUBLIC_HUB_URL ?? "http://localhost:3001";
+  }
+
+  async function loadData() {
+    try {
+      const [nodesResult, runtimesResult] = await Promise.allSettled([
+        listNodes(),
+        listRuntimes(),
+      ]);
+      if (nodesResult.status === "fulfilled") {
+        nodes = nodesResult.value;
+      } else {
+        error =
+          nodesResult.reason instanceof Error
+            ? nodesResult.reason.message
+            : "Failed to load nodes";
+      }
+      if (runtimesResult.status === "fulfilled") {
+        runtimes = runtimesResult.value;
+      }
+      // runtimes failing is non-fatal — keep the previous value
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  onMount(async () => {
+    // Fetch enabled providers; fall back to defaults on failure
+    try {
+      const res = await listRuntimeProviders();
+      if (res.providers.length > 0) providers = res.providers;
+    } catch {
+      // keep fallback ["docker", "cloudflare"]
+    }
+    await loadData();
+
+    // ?action auto-open (runs once; guards against missing searchParams in test env)
+    const action = (page.url as { searchParams?: URLSearchParams } | undefined)?.searchParams?.get("action") ?? null;
+    if (action === "new-runtime") {
+      showNewRuntimeDialog = true;
+    } else if (action === "create-token") {
+      handleCreateToken();
+    }
+    if (action) {
+      try {
+        replaceState("/", {});
+      } catch {
+        // non-critical in environments where history is unavailable
+      }
+    }
+  });
+
+  async function handleCreateToken() {
+    mintError = null;
+    isMinting = true;
+    try {
+      const result = await createEnrollmentToken();
+      lastToken = result.token;
+    } catch (e) {
+      mintError = e instanceof Error ? e.message : "Failed to create enrollment token";
+    } finally {
+      isMinting = false;
+    }
+  }
+
+  async function handleRuntimeCreated() {
+    isLoading = true;
+    showNewRuntimeDialog = false;
+    await loadData();
+  }
+</script>
+
+<section class="space-y-6">
+  <!-- Header row -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+      <h2 class="text-2xl font-bold tracking-tight">Fleet Overview</h2>
+      <p class="text-sm text-muted-foreground font-mono">// connected nodes</p>
+    </div>
+    <div class="flex flex-col items-start sm:items-end gap-2">
+      <div class="flex gap-2 flex-wrap justify-end">
+        <Button
+          onclick={() => (showNewRuntimeDialog = true)}
+          variant="outline"
+          class="font-mono text-xs uppercase tracking-wider w-full sm:w-auto"
+        >
+          <PlusIcon class="h-4 w-4 mr-2" />
+          New runtime
+        </Button>
+        <!--
+          Show the "Create enrollment token" header button only when nodes are present
+          (or while loading). When nodes=0 the ConnectBanner below supplies the same CTA
+          to avoid duplicate accessible buttons.
+        -->
+        {#if isLoading || nodes.length > 0 || provisioningRuntimes.length > 0}
+          <Button
+            onclick={handleCreateToken}
+            disabled={isMinting}
+            class="font-mono text-xs uppercase tracking-wider w-full sm:w-auto"
+          >
+            <PlusIcon class="h-4 w-4 mr-2" />
+            {isMinting ? "Creating…" : "Create enrollment token"}
+          </Button>
+        {/if}
+      </div>
+      {#if mintError}<p class="text-xs text-destructive">{mintError}</p>{/if}
+    </div>
+  </div>
+
+  <!-- Fleet activity ticker (self-hides when there is no recent activity) -->
+  <ActivityTicker />
+
+  <!-- Enrollment command block -->
+  {#if lastToken}
+    <div class="cyber-card p-4 space-y-2">
+      <p class="text-xs font-mono text-muted-foreground">// run this on the target node to connect it</p>
+      <code class="block text-sm font-mono break-all text-[var(--cyber-cyan)]">
+        curl -fsSL https://github.com/rakeshgangwar/agentpod/releases/latest/download/install.sh | sudo bash -s -- {resolvedHubUrl()} {lastToken}
+      </code>
+    </div>
+  {/if}
+
+  <!-- Loading state -->
+  {#if isLoading}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {#each [1, 2, 3] as _}
+        <Skeleton class="h-36 rounded-xl" />
+      {/each}
+    </div>
+
+  <!-- Error state -->
+  {:else if error}
+    <div class="cyber-card p-4 border-destructive/50">
+      <p class="text-sm font-mono text-destructive">{error}</p>
+    </div>
+
+  <!-- Empty state: no nodes and no provisioning runtimes → connect banner -->
+  {:else if nodes.length === 0 && provisioningRuntimes.length === 0}
+    <ConnectBanner onCreateToken={handleCreateToken} />
+
+  <!-- Node cards + provisioning cards grid -->
+  {:else}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <!-- Provisioning cards (runtimes that are still spinning up) -->
+      {#each provisioningRuntimes as rt (rt.id)}
+        <Card.Root class="h-full border-[var(--cyber-cyan)]/30 bg-[var(--cyber-cyan)]/5">
+          <Card.Header>
+            <div class="flex items-start justify-between gap-2">
+              <Card.Title class="font-mono text-sm leading-tight truncate">
+                {rt.name}
+              </Card.Title>
+              <Badge variant="secondary" class="shrink-0 gap-1.5">
+                <Loader2Icon class="h-3 w-3 animate-spin" />
+                provisioning
+              </Badge>
+            </div>
+          </Card.Header>
+          <Card.Content class="space-y-1">
+            <p class="text-sm font-mono text-muted-foreground">
+              {rt.provider} · {rt.resourceTier}
+            </p>
+            {#if rt.harness && rt.harness !== "none"}
+              <Badge
+                variant="outline"
+                class="font-mono text-[10px] border-[var(--cyber-cyan)]/40 text-[var(--cyber-cyan)]"
+              >
+                {rt.harness}
+              </Badge>
+            {/if}
+          </Card.Content>
+        </Card.Root>
+      {/each}
+
+      <!-- Online / offline node cards -->
+      {#each nodes as node (node.id)}
+        <a
+          href="/nodes/{node.id}"
+          class="block group focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cyber-cyan)] rounded-xl"
+        >
+          <Card.Root class="h-full transition-colors group-hover:border-[var(--cyber-cyan)]/50">
+            <Card.Header>
+              <div class="flex items-start justify-between gap-2">
+                <Card.Title class="font-mono text-sm leading-tight truncate">
+                  {node.hostname}
+                </Card.Title>
+                <Badge
+                  variant={node.status === "online" ? "default" : "secondary"}
+                  class={node.status === "online"
+                    ? "shrink-0 bg-[var(--cyber-emerald)] text-black border-transparent"
+                    : "shrink-0"}
+                >
+                  {node.status}
+                </Badge>
+              </div>
+            </Card.Header>
+            <Card.Content class="space-y-1">
+              <p class="text-sm font-mono text-muted-foreground">
+                {node.arch} · {node.cpuCount} CPU
+              </p>
+              <p class="text-xs font-mono text-muted-foreground/70">
+                {node.os}
+              </p>
+              {#if node.provisioned}
+                <Badge
+                  variant="outline"
+                  class="font-mono text-[10px] border-[var(--cyber-cyan)]/40 text-[var(--cyber-cyan)]"
+                >
+                  provisioned · {node.provisioned.provider}
+                </Badge>
+              {/if}
+            </Card.Content>
+          </Card.Root>
+        </a>
+      {/each}
+    </div>
+  {/if}
+</section>
+
+<!-- New runtime provisioning dialog -->
+<NewRuntimeDialog
+  open={showNewRuntimeDialog}
+  {providers}
+  onClose={() => (showNewRuntimeDialog = false)}
+  onCreated={handleRuntimeCreated}
+/>

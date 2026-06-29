@@ -2,8 +2,8 @@
 
 ## Monorepo Structure
 This is a Turborepo monorepo with the following structure:
-- `apps/frontend` - Tauri desktop app (SvelteKit + Rust)
-- `apps/api` - Management API (Bun + Hono)
+- `apps/console` - Tauri desktop app (SvelteKit + Rust)
+- `apps/hub` - Management API (Bun + Hono)
 - `packages/types` - Shared TypeScript types (`@agentpod/types`)
 - `packages/ui` - Shared UI components (`@agentpod/ui`)
 - `packages/tsconfig` - Shared TypeScript configs (`@agentpod/tsconfig`)
@@ -18,7 +18,7 @@ This is a Turborepo monorepo with the following structure:
 - `pnpm check` - TypeScript/Svelte type checking
 - `pnpm tauri dev` - Run full Tauri app in dev mode
 - `pnpm tauri build` - Build desktop/mobile app
-- `cargo test` - Run Rust tests (in apps/frontend/src-tauri/)
+- `cargo test` - Run Rust tests (in apps/console/src-tauri/)
 
 ## Code Style
 - **TypeScript**: Strict mode, ES modules, double quotes, semicolons
@@ -28,9 +28,9 @@ This is a Turborepo monorepo with the following structure:
 - **Formatting**: 2-space indent (TS/Svelte), 4-space indent (Rust)
 
 ## Architecture
-- Frontend: SvelteKit + TypeScript in `apps/frontend/src/`
-- Backend (Tauri): Rust in `apps/frontend/src-tauri/`
-- Backend (API): Bun + Hono in `apps/api/src/`
+- Frontend: SvelteKit + TypeScript in `apps/console/src/`
+- Backend (Tauri): Rust in `apps/console/src-tauri/`
+- Backend (API): Bun + Hono in `apps/hub/src/`
 - Static adapter (SSG), no SSR (`ssr = false` in layout)
 - Commands exposed via `invoke()` from frontend to Rust
 
