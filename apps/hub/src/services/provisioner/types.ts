@@ -1,0 +1,53 @@
+/**
+ * Fleet-era RuntimeProvisioner interface + supporting types (P4 Task 4).
+ *
+ * A RuntimeProvisioner creates and manages node-agent containers/sandboxes
+ * that auto-enroll into the fleet via one-time enrollment tokens.
+ */
+
+export type RuntimeProviderName = "docker" | "cloudflare";
+
+/**
+ * The spec passed to a provisioner when creating a new runtime.
+ * Contains everything the container/sandbox needs to boot and self-enroll.
+ */
+export interface ProvisionSpec {
+  /** Stable DB id of the provisioned_runtimes row (used as a label/tag). */
+  runtimeId: string;
+  /** Human-readable name for the runtime. */
+  name: string;
+  /** Resource tier controlling CPU/memory allocation. */
+  resourceTier: "small" | "medium" | "large";
+  /** Hub URL injected as AGENTPOD_HUB_URL into the container env. */
+  hubUrl: string;
+  /** One-time enrollment token injected as AGENTPOD_ENROLL_TOKEN. Never log. */
+  enrollToken: string;
+}
+
+/**
+ * Implemented by each driver (docker, cloudflare) to create/manage runtimes.
+ */
+export interface RuntimeProvisioner {
+  readonly provider: RuntimeProviderName;
+
+  /**
+   * Create and start a new runtime for the given spec.
+   * Returns the provider-specific external identifier (container id, sandbox id, …).
+   */
+  provision(spec: ProvisionSpec): Promise<{ externalId: string }>;
+
+  /**
+   * Permanently destroy the runtime identified by externalId.
+   */
+  destroy(externalId: string): Promise<void>;
+
+  /**
+   * Start a stopped runtime (optional — not supported by ephemeral providers).
+   */
+  start?(externalId: string): Promise<void>;
+
+  /**
+   * Stop a running runtime without destroying it (optional — Docker only).
+   */
+  stop?(externalId: string): Promise<void>;
+}

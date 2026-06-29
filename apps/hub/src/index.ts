@@ -51,6 +51,8 @@ import { mcpOauthRoutes } from './routes/mcp-oauth.ts';
 // Node fleet enrollment & registry
 import { nodeEnrollRoutes, nodeRoutes } from './routes/nodes.ts';
 import { enrollmentTokenRoutes } from './routes/enrollment-tokens.ts';
+// Runtime provisioning routes
+import { runtimeRoutes } from './routes/runtimes.ts';
 // Station routes (detect, adopt, list, unadopt)
 import { stationRoutes } from './routes/stations.ts';
 // Station terminal WebSocket bridge (fleet console ↔ node PTY)
@@ -156,6 +158,7 @@ const app = new Hono()
   // Node fleet management (authenticated)
   .route('/api/enrollment-tokens', enrollmentTokenRoutes)  // POST /api/enrollment-tokens
   .route('/api/nodes', nodeRoutes)                         // GET /api/nodes
+  .route('/api/runtimes', runtimeRoutes)                   // CRUD /api/runtimes
   // Station routes (detect, adopt, list, unadopt)
   .route('/api', stationRoutes)                            // GET/POST/DELETE /api/nodes/:id/... and /api/stations/:id
   // Station terminal WebSocket bridge (fleet console ↔ node PTY)

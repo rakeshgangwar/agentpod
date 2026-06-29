@@ -17,6 +17,21 @@ export const nodes = pgTable("nodes", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (t) => [index("nodes_user_id_idx").on(t.userId)]);
 
+export const runtimeStatusEnum = pgEnum("runtime_status", ["provisioning", "online", "stopped", "error", "destroyed"]);
+
+export const provisionedRuntimes = pgTable("provisioned_runtimes", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  provider: text("provider").notNull(),
+  externalId: text("external_id"),
+  status: runtimeStatusEnum("status").notNull().default("provisioning"),
+  nodeId: text("node_id").references(() => nodes.id, { onDelete: "set null" }),
+  name: text("name").notNull(),
+  resourceTier: text("resource_tier").notNull().default("small"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [index("provisioned_runtimes_user_id_idx").on(t.userId)]);
+
 export const enrollmentTokens = pgTable("enrollment_tokens", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
@@ -24,4 +39,5 @@ export const enrollmentTokens = pgTable("enrollment_tokens", {
   expiresAt: timestamp("expires_at").notNull(),
   usedAt: timestamp("used_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  provisionedRuntimeId: text("provisioned_runtime_id").references(() => provisionedRuntimes.id, { onDelete: "set null" }),
 }, (t) => [index("enrollment_tokens_user_id_idx").on(t.userId)]);

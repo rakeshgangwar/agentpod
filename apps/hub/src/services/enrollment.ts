@@ -1,6 +1,6 @@
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { db } from "../db/drizzle";
-import { nodes, enrollmentTokens } from "../db/schema/nodes";
+import { nodes, enrollmentTokens, provisionedRuntimes } from "../db/schema/nodes";
 import type { HostInfo, EnrollResponse } from "@agentpod/contract";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -24,11 +24,18 @@ const sha256 = async (s: string): Promise<string> =>
 /**
  * Mint a one-time enrollment token for a user.
  * The raw token is returned once; only its SHA-256 hash is persisted.
+ *
+ * @param userId - The user to mint the token for.
+ * @param opts   - Optional settings:
+ *   - ttlMs              — token lifetime in ms (default: 1 hour)
+ *   - provisionedRuntimeId — when set, the token is linked to that runtime so
+ *                            enrollNode can flip it online automatically.
  */
 export async function mintEnrollmentToken(
   userId: string,
-  ttlMs = 60 * 60 * 1000
+  opts?: { ttlMs?: number; provisionedRuntimeId?: string }
 ): Promise<{ token: string; expiresAt: Date }> {
+  const ttlMs = opts?.ttlMs ?? 60 * 60 * 1000;
   const token =
     prefixedId("enr") + crypto.randomUUID().replace(/-/g, "");
   const expiresAt = new Date(Date.now() + ttlMs);
@@ -38,6 +45,9 @@ export async function mintEnrollmentToken(
     userId,
     tokenHash: await sha256(token),
     expiresAt,
+    ...(opts?.provisionedRuntimeId
+      ? { provisionedRuntimeId: opts.provisionedRuntimeId }
+      : {}),
   });
 
   return { token, expiresAt };
@@ -91,6 +101,15 @@ export async function enrollNode(
     secretHash: await Bun.password.hash(nodeSecret),
     status: "offline",
   });
+
+  // If the token was minted with a provisioned runtime, link the node back to it
+  // and flip its status to "online" so the runtime record reflects the enrolment.
+  if (row.provisionedRuntimeId) {
+    await db
+      .update(provisionedRuntimes)
+      .set({ nodeId, status: "online", updatedAt: new Date() })
+      .where(eq(provisionedRuntimes.id, row.provisionedRuntimeId));
+  }
 
   return { nodeId, nodeSecret };
 }
