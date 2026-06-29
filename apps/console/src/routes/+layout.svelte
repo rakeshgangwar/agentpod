@@ -7,11 +7,11 @@
   import { auth, initAuth } from "$lib/stores/auth.svelte";
   import { initSettings } from "$lib/stores/settings.svelte";
   import { themeStore } from "$lib/themes/store.svelte";
-  import { quickTask } from "$lib/stores/quick-task.svelte";
+  import { commandPalette } from "$lib/stores/command-palette.svelte";
   import { Toaster } from "$lib/components/ui/sonner";
   import * as Tooltip from "$lib/components/ui/tooltip";
   import AppShell from "$lib/components/app-shell.svelte";
-  import QuickTaskModal from "$lib/components/quick-task-modal.svelte";
+  import CommandPalette from "$lib/components/command-palette.svelte";
   import { dev } from "$app/environment";
 
   let { children } = $props();
@@ -40,7 +40,7 @@
   function handleGlobalKeydown(e: KeyboardEvent) {
     if ((e.metaKey || e.ctrlKey) && e.key === "k") {
       e.preventDefault();
-      quickTask.toggle();
+      commandPalette.toggle();
     }
   }
 
@@ -134,5 +134,5 @@
     {/if}
   </div>
 
-  <QuickTaskModal />
+  <CommandPalette />
 </Tooltip.Provider>
