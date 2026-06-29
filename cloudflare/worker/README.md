@@ -253,3 +253,13 @@ Cloudflare Containers require Workers Paid plan. Check:
 - [Cloudflare Containers](https://developers.cloudflare.com/workers/containers/)
 - [Durable Objects](https://developers.cloudflare.com/durable-objects/)
 - [R2 Storage](https://developers.cloudflare.com/r2/)
+
+---
+
+## AgentPod role
+
+This worker is the **Cloudflare provisioning target** for AgentPod's fleet console.
+The hub's P4 CF provisioner (`apps/hub/src/services/provisioner/cloudflare.ts`) posts
+to it via `CLOUDFLARE_WORKER_URL` to create node-agent sandboxes; the worker calls
+back to the hub's `/api/v2/cloudflare` webhook. Kept (not OpenCode legacy). CF
+provisioning is gated by `ENABLE_CLOUDFLARE_SANDBOXES` and is currently live-unverified.
