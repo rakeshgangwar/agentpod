@@ -802,43 +802,11 @@ article,
    TERMINAL/CYBERPUNK DESIGN SYSTEM
    ============================================ */
 
-/* Custom color palette for cyberpunk theme
-   These are fallback values - the theme store will override them
-   with theme-specific colors when a preset is applied.
-   Light mode values are darkened for WCAG AA contrast (4.5:1) on white.
-   Foreground colors are set for proper contrast when used as backgrounds. */
 :root {
-  --cyber-cyan: oklch(0.30 0.18 192);
-  --cyber-cyan-dim: oklch(0.25 0.14 192);
-  --cyber-cyan-foreground: #ffffff;
-  --cyber-emerald: oklch(0.30 0.18 160);
-  --cyber-emerald-foreground: #ffffff;
-  --cyber-magenta: oklch(0.30 0.2 330);
-  --cyber-magenta-foreground: #ffffff;
-  --cyber-amber: oklch(0.30 0.18 85);
-  --cyber-amber-foreground: #ffffff;
-  --cyber-red: oklch(0.30 0.22 25);
-  --cyber-red-foreground: #ffffff;
-  --cyber-glow: 0 0 12px oklch(0.30 0.18 192 / 0.2);
-  --cyber-glow-emerald: 0 0 12px oklch(0.30 0.18 160 / 0.2);
   --noise-opacity: 0.03;
 }
 
-/* Dark mode fallback values (theme store overrides these) */
 .dark {
-  --cyber-cyan: oklch(0.85 0.15 192);
-  --cyber-cyan-dim: oklch(0.65 0.12 192);
-  --cyber-cyan-foreground: #000000;
-  --cyber-emerald: oklch(0.75 0.18 160);
-  --cyber-emerald-foreground: #000000;
-  --cyber-magenta: oklch(0.7 0.2 330);
-  --cyber-magenta-foreground: #000000;
-  --cyber-amber: oklch(0.8 0.18 85);
-  --cyber-amber-foreground: #000000;
-  --cyber-red: oklch(0.65 0.22 25);
-  --cyber-red-foreground: #000000;
-  --cyber-glow: 0 0 20px oklch(0.85 0.15 192 / 0.3);
-  --cyber-glow-emerald: 0 0 20px oklch(0.75 0.18 160 / 0.3);
   --noise-opacity: 0.05;
 }
 
@@ -871,17 +839,17 @@ article,
 
 /* Gradient mesh background */
 .mesh-gradient {
-  background: 
-    radial-gradient(ellipse at 20% 20%, color-mix(in oklch, var(--cyber-cyan) 8%, transparent) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 80%, color-mix(in oklch, var(--cyber-emerald) 6%, transparent) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 50%, color-mix(in oklch, var(--cyber-magenta) 4%, transparent) 0%, transparent 60%);
+  background:
+    radial-gradient(ellipse at 20% 20%, color-mix(in oklch, var(--primary) 8%, transparent) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, color-mix(in oklch, var(--chart-2) 6%, transparent) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, color-mix(in oklch, var(--chart-5) 4%, transparent) 0%, transparent 60%);
 }
 
 .dark .mesh-gradient {
-  background: 
-    radial-gradient(ellipse at 20% 20%, color-mix(in oklch, var(--cyber-cyan) 12%, transparent) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 80%, color-mix(in oklch, var(--cyber-emerald) 8%, transparent) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 50%, color-mix(in oklch, var(--cyber-magenta) 5%, transparent) 0%, transparent 60%);
+  background:
+    radial-gradient(ellipse at 20% 20%, color-mix(in oklch, var(--primary) 12%, transparent) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, color-mix(in oklch, var(--chart-2) 8%, transparent) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, color-mix(in oklch, var(--chart-5) 5%, transparent) 0%, transparent 60%);
 }
 
 /* Scanline effect */
@@ -1000,7 +968,7 @@ article,
 .typing-cursor::after {
   content: '_';
   animation: blink 1s step-end infinite;
-  color: var(--cyber-cyan);
+  color: var(--primary);
 }
 
 /* Streaming text cursor (ChatGPT/Claude-style) */
@@ -1030,19 +998,19 @@ article,
   }
   92% {
     transform: translate(-2px, 1px);
-    text-shadow: 2px 0 var(--cyber-magenta);
+    text-shadow: 2px 0 var(--chart-5);
   }
   94% {
     transform: translate(2px, -1px);
-    text-shadow: -2px 0 var(--cyber-cyan);
+    text-shadow: -2px 0 var(--primary);
   }
   96% {
     transform: translate(-1px, 2px);
-    text-shadow: 1px 0 var(--cyber-emerald);
+    text-shadow: 1px 0 var(--chart-2);
   }
   98% {
     transform: translate(1px, -2px);
-    text-shadow: -1px 0 var(--cyber-magenta);
+    text-shadow: -1px 0 var(--chart-5);
   }
 }
 
@@ -1053,12 +1021,12 @@ article,
 /* Border glow animation */
 @keyframes border-glow {
   0%, 100% {
-    border-color: color-mix(in oklch, var(--cyber-cyan) 30%, transparent);
-    box-shadow: 0 0 10px color-mix(in oklch, var(--cyber-cyan) 10%, transparent);
+    border-color: color-mix(in oklch, var(--primary) 30%, transparent);
+    box-shadow: 0 0 10px color-mix(in oklch, var(--primary) 10%, transparent);
   }
   50% {
-    border-color: color-mix(in oklch, var(--cyber-cyan) 60%, transparent);
-    box-shadow: 0 0 20px color-mix(in oklch, var(--cyber-cyan) 20%, transparent);
+    border-color: color-mix(in oklch, var(--primary) 60%, transparent);
+    box-shadow: 0 0 20px color-mix(in oklch, var(--primary) 20%, transparent);
   }
 }
 
@@ -1136,18 +1104,18 @@ article,
   background: linear-gradient(
     90deg,
     transparent,
-    var(--cyber-cyan) 20%,
-    var(--cyber-cyan) 80%,
+    var(--primary) 20%,
+    var(--primary) 80%,
     transparent
   );
   opacity: 0.5;
 }
 
 .cyber-card:hover {
-  border-color: color-mix(in oklch, var(--cyber-cyan) 30%, transparent);
+  border-color: color-mix(in oklch, var(--primary) 30%, transparent);
   box-shadow:
     0 4px 24px hsl(var(--background) / 0.1),
-    0 0 30px color-mix(in oklch, var(--cyber-cyan) 5%, transparent);
+    0 0 30px color-mix(in oklch, var(--primary) 5%, transparent);
   transform: translateY(-2px);
 }
 
@@ -1158,10 +1126,10 @@ article,
 }
 
 .dark .cyber-card:hover {
-  border-color: color-mix(in oklch, var(--cyber-cyan) 40%, transparent);
-  box-shadow: 
+  border-color: color-mix(in oklch, var(--primary) 40%, transparent);
+  box-shadow:
     0 4px 24px hsl(var(--background) / 0.3),
-    0 0 40px color-mix(in oklch, var(--cyber-cyan) 10%, transparent);
+    0 0 40px color-mix(in oklch, var(--primary) 10%, transparent);
 }
 
 /* Corner accents for cards */
@@ -1176,8 +1144,8 @@ article,
   right: 0;
   width: 24px;
   height: 24px;
-  border-right: 2px solid var(--cyber-cyan);
-  border-bottom: 2px solid var(--cyber-cyan);
+  border-right: 2px solid var(--primary);
+  border-bottom: 2px solid var(--primary);
   opacity: 0.3;
   transition: opacity 0.3s ease;
 }
@@ -1204,14 +1172,14 @@ article,
 }
 
 .status-running {
-  color: var(--cyber-emerald);
-  background: color-mix(in oklch, var(--cyber-emerald) 10%, transparent);
-  border: 1px solid color-mix(in oklch, var(--cyber-emerald) 30%, transparent);
+  color: var(--chart-2);
+  background: color-mix(in oklch, var(--chart-2) 10%, transparent);
+  border: 1px solid color-mix(in oklch, var(--chart-2) 30%, transparent);
 }
 
 .status-running .status-dot {
-  background: var(--cyber-emerald);
-  box-shadow: 0 0 8px var(--cyber-emerald);
+  background: var(--chart-2);
+  box-shadow: 0 0 8px var(--chart-2);
 }
 
 .status-stopped {
@@ -1229,36 +1197,36 @@ article,
 }
 
 .status-starting, .status-stopping {
-  color: var(--cyber-amber);
-  background: color-mix(in oklch, var(--cyber-amber) 10%, transparent);
-  border: 1px solid color-mix(in oklch, var(--cyber-amber) 30%, transparent);
+  color: var(--chart-4);
+  background: color-mix(in oklch, var(--chart-4) 10%, transparent);
+  border: 1px solid color-mix(in oklch, var(--chart-4) 30%, transparent);
 }
 
 .status-starting .status-dot, .status-stopping .status-dot {
-  background: var(--cyber-amber);
-  box-shadow: 0 0 8px var(--cyber-amber);
+  background: var(--chart-4);
+  box-shadow: 0 0 8px var(--chart-4);
 }
 
 .status-error {
-  color: var(--cyber-red);
-  background: color-mix(in oklch, var(--cyber-red) 10%, transparent);
-  border: 1px solid color-mix(in oklch, var(--cyber-red) 30%, transparent);
+  color: var(--destructive);
+  background: color-mix(in oklch, var(--destructive) 10%, transparent);
+  border: 1px solid color-mix(in oklch, var(--destructive) 30%, transparent);
 }
 
 .status-error .status-dot {
-  background: var(--cyber-red);
-  box-shadow: 0 0 8px var(--cyber-red);
+  background: var(--destructive);
+  box-shadow: 0 0 8px var(--destructive);
 }
 
 .status-sleeping {
-  color: var(--cyber-magenta);
-  background: color-mix(in oklch, var(--cyber-magenta) 10%, transparent);
-  border: 1px solid color-mix(in oklch, var(--cyber-magenta) 30%, transparent);
+  color: var(--chart-5);
+  background: color-mix(in oklch, var(--chart-5) 10%, transparent);
+  border: 1px solid color-mix(in oklch, var(--chart-5) 30%, transparent);
 }
 
 .status-sleeping .status-dot {
-  background: var(--cyber-magenta);
-  box-shadow: 0 0 8px var(--cyber-magenta);
+  background: var(--chart-5);
+  box-shadow: 0 0 8px var(--chart-5);
   animation: pulse-slow 3s ease-in-out infinite;
 }
 
@@ -1313,17 +1281,17 @@ article,
   text-transform: uppercase;
   letter-spacing: 0.5px;
   font-family: var(--font-mono), ui-monospace, monospace;
-  color: var(--cyber-amber);
-  background: color-mix(in oklch, var(--cyber-amber) 10%, transparent);
-  border: 1px solid color-mix(in oklch, var(--cyber-amber) 30%, transparent);
+  color: var(--chart-4);
+  background: color-mix(in oklch, var(--chart-4) 10%, transparent);
+  border: 1px solid color-mix(in oklch, var(--chart-4) 30%, transparent);
 }
 
 .session-activity-indicator .activity-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--cyber-amber);
-  box-shadow: 0 0 8px var(--cyber-amber);
+  background: var(--chart-4);
+  box-shadow: 0 0 8px var(--chart-4);
   animation: activity-pulse 1s ease-in-out infinite;
 }
 
@@ -1335,16 +1303,16 @@ article,
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: color-mix(in oklch, var(--cyber-amber) 15%, transparent);
-  border: 1px solid color-mix(in oklch, var(--cyber-amber) 40%, transparent);
+  background: color-mix(in oklch, var(--chart-4) 15%, transparent);
+  border: 1px solid color-mix(in oklch, var(--chart-4) 40%, transparent);
 }
 
 .session-activity-badge .activity-dot-small {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--cyber-amber);
-  box-shadow: 0 0 6px var(--cyber-amber);
+  background: var(--chart-4);
+  box-shadow: 0 0 6px var(--chart-4);
   animation: activity-pulse 1s ease-in-out infinite;
 }
 
@@ -1367,8 +1335,8 @@ article,
   position: relative;
   padding: 8px 16px;
   background: transparent;
-  border: 1px solid var(--cyber-cyan);
-  color: var(--cyber-cyan);
+  border: 1px solid var(--primary);
+  color: var(--primary);
   font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 12px;
   font-weight: 600;
@@ -1386,7 +1354,7 @@ article,
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--cyber-cyan);
+  background: var(--primary);
   opacity: 0;
   transition: opacity 0.2s ease;
   clip-path: inherit;
@@ -1407,23 +1375,23 @@ article,
 }
 
 .cyber-btn-primary {
-  background: var(--cyber-cyan);
-  color: var(--cyber-cyan-foreground);
+  background: var(--primary);
+  color: var(--primary-foreground);
   font-weight: 600;
 }
 
 .cyber-btn-primary:hover {
-  background: color-mix(in oklch, var(--cyber-cyan) 85%, white);
-  box-shadow: var(--cyber-glow);
+  background: color-mix(in oklch, var(--primary) 85%, white);
+  box-shadow: 0 0 12px color-mix(in oklch, var(--primary) 20%, transparent);
 }
 
 .cyber-btn-danger {
-  border-color: var(--cyber-red);
-  color: var(--cyber-red);
+  border-color: var(--destructive);
+  color: var(--destructive);
 }
 
 .cyber-btn-danger::before {
-  background: var(--cyber-red);
+  background: var(--destructive);
 }
 
 /* ============================================
@@ -1436,13 +1404,13 @@ article,
 
 .ascii-border-top::before {
   content: '[ ';
-  color: var(--cyber-cyan);
+  color: var(--primary);
   opacity: 0.5;
 }
 
 .ascii-border-top::after {
   content: ' ]';
-  color: var(--cyber-cyan);
+  color: var(--primary);
   opacity: 0.5;
 }
 
@@ -1450,7 +1418,7 @@ article,
 .terminal-prefix::before {
   content: '>';
   margin-right: 8px;
-  color: var(--cyber-cyan);
+  color: var(--primary);
   font-weight: bold;
 }
 
@@ -1478,13 +1446,13 @@ article,
 }
 
 .health-indicator.healthy {
-  color: var(--cyber-emerald);
-  border-color: color-mix(in oklch, var(--cyber-emerald) 30%, transparent);
+  color: var(--chart-2);
+  border-color: color-mix(in oklch, var(--chart-2) 30%, transparent);
 }
 
 .health-indicator.unhealthy {
-  color: var(--cyber-red);
-  border-color: color-mix(in oklch, var(--cyber-red) 30%, transparent);
+  color: var(--destructive);
+  border-color: color-mix(in oklch, var(--destructive) 30%, transparent);
 }
 
 /* assistant-ui custom styles */
