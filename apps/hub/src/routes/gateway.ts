@@ -18,6 +18,7 @@ import { connectionManager } from "../services/connection-manager";
 import { handleNodeMessage, dropNode } from "../services/broker";
 import { upgradeWebSocket } from "../ws";
 import { autoAdoptProvisionedHarness } from "../services/runtime-autoadopt";
+import { recordHealth, clearNode } from "../services/health-cache";
 
 // Node connects with `Authorization: Bearer <nodeId>:<nodeSecret>`.
 export const gatewayRoutes = new Hono().get(
@@ -88,6 +89,8 @@ export const gatewayRoutes = new Hono().get(
         } else if (parsed.data.type === "heartbeat") {
           await setNodeStatus(authed, "online");
           connectionManager.send(authed, { type: "ack", ts: Date.now() });
+        } else if (parsed.data.type === "health") {
+          recordHealth(authed, parsed.data.stations);
         } else if (
           parsed.data.type === "res" ||
           parsed.data.type === "stream"
@@ -99,6 +102,7 @@ export const gatewayRoutes = new Hono().get(
       async onClose() {
         resolveAuth(false); // unblock any onMessage awaiting auth on early close
         if (authed) {
+          clearNode(authed); // flush health cache immediately on disconnect
           dropNode(authed);
           connectionManager.unregister(authed);
           await setNodeStatus(authed, "offline");

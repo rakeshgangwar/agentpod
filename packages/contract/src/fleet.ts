@@ -19,7 +19,7 @@ export const FleetAgent = z.object({
   harness: z.string(),
   /** stations.kind */
   kind: z.string(),
-  /** nodes.status — node reachability only (true running/idle = P2) */
+  /** nodes.status — node reachability only */
   nodeStatus: z.enum(["online", "offline"]),
   /** nodes.agent_version — null when the node has never reported a version */
   agentVersion: z.string().nullable(),
@@ -31,6 +31,20 @@ export const FleetAgent = z.object({
   capabilities: z.array(z.string()),
   /** stations.workspace_path */
   workspacePath: z.string().nullable(),
+  // ─── P2: live health fields ────────────────────────────────────────────────
+  /**
+   * Derived from the most recent health push for this station.
+   * "unknown" when: node offline; no health report yet; report age > 75 s.
+   * "error" when the node's Health(key) call errored (ok=false).
+   * "running" / "stopped" reflect the process state from the most recent report.
+   */
+  status: z.enum(["running", "stopped", "error", "unknown"]),
+  /** CPU usage percent — null when status is "unknown" or "error". */
+  cpuPct: z.number().nullable(),
+  /** Resident memory in bytes — null when status is "unknown" or "error". */
+  memBytes: z.number().nullable(),
+  /** Process uptime in seconds — null when status is "unknown" or "error". */
+  uptimeSec: z.number().nullable(),
 });
 export type FleetAgent = z.infer<typeof FleetAgent>;
 
@@ -54,5 +68,10 @@ export const FleetStats = z.object({
    * show "N agents need an update".
    */
   updatesAvailable: z.number().int().nonnegative(),
+  /**
+   * Number of adopted agents whose live status is "running" (P2).
+   * Zero when no health data is available yet.
+   */
+  running: z.number().int().nonnegative(),
 });
 export type FleetStats = z.infer<typeof FleetStats>;

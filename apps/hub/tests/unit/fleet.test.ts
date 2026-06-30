@@ -23,8 +23,11 @@ import {
   annotateFleetRows,
   computeFleetStats,
   createFleetService,
+  deriveStatus,
   type RawFleetRow,
 } from "../../src/services/fleet";
+import type { CachedHealth } from "../../src/services/health-cache";
+import type { StationHealthReport } from "@agentpod/contract";
 
 // ─── Seed data ────────────────────────────────────────────────────────────────
 
@@ -33,6 +36,9 @@ const NODE_NAME = "superchotu";
 
 const STATION_ALPHA = "station-alpha-001";
 const STATION_BETA = "station-beta-001";
+
+const STATION_KEY_ALPHA = "hermes-alpha";
+const STATION_KEY_BETA = "openclaw-beta";
 
 /** Two adopted stations sharing the same node. */
 const seedRows: RawFleetRow[] = [
@@ -43,6 +49,7 @@ const seedRows: RawFleetRow[] = [
     agentName: "alpha-agent",
     harness: "hermes",
     kind: "claude",
+    stationKey: STATION_KEY_ALPHA,
     nodeStatus: "online",
     agentVersion: "v0.1.4",
     capabilities: ["terminal", "fs.read"],
@@ -55,6 +62,7 @@ const seedRows: RawFleetRow[] = [
     agentName: "beta-agent",
     harness: "openclaw",
     kind: "openai",
+    stationKey: STATION_KEY_BETA,
     nodeStatus: "online",
     agentVersion: "v0.1.4",
     capabilities: ["terminal"],
@@ -238,5 +246,189 @@ describe("createFleetService (mocked deps)", () => {
     });
     await service.listFleetAgents("user-test-001");
     expect(versionCallCount).toBe(1);
+  });
+});
+
+// ─── Live health + status derivation integration (via createFleetService) ─────
+
+const NOW_FIXED = 1_000_000_000;
+
+/** Build a StationHealthReport for use in stubbed cache entries. */
+function makeHealthReport(
+  key: string,
+  ok: boolean,
+  running: boolean
+): StationHealthReport {
+  return {
+    key,
+    ok,
+    running,
+    pid: running ? 1234 : null,
+    cpuPct: running ? 8.5 : null,
+    memBytes: running ? 128 * 1024 * 1024 : null,
+    uptimeSec: running ? 3600 : null,
+  };
+}
+
+/** Stub a health cache map: nodeId → stationKey → CachedHealth. */
+function makeHealthFn(
+  entries: Record<string, Record<string, CachedHealth>>
+): (nodeId: string, stationKey: string) => CachedHealth | null {
+  return (nodeId, stationKey) => entries[nodeId]?.[stationKey] ?? null;
+}
+
+describe("annotateFleetRows — health + status derivation", () => {
+  test("no health data → all agents get status:unknown + null metrics", () => {
+    const agents = annotateFleetRows(seedRows, "v0.1.5", () => null, NOW_FIXED);
+    for (const a of agents) {
+      expect(a.status).toBe("unknown");
+      expect(a.cpuPct).toBeNull();
+      expect(a.memBytes).toBeNull();
+      expect(a.uptimeSec).toBeNull();
+    }
+  });
+
+  test("fresh ok+running report → status:running + metrics", () => {
+    const getHealthFn = makeHealthFn({
+      [NODE_ID]: {
+        [STATION_KEY_ALPHA]: {
+          report: makeHealthReport(STATION_KEY_ALPHA, true, true),
+          at: NOW_FIXED - 1_000,
+        },
+      },
+    });
+    const agents = annotateFleetRows(seedRows, null, getHealthFn, NOW_FIXED);
+    const alpha = agents.find((a) => a.stationId === STATION_ALPHA)!;
+    expect(alpha.status).toBe("running");
+    expect(alpha.cpuPct).toBe(8.5);
+    expect(alpha.memBytes).toBe(128 * 1024 * 1024);
+    expect(alpha.uptimeSec).toBe(3600);
+    // beta has no cached entry → unknown
+    const beta = agents.find((a) => a.stationId === STATION_BETA)!;
+    expect(beta.status).toBe("unknown");
+  });
+
+  test("ok=true, running=false → status:stopped", () => {
+    const getHealthFn = makeHealthFn({
+      [NODE_ID]: {
+        [STATION_KEY_ALPHA]: {
+          report: makeHealthReport(STATION_KEY_ALPHA, true, false),
+          at: NOW_FIXED - 1_000,
+        },
+      },
+    });
+    const agents = annotateFleetRows([seedRows[0]!], null, getHealthFn, NOW_FIXED);
+    expect(agents[0]!.status).toBe("stopped");
+  });
+
+  test("ok=false → status:error + null metrics", () => {
+    const getHealthFn = makeHealthFn({
+      [NODE_ID]: {
+        [STATION_KEY_ALPHA]: {
+          report: makeHealthReport(STATION_KEY_ALPHA, false, false),
+          at: NOW_FIXED - 1_000,
+        },
+      },
+    });
+    const agents = annotateFleetRows([seedRows[0]!], null, getHealthFn, NOW_FIXED);
+    expect(agents[0]!.status).toBe("error");
+    expect(agents[0]!.cpuPct).toBeNull();
+  });
+
+  test("stale report (age > 75s) → status:unknown", () => {
+    const getHealthFn = makeHealthFn({
+      [NODE_ID]: {
+        [STATION_KEY_ALPHA]: {
+          report: makeHealthReport(STATION_KEY_ALPHA, true, true),
+          at: NOW_FIXED - 80_000, // 80 s > 75 s threshold
+        },
+      },
+    });
+    const agents = annotateFleetRows([seedRows[0]!], null, getHealthFn, NOW_FIXED);
+    expect(agents[0]!.status).toBe("unknown");
+    expect(agents[0]!.cpuPct).toBeNull();
+  });
+
+  test("offline node → status:unknown even with fresh cache", () => {
+    const offlineRow: RawFleetRow = { ...seedRows[0]!, nodeStatus: "offline" };
+    const getHealthFn = makeHealthFn({
+      [NODE_ID]: {
+        [STATION_KEY_ALPHA]: {
+          report: makeHealthReport(STATION_KEY_ALPHA, true, true),
+          at: NOW_FIXED - 1_000,
+        },
+      },
+    });
+    const agents = annotateFleetRows([offlineRow], null, getHealthFn, NOW_FIXED);
+    expect(agents[0]!.status).toBe("unknown");
+  });
+});
+
+describe("computeFleetStats — running count (P2)", () => {
+  test("running = count of agents with status:running", () => {
+    const getHealthFn = makeHealthFn({
+      [NODE_ID]: {
+        [STATION_KEY_ALPHA]: {
+          report: makeHealthReport(STATION_KEY_ALPHA, true, true),
+          at: NOW_FIXED - 1_000,
+        },
+        [STATION_KEY_BETA]: {
+          report: makeHealthReport(STATION_KEY_BETA, true, false),
+          at: NOW_FIXED - 1_000,
+        },
+      },
+    });
+    const agents = annotateFleetRows(seedRows, null, getHealthFn, NOW_FIXED);
+    const stats = computeFleetStats(agents);
+    // alpha → running, beta → stopped
+    expect(stats.running).toBe(1);
+  });
+
+  test("running = 0 when all agents have status:unknown", () => {
+    const agents = annotateFleetRows(seedRows, null, () => null, NOW_FIXED);
+    const stats = computeFleetStats(agents);
+    expect(stats.running).toBe(0);
+  });
+
+  test("running = 0 on empty agent list", () => {
+    const stats = computeFleetStats([]);
+    expect(stats.running).toBe(0);
+  });
+});
+
+describe("createFleetService — getHealthFn injection", () => {
+  test("getHealthFn is called with nodeId + stationKey per agent", async () => {
+    const calls: [string, string][] = [];
+    const service = createFleetService({
+      queryFn: async (_userId) => seedRows,
+      latestVersionFn: async () => null,
+      getHealthFn: (nodeId, stationKey) => {
+        calls.push([nodeId, stationKey]);
+        return null;
+      },
+    });
+    await service.listFleetAgents("user-test-001");
+    // Two rows → two calls
+    expect(calls).toHaveLength(2);
+    expect(calls.some(([n, k]) => n === NODE_ID && k === STATION_KEY_ALPHA)).toBe(true);
+    expect(calls.some(([n, k]) => n === NODE_ID && k === STATION_KEY_BETA)).toBe(true);
+  });
+
+  test("getFleetStats.running reflects live health data", async () => {
+    const service = createFleetService({
+      queryFn: async (_userId) => seedRows,
+      latestVersionFn: async () => null,
+      getHealthFn: (nodeId, stationKey) => {
+        if (stationKey === STATION_KEY_ALPHA) {
+          return {
+            report: makeHealthReport(STATION_KEY_ALPHA, true, true),
+            at: Date.now() - 1_000, // fresh
+          };
+        }
+        return null;
+      },
+    });
+    const stats = await service.getFleetStats("user-test-001");
+    expect(stats.running).toBe(1); // only alpha is running
   });
 });
