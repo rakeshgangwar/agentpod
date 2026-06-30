@@ -18,6 +18,7 @@ export async function listNodes(userId: string): Promise<NodeWithProvisioning[]>
       os: nodes.os,
       arch: nodes.arch,
       cpuCount: nodes.cpuCount,
+      agentVersion: nodes.agentVersion,
       status: nodes.status,
       lastSeenAt: nodes.lastSeenAt,
       createdAt: nodes.createdAt,
@@ -35,6 +36,7 @@ export async function listNodes(userId: string): Promise<NodeWithProvisioning[]>
     os: n.os,
     arch: n.arch,
     cpuCount: n.cpuCount,
+    agentVersion: n.agentVersion ?? null,
     status: n.status,
     lastSeenAt: n.lastSeenAt ? n.lastSeenAt.toISOString() : null,
     createdAt: n.createdAt.toISOString(),
@@ -52,5 +54,15 @@ export async function setNodeStatus(
   await db
     .update(nodes)
     .set({ status, lastSeenAt: new Date() })
+    .where(eq(nodes.id, nodeId));
+}
+
+export async function setNodeAgentVersion(
+  nodeId: string,
+  agentVersion: string | null
+) {
+  await db
+    .update(nodes)
+    .set({ agentVersion })
     .where(eq(nodes.id, nodeId));
 }

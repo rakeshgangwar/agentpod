@@ -197,3 +197,46 @@ test("heartbeat keeps node online and receives ack", async () => {
     server.stop(true);
   }
 });
+
+test("hello frame version is persisted to agentVersion on the node row", async () => {
+  const server = Bun.serve({ fetch: testApp.fetch, websocket, port: 0 });
+
+  try {
+    const { token } = await mintEnrollmentToken(TEST_USER_ID);
+    const { nodeId, nodeSecret } = await enrollNode(token, {
+      hostname: "version-host",
+      os: "linux",
+      arch: "amd64",
+      cpuCount: 2,
+    });
+
+    const ws = new WebSocket(
+      `ws://localhost:${server.port}/public/nodes/gateway`,
+      {
+        headers: { Authorization: `Bearer ${nodeId}:${nodeSecret}` },
+      } as RequestInit & { headers: Record<string, string> }
+    );
+
+    await new Promise<void>((res, rej) => {
+      ws.onopen = () => res();
+      ws.onerror = () => rej(new Error("WebSocket connection error"));
+    });
+
+    // Wait for server onOpen to complete (verifyNodeCredential is async)
+    await new Promise((r) => setTimeout(r, 150));
+
+    // Send hello with version field
+    ws.send(JSON.stringify({ type: "hello", hostInfo: { hostname: "version-host", os: "linux", arch: "amd64", cpuCount: 2 }, version: "v0.1.1" }));
+
+    await new Promise((r) => setTimeout(r, 300));
+
+    // Verify agentVersion was persisted
+    const list = await listNodes(TEST_USER_ID);
+    const node = list.find((n) => n.id === nodeId);
+    expect(node?.agentVersion).toBe("v0.1.1");
+
+    ws.close();
+  } finally {
+    server.stop(true);
+  }
+});

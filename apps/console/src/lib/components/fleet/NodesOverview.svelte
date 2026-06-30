@@ -295,6 +295,9 @@
               <p class="text-xs font-mono text-muted-foreground/70">
                 {node.os}
               </p>
+              <p class="text-xs font-mono text-muted-foreground/60">
+                v: {node.agentVersion ?? "unknown"}
+              </p>
               {#if node.provisioned}
                 <Badge
                   variant="outline"

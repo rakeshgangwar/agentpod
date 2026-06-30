@@ -31,6 +31,7 @@ const mockNodes = [
     status: "online" as const,
     lastSeenAt: "2026-06-28T10:00:00Z",
     createdAt: "2026-06-22T00:00:00Z",
+    agentVersion: null,
   },
   {
     id: "node_2",
@@ -42,6 +43,7 @@ const mockNodes = [
     status: "offline" as const,
     lastSeenAt: null,
     createdAt: "2026-06-23T00:00:00Z",
+    agentVersion: null,
   },
 ];
 

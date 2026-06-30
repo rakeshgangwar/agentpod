@@ -13,7 +13,7 @@
 import { Hono } from "hono";
 import { GatewayClientMessage } from "@agentpod/contract";
 import { verifyNodeCredential } from "../services/enrollment";
-import { setNodeStatus } from "../services/node-registry";
+import { setNodeStatus, setNodeAgentVersion } from "../services/node-registry";
 import { connectionManager } from "../services/connection-manager";
 import { handleNodeMessage, dropNode } from "../services/broker";
 import { upgradeWebSocket } from "../ws";
@@ -67,7 +67,10 @@ export const gatewayRoutes = new Hono().get(
           return;
         }
         if (!parsed.success) return;
-        if (parsed.data.type === "heartbeat") {
+        if (parsed.data.type === "hello") {
+          const version = parsed.data.version ?? null;
+          await setNodeAgentVersion(authed, version);
+        } else if (parsed.data.type === "heartbeat") {
           await setNodeStatus(authed, "online");
           connectionManager.send(authed, { type: "ack", ts: Date.now() });
         } else if (

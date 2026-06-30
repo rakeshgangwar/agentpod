@@ -32,6 +32,7 @@ const dockerNode = {
   status: "online" as const,
   lastSeenAt: null,
   createdAt: "2026-06-29T00:00:00Z",
+  agentVersion: null,
   provisioned: { runtimeId: "rt_docker_1", provider: "docker" },
 };
 

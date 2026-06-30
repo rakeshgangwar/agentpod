@@ -12,6 +12,7 @@ export const nodes = pgTable("nodes", {
   arch: text("arch").notNull(),
   cpuCount: integer("cpu_count").notNull().default(0),
   secretHash: text("secret_hash").notNull(),
+  agentVersion: text("agent_version"),
   status: nodeStatusEnum("status").notNull().default("offline"),
   lastSeenAt: timestamp("last_seen_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

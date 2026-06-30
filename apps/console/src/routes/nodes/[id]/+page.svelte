@@ -66,6 +66,9 @@
           >
             {node.status}
           </Badge>
+          <span class="text-xs font-mono text-muted-foreground">
+            {node.agentVersion ?? "unknown"}
+          </span>
         </div>
 
         <!-- Provisioned runtime controls (destroy / stop / start) -->

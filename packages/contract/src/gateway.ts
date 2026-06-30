@@ -2,7 +2,7 @@ import { z } from "zod";
 import { HostInfo } from "./node";
 import { RequestMsg, ResponseMsg, StreamMsg, CancelMsg, InputMsg, ResizeMsg } from "./protocol";
 
-export const HelloMsg = z.object({ type: z.literal("hello"), hostInfo: HostInfo });
+export const HelloMsg = z.object({ type: z.literal("hello"), hostInfo: HostInfo, version: z.string().optional() });
 export const HeartbeatMsg = z.object({ type: z.literal("heartbeat"), ts: z.number() });
 export const AckMsg = z.object({ type: z.literal("ack"), ts: z.number() });
 
