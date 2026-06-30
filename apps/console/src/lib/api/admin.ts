@@ -16,6 +16,7 @@ import type {
   AuditLogResponse,
   UserRole,
 } from "@agentpod/types";
+import { handleUnauthorized } from "./client";
 // =============================================================================
 // API Client Helper
 // =============================================================================
@@ -54,17 +55,22 @@ async function apiRequest<T>(
     credentials: "include",
   });
 
+  if (response.status === 401) {
+    handleUnauthorized();
+    throw new Error(`API Error: ${response.status}`);
+  }
+
   if (!response.ok) {
     const errorBody = await response.text();
     let errorMessage: string;
-    
+
     try {
       const parsed = JSON.parse(errorBody);
       errorMessage = parsed.message || parsed.error || `API Error: ${response.status}`;
     } catch {
       errorMessage = errorBody || `API Error: ${response.status}`;
     }
-    
+
     throw new Error(errorMessage);
   }
 

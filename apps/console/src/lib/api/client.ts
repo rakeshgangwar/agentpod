@@ -1,4 +1,6 @@
 import type { NodeSummary, DetectedStation, StationHealth, FsEntry, ProvisionedRuntime } from "@agentpod/contract";
+import { goto } from "$app/navigation";
+import { clearAuthSession } from "$lib/stores/auth.svelte";
 
 /** Resolves the hub base URL at call time so it reflects the runtime connection. */
 function hubUrl(): string {
@@ -7,8 +9,29 @@ function hubUrl(): string {
   return stored ?? import.meta.env.PUBLIC_HUB_URL ?? "http://localhost:3001";
 }
 
+/**
+ * Handle a 401 Unauthorized response by clearing the local auth session and
+ * redirecting to /login.  Guards against redirect loops: does nothing when the
+ * current path is already a public route (/login, /setup) or when running
+ * server-side (typeof window === "undefined").
+ */
+export function handleUnauthorized(): void {
+  if (
+    typeof window !== "undefined" &&
+    !window.location.pathname.startsWith("/login") &&
+    !window.location.pathname.startsWith("/setup")
+  ) {
+    clearAuthSession();
+    goto("/login");
+  }
+}
+
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${hubUrl()}${path}`, { credentials: "include", ...init });
+  if (res.status === 401) {
+    handleUnauthorized();
+    throw new Error(`${init?.method ?? "GET"} ${path} → ${res.status}`);
+  }
   if (!res.ok) throw new Error(`${init?.method ?? "GET"} ${path} → ${res.status}`);
   // 204 No Content (and other empty bodies, e.g. DELETE/start/stop) have nothing
   // to parse — calling res.json() on them throws "Unexpected end of JSON input".
