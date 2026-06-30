@@ -17,6 +17,11 @@ import { render, waitFor, fireEvent, cleanup } from "@testing-library/svelte";
 import * as api from "$lib/api/client";
 import NodesOverview from "./NodesOverview.svelte";
 
+// Stub svelte-sonner (its runed dependency can't resolve in the jsdom test env)
+vi.mock("svelte-sonner", () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
+
 beforeEach(() => vi.restoreAllMocks());
 afterEach(cleanup);
 
@@ -32,6 +37,8 @@ const mockNodes = [
     lastSeenAt: "2026-06-28T10:00:00Z",
     createdAt: "2026-06-22T00:00:00Z",
     agentVersion: null,
+    latestVersion: null,
+    updateAvailable: false,
   },
   {
     id: "node_2",
@@ -44,6 +51,8 @@ const mockNodes = [
     lastSeenAt: null,
     createdAt: "2026-06-23T00:00:00Z",
     agentVersion: null,
+    latestVersion: null,
+    updateAvailable: false,
   },
 ];
 
@@ -172,4 +181,53 @@ test("clicking 'Create enrollment token' calls createEnrollmentToken and shows t
     expect(api.createEnrollmentToken).toHaveBeenCalledOnce();
     expect(getByText(/tok_test_abc123/)).toBeTruthy();
   });
+});
+
+// ── Update button TDD tests ────────────────────────────────────────────────────
+
+test("node with updateAvailable:true renders Update button and version upgrade text", async () => {
+  const updatableNode = {
+    id: "node_upd",
+    name: "updatable",
+    hostname: "updatable.local",
+    os: "linux",
+    arch: "amd64",
+    cpuCount: 2,
+    status: "online" as const,
+    lastSeenAt: null,
+    createdAt: "2026-06-30T00:00:00Z",
+    agentVersion: "v0.1.2",
+    latestVersion: "v0.1.3",
+    updateAvailable: true,
+  };
+  vi.spyOn(api, "listNodes").mockResolvedValue([updatableNode]);
+  vi.spyOn(api, "updateNode").mockResolvedValue({ ok: true, updating: true, tag: "v0.1.3" });
+
+  const { getByRole, getByText } = render(NodesOverview);
+
+  await waitFor(() => {
+    // Version upgrade text is visible
+    expect(getByText(/v0\.1\.2.*v0\.1\.3/)).toBeTruthy();
+    // Update button is present
+    expect(getByRole("button", { name: /^update$/i })).toBeTruthy();
+  });
+});
+
+test("node with updateAvailable:false renders no Update button", async () => {
+  const upToDateNode = {
+    ...mockNodes[0],
+    agentVersion: "v0.1.3",
+    latestVersion: "v0.1.3",
+    updateAvailable: false,
+  };
+  vi.spyOn(api, "listNodes").mockResolvedValue([upToDateNode]);
+
+  const { queryByRole, getByText } = render(NodesOverview);
+
+  // Wait for the node to render
+  await waitFor(() => {
+    expect(getByText(upToDateNode.hostname)).toBeTruthy();
+  });
+
+  expect(queryByRole("button", { name: /^update$/i })).toBeNull();
 });

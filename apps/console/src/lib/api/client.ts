@@ -46,6 +46,12 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const listNodes = () => http<NodeSummary[]>("/api/nodes");
 
+export const updateNode = (id: string) =>
+  http<{ ok: boolean; updating?: boolean; tag?: string; error?: string }>(
+    `/api/nodes/${id}/update`,
+    { method: "POST" }
+  );
+
 // ─── Runtime endpoints ────────────────────────────────────────────────────────
 
 export const provisionRuntime = (req: {

@@ -2,7 +2,8 @@
   import { onMount } from "svelte";
   import { page } from "$app/state";
   import { replaceState } from "$app/navigation";
-  import { listNodes, createEnrollmentToken, listRuntimes, listRuntimeProviders } from "$lib/api/client";
+  import { listNodes, createEnrollmentToken, listRuntimes, listRuntimeProviders, updateNode } from "$lib/api/client";
+  import { toast } from "svelte-sonner";
   import type { NodeSummary, ProvisionedRuntime } from "@agentpod/contract";
   import * as Card from "$lib/components/ui/card";
   import { Badge } from "$lib/components/ui/badge";
@@ -108,6 +109,28 @@
     isLoading = true;
     showNewRuntimeDialog = false;
     await loadData();
+  }
+
+  // ── Per-node update state (keyed by node id) ──────────────────────────────
+  let updatingNodes = $state<Record<string, boolean>>({});
+
+  async function handleUpdate(id: string) {
+    updatingNodes[id] = true;
+    try {
+      const result = await updateNode(id);
+      if (result.ok) {
+        // Keep "updating…" state — the node will blip offline→online on the new
+        // version and the next nodes refresh will clear updateAvailable.
+      } else {
+        delete updatingNodes[id];
+        toast.error("Update failed", { description: result.error ?? "Unknown error" });
+      }
+    } catch (e) {
+      delete updatingNodes[id];
+      toast.error("Update failed", {
+        description: e instanceof Error ? e.message : "Unknown error",
+      });
+    }
   }
 
   // ── Copy-to-clipboard for enrollment command ───────────────────────────────
@@ -298,6 +321,21 @@
               <p class="text-xs font-mono text-muted-foreground/60">
                 v: {node.agentVersion ?? "unknown"}
               </p>
+              {#if node.updateAvailable}
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-[10px] font-mono text-yellow-500/90">
+                    update: {node.agentVersion} → {node.latestVersion}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={!!updatingNodes[node.id]}
+                    onclick={(e) => { e.stopPropagation(); e.preventDefault(); handleUpdate(node.id); }}
+                    class="font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border transition-colors border-primary/50 text-primary hover:border-primary hover:bg-primary/10 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                  >
+                    {updatingNodes[node.id] ? "updating…" : "Update"}
+                  </button>
+                </div>
+              {/if}
               {#if node.provisioned}
                 <Badge
                   variant="outline"

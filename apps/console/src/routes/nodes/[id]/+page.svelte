@@ -2,7 +2,8 @@
   import { onMount } from "svelte";
   import { page } from "$app/stores";
   import { stations, loadDetected, adopt, loadAdopted } from "$lib/stores/stations.svelte";
-  import { listNodes } from "$lib/api/client";
+  import { listNodes, updateNode } from "$lib/api/client";
+  import { toast } from "svelte-sonner";
   import type { NodeSummary } from "@agentpod/contract";
   import StationTree from "$lib/components/stations/StationTree.svelte";
   import ProvisionedNodeControls from "$lib/components/fleet/ProvisionedNodeControls.svelte";
@@ -32,6 +33,28 @@
     loadAdopted(id);
     loadNode();
   });
+
+  let updating = $state(false);
+
+  async function handleUpdate() {
+    if (!node) return;
+    updating = true;
+    try {
+      const result = await updateNode(node.id);
+      if (result.ok) {
+        // Keep "updating…" state — the node will blip offline→online on the
+        // new version; next refresh clears updateAvailable.
+      } else {
+        updating = false;
+        toast.error("Update failed", { description: result.error ?? "Unknown error" });
+      }
+    } catch (e) {
+      updating = false;
+      toast.error("Update failed", {
+        description: e instanceof Error ? e.message : "Unknown error",
+      });
+    }
+  }
 
   async function handleAdopt(key: string) {
     await adopt(id, [key]);
@@ -69,6 +92,20 @@
           <span class="text-xs font-mono text-muted-foreground">
             {node.agentVersion ?? "unknown"}
           </span>
+          {#if node.updateAvailable}
+            <span class="text-[10px] font-mono text-yellow-500/90">
+              update: {node.agentVersion} → {node.latestVersion}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={updating}
+              onclick={handleUpdate}
+              class="font-mono text-xs uppercase tracking-wider h-6 px-2"
+            >
+              {updating ? "updating…" : "Update"}
+            </Button>
+          {/if}
         </div>
 
         <!-- Provisioned runtime controls (destroy / stop / start) -->
