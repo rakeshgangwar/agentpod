@@ -150,6 +150,17 @@ func (h *hermesDescriptor) Health(key string) (Health, error) {
 	// Best-effort process check via pgrep.
 	health.Running, _ = hermesProcessRunning(key)
 
+	// Live process metrics: best-effort — when the profile is running, resolve
+	// its PID and gather CPU/memory/uptime. Hermes runs a separate process per
+	// profile, so these are honest PER-AGENT numbers. Any failure leaves the
+	// metric fields nil; Health() never fails on a ps hiccup.
+	if health.Running {
+		if pid, err := hermesPID(key); err == nil {
+			health.PID = &pid
+			health.CpuPct, health.MemBytes, health.UptimeSec = gatherPidMetrics(pid)
+		}
+	}
+
 	return health, nil
 }
 

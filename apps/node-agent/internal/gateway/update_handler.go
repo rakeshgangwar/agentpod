@@ -62,3 +62,16 @@ func (h *updateHandler) Handle(
 
 	return map[string]any{"ok": true, "updating": true, "tag": res.LatestTag}, true, nil
 }
+
+// HandleFrame forwards inbound terminal input/resize frames to the inner handler
+// when it implements FrameHandler. The dispatcher (serve) routes such frames via
+// a type assertion on the OUTERMOST handler; without this forwarder, wrapping a
+// terminalHandler in updateHandler would erase the FrameHandler interface and
+// every keystroke would be silently dropped (terminal connects but ignores
+// input). Returns nil when the inner handler has no frame support.
+func (h *updateHandler) HandleFrame(frameType, id string, raw json.RawMessage) error {
+	if fh, ok := h.inner.(FrameHandler); ok {
+		return fh.HandleFrame(frameType, id, raw)
+	}
+	return nil
+}

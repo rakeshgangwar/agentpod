@@ -74,6 +74,47 @@ func TestUpdateHandler_UpdateVerb(t *testing.T) {
 	}
 }
 
+// frameRecorder is a Handler that ALSO implements FrameHandler, recording the
+// last HandleFrame call. Used to prove updateHandler forwards inbound terminal
+// input/resize frames to its inner handler instead of erasing the interface.
+type frameRecorder struct {
+	stubInner
+	gotType string
+	gotID   string
+	gotRaw  json.RawMessage
+}
+
+func (f *frameRecorder) HandleFrame(frameType, id string, raw json.RawMessage) error {
+	f.gotType = frameType
+	f.gotID = id
+	f.gotRaw = raw
+	return nil
+}
+
+// TestUpdateHandler_ForwardsFrames guards against the decorator dropping the
+// FrameHandler interface. In run.go updateHandler wraps a terminalHandler, and
+// the dispatcher routes terminal keystrokes via `h.(FrameHandler)` on the
+// OUTERMOST handler. If updateHandler does not forward HandleFrame, that
+// assertion fails and every input/resize frame is silently discarded — the
+// terminal connects but accepts no input.
+func TestUpdateHandler_ForwardsFrames(t *testing.T) {
+	inner := &frameRecorder{}
+	h := NewUpdateHandler(inner, "v0.1.2")
+
+	fh, ok := h.(FrameHandler)
+	if !ok {
+		t.Fatal("updateHandler must implement FrameHandler so wrapping a terminalHandler does not drop terminal input/resize frames")
+	}
+
+	raw := json.RawMessage(`{"type":"input","id":"attach-1","data":"aGk="}`)
+	if err := fh.HandleFrame("input", "attach-1", raw); err != nil {
+		t.Fatalf("HandleFrame: %v", err)
+	}
+	if inner.gotType != "input" || inner.gotID != "attach-1" {
+		t.Errorf("frame not forwarded to inner: gotType=%q gotID=%q", inner.gotType, inner.gotID)
+	}
+}
+
 func TestUpdateHandler_DelegatesNonUpdate(t *testing.T) {
 	inner := &stubInner{result: map[string]any{"pong": true}}
 
