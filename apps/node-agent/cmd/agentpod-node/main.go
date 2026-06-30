@@ -1,9 +1,14 @@
 package main
 
-import ("flag"; "fmt"; "os"
+import ("flag"; "fmt"; "os"; "runtime"
   "github.com/rakeshgangwar/agentpod/node-agent/internal/config"
   "github.com/rakeshgangwar/agentpod/node-agent/internal/enroll"
   "github.com/rakeshgangwar/agentpod/node-agent/internal/host")
+
+// version is the agent's build version. Overridden at link time via:
+//
+//	-ldflags "-X main.version=<tag>"
+var version = "dev"
 
 // alreadyEnrolled returns true when a previously saved config exists and
 // contains both NodeID and NodeSecret, meaning the node has already been
@@ -15,7 +20,7 @@ func alreadyEnrolled(cfg config.Config, loadErr error) bool {
 }
 
 func main() {
-  if len(os.Args) < 2 { fmt.Println("usage: agentpod-node <enroll|run|detect>"); os.Exit(2) }
+  if len(os.Args) < 2 { fmt.Println("usage: agentpod-node <enroll|run|detect|version>"); os.Exit(2) }
   switch os.Args[1] {
   case "enroll":
     // Idempotency guard: if a valid config already exists on disk, skip the
@@ -39,6 +44,8 @@ func main() {
     runCmd() // implemented in Task 9
   case "detect":
     detectCmd() // debug/ops: print detected stations as JSON
+  case "version":
+    fmt.Printf("agentpod-node %s %s/%s\n", version, runtime.GOOS, runtime.GOARCH)
   default:
     fmt.Println("unknown command:", os.Args[1]); os.Exit(2)
   }

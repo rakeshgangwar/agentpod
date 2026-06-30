@@ -71,5 +71,5 @@ func runCmd() {
 	})
 
 	h := gateway.NewTerminalHandler(descriptor.NewHandler(reg), resolver, mgr, lifecycleFn)
-	gateway.Run(ctx, cfg, h)
+	gateway.Run(ctx, cfg, h, version)
 }

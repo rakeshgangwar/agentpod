@@ -110,9 +110,13 @@ func runWithOpts(ctx context.Context, cfg config.Config, h Handler, opts runOpti
 // On any disconnect or dial error it reconnects with exponential back-off +
 // jitter (min(30 s, 1 s × 2^n) + [0, base/2)), resetting the counter on each
 // successful connection. It exits only when ctx is cancelled.
-func Run(ctx context.Context, cfg config.Config, h Handler) error {
+// version is included in the hello frame sent on each connection; use "dev"
+// when not built with ldflags.
+func Run(ctx context.Context, cfg config.Config, h Handler, version string) error {
 	return runWithOpts(ctx, cfg, h, runOptions{
-		dialFn:   connectOnce,
+		dialFn: func(ctx context.Context, cfg config.Config, h Handler, onConnected func()) error {
+			return connectOnce(ctx, cfg, h, onConnected, version)
+		},
 		sleepFn:  defaultSleep,
 		jitterFn: defaultJitter,
 	})
@@ -121,8 +125,9 @@ func Run(ctx context.Context, cfg config.Config, h Handler) error {
 // connectOnce dials the hub, sends the hello frame, starts the heartbeat
 // ticker, and serves the inbound read loop until the connection is lost or ctx
 // is cancelled. onConnected is called immediately after the hello is sent so
-// the caller can reset the backoff counter.
-func connectOnce(ctx context.Context, cfg config.Config, h Handler, onConnected func()) error {
+// the caller can reset the backoff counter. version is embedded in the hello
+// frame as the "version" field so the hub can record the agent's build version.
+func connectOnce(ctx context.Context, cfg config.Config, h Handler, onConnected func(), version string) error {
 	c, _, err := websocket.Dial(ctx, wsURL(cfg.Hub), &websocket.DialOptions{
 		HTTPHeader: map[string][]string{"Authorization": {"Bearer " + cfg.NodeID + ":" + cfg.NodeSecret}},
 	})
@@ -131,7 +136,7 @@ func connectOnce(ctx context.Context, cfg config.Config, h Handler, onConnected 
 	}
 	defer c.Close(websocket.StatusNormalClosure, "")
 
-	hello, _ := json.Marshal(map[string]any{"type": "hello", "hostInfo": host.Info()})
+	hello, _ := json.Marshal(map[string]any{"type": "hello", "hostInfo": host.Info(), "version": version})
 	if err := c.Write(ctx, websocket.MessageText, hello); err != nil {
 		return err
 	}
