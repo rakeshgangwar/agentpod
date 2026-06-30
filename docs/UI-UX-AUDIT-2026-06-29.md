@@ -31,9 +31,22 @@ The console has a coherent identity (mono type, `[bracket]`/`//` cyber motifs, t
 ### Strengths (keep)
 - Responsive sidebar→bottom-nav; clean empty states with guidance; consistent cyber aesthetic on Fleet/Login; the login page is well-composed; Cmd-K palette.
 
-## Not yet audited — needs a connected node (re-enroll `superchotu`)
+## Station capability panels — AUDITED 2026-06-30 (on `superchotu`, 13 OpenClaw stations)
 
-The **core product UX was not auditable live** (empty fleet): the **node detail + station capability panels** — terminal, filesystem, logs, config editor, health, lifecycle, cleanup, activity — and the **New Runtime provision→drive→destroy** flow. These are the heart of the console and deserve their own deep pass. **Next step:** re-enroll a node (`superchotu`) and continue the audit on the populated states.
+**Core product UX works live on the real fleet** ✅ — node detail → detect→adopt → station panels all functional:
+- **Node detail:** clean detect→adopt (Adopt / Adopt all; "detected" vs "adopted" sections); 13 OpenClaw composite stations enumerated.
+- **Health:** metric grid (status/PID/CPU/mem/disk/uptime/activity/note) + Start/Stop/Restart lifecycle.
+- **Terminal:** **live PTY** — `openclaw@superchotu:~/.openclaw/workspace/agent-workspaces/hanuman$` in the correct workspace, over the tunnel. The signature capability is solid.
+- **Files:** real workspace tree (folders + `AGENTS.md`/`SOUL.md`/`IDENTITY.md`…), split-pane preview, New File/Folder.
+- (Logs / Cleanup / Activity tabs present, same panel pattern — consistent; not individually screenshotted.)
+
+**Findings:**
+- **F15** [P1] — **status badges render invisible text.** The Health "Running" status pill and the Terminal connection chip use a chart-color background with **no contrasting `-foreground`**, so the label is the same color as the badge (unreadable). Root cause is the token-migration status-color theming; fix by pairing every status badge with `*-foreground` (or add semantic `--success`/`--warning` tokens). Strengthens the case for the A+C status-color option.
+- **F16** [P2] — Health shows many `—` metrics (PID/CPU/Memory/Uptime/Last Activity) for composite OpenClaw stations; the "gateway process shared across all subagents" note explains it, but a panel of dashes reads unfinished — hide N/A rows or group them.
+- **F17** [P2] — node-detail: 13 near-identical `openclaw composite` cards with **CSS-truncated workspace paths** and no `title`/tooltip — hard to tell apart; add a `title` attr or surface the distinguishing path segment.
+- **F18** [P2] — no **Config** tab for OpenClaw stations (the capability set is harness-dependent); confirm config editing is reachable for harnesses that expose config.
+
+**Still not audited live:** the **New Runtime provision→drive→destroy** flow (Docker provisioning) — needs a provisioned runtime; lower priority since P4 was dogfood-proven.
 
 ## Recommended fix order
 
