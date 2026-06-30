@@ -61,7 +61,7 @@
       </p>
 
       <!-- Code hint -->
-      <p class="mt-2 text-xs font-mono text-muted-foreground/60">
+      <p class="mt-2 text-xs font-mono text-muted-foreground">
         curl -fsSL https://github.com/rakeshgangwar/agentpod/releases/latest/download/install.sh | sudo bash -s -- &lt;hub-url&gt; &lt;token&gt;
       </p>
 

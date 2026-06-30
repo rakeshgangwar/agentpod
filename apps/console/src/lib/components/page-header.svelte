@@ -137,8 +137,8 @@
   }
 </script>
 
-<header 
-  class="z-40 border-b border-border/30 bg-background/80 backdrop-blur-md {sticky ? 'sticky top-0' : ''}"
+<header
+  class="z-40 border-b border-border/30 bg-background/80 backdrop-blur-md pt-[env(safe-area-inset-top,0px)] {sticky ? 'sticky top-0' : ''}"
 >
   <div class="container mx-auto px-4 sm:px-6 max-w-7xl">
     <!-- Collapsible Title Section (hidden on mobile when collapsed) -->

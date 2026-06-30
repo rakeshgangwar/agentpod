@@ -167,8 +167,8 @@
   <!-- Fleet activity ticker (self-hides when there is no recent activity) -->
   <ActivityTicker />
 
-  <!-- Enrollment command block -->
-  {#if lastToken}
+  <!-- Enrollment command block (only when nodes/runtimes already exist; in empty state it shows in-place) -->
+  {#if lastToken && (nodes.length > 0 || provisioningRuntimes.length > 0)}
     <div class="cyber-card p-4 space-y-2">
       <p class="text-xs font-mono text-muted-foreground">// run this on the target node to connect it</p>
       <div class="flex items-start gap-2">
@@ -204,9 +204,36 @@
       <p class="text-sm font-mono text-destructive">{error}</p>
     </div>
 
-  <!-- Empty state: no nodes and no provisioning runtimes → connect banner -->
+  <!-- Empty state: no nodes and no provisioning runtimes → connect banner or in-place token -->
   {:else if nodes.length === 0 && provisioningRuntimes.length === 0}
-    <ConnectBanner onCreateToken={handleCreateToken} />
+    <div class="flex flex-col items-center py-8">
+      <div class="w-full max-w-2xl">
+        {#if lastToken}
+          <div class="cyber-card p-6 space-y-3">
+            <p class="text-xs font-mono text-muted-foreground">// enrollment token created — run this on the target node to connect it</p>
+            <div class="flex items-start gap-2">
+              <code class="flex-1 block text-sm font-mono break-all text-primary">
+                curl -fsSL https://github.com/rakeshgangwar/agentpod/releases/latest/download/install.sh | sudo bash -s -- {resolvedHubUrl()} {lastToken}
+              </code>
+              <button
+                type="button"
+                onclick={handleCopyEnrollCmd}
+                class="shrink-0 font-mono text-[10px] uppercase tracking-wider px-2 py-1 rounded border transition-colors
+                  {copied
+                    ? 'border-chart-2 text-chart-2 bg-chart-2/10'
+                    : 'border-primary/40 text-primary/70 hover:border-primary hover:text-primary bg-transparent'}"
+                aria-label="Copy enrollment command"
+              >
+                {copied ? "copied ✓" : "copy"}
+              </button>
+            </div>
+            <p class="text-xs font-mono text-muted-foreground/60">// the node will appear below once it connects</p>
+          </div>
+        {:else}
+          <ConnectBanner onCreateToken={handleCreateToken} />
+        {/if}
+      </div>
+    </div>
 
   <!-- Node cards + provisioning cards grid -->
   {:else}

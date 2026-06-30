@@ -18,6 +18,7 @@
   import { Button } from "$lib/components/ui/button";
   import TypeToConfirmDialog from "$lib/components/ui/TypeToConfirmDialog.svelte";
   import ConfirmDialog from "$lib/components/ui/ConfirmDialog.svelte";
+  import { autofocus } from "$lib/actions/autofocus";
 
   interface Props {
     stationId: string;
@@ -288,7 +289,7 @@
             placeholder={newItemMode === "dir" ? "Folder name" : "File name"}
             bind:value={newItemName}
             onkeydown={handleNewItemKeydown}
-            autofocus
+            use:autofocus
           />
         </div>
       {/if}
@@ -351,7 +352,7 @@
                     class="h-6 w-24 shrink-0 rounded border border-input bg-background px-1 text-[12px] font-mono outline-none"
                     bind:value={renameName}
                     onkeydown={handleRenameKeydown}
-                    autofocus
+                    use:autofocus
                   />
                 {:else}
                   <Button

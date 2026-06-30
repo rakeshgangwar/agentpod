@@ -30,7 +30,7 @@
   </div>
 
   <div class="flex-1 overflow-y-auto">
-    <div class="container mx-auto px-4 py-6 max-w-3xl space-y-6 animate-fade-in">
+    <div class="container mx-auto px-4 sm:px-6 py-6 max-w-7xl space-y-6 animate-fade-in">
 
       <!-- ================================================================ -->
       <!-- Section 1: Appearance                                             -->

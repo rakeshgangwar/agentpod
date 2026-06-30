@@ -131,7 +131,7 @@
                   <span class="text-xs text-muted-foreground">{s.kind}</span>
                 </div>
                 {#if s.workspacePath}
-                  <code class="text-xs text-muted-foreground font-mono truncate">{s.workspacePath}</code>
+                  <code class="text-xs text-muted-foreground font-mono truncate" title={s.workspacePath}>{s.workspacePath}</code>
                 {/if}
               </div>
               {#if !isAlreadyAdopted(s.key)}
