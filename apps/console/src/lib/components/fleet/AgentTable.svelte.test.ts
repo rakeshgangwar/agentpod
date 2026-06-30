@@ -9,6 +9,10 @@
  *   - search input filters rows by agentName
  *   - search input filters rows by nodeName
  *   - Update button calls updateNode and shows "updating…"
+ *   - Status column renders agent.status badge (P2)
+ *   - CPU/Mem/Uptime cells render formatted values or "—" (P2)
+ *   - externalFilter.stationId narrows table to one agent (P2)
+ *   - externalFilter.status narrows table to matching agents (P2)
  */
 
 import { test, expect, vi, beforeEach, afterEach } from "vitest";
@@ -57,6 +61,11 @@ const makeAgent = (overrides: Partial<FleetAgent> & { stationId: string }): Flee
   updateAvailable: false,
   capabilities: [],
   workspacePath: null,
+  // P2 live health fields
+  status: "running",
+  cpuPct: null,
+  memBytes: null,
+  uptimeSec: null,
   ...overrides,
 });
 
@@ -78,7 +87,7 @@ const agentNoUpdate = makeAgent({
 const twoAgents: FleetAgent[] = [agentWithUpdate, agentNoUpdate];
 
 // ---------------------------------------------------------------------------
-// Tests
+// Tests — grouping / search / update (P1 coverage kept)
 // ---------------------------------------------------------------------------
 
 test("renders both agent rows and a group header with node name", () => {
@@ -183,4 +192,133 @@ test("row links to /nodes/{nodeId}/stations/{stationId}", () => {
   const { container } = render(AgentTable, { props: { agents: [agentWithUpdate] } });
   const link = container.querySelector(`a[href="/nodes/${agentWithUpdate.nodeId}/stations/${agentWithUpdate.stationId}"]`);
   expect(link).toBeTruthy();
+});
+
+// ---------------------------------------------------------------------------
+// Tests — P2: Status column
+// ---------------------------------------------------------------------------
+
+test("Status column shows agent.status badge text", () => {
+  const agent = makeAgent({ stationId: "s1", status: "running" });
+  const { getAllByText } = render(AgentTable, { props: { agents: [agent] } });
+  // The badge renders the status text
+  const badges = getAllByText("running");
+  expect(badges.length).toBeGreaterThan(0);
+});
+
+test("Status column reflects error status", () => {
+  const agent = makeAgent({ stationId: "s1", status: "error" });
+  const { getAllByText } = render(AgentTable, { props: { agents: [agent] } });
+  expect(getAllByText("error").length).toBeGreaterThan(0);
+});
+
+test("Status column reflects stopped status", () => {
+  const agent = makeAgent({ stationId: "s1", status: "stopped" });
+  const { getAllByText } = render(AgentTable, { props: { agents: [agent] } });
+  expect(getAllByText("stopped").length).toBeGreaterThan(0);
+});
+
+// ---------------------------------------------------------------------------
+// Tests — P2: CPU / Mem / Uptime metric cells
+// ---------------------------------------------------------------------------
+
+test("CPU cell shows '—' when cpuPct is null", () => {
+  const agent = makeAgent({ stationId: "s1", cpuPct: null });
+  const { getAllByTestId } = render(AgentTable, { props: { agents: [agent] } });
+  const cpuCells = getAllByTestId("cpu-cell");
+  expect(cpuCells[0].textContent?.trim()).toBe("—");
+});
+
+test("CPU cell shows formatted percentage when cpuPct is provided", () => {
+  const agent = makeAgent({ stationId: "s1", cpuPct: 12.5 });
+  const { getAllByTestId } = render(AgentTable, { props: { agents: [agent] } });
+  const cpuCells = getAllByTestId("cpu-cell");
+  expect(cpuCells[0].textContent?.trim()).toBe("12.5%");
+});
+
+test("Mem cell shows '—' when memBytes is null", () => {
+  const agent = makeAgent({ stationId: "s1", memBytes: null });
+  const { getAllByTestId } = render(AgentTable, { props: { agents: [agent] } });
+  const memCells = getAllByTestId("mem-cell");
+  expect(memCells[0].textContent?.trim()).toBe("—");
+});
+
+test("Mem cell shows MB when memBytes < 1 GiB", () => {
+  const agent = makeAgent({ stationId: "s1", memBytes: 740 * 1024 * 1024 });
+  const { getAllByTestId } = render(AgentTable, { props: { agents: [agent] } });
+  const memCells = getAllByTestId("mem-cell");
+  expect(memCells[0].textContent?.trim()).toBe("740 MB");
+});
+
+test("Mem cell shows GB when memBytes >= 1 GiB", () => {
+  // 2.1 GB in bytes
+  const agent = makeAgent({ stationId: "s1", memBytes: Math.round(2.1 * 1024 * 1024 * 1024) });
+  const { getAllByTestId } = render(AgentTable, { props: { agents: [agent] } });
+  const memCells = getAllByTestId("mem-cell");
+  expect(memCells[0].textContent?.trim()).toBe("2.1 GB");
+});
+
+test("Uptime cell shows '—' when uptimeSec is null", () => {
+  const agent = makeAgent({ stationId: "s1", uptimeSec: null });
+  const { getAllByTestId } = render(AgentTable, { props: { agents: [agent] } });
+  const uptimeCells = getAllByTestId("uptime-cell");
+  expect(uptimeCells[0].textContent?.trim()).toBe("—");
+});
+
+test("Uptime cell shows 'Xh Ym' format for >= 1 hour", () => {
+  const agent = makeAgent({ stationId: "s1", uptimeSec: 3 * 3600 + 25 * 60 }); // 3h 25m
+  const { getAllByTestId } = render(AgentTable, { props: { agents: [agent] } });
+  const uptimeCells = getAllByTestId("uptime-cell");
+  expect(uptimeCells[0].textContent?.trim()).toBe("3h 25m");
+});
+
+test("Uptime cell shows 'Xm' format for < 1 hour", () => {
+  const agent = makeAgent({ stationId: "s1", uptimeSec: 42 * 60 }); // 42m
+  const { getAllByTestId } = render(AgentTable, { props: { agents: [agent] } });
+  const uptimeCells = getAllByTestId("uptime-cell");
+  expect(uptimeCells[0].textContent?.trim()).toBe("42m");
+});
+
+// ---------------------------------------------------------------------------
+// Tests — P2: externalFilter prop
+// ---------------------------------------------------------------------------
+
+test("externalFilter.stationId narrows table to only that agent", async () => {
+  const { getByText, queryByText } = render(AgentTable, {
+    props: {
+      agents: twoAgents,
+      externalFilter: { stationId: "s1" },
+    },
+  });
+
+  await waitFor(() => {
+    expect(getByText("hanuman")).toBeTruthy();
+    expect(queryByText("kubera")).toBeNull();
+  });
+});
+
+test("externalFilter.status narrows table to agents with that status", async () => {
+  const agentStopped = makeAgent({ stationId: "s2", agentName: "kubera", status: "stopped" });
+  const { getByText, queryByText } = render(AgentTable, {
+    props: {
+      agents: [agentWithUpdate, agentStopped],
+      externalFilter: { status: "stopped" },
+    },
+  });
+
+  await waitFor(() => {
+    expect(getByText("kubera")).toBeTruthy();
+    expect(queryByText("hanuman")).toBeNull();
+  });
+});
+
+test("null externalFilter shows all agents", async () => {
+  const { getByText } = render(AgentTable, {
+    props: { agents: twoAgents, externalFilter: null },
+  });
+
+  await waitFor(() => {
+    expect(getByText("hanuman")).toBeTruthy();
+    expect(getByText("kubera")).toBeTruthy();
+  });
 });

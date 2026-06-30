@@ -5,7 +5,42 @@
   import { Badge } from "$lib/components/ui/badge";
   import { toast } from "svelte-sonner";
 
-  let { agents }: { agents: FleetAgent[] } = $props();
+  // ── External filter (from heatmap) ───────────────────────────────────────────
+
+  interface ExternalFilter {
+    stationId?: string;
+    status?: string;
+  }
+
+  let {
+    agents,
+    externalFilter = null,
+  }: {
+    agents: FleetAgent[];
+    externalFilter?: ExternalFilter | null;
+  } = $props();
+
+  // ── Metric formatters ────────────────────────────────────────────────────────
+
+  function formatCpu(cpuPct: number | null): string {
+    if (cpuPct === null) return "—";
+    return `${cpuPct.toFixed(1)}%`;
+  }
+
+  function formatMem(memBytes: number | null): string {
+    if (memBytes === null) return "—";
+    const mb = memBytes / (1024 * 1024);
+    if (mb >= 1024) return `${(mb / 1024).toFixed(1)} GB`;
+    return `${Math.round(mb)} MB`;
+  }
+
+  function formatUptime(uptimeSec: number | null): string {
+    if (uptimeSec === null) return "—";
+    const h = Math.floor(uptimeSec / 3600);
+    const m = Math.floor((uptimeSec % 3600) / 60);
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
+  }
 
   // ── Toolbar state ────────────────────────────────────────────────────────────
 
@@ -29,6 +64,13 @@
 
     if (filterUpdateAvailable) {
       result = result.filter((a) => a.updateAvailable);
+    }
+
+    // External filter from heatmap (stationId takes precedence over status)
+    if (externalFilter?.stationId) {
+      result = result.filter((a) => a.stationId === externalFilter!.stationId);
+    } else if (externalFilter?.status) {
+      result = result.filter((a) => a.status === externalFilter!.status);
     }
 
     return result;
@@ -66,6 +108,16 @@
   function toggleGroup(nodeId: string) {
     collapsedGroups[nodeId] = !collapsedGroups[nodeId];
   }
+
+  // Auto-expand the group that contains the externally selected agent
+  $effect(() => {
+    const sid = externalFilter?.stationId;
+    if (!sid) return;
+    const agent = agents.find((a) => a.stationId === sid);
+    if (agent) {
+      collapsedGroups[agent.nodeId] = false;
+    }
+  });
 
   // ── Per-node update state (mirrors slice-3 pattern from NodesOverview) ────────
 
@@ -134,7 +186,10 @@
           <th class="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground text-left px-3 py-2">Agent</th>
           <th class="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground text-left px-3 py-2 hidden sm:table-cell">Harness</th>
           <th class="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground text-left px-3 py-2 hidden md:table-cell">Node</th>
-          <th class="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground text-left px-3 py-2">Reachability</th>
+          <th class="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground text-left px-3 py-2">Status</th>
+          <th class="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground text-left px-3 py-2 hidden lg:table-cell">CPU</th>
+          <th class="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground text-left px-3 py-2 hidden lg:table-cell">Mem</th>
+          <th class="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground text-left px-3 py-2 hidden lg:table-cell">Uptime</th>
           <th class="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground text-left px-3 py-2 hidden sm:table-cell">Version</th>
           <th class="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground text-left px-3 py-2">Update</th>
         </tr>
@@ -144,7 +199,7 @@
           {#each groupedAgents as group (group.nodeId)}
             <!-- Group header row -->
             <tr class="border-b border-border/20 bg-muted/10">
-              <td colspan="6" class="px-3 py-1.5">
+              <td colspan="9" class="px-3 py-1.5">
                 <button
                   type="button"
                   onclick={() => toggleGroup(group.nodeId)}
@@ -176,9 +231,18 @@
                     <span class="font-mono text-xs text-muted-foreground">{agent.nodeName}</span>
                   </td>
                   <td class="px-3 py-2">
-                    <Badge variant="outline" class={statusBadgeClass(agent.nodeStatus)}>
-                      {agent.nodeStatus}
+                    <Badge variant="outline" class={statusBadgeClass(agent.status)}>
+                      {agent.status}
                     </Badge>
+                  </td>
+                  <td class="px-3 py-2 hidden lg:table-cell" data-testid="cpu-cell">
+                    <span class="font-mono text-xs text-muted-foreground">{formatCpu(agent.cpuPct)}</span>
+                  </td>
+                  <td class="px-3 py-2 hidden lg:table-cell" data-testid="mem-cell">
+                    <span class="font-mono text-xs text-muted-foreground">{formatMem(agent.memBytes)}</span>
+                  </td>
+                  <td class="px-3 py-2 hidden lg:table-cell" data-testid="uptime-cell">
+                    <span class="font-mono text-xs text-muted-foreground">{formatUptime(agent.uptimeSec)}</span>
                   </td>
                   <td class="px-3 py-2 hidden sm:table-cell">
                     <span class="font-mono text-xs text-muted-foreground">{agent.agentVersion ?? "—"}</span>
@@ -218,9 +282,18 @@
                 <span class="font-mono text-xs text-muted-foreground">{agent.nodeName}</span>
               </td>
               <td class="px-3 py-2">
-                <Badge variant="outline" class={statusBadgeClass(agent.nodeStatus)}>
-                  {agent.nodeStatus}
+                <Badge variant="outline" class={statusBadgeClass(agent.status)}>
+                  {agent.status}
                 </Badge>
+              </td>
+              <td class="px-3 py-2 hidden lg:table-cell" data-testid="cpu-cell">
+                <span class="font-mono text-xs text-muted-foreground">{formatCpu(agent.cpuPct)}</span>
+              </td>
+              <td class="px-3 py-2 hidden lg:table-cell" data-testid="mem-cell">
+                <span class="font-mono text-xs text-muted-foreground">{formatMem(agent.memBytes)}</span>
+              </td>
+              <td class="px-3 py-2 hidden lg:table-cell" data-testid="uptime-cell">
+                <span class="font-mono text-xs text-muted-foreground">{formatUptime(agent.uptimeSec)}</span>
               </td>
               <td class="px-3 py-2 hidden sm:table-cell">
                 <span class="font-mono text-xs text-muted-foreground">{agent.agentVersion ?? "—"}</span>

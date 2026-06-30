@@ -5,6 +5,7 @@
   import PageHeader from "$lib/components/page-header.svelte";
   import OverviewStats from "$lib/components/fleet/OverviewStats.svelte";
   import AgentTable from "$lib/components/fleet/AgentTable.svelte";
+  import FleetHeatmap from "$lib/components/fleet/FleetHeatmap.svelte";
   import ConnectBanner from "$lib/components/fleet/connect-banner.svelte";
   import { Skeleton } from "$lib/components/ui/skeleton";
 
@@ -16,6 +17,37 @@
   // Enrollment token state (for empty-state connect banner)
   let lastToken = $state<string | null>(null);
   let isMinting = $state(false);
+
+  // ── Shared heatmap filter ─────────────────────────────────────────────────────
+
+  interface ExternalFilter {
+    stationId?: string;
+    status?: string;
+  }
+
+  let externalFilter = $state<ExternalFilter | null>(null);
+
+  function handleSelectAgent(stationId: string) {
+    externalFilter = { stationId };
+  }
+
+  function handleFilterStatus(status: string) {
+    externalFilter = { status };
+  }
+
+  function clearFilter() {
+    externalFilter = null;
+  }
+
+  let filterLabel = $derived.by(() => {
+    if (!externalFilter) return null;
+    if (externalFilter.stationId) {
+      const agent = agents.find((a) => a.stationId === externalFilter!.stationId);
+      return agent ? `station: ${agent.agentName}` : `station: ${externalFilter.stationId}`;
+    }
+    if (externalFilter.status) return `status: ${externalFilter.status}`;
+    return null;
+  });
 
   async function loadFleet() {
     try {
@@ -86,9 +118,29 @@
       <OverviewStats {stats} />
     {/if}
 
-    <!-- P2: health heatmap slots here -->
+    <!-- Fleet heatmap — one cell per agent, colored by live status -->
+    <div class="cyber-card p-4 space-y-2">
+      <div class="flex items-center justify-between">
+        <span class="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">// fleet health</span>
+        {#if filterLabel}
+          <button
+            type="button"
+            onclick={clearFilter}
+            class="font-mono text-[10px] px-2 py-0.5 rounded border border-primary/40 text-primary bg-primary/10 hover:bg-primary/20 transition-colors"
+            data-testid="clear-filter"
+          >
+            {filterLabel} ✕
+          </button>
+        {/if}
+      </div>
+      <FleetHeatmap
+        {agents}
+        onSelectAgent={handleSelectAgent}
+        onFilterStatus={handleFilterStatus}
+      />
+    </div>
 
     <!-- Agent table — grouped, searchable, filterable -->
-    <AgentTable {agents} />
+    <AgentTable {agents} {externalFilter} />
   {/if}
 </div>

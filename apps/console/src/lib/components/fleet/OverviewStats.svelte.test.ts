@@ -21,6 +21,7 @@ const baseStats: FleetStats = {
   nodes: { total: 3, online: 2 },
   agents: { total: 13 },
   updatesAvailable: 0,
+  running: 0,
 };
 
 test("renders nodes online and total", () => {
