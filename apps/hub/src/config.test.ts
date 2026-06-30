@@ -7,8 +7,8 @@ import { allowedOrigins, isAllowedOrigin } from "./config";
 
 describe("allowedOrigins (single canonical list)", () => {
   it("contains expected default origins", () => {
-    expect(allowedOrigins).toContain("http://localhost:1420");
     expect(allowedOrigins).toContain("http://localhost:5173");
+    expect(allowedOrigins).toContain("https://console.agentpod.dev");
     expect(allowedOrigins).toContain("https://app.agentpod.dev");
   });
 
@@ -19,14 +19,15 @@ describe("allowedOrigins (single canonical list)", () => {
 
 describe("isAllowedOrigin", () => {
   it("returns true for origins in the allowedOrigins list", () => {
+    expect(isAllowedOrigin("https://console.agentpod.dev")).toBe(true);
     expect(isAllowedOrigin("https://app.agentpod.dev")).toBe(true);
-    expect(isAllowedOrigin("http://localhost:1420")).toBe(true);
     expect(isAllowedOrigin("http://localhost:5173")).toBe(true);
   });
 
   it("returns false for origins not in the list", () => {
     expect(isAllowedOrigin("https://malicious.com")).toBe(false);
     expect(isAllowedOrigin("http://localhost:9999")).toBe(false);
+    expect(isAllowedOrigin("http://localhost:1420")).toBe(false); // removed in P2c (no Tauri); localhost is not a LAN IP
   });
 
   it("returns true for missing/empty origin (server-to-server, no CSWSH risk)", () => {
@@ -35,7 +36,7 @@ describe("isAllowedOrigin", () => {
     expect(isAllowedOrigin("")).toBe(true);
   });
 
-  it("returns true for local LAN IP origins (development)", () => {
+  it("returns true for local LAN IP origins (192.168/10.x, any port — dev)", () => {
     expect(isAllowedOrigin("http://192.168.1.50:5173")).toBe(true);
     expect(isAllowedOrigin("http://10.0.1.2:1420")).toBe(true);
   });

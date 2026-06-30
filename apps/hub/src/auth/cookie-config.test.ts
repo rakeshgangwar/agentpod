@@ -40,7 +40,6 @@ describe("allowedOrigins (unified list)", () => {
   });
 
   it("includes localhost dev origins", () => {
-    expect(allowedOrigins).toContain("http://localhost:1420");
     expect(allowedOrigins).toContain("http://localhost:5173");
   });
 });
