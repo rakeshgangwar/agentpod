@@ -2,10 +2,33 @@ import { eq } from "drizzle-orm";
 import { db } from "../db/drizzle";
 import { nodes, provisionedRuntimes } from "../db/schema/nodes";
 import type { NodeSummary } from "@agentpod/contract";
+import { getLatestAgentVersion } from "./agent-version";
 
 export type NodeWithProvisioning = NodeSummary & {
   provisioned: { runtimeId: string; provider: string } | null;
 };
+
+/**
+ * Pure helper — annotates a list of node objects with latestVersion and
+ * updateAvailable without touching the database or the network.
+ *
+ * Exported so it can be unit-tested without a live database.
+ */
+export function annotateWithVersion<
+  T extends { agentVersion: string | null }
+>(
+  rows: T[],
+  latestVersion: string | null
+): (T & { latestVersion: string | null; updateAvailable: boolean })[] {
+  return rows.map((n) => ({
+    ...n,
+    latestVersion,
+    updateAvailable:
+      n.agentVersion != null &&
+      latestVersion != null &&
+      n.agentVersion !== latestVersion,
+  }));
+}
 
 export async function listNodes(userId: string): Promise<NodeWithProvisioning[]> {
   // Left-join provisioned_runtimes on node_id so each node carries its
@@ -29,7 +52,10 @@ export async function listNodes(userId: string): Promise<NodeWithProvisioning[]>
     .leftJoin(provisionedRuntimes, eq(provisionedRuntimes.nodeId, nodes.id))
     .where(eq(nodes.userId, userId));
 
-  return rows.map((n) => ({
+  // Resolve latest version once for the whole batch.
+  const latestVersion = await getLatestAgentVersion();
+
+  const mapped = rows.map((n) => ({
     id: n.id,
     name: n.name,
     hostname: n.hostname,
@@ -45,6 +71,8 @@ export async function listNodes(userId: string): Promise<NodeWithProvisioning[]>
         ? { runtimeId: n.runtimeId, provider: n.runtimeProvider }
         : null,
   }));
+
+  return annotateWithVersion(mapped, latestVersion);
 }
 
 export async function setNodeStatus(
