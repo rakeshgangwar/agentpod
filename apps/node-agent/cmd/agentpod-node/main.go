@@ -1,9 +1,10 @@
 package main
 
-import ("flag"; "fmt"; "os"; "runtime"
+import ("context"; "errors"; "flag"; "fmt"; "os"; "runtime"
   "github.com/rakeshgangwar/agentpod/node-agent/internal/config"
   "github.com/rakeshgangwar/agentpod/node-agent/internal/enroll"
-  "github.com/rakeshgangwar/agentpod/node-agent/internal/host")
+  "github.com/rakeshgangwar/agentpod/node-agent/internal/host"
+  "github.com/rakeshgangwar/agentpod/node-agent/internal/selfupdate")
 
 // version is the agent's build version. Overridden at link time via:
 //
@@ -20,7 +21,7 @@ func alreadyEnrolled(cfg config.Config, loadErr error) bool {
 }
 
 func main() {
-  if len(os.Args) < 2 { fmt.Println("usage: agentpod-node <enroll|run|detect|version>"); os.Exit(2) }
+  if len(os.Args) < 2 { fmt.Println("usage: agentpod-node <enroll|run|detect|update|version>"); os.Exit(2) }
   switch os.Args[1] {
   case "enroll":
     // Idempotency guard: if a valid config already exists on disk, skip the
@@ -44,6 +45,39 @@ func main() {
     runCmd() // implemented in Task 9
   case "detect":
     detectCmd() // debug/ops: print detected stations as JSON
+  case "update":
+    fs := flag.NewFlagSet("update", flag.ExitOnError)
+    check := fs.Bool("check", false, "resolve and report current/latest version, no changes")
+    force := fs.Bool("force", false, "update even when already on the latest version")
+    fs.Parse(os.Args[2:])
+    ctx := context.Background()
+    res, err := selfupdate.Update(ctx, selfupdate.Options{
+      CurrentVersion: version,
+      Force:          *force,
+      CheckOnly:      *check,
+    })
+    if err != nil {
+      if errors.Is(err, selfupdate.ErrRestartFailed) {
+        fmt.Fprintln(os.Stderr, "update: binary swapped but service restart failed:", err)
+        fmt.Fprintln(os.Stderr, "restart the service manually: systemctl restart agentpod-node")
+        os.Exit(1)
+      }
+      fmt.Fprintln(os.Stderr, "update:", err)
+      os.Exit(1)
+    }
+    fmt.Printf("current %s, latest %s\n", res.CurrentVersion, res.LatestTag)
+    switch {
+    case res.Updated:
+      fmt.Printf("updated to %s, restarting…\n", res.LatestTag)
+    case *check:
+      if res.CurrentVersion == res.LatestTag {
+        fmt.Println("up to date")
+      } else {
+        fmt.Printf("update available: %s → %s\n", res.CurrentVersion, res.LatestTag)
+      }
+    default:
+      fmt.Println(res.Reason)
+    }
   case "version":
     fmt.Printf("agentpod-node %s %s/%s\n", version, runtime.GOOS, runtime.GOARCH)
   default:
