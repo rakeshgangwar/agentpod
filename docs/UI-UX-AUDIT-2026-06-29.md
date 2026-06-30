@@ -8,6 +8,16 @@ The console has a coherent identity (mono type, `[bracket]`/`//` cyber motifs, t
 
 **Recurring theme:** the survivors of the OpenCode era (Settings theme customizer, Admin sub-app, the empty-state enroll command) weren't fully re-aligned to the fleet console. A focused "vestige sweep" closes most of this.
 
+## Remediation status (fix sweep, 2026-06-30)
+
+**Fixed + deployed** (`main` `61a85bb`; spec/plan `…/2026-06-30-ui-fix-sweep*`):
+- **F15** — status badges → theme-robust **outline** pattern (`statusBadgeClass` helper across Health/fleet/station-tree/Terminal/LogTail/ActivityPanel); verified legible under Cyberpunk dark.
+- **F2/F5** — connect-banner → curl one-liner; **copy button** on the generated token.
+- **F9–F12** — **admin re-skinned** to the app-shell (PageHeader; removed the hero/theme-toggle/collapse chrome + Agents tab + `routes/admin/agents/` + Sandboxes column + "resource limits" copy); all admin functions intact; verified live.
+- **F1** — global **401 → `/login`** redirect (`handleUnauthorized` in client.ts + admin.ts, loop-guarded).
+
+**Still open (P2 polish, not yet swept):** F3 (empty-state command contrast), F4 (empty-fleet dead space), F6 (token-result placement), F8 (settings column width), F13 (mobile top padding), F14 (a11y pass), F16 (health "—" metrics), F17 (path tooltip), F18 (no Config tab).
+
 ## Findings
 
 ### P1 — should-fix
