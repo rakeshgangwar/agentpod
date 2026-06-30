@@ -22,6 +22,8 @@ import { banCheckMiddleware, signupCheckMiddleware } from './auth/admin-middlewa
 import { cloudflareWebhookRoutes } from './routes/cloudflare-webhook.ts';
 // Node fleet enrollment & registry
 import { nodeEnrollRoutes, nodeRoutes } from './routes/nodes.ts';
+// Fleet aggregate read (Overview home — control-plane P1)
+import { fleetRoutes } from './routes/fleet.ts';
 import { enrollmentTokenRoutes } from './routes/enrollment-tokens.ts';
 // Runtime provisioning routes
 import { runtimeRoutes } from './routes/runtimes.ts';
@@ -92,6 +94,8 @@ const app = new Hono()
   // Node fleet management (authenticated)
   .route('/api/enrollment-tokens', enrollmentTokenRoutes)  // POST /api/enrollment-tokens
   .route('/api/nodes', nodeRoutes)                         // GET /api/nodes
+  // Fleet aggregate read (Overview home — control-plane P1)
+  .route('/api/fleet', fleetRoutes)                        // GET /api/fleet/agents, /api/fleet/stats
   .route('/api/runtimes', runtimeRoutes)                   // CRUD /api/runtimes
   // Station routes (detect, adopt, list, unadopt)
   .route('/api', stationRoutes)                            // GET/POST/DELETE /api/nodes/:id/... and /api/stations/:id
