@@ -1,0 +1,232 @@
+/**
+ * runtimes/page.svelte.test.ts
+ *
+ * Tests for the /runtimes page.
+ * Asserts:
+ *  - renders a PageHeader with title "Runtimes"
+ *  - renders runtime rows (name, provider, status) from a mocked listRuntimes
+ *  - empty state: "no runtimes yet" when listRuntimes returns []
+ *  - destroy button triggers destroyRuntime after confirm dialog
+ *  - error state when listRuntimes rejects
+ */
+
+import { test, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, waitFor, fireEvent, cleanup, screen } from "@testing-library/svelte";
+import * as api from "$lib/api/client";
+
+// ---------------------------------------------------------------------------
+// SvelteKit stubs
+// ---------------------------------------------------------------------------
+
+vi.mock("$app/navigation", () => ({
+  goto: vi.fn(),
+  replaceState: vi.fn(),
+}));
+
+vi.mock("$app/state", () => ({
+  page: {
+    url: { pathname: "/runtimes", searchParams: null },
+  },
+}));
+
+// ---------------------------------------------------------------------------
+// Sonner stub (toast used by destroy/start/stop error handlers)
+// ---------------------------------------------------------------------------
+
+vi.mock("svelte-sonner", () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
+
+// ---------------------------------------------------------------------------
+// Static import — compiled once after all mocks are registered
+// ---------------------------------------------------------------------------
+
+import RuntimesPage from "./+page.svelte";
+
+// ---------------------------------------------------------------------------
+// Fixtures
+// ---------------------------------------------------------------------------
+
+beforeEach(() => vi.restoreAllMocks());
+afterEach(cleanup);
+
+const createdAt = new Date(Date.now() - 5 * 60 * 1000).toISOString(); // 5 min ago
+
+const mockRuntimes = [
+  {
+    id: "rt-aaa111",
+    ownerId: "user-1",
+    provider: "docker" as const,
+    externalId: null,
+    status: "online" as const,
+    nodeId: "node-xyz",
+    name: "my-runtime",
+    resourceTier: "small" as const,
+    harness: "none" as const,
+    createdAt,
+    updatedAt: createdAt,
+  },
+  {
+    id: "rt-bbb222",
+    ownerId: "user-1",
+    provider: "cloudflare" as const,
+    externalId: "cf-ext-1",
+    status: "stopped" as const,
+    nodeId: null,
+    name: "cf-runtime",
+    resourceTier: "medium" as const,
+    harness: "opencode" as const,
+    createdAt,
+    updatedAt: createdAt,
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+test("renders the Runtimes page header", async () => {
+  vi.spyOn(api, "listRuntimes").mockResolvedValue(mockRuntimes);
+  vi.spyOn(api, "listRuntimeProviders").mockResolvedValue({ providers: ["docker"] });
+
+  const { container } = render(RuntimesPage);
+
+  await waitFor(() => {
+    expect(container.textContent).toContain("Runtimes");
+  });
+});
+
+test("renders runtime rows with name, provider, and status after loading", async () => {
+  vi.spyOn(api, "listRuntimes").mockResolvedValue(mockRuntimes);
+  vi.spyOn(api, "listRuntimeProviders").mockResolvedValue({ providers: ["docker"] });
+
+  const { getAllByTestId, getByText } = render(RuntimesPage);
+
+  await waitFor(() => {
+    expect(getByText("my-runtime")).toBeTruthy();
+    expect(getByText("cf-runtime")).toBeTruthy();
+  });
+
+  const rows = getAllByTestId("runtime-row");
+  expect(rows.length).toBe(2);
+
+  const badges = getAllByTestId("status-badge");
+  expect(badges[0].textContent).toContain("online");
+  expect(badges[1].textContent).toContain("stopped");
+});
+
+test("shows provider in each row", async () => {
+  vi.spyOn(api, "listRuntimes").mockResolvedValue(mockRuntimes);
+  vi.spyOn(api, "listRuntimeProviders").mockResolvedValue({ providers: ["docker"] });
+
+  const { getByText } = render(RuntimesPage);
+
+  await waitFor(() => {
+    expect(getByText("docker")).toBeTruthy();
+    expect(getByText("cloudflare")).toBeTruthy();
+  });
+});
+
+test("shows Stop button for online runtime and Start button for stopped runtime", async () => {
+  vi.spyOn(api, "listRuntimes").mockResolvedValue(mockRuntimes);
+  vi.spyOn(api, "listRuntimeProviders").mockResolvedValue({ providers: ["docker"] });
+
+  const { getAllByTestId } = render(RuntimesPage);
+
+  await waitFor(() => {
+    const stopBtns = getAllByTestId("stop-btn");
+    const startBtns = getAllByTestId("start-btn");
+    expect(stopBtns.length).toBe(1); // online runtime
+    expect(startBtns.length).toBe(1); // stopped runtime
+  });
+});
+
+test("shows Destroy buttons for non-provisioning, non-destroyed runtimes", async () => {
+  vi.spyOn(api, "listRuntimes").mockResolvedValue(mockRuntimes);
+  vi.spyOn(api, "listRuntimeProviders").mockResolvedValue({ providers: ["docker"] });
+
+  const { getAllByTestId } = render(RuntimesPage);
+
+  await waitFor(() => {
+    const destroyBtns = getAllByTestId("destroy-btn");
+    expect(destroyBtns.length).toBe(2); // both runtimes qualify
+  });
+});
+
+test("clicking Destroy opens confirm dialog and confirming calls destroyRuntime", async () => {
+  vi.spyOn(api, "listRuntimes").mockResolvedValue(mockRuntimes);
+  vi.spyOn(api, "listRuntimeProviders").mockResolvedValue({ providers: ["docker"] });
+  const destroySpy = vi.spyOn(api, "destroyRuntime").mockResolvedValue(undefined);
+
+  const { getAllByTestId } = render(RuntimesPage);
+
+  // Wait for runtime rows to render
+  await waitFor(() => {
+    expect(getAllByTestId("destroy-btn").length).toBeGreaterThan(0);
+  });
+
+  // Click the first Destroy button (opens the confirm dialog)
+  const [firstDestroyBtn] = getAllByTestId("destroy-btn");
+  await fireEvent.click(firstDestroyBtn);
+
+  // Wait for the confirm button to appear (rendered via dialog portal in document.body)
+  await waitFor(() => {
+    const confirmBtn = screen.getByTestId("confirm-destroy-btn");
+    expect(confirmBtn).toBeTruthy();
+  });
+
+  // Click confirm — triggers destroyRuntime
+  const confirmBtn = screen.getByTestId("confirm-destroy-btn");
+  await fireEvent.click(confirmBtn);
+
+  await waitFor(() => {
+    expect(destroySpy).toHaveBeenCalledOnce();
+    expect(destroySpy).toHaveBeenCalledWith("rt-aaa111");
+  });
+});
+
+test("shows empty state when listRuntimes returns []", async () => {
+  vi.spyOn(api, "listRuntimes").mockResolvedValue([]);
+  vi.spyOn(api, "listRuntimeProviders").mockResolvedValue({ providers: ["docker"] });
+
+  const { getByTestId } = render(RuntimesPage);
+
+  await waitFor(() => {
+    const emptyState = getByTestId("empty-state");
+    expect(emptyState.textContent).toContain("no runtimes yet");
+  });
+});
+
+test("shows empty state CTA button", async () => {
+  vi.spyOn(api, "listRuntimes").mockResolvedValue([]);
+  vi.spyOn(api, "listRuntimeProviders").mockResolvedValue({ providers: ["docker"] });
+
+  const { getByTestId } = render(RuntimesPage);
+
+  await waitFor(() => {
+    const ctaBtn = getByTestId("empty-new-runtime-btn");
+    expect(ctaBtn).toBeTruthy();
+  });
+});
+
+test("shows error message when listRuntimes rejects", async () => {
+  vi.spyOn(api, "listRuntimes").mockRejectedValue(new Error("network error"));
+  vi.spyOn(api, "listRuntimeProviders").mockResolvedValue({ providers: ["docker"] });
+
+  const { getByText } = render(RuntimesPage);
+
+  await waitFor(() => {
+    expect(getByText("network error")).toBeTruthy();
+  });
+});
+
+test("calls listRuntimes on mount", async () => {
+  const spy = vi.spyOn(api, "listRuntimes").mockResolvedValue([]);
+  vi.spyOn(api, "listRuntimeProviders").mockResolvedValue({ providers: ["docker"] });
+
+  render(RuntimesPage);
+
+  await waitFor(() => {
+    expect(spy).toHaveBeenCalledOnce();
+  });
+});

@@ -7,6 +7,7 @@
   import LayoutDashboard from "@lucide/svelte/icons/layout-dashboard";
   import Boxes from "@lucide/svelte/icons/boxes";
   import Server from "@lucide/svelte/icons/server";
+  import ContainerIcon from "@lucide/svelte/icons/container";
   import ActivityIcon from "@lucide/svelte/icons/activity";
   import Settings from "@lucide/svelte/icons/settings";
   import ShieldIcon from "@lucide/svelte/icons/shield";
@@ -53,6 +54,7 @@
         { href: "/", label: "Overview", icon: LayoutDashboard },
         { href: "/agents", label: "Agents", icon: Boxes },
         { href: "/nodes", label: "Nodes", icon: Server },
+        { href: "/runtimes", label: "Runtimes", icon: ContainerIcon },
         { href: "/activity", label: "Activity", icon: ActivityIcon },
       ],
     },
