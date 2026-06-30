@@ -92,6 +92,7 @@ const mockStats = {
   nodes: { online: 1, total: 1 },
   agents: { total: 2 },
   updatesAvailable: 0,
+  running: 1,
 };
 
 // ---------------------------------------------------------------------------

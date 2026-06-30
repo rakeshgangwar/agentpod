@@ -12,7 +12,6 @@
   import PlusIcon from "@lucide/svelte/icons/plus";
   import Loader2Icon from "@lucide/svelte/icons/loader-2";
   import NewRuntimeDialog from "./NewRuntimeDialog.svelte";
-  import ActivityTicker from "./activity-ticker.svelte";
   import ConnectBanner from "./connect-banner.svelte";
   import { statusBadgeClass } from "$lib/utils/status-badge";
 
@@ -186,9 +185,6 @@
       {#if mintError}<p class="text-xs text-destructive">{mintError}</p>{/if}
     </div>
   </div>
-
-  <!-- Fleet activity ticker (self-hides when there is no recent activity) -->
-  <ActivityTicker />
 
   <!-- Enrollment command block (only when nodes/runtimes already exist; in empty state it shows in-place) -->
   {#if lastToken && (nodes.length > 0 || provisioningRuntimes.length > 0)}
