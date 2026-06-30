@@ -327,6 +327,61 @@ func TestRestartService(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Apply: resolve latest → download → verify → swap, NO restart
+// ---------------------------------------------------------------------------
+
+func TestApply(t *testing.T) {
+	const latestTag = "v0.1.3"
+	content := []byte("BINARY_APPLY")
+	correctHash := binaryHash(content)
+
+	srv := makeUpdateServer(latestTag, content, correctHash)
+	defer srv.Close()
+
+	dir := t.TempDir()
+	target := filepath.Join(dir, "agentpod-node")
+	if err := os.WriteFile(target, []byte("OLD"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	var runCalled bool
+	run := func(name string, args ...string) error {
+		runCalled = true
+		return nil
+	}
+
+	res, err := Apply(context.Background(), Options{
+		CurrentVersion:    "v0.1.1",
+		APIBase:           srv.URL,
+		DLBase:            srv.URL,
+		HTTPClient:        srv.Client(),
+		RunCommand:        run,
+		targetPathForTest: target,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !res.Updated {
+		t.Error("Updated should be true")
+	}
+	if res.LatestTag != latestTag {
+		t.Errorf("LatestTag: got %q want %q", res.LatestTag, latestTag)
+	}
+	// Target should now contain the new binary.
+	got, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatalf("read target: %v", err)
+	}
+	if string(got) != string(content) {
+		t.Errorf("target: got %q want %q", got, content)
+	}
+	// Apply must NEVER invoke the restart runner.
+	if runCalled {
+		t.Error("Apply must not invoke the restart RunCommand")
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Steps 11–12: Update orchestration
 // ---------------------------------------------------------------------------
 

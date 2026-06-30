@@ -236,6 +236,71 @@ func restartService(run func(name string, args ...string) error) error {
 	return nil
 }
 
+// applyTag downloads, verifies, and atomically swaps the binary for the given
+// release tag. It does NOT restart the service; callers are responsible for
+// that. This is the shared implementation for both Update and Apply.
+func applyTag(ctx context.Context, opts Options, tag string) (Result, error) {
+	// Resolve the live binary path (handles symlinks such as the "apn" wrapper).
+	var targetPath string
+	if opts.targetPathForTest != "" {
+		targetPath = opts.targetPathForTest
+	} else {
+		exe, err := os.Executable()
+		if err != nil {
+			return Result{}, fmt.Errorf("selfupdate: resolve executable: %w", err)
+		}
+		targetPath, err = filepath.EvalSymlinks(exe)
+		if err != nil {
+			return Result{}, fmt.Errorf("selfupdate: eval symlinks: %w", err)
+		}
+	}
+	targetDir := filepath.Dir(targetPath)
+
+	asset := assetName(runtime.GOOS, runtime.GOARCH)
+
+	tmpPath, err := downloadAndVerify(ctx, opts.HTTPClient, opts.DLBase, tag, asset, targetDir)
+	if err != nil {
+		return Result{}, err
+	}
+
+	if err := swapBinary(targetPath, tmpPath); err != nil {
+		return Result{}, err
+	}
+
+	return Result{
+		CurrentVersion: opts.CurrentVersion,
+		LatestTag:      tag,
+		Updated:        true,
+	}, nil
+}
+
+// Apply resolves the latest GitHub release tag, then downloads, verifies, and
+// atomically swaps the binary. It does NOT restart the service — the caller is
+// responsible for exiting so that the supervisor (e.g. systemd Restart=always)
+// can start the new binary.
+//
+// This is the preferred entry point for programmatic callers such as the
+// gateway "update" verb handler.
+func Apply(ctx context.Context, opts Options) (Result, error) {
+	// Apply defaults.
+	if opts.HTTPClient == nil {
+		opts.HTTPClient = http.DefaultClient
+	}
+	if opts.APIBase == "" {
+		opts.APIBase = "https://api.github.com"
+	}
+	if opts.DLBase == "" {
+		opts.DLBase = "https://github.com"
+	}
+
+	tag, err := LatestTag(ctx, opts.HTTPClient, opts.APIBase)
+	if err != nil {
+		return Result{}, err
+	}
+
+	return applyTag(ctx, opts, tag)
+}
+
 // Update orchestrates a full self-update: resolve latest tag, compare to
 // current version, download+verify the binary, swap it in, restart the service.
 func Update(ctx context.Context, opts Options) (Result, error) {
@@ -275,38 +340,15 @@ func Update(ctx context.Context, opts Options) (Result, error) {
 		return res, nil
 	}
 
-	// Resolve the live binary path (handles symlinks such as the "apn" wrapper).
-	var targetPath string
-	if opts.targetPathForTest != "" {
-		targetPath = opts.targetPathForTest
-	} else {
-		exe, err := os.Executable()
-		if err != nil {
-			return Result{}, fmt.Errorf("selfupdate: resolve executable: %w", err)
-		}
-		targetPath, err = filepath.EvalSymlinks(exe)
-		if err != nil {
-			return Result{}, fmt.Errorf("selfupdate: eval symlinks: %w", err)
-		}
-	}
-	targetDir := filepath.Dir(targetPath)
-
-	asset := assetName(runtime.GOOS, runtime.GOARCH)
-
-	tmpPath, err := downloadAndVerify(ctx, opts.HTTPClient, opts.DLBase, tag, asset, targetDir)
+	updated, err := applyTag(ctx, opts, tag)
 	if err != nil {
 		return Result{}, err
 	}
 
-	if err := swapBinary(targetPath, tmpPath); err != nil {
-		return Result{}, err
-	}
-
 	// Restart the service. Even if this fails the binary has been updated.
-	res.Updated = true
 	if err := restartService(opts.RunCommand); err != nil {
-		return res, err
+		return updated, err
 	}
 
-	return res, nil
+	return updated, nil
 }
