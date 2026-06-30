@@ -20,6 +20,25 @@ const (
 	backoffCap = 30 * time.Second
 )
 
+// healthTickInterval is the cadence at which the agent pushes station health
+// frames to the hub. Exported as a package-level var so tests can override it
+// without touching production code paths.
+var healthTickInterval = 30 * time.Second
+
+// HealthReport is a single station's health snapshot inside a health push frame.
+// Metrics fields are nullable (pointer) so they can be omitted as JSON null when
+// not available. OK=false signals that Health(key) returned an error; in that
+// case all metric fields are nil.
+type HealthReport struct {
+	Key       string   `json:"key"`
+	OK        bool     `json:"ok"`
+	Running   bool     `json:"running"`
+	PID       *int     `json:"pid"`
+	CPUPct    *float64 `json:"cpuPct"`
+	MemBytes  *int64   `json:"memBytes"`
+	UptimeSec *int64   `json:"uptimeSec"`
+}
+
 // wsURL derives the WebSocket gateway URL from the hub's HTTP(S) URL.
 // https://host → wss://host/public/nodes/gateway
 // http://host  → ws://host/public/nodes/gateway
@@ -112,10 +131,12 @@ func runWithOpts(ctx context.Context, cfg config.Config, h Handler, opts runOpti
 // successful connection. It exits only when ctx is cancelled.
 // version is included in the hello frame sent on each connection; use "dev"
 // when not built with ldflags.
-func Run(ctx context.Context, cfg config.Config, h Handler, version string) error {
+// gatherHealth is called on each health tick to collect per-station snapshots;
+// if nil no health frames are pushed (old-node compat / tests that don't care).
+func Run(ctx context.Context, cfg config.Config, h Handler, version string, gatherHealth func() []HealthReport) error {
 	return runWithOpts(ctx, cfg, h, runOptions{
 		dialFn: func(ctx context.Context, cfg config.Config, h Handler, onConnected func()) error {
-			return connectOnce(ctx, cfg, h, onConnected, version)
+			return connectOnce(ctx, cfg, h, onConnected, version, gatherHealth)
 		},
 		sleepFn:  defaultSleep,
 		jitterFn: defaultJitter,
@@ -127,7 +148,10 @@ func Run(ctx context.Context, cfg config.Config, h Handler, version string) erro
 // is cancelled. onConnected is called immediately after the hello is sent so
 // the caller can reset the backoff counter. version is embedded in the hello
 // frame as the "version" field so the hub can record the agent's build version.
-func connectOnce(ctx context.Context, cfg config.Config, h Handler, onConnected func(), version string) error {
+// gatherHealth, if non-nil, is called on each health tick (healthTickInterval)
+// and the result is pushed as a {"type":"health","stations":[...]} frame. The
+// health ticker runs in its own goroutine, independent of the heartbeat path.
+func connectOnce(ctx context.Context, cfg config.Config, h Handler, onConnected func(), version string, gatherHealth func() []HealthReport) error {
 	c, _, err := websocket.Dial(ctx, wsURL(cfg.Hub), &websocket.DialOptions{
 		HTTPHeader: map[string][]string{"Authorization": {"Bearer " + cfg.NodeID + ":" + cfg.NodeSecret}},
 	})
@@ -150,6 +174,29 @@ func connectOnce(ctx context.Context, cfg config.Config, h Handler, onConnected 
 
 	// Start the inbound read-loop; shares writeMu with the heartbeat below.
 	go serve(ctx, c, h, &writeMu)
+
+	// Health ticker — runs in its own goroutine, entirely separate from the
+	// heartbeat path, so a slow gatherHealth call never delays heartbeats.
+	if gatherHealth != nil {
+		go func() {
+			ht := time.NewTicker(healthTickInterval)
+			defer ht.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ht.C:
+					frame, _ := json.Marshal(map[string]any{
+						"type":     "health",
+						"stations": gatherHealth(),
+					})
+					writeMu.Lock()
+					_ = c.Write(ctx, websocket.MessageText, frame)
+					writeMu.Unlock()
+				}
+			}
+		}()
+	}
 
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()

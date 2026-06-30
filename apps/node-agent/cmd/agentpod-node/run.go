@@ -70,7 +70,36 @@ func runCmd() {
 		}
 	})
 
+	// gatherHealth enumerates all detected stations and collects a point-in-time
+	// health snapshot for each one. Called by the gateway health ticker (~30 s).
+	gatherHealth := func() []gateway.HealthReport {
+		stations := reg.DetectAll()
+		reports := make([]gateway.HealthReport, 0, len(stations))
+		for _, s := range stations {
+			d, err := reg.For(s.Key)
+			if err != nil {
+				reports = append(reports, gateway.HealthReport{Key: s.Key, OK: false})
+				continue
+			}
+			h, err := d.Health(s.Key)
+			if err != nil {
+				reports = append(reports, gateway.HealthReport{Key: s.Key, OK: false})
+				continue
+			}
+			reports = append(reports, gateway.HealthReport{
+				Key:       s.Key,
+				OK:        true,
+				Running:   h.Running,
+				PID:       h.PID,
+				CPUPct:    h.CpuPct,
+				MemBytes:  h.MemBytes,
+				UptimeSec: h.UptimeSec,
+			})
+		}
+		return reports
+	}
+
 	h := gateway.NewTerminalHandler(descriptor.NewHandler(reg), resolver, mgr, lifecycleFn)
 	h = gateway.NewUpdateHandler(h, version)
-	gateway.Run(ctx, cfg, h, version)
+	gateway.Run(ctx, cfg, h, version, gatherHealth)
 }
