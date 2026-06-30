@@ -62,6 +62,10 @@
     return `${s}s`;
   }
 
+  // True when the health note indicates the metrics belong to the shared gateway
+  // process (composite OpenClaw stations where all subagents share one process).
+  let isGateway = $derived(health?.note?.includes("gateway") ?? false);
+
   async function doLifecycle(action: "start" | "stop" | "restart") {
     actionInFlight = true;
     actionError = null;
@@ -126,21 +130,25 @@
         <!-- PID -->
         <div class="flex flex-col gap-1">
           <dt class="text-xs font-medium text-muted-foreground uppercase tracking-wide">PID</dt>
-          <dd class="font-mono text-sm text-foreground">{fmt(health.pid)}</dd>
+          <dd class="font-mono text-sm text-foreground">
+            {fmt(health.pid)}{#if isGateway && health.pid !== null}<span class="text-muted-foreground text-xs ml-1">(gateway)</span>{/if}
+          </dd>
         </div>
 
         <!-- CPU -->
         <div class="flex flex-col gap-1">
           <dt class="text-xs font-medium text-muted-foreground uppercase tracking-wide">CPU</dt>
           <dd class="font-mono text-sm text-foreground">
-            {health.cpuPct !== null ? `${health.cpuPct}%` : "—"}
+            {health.cpuPct !== null ? `${health.cpuPct}%` : "—"}{#if isGateway && health.cpuPct !== null}<span class="text-muted-foreground text-xs ml-1">(gateway)</span>{/if}
           </dd>
         </div>
 
         <!-- Memory -->
         <div class="flex flex-col gap-1">
           <dt class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Memory</dt>
-          <dd class="font-mono text-sm text-foreground">{fmtBytes(health.memBytes)}</dd>
+          <dd class="font-mono text-sm text-foreground">
+            {fmtBytes(health.memBytes)}{#if isGateway && health.memBytes !== null}<span class="text-muted-foreground text-xs ml-1">(gateway)</span>{/if}
+          </dd>
         </div>
 
         <!-- Disk -->
@@ -152,7 +160,9 @@
         <!-- Uptime -->
         <div class="flex flex-col gap-1">
           <dt class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Uptime</dt>
-          <dd class="font-mono text-sm text-foreground">{fmtUptime(health.uptimeSec)}</dd>
+          <dd class="font-mono text-sm text-foreground">
+            {fmtUptime(health.uptimeSec)}{#if isGateway && health.uptimeSec !== null}<span class="text-muted-foreground text-xs ml-1">(gateway)</span>{/if}
+          </dd>
         </div>
 
         <!-- Last Activity -->
