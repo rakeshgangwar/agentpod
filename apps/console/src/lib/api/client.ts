@@ -224,6 +224,18 @@ export interface AuditRow {
 
 export const listFleetActivity = () => http<AuditRow[]>("/api/activity");
 
+/** Minimal shape returned by GET /api/activity (fleet-wide audit rows). */
+export type ActivityRow = {
+  id: string;
+  verb: string;
+  stationKey?: string;
+  nodeId?: string;
+  result?: string;
+  createdAt: string;
+};
+
+export const listActivity = () => http<ActivityRow[]>("/api/activity");
+
 // ─── Cleanup endpoints ────────────────────────────────────────────────────────
 
 export type CleanupItem = { path: string; size: number; kind: string };

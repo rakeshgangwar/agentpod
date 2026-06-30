@@ -85,7 +85,7 @@
     }
     if (action) {
       try {
-        replaceState("/", {});
+        replaceState("/nodes", {});
       } catch {
         // non-critical in environments where history is unavailable
       }
@@ -154,8 +154,8 @@
   <!-- Header row -->
   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
     <div>
-      <h2 class="text-2xl font-bold tracking-tight">Fleet Overview</h2>
-      <p class="text-sm text-muted-foreground font-mono">// connected nodes</p>
+      <h2 class="text-2xl font-bold tracking-tight">Nodes</h2>
+      <p class="text-sm text-muted-foreground font-mono">// connected machines</p>
     </div>
     <div class="flex flex-col items-start sm:items-end gap-2">
       <div class="flex gap-2 flex-wrap justify-end">

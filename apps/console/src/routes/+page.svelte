@@ -1,11 +1,13 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { goto } from "$app/navigation";
   import { getFleet, createEnrollmentToken } from "$lib/api/client";
   import type { FleetStats, FleetAgent } from "@agentpod/contract";
   import PageHeader from "$lib/components/page-header.svelte";
   import OverviewStats from "$lib/components/fleet/OverviewStats.svelte";
-  import AgentTable from "$lib/components/fleet/AgentTable.svelte";
   import FleetHeatmap from "$lib/components/fleet/FleetHeatmap.svelte";
+  import NeedsAttention from "$lib/components/fleet/NeedsAttention.svelte";
+  import RecentActivity from "$lib/components/fleet/RecentActivity.svelte";
   import ConnectBanner from "$lib/components/fleet/connect-banner.svelte";
   import { Skeleton } from "$lib/components/ui/skeleton";
 
@@ -18,36 +20,15 @@
   let lastToken = $state<string | null>(null);
   let isMinting = $state(false);
 
-  // ── Shared heatmap filter ─────────────────────────────────────────────────────
-
-  interface ExternalFilter {
-    stationId?: string;
-    status?: string;
-  }
-
-  let externalFilter = $state<ExternalFilter | null>(null);
+  // ── Heatmap navigation callbacks ──────────────────────────────────────────────
 
   function handleSelectAgent(stationId: string) {
-    externalFilter = { stationId };
+    goto("/agents?station=" + stationId);
   }
 
   function handleFilterStatus(status: string) {
-    externalFilter = { status };
+    goto("/agents?status=" + status);
   }
-
-  function clearFilter() {
-    externalFilter = null;
-  }
-
-  let filterLabel = $derived.by(() => {
-    if (!externalFilter) return null;
-    if (externalFilter.stationId) {
-      const agent = agents.find((a) => a.stationId === externalFilter!.stationId);
-      return agent ? `station: ${agent.agentName}` : `station: ${externalFilter.stationId}`;
-    }
-    if (externalFilter.status) return `status: ${externalFilter.status}`;
-    return null;
-  });
 
   async function loadFleet() {
     try {
@@ -118,21 +99,9 @@
       <OverviewStats {stats} />
     {/if}
 
-    <!-- Fleet heatmap — one cell per agent, colored by live status -->
+    <!-- Fleet heatmap — clicking a cell navigates to /agents filtered by that station -->
     <div class="cyber-card p-4 space-y-2">
-      <div class="flex items-center justify-between">
-        <span class="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">// fleet health</span>
-        {#if filterLabel}
-          <button
-            type="button"
-            onclick={clearFilter}
-            class="font-mono text-[10px] px-2 py-0.5 rounded border border-primary/40 text-primary bg-primary/10 hover:bg-primary/20 transition-colors"
-            data-testid="clear-filter"
-          >
-            {filterLabel} ✕
-          </button>
-        {/if}
-      </div>
+      <span class="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">// fleet health</span>
       <FleetHeatmap
         {agents}
         onSelectAgent={handleSelectAgent}
@@ -140,7 +109,10 @@
       />
     </div>
 
-    <!-- Agent table — grouped, searchable, filterable -->
-    <AgentTable {agents} {externalFilter} />
+    <!-- Dashboard panels: Needs Attention + Recent Activity -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <NeedsAttention {agents} />
+      <RecentActivity />
+    </div>
   {/if}
 </div>

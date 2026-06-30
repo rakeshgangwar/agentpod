@@ -5,6 +5,7 @@
   import { BottomNav, BottomNavItem } from "$lib/components/ui/bottom-nav";
   import { auth } from "$lib/stores/auth.svelte";
   import LayoutDashboard from "@lucide/svelte/icons/layout-dashboard";
+  import Boxes from "@lucide/svelte/icons/boxes";
   import Server from "@lucide/svelte/icons/server";
   import Settings from "@lucide/svelte/icons/settings";
   import ShieldIcon from "@lucide/svelte/icons/shield";
@@ -49,6 +50,7 @@
       label: "Fleet",
       items: [
         { href: "/", label: "Overview", icon: LayoutDashboard },
+        { href: "/agents", label: "Agents", icon: Boxes },
         { href: "/nodes", label: "Nodes", icon: Server },
       ],
     },

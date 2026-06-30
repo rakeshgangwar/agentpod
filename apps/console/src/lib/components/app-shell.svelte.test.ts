@@ -137,3 +137,22 @@ test("Settings nav item is always present", () => {
   const settingsLinks = linksTo(container, "/settings");
   expect(settingsLinks.length).toBeGreaterThan(0);
 });
+
+test("renders an Agents nav item with href='/agents'", () => {
+  const { container } = render(AppShell);
+  const agentLinks = linksTo(container, "/agents");
+  expect(agentLinks.length).toBeGreaterThan(0);
+});
+
+test("Agents nav item appears in the Fleet group (between Overview and Nodes)", () => {
+  const { container } = render(AppShell);
+  const navLinks = getAllLinks(container);
+  const hrefs = navLinks.map((a) => a.getAttribute("href"));
+  const overviewIdx = hrefs.indexOf("/");
+  const agentsIdx = hrefs.indexOf("/agents");
+  const nodesIdx = hrefs.indexOf("/nodes");
+  // All three must be present and in order: Overview → Agents → Nodes
+  expect(overviewIdx).toBeGreaterThanOrEqual(0);
+  expect(agentsIdx).toBeGreaterThan(overviewIdx);
+  expect(nodesIdx).toBeGreaterThan(agentsIdx);
+});
