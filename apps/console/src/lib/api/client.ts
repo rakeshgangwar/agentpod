@@ -1,4 +1,4 @@
-import type { NodeSummary, DetectedStation, StationHealth, FsEntry, ProvisionedRuntime } from "@agentpod/contract";
+import type { NodeSummary, DetectedStation, StationHealth, FsEntry, ProvisionedRuntime, FleetAgent, FleetStats } from "@agentpod/contract";
 import { goto } from "$app/navigation";
 import { clearAuthSession } from "$lib/stores/auth.svelte";
 
@@ -41,6 +41,11 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
   const text = await res.text();
   return (text ? JSON.parse(text) : undefined) as T;
 }
+
+// ─── Fleet aggregate endpoints ────────────────────────────────────────────────
+
+export const getFleet = () =>
+  http<{ stats: FleetStats; agents: FleetAgent[] }>("/api/fleet/agents");
 
 // ─── Node endpoints ───────────────────────────────────────────────────────────
 

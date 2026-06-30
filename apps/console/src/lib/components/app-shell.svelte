@@ -4,14 +4,21 @@
   import { cn } from "$lib/utils";
   import { BottomNav, BottomNavItem } from "$lib/components/ui/bottom-nav";
   import { auth } from "$lib/stores/auth.svelte";
+  import LayoutDashboard from "@lucide/svelte/icons/layout-dashboard";
   import Server from "@lucide/svelte/icons/server";
   import Settings from "@lucide/svelte/icons/settings";
   import ShieldIcon from "@lucide/svelte/icons/shield";
+
   interface NavItem {
     href: string;
     label: string;
     icon: Component<{ class?: string }>;
     adminOnly?: boolean;
+  }
+
+  interface NavGroup {
+    label: string;
+    items: NavItem[];
   }
 
   interface Props {
@@ -36,10 +43,21 @@
 
   let isAdmin = $derived(auth.user?.role === "admin");
 
-  // Primary nav items — shared between mobile BottomNav and desktop side nav
-  const baseNavItems: NavItem[] = [
-    { href: "/", label: "Fleet", icon: Server },
-    { href: "/settings", label: "Settings", icon: Settings },
+  // Resource-typed nav groups for the desktop sidebar
+  const baseNavGroups: NavGroup[] = [
+    {
+      label: "Fleet",
+      items: [
+        { href: "/", label: "Overview", icon: LayoutDashboard },
+        { href: "/nodes", label: "Nodes", icon: Server },
+      ],
+    },
+    {
+      label: "System",
+      items: [
+        { href: "/settings", label: "Settings", icon: Settings },
+      ],
+    },
   ];
 
   const adminNavItem: NavItem = {
@@ -49,8 +67,17 @@
     adminOnly: true,
   };
 
-  // Reactive list — recomputes when isAdmin changes
-  let navItems = $derived([...baseNavItems, ...(isAdmin ? [adminNavItem] : [])]);
+  // Reactive nav groups — System group gains Admin when user is admin
+  let navGroups = $derived(
+    baseNavGroups.map((g) =>
+      g.label === "System" && isAdmin
+        ? { ...g, items: [...g.items, adminNavItem] }
+        : g
+    )
+  );
+
+  // Flat list for the mobile BottomNav (derived from groups, same reactivity)
+  let navItems = $derived(navGroups.flatMap((g) => g.items));
 
   // ---------------------------------------------------------------------------
   // Active-link helper (mirrors BottomNavItem logic)
@@ -94,30 +121,38 @@
       </div>
     </div>
 
-    <!-- Nav items -->
-    <nav class="flex-1 p-2 space-y-0.5 overflow-y-auto">
-      {#each navItems as item (item.href)}
-        {@const active = isActive(item.href)}
-        <a
-          href={item.href}
-          class={cn(
-            "flex items-center gap-3 px-2 py-2.5 rounded-sm",
-            "font-mono text-sm transition-colors",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            active
-              ? "text-primary bg-primary/8"
-              : "text-muted-foreground hover:text-foreground hover:bg-accent/50",
-          )}
-          aria-current={active ? "page" : undefined}
-        >
-          <item.icon
-            class={cn(
-              "h-5 w-5 shrink-0 transition-transform",
-              active && "scale-110",
-            )}
-          />
-          <span class="hidden lg:block truncate">{item.label}</span>
-        </a>
+    <!-- Nav items — grouped with uppercase section labels -->
+    <nav class="flex-1 p-2 overflow-y-auto">
+      {#each navGroups as group (group.label)}
+        <!-- Group label — hidden on collapsed (icon-only) sidebar -->
+        <p class="hidden lg:block font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground/50 px-2 pt-3 pb-1 first:pt-1">
+          {group.label}
+        </p>
+        <div class="space-y-0.5 mb-1">
+          {#each group.items as item (item.href)}
+            {@const active = isActive(item.href)}
+            <a
+              href={item.href}
+              class={cn(
+                "flex items-center gap-3 px-2 py-2.5 rounded-sm",
+                "font-mono text-sm transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                active
+                  ? "text-primary bg-primary/8"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent/50",
+              )}
+              aria-current={active ? "page" : undefined}
+            >
+              <item.icon
+                class={cn(
+                  "h-5 w-5 shrink-0 transition-transform",
+                  active && "scale-110",
+                )}
+              />
+              <span class="hidden lg:block truncate">{item.label}</span>
+            </a>
+          {/each}
+        </div>
       {/each}
     </nav>
 
