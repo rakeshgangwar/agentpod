@@ -99,14 +99,20 @@ DEST_BIN="$BIN_DIR/agentpod-node"
 
 echo "==> Downloading agentpod-node-${OS}-${ARCH}..."
 BINARY_URL="${DOWNLOAD_BASE}/agentpod-node-${OS}-${ARCH}"
-if ! curl -fSL --progress-bar -o "$DEST_BIN" "$BINARY_URL"; then
+# Download to a sibling temp file, then atomically rename over the destination.
+# Writing directly to $DEST_BIN fails with ETXTBSY when re-running while the
+# service holds the running binary open; rename replaces the path safely.
+TMP_BIN="${DEST_BIN}.new.$$"
+if ! curl -fSL --progress-bar -o "$TMP_BIN" "$BINARY_URL"; then
+  rm -f "$TMP_BIN"
   echo "" >&2
   echo "ERROR: download failed: ${BINARY_URL}" >&2
   echo "       Make sure a release exists for this version/arch:" >&2
   echo "       https://github.com/${REPO}/releases" >&2
   exit 1
 fi
-chmod 0755 "$DEST_BIN"
+chmod 0755 "$TMP_BIN"
+mv -f "$TMP_BIN" "$DEST_BIN"
 ln -sf "$DEST_BIN" "$BIN_DIR/apn"
 echo "    Installed to ${DEST_BIN}  (alias: apn)"
 
