@@ -50,7 +50,7 @@ func (h *updateHandler) Handle(
 
 	res, err := h.apply(ctx, selfupdate.Options{CurrentVersion: h.version})
 	if err != nil {
-		return map[string]any{"ok": false, "error": err.Error()}, true, nil
+		return map[string]any{"ok": false, "error": err.Error()}, false, nil
 	}
 
 	// Respond to the hub before exiting so it can mark the node as updating.
@@ -60,7 +60,7 @@ func (h *updateHandler) Handle(
 		h.exit(0)
 	}()
 
-	return map[string]any{"ok": true, "updating": true, "tag": res.LatestTag}, true, nil
+	return map[string]any{"ok": true, "updating": true, "tag": res.LatestTag}, false, nil
 }
 
 // HandleFrame forwards inbound terminal input/resize frames to the inner handler

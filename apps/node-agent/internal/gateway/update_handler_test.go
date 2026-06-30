@@ -44,8 +44,13 @@ func TestUpdateHandler_UpdateVerb(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !handled {
-		t.Error("expected handled=true")
+	// update must NOT be streamed: it is a one-shot RPC whose result map is sent
+	// as a `res` frame. The hub issues it via broker.request(), which only
+	// resolves on a `res` frame — a streamed (stream-eof) reply is never matched,
+	// so the request hangs until the node exits to restart and is then reported
+	// as a false "node disconnected" failure even though the update succeeded.
+	if handled {
+		t.Error("update must return streamed=false so the dispatcher emits a res frame the hub can resolve")
 	}
 
 	m, ok := result.(map[string]any)
