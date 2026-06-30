@@ -15,12 +15,10 @@
   import * as Select from "$lib/components/ui/select";
   import * as Dialog from "$lib/components/ui/dialog";
   import PageHeader from "$lib/components/page-header.svelte";
-  import ThemeToggle from "$lib/components/theme-toggle.svelte";
 
   // Icons
   import UserIcon from "@lucide/svelte/icons/user";
   import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
-  import HomeIcon from "@lucide/svelte/icons/home";
   import ShieldIcon from "@lucide/svelte/icons/shield";
   import BanIcon from "@lucide/svelte/icons/ban";
   import CheckIcon from "@lucide/svelte/icons/check";
@@ -135,33 +133,17 @@
     title={user?.name || user?.email || "User Details"}
     icon={UserIcon}
     subtitle={user?.email || "Loading..."}
-    sticky={false}
-    collapsible={true}
   >
     {#snippet leading()}
-      <div class="flex items-center gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          onclick={() => goto("/")}
-          class="h-8 w-8 border border-border/30 hover:border-primary hover:text-primary"
-          title="Home"
-        >
-          <HomeIcon class="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onclick={() => goto("/admin")}
-          class="h-8 w-8 border border-border/30 hover:border-primary hover:text-primary"
-          title="Back to Admin"
-        >
-          <ArrowLeftIcon class="h-4 w-4" />
-        </Button>
-      </div>
-    {/snippet}
-    {#snippet actions()}
-      <ThemeToggle />
+      <Button
+        variant="ghost"
+        size="icon"
+        onclick={() => goto("/admin/users")}
+        class="h-8 w-8 border border-border/30 hover:border-primary hover:text-primary"
+        title="Back to Users"
+      >
+        <ArrowLeftIcon class="h-4 w-4" />
+      </Button>
     {/snippet}
   </PageHeader>
 

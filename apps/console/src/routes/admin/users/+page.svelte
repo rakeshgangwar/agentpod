@@ -22,12 +22,8 @@
   import * as Select from "$lib/components/ui/select";
   import * as Dialog from "$lib/components/ui/dialog";
   import PageHeader from "$lib/components/page-header.svelte";
-  import type { Tab } from "$lib/components/page-header.svelte";
-  import ThemeToggle from "$lib/components/theme-toggle.svelte";
 
   import UsersIcon from "@lucide/svelte/icons/users";
-  import BotIcon from "@lucide/svelte/icons/bot";
-  import HomeIcon from "@lucide/svelte/icons/home";
   import SearchIcon from "@lucide/svelte/icons/search";
   import RefreshIcon from "@lucide/svelte/icons/refresh-cw";
   import ShieldIcon from "@lucide/svelte/icons/shield";
@@ -75,19 +71,6 @@
   let newUserName = $state("");
   let newUserRole = $state<UserRole>("user");
   let createUserLoading = $state(false);
-
-  const tabs: Tab[] = [
-    { id: "users", label: "Users", icon: UsersIcon },
-    { id: "agents", label: "Agents", icon: BotIcon },
-  ];
-  let activeTab = $state("users");
-
-  function handleTabChange(tab: string) {
-    if (tab === "agents") {
-      goto("/admin/agents");
-    }
-    activeTab = tab;
-  }
 
   // Load data
   async function loadData() {
@@ -283,30 +266,10 @@
 <main class="h-screen flex flex-col grid-bg mesh-gradient overflow-hidden">
   <!-- Header -->
   <PageHeader
-    title="Admin Panel"
+    title="Admin"
     icon={ShieldIcon}
-    subtitle="Manage users, resource limits, and system settings"
-    tabs={tabs}
-    activeTab={activeTab}
-    onTabChange={handleTabChange}
-    sticky={false}
-    collapsible={true}
-  >
-    {#snippet leading()}
-      <Button 
-        variant="ghost" 
-        size="icon"
-        onclick={() => goto("/")}
-        class="h-8 w-8 border border-border/30 hover:border-primary hover:text-primary"
-        title="Home"
-      >
-        <HomeIcon class="h-4 w-4" />
-      </Button>
-    {/snippet}
-    {#snippet actions()}
-      <ThemeToggle />
-    {/snippet}
-  </PageHeader>
+    subtitle="// user management"
+  />
 
   <!-- Content -->
   <div class="flex-1 overflow-y-auto">
@@ -487,7 +450,6 @@
                   <th class="text-left px-4 py-3 font-mono text-xs uppercase tracking-wider text-muted-foreground">User</th>
                   <th class="text-left px-4 py-3 font-mono text-xs uppercase tracking-wider text-muted-foreground">Role</th>
                   <th class="text-left px-4 py-3 font-mono text-xs uppercase tracking-wider text-muted-foreground">Status</th>
-                  <th class="text-left px-4 py-3 font-mono text-xs uppercase tracking-wider text-muted-foreground">Sandboxes</th>
                   <th class="text-left px-4 py-3 font-mono text-xs uppercase tracking-wider text-muted-foreground">Joined</th>
                   <th class="text-right px-4 py-3 font-mono text-xs uppercase tracking-wider text-muted-foreground">Actions</th>
                 </tr>
@@ -543,14 +505,6 @@
                           </span>
                         {/if}
                       </div>
-                    </td>
-
-                    <!-- Sandboxes -->
-                    <td class="px-4 py-3 font-mono text-sm">
-                      {user.sandboxCount}
-                      {#if user.runningSandboxCount > 0}
-                        <span class="text-chart-2">({user.runningSandboxCount} running)</span>
-                      {/if}
                     </td>
 
                     <!-- Joined -->
