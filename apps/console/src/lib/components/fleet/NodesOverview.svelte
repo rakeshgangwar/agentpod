@@ -13,6 +13,7 @@
   import NewRuntimeDialog from "./NewRuntimeDialog.svelte";
   import ActivityTicker from "./activity-ticker.svelte";
   import ConnectBanner from "./connect-banner.svelte";
+  import { statusBadgeClass } from "$lib/utils/status-badge";
 
   let nodes = $state<NodeSummary[]>([]);
   let isLoading = $state(true);
@@ -108,6 +109,22 @@
     showNewRuntimeDialog = false;
     await loadData();
   }
+
+  // ── Copy-to-clipboard for enrollment command ───────────────────────────────
+  let copied = $state(false);
+  let copyTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  function handleCopyEnrollCmd() {
+    const cmd = `curl -fsSL https://github.com/rakeshgangwar/agentpod/releases/latest/download/install.sh | sudo bash -s -- ${resolvedHubUrl()} ${lastToken}`;
+    navigator.clipboard.writeText(cmd).then(() => {
+      copied = true;
+      if (copyTimeout) clearTimeout(copyTimeout);
+      copyTimeout = setTimeout(() => {
+        copied = false;
+        copyTimeout = null;
+      }, 2000);
+    });
+  }
 </script>
 
 <section class="space-y-6">
@@ -154,9 +171,22 @@
   {#if lastToken}
     <div class="cyber-card p-4 space-y-2">
       <p class="text-xs font-mono text-muted-foreground">// run this on the target node to connect it</p>
-      <code class="block text-sm font-mono break-all text-primary">
-        curl -fsSL https://github.com/rakeshgangwar/agentpod/releases/latest/download/install.sh | sudo bash -s -- {resolvedHubUrl()} {lastToken}
-      </code>
+      <div class="flex items-start gap-2">
+        <code class="flex-1 block text-sm font-mono break-all text-primary">
+          curl -fsSL https://github.com/rakeshgangwar/agentpod/releases/latest/download/install.sh | sudo bash -s -- {resolvedHubUrl()} {lastToken}
+        </code>
+        <button
+          type="button"
+          onclick={handleCopyEnrollCmd}
+          class="shrink-0 font-mono text-[10px] uppercase tracking-wider px-2 py-1 rounded border transition-colors
+            {copied
+              ? 'border-chart-2 text-chart-2 bg-chart-2/10'
+              : 'border-primary/40 text-primary/70 hover:border-primary hover:text-primary bg-transparent'}"
+          aria-label="Copy enrollment command"
+        >
+          {copied ? "copied ✓" : "copy"}
+        </button>
+      </div>
     </div>
   {/if}
 
@@ -224,10 +254,8 @@
                   {node.hostname}
                 </Card.Title>
                 <Badge
-                  variant={node.status === "online" ? "default" : "secondary"}
-                  class={node.status === "online"
-                    ? "shrink-0 bg-chart-2 text-black border-transparent"
-                    : "shrink-0"}
+                  variant="outline"
+                  class="shrink-0 {statusBadgeClass(node.status)}"
                 >
                   {node.status}
                 </Badge>

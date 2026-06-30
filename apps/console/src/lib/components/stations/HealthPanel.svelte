@@ -6,6 +6,7 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import type { StationHealth } from "@agentpod/contract";
+  import { statusBadgeClass } from "$lib/utils/status-badge";
 
   interface Props {
     stationId: string;
@@ -114,10 +115,8 @@
           <dt class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</dt>
           <dd>
             <Badge
-              variant={health.running ? "default" : "secondary"}
-              class={health.running
-                ? "bg-chart-2 text-chart-2 border-transparent"
-                : ""}
+              variant="outline"
+              class={statusBadgeClass(health.running ? "running" : "stopped")}
             >
               {health.running ? "Running" : "Stopped"}
             </Badge>

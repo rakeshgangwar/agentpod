@@ -8,6 +8,7 @@
   import ProvisionedNodeControls from "$lib/components/fleet/ProvisionedNodeControls.svelte";
   import * as Card from "$lib/components/ui/card";
   import { Badge } from "$lib/components/ui/badge";
+  import { statusBadgeClass } from "$lib/utils/status-badge";
   import { Button } from "$lib/components/ui/button";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
@@ -60,10 +61,8 @@
       {#if node}
         <div class="flex flex-wrap items-center gap-2 mt-1">
           <Badge
-            variant={node.status === "online" ? "default" : "secondary"}
-            class={node.status === "online"
-              ? "bg-chart-2 text-black border-transparent"
-              : ""}
+            variant="outline"
+            class={statusBadgeClass(node.status)}
           >
             {node.status}
           </Badge>

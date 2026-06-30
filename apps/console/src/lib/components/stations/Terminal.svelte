@@ -3,6 +3,7 @@
   import { createTerminalClient } from "$lib/api/terminal";
   import type { TerminalClient } from "$lib/api/terminal";
   import { Badge } from "$lib/components/ui/badge";
+  import { statusBadgeClass } from "$lib/utils/status-badge";
 
   interface Props {
     stationId: string;
@@ -99,17 +100,11 @@
     disconnected: "Disconnected",
   };
 
-  const statusVariant: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
-    connecting: "outline",
-    connected: "default",
-    disconnected: "secondary",
-  };
-
-  const statusBadgeClass: Record<string, string> = {
-    connecting: "text-chart-4 border-chart-4/50",
-    connected:
-      "bg-chart-2 text-chart-2 border-transparent",
-    disconnected: "",
+  // Map terminal states to status tokens understood by statusBadgeClass
+  const statusToken: Record<string, string> = {
+    connecting: "pending",
+    connected: "connected",
+    disconnected: "stopped",
   };
 </script>
 
@@ -124,7 +119,7 @@
     <span class="text-xs font-mono text-muted-foreground/70 uppercase tracking-wide"
       >Terminal</span
     >
-    <Badge variant={statusVariant[status]} class={statusBadgeClass[status]}>
+    <Badge variant="outline" class={statusBadgeClass(statusToken[status] ?? status)}>
       {statusLabel[status]}
     </Badge>
   </div>

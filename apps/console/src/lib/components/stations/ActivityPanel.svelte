@@ -4,6 +4,7 @@
   import type { StationAuditRow } from "$lib/api/client";
   import { Button } from "$lib/components/ui/button";
   import { Badge } from "$lib/components/ui/badge";
+  import { statusBadgeClass } from "$lib/utils/status-badge";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import * as Card from "$lib/components/ui/card";
 
@@ -46,16 +47,10 @@
     return d.toLocaleString();
   }
 
-  function resultVariant(result: string): "default" | "destructive" | "secondary" | "outline" {
-    if (result === "ok") return "default";
-    if (result === "error") return "destructive";
-    return "secondary";
-  }
-
-  function resultClass(result: string): string {
-    if (result === "ok")
-      return "bg-chart-2 text-chart-2 border-transparent";
-    return "";
+  function resultBadgeClass(result: string): string {
+    if (result === "ok") return statusBadgeClass("running");   // chart-2 green
+    if (result === "error") return statusBadgeClass("error");  // destructive red
+    return statusBadgeClass("stopped");                        // muted default
   }
 </script>
 
@@ -104,8 +99,8 @@
               </span>
             {/if}
             <Badge
-              variant={resultVariant(row.result)}
-              class="text-[11px] uppercase tracking-wide {resultClass(row.result)}"
+              variant="outline"
+              class="text-[11px] uppercase tracking-wide {resultBadgeClass(row.result)}"
             >
               {row.result}
             </Badge>

@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from "svelte";
   import { logsUrl } from "$lib/api/client";
   import { Badge } from "$lib/components/ui/badge";
+  import { statusBadgeClass } from "$lib/utils/status-badge";
 
   interface Props {
     stationId: string;
@@ -65,17 +66,11 @@
     closed: "Disconnected",
   };
 
-  const statusVariant: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
-    connecting: "outline",
-    connected: "default",
-    closed: "secondary",
-  };
-
-  const statusBadgeClass: Record<string, string> = {
-    connecting: "text-chart-4 border-chart-4/50",
-    connected:
-      "bg-chart-2 text-chart-2 border-transparent",
-    closed: "",
+  // Map log-stream states to status tokens understood by statusBadgeClass
+  const statusToken: Record<string, string> = {
+    connecting: "pending",
+    connected: "connected",
+    closed: "stopped",
   };
 </script>
 
@@ -85,7 +80,7 @@
     class="flex items-center gap-2 px-3 py-1.5 border-b border-border/50 bg-black/30 shrink-0"
   >
     <span class="text-xs font-mono text-muted-foreground/70 uppercase tracking-wide">Logs</span>
-    <Badge variant={statusVariant[status]} class={statusBadgeClass[status]}>
+    <Badge variant="outline" class={statusBadgeClass(statusToken[status] ?? status)}>
       {statusLabel[status]}
     </Badge>
     <span class="ml-auto text-xs font-mono text-muted-foreground/60">

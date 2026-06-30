@@ -62,7 +62,7 @@
 
       <!-- Code hint -->
       <p class="mt-2 text-xs font-mono text-muted-foreground/60">
-        agentpod-node enroll --hub &lt;hub-url&gt; --token &lt;token&gt;
+        curl -fsSL https://github.com/rakeshgangwar/agentpod/releases/latest/download/install.sh | sudo bash -s -- &lt;hub-url&gt; &lt;token&gt;
       </p>
 
       <!-- CTA -->
