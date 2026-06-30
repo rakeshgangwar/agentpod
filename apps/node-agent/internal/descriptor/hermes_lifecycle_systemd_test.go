@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // writeFakeSystemctl writes an executable shell script named "systemctl" in
@@ -168,20 +169,31 @@ func TestHermesStart_KnownUnit_UsesSystemctl(t *testing.T) {
 	}
 }
 
-// TestHermesStart_AbsentUnit_FallsBackToStartCmd asserts that Start falls back
-// to the configured startCmd when the systemd unit is absent.
+// TestHermesStart_AbsentUnit_FallsBackToStartCmd asserts that, when the systemd
+// unit is absent, a configured startCmd is executed and takes precedence over
+// the native `hermes ... gateway run` fallback.
 func TestHermesStart_AbsentUnit_FallsBackToStartCmd(t *testing.T) {
 	tmpDir := t.TempDir()
 	writeFakeSystemctl(t, tmpDir, false /* unit absent */)
 	prependPath(t, tmpDir)
 
-	// With no startCmd configured, Start must return a descriptive error.
-	h := &hermesDescriptor{home: t.TempDir(), startCmd: ""}
-	err := h.Start("hermes:analyst-echo")
-	if err == nil {
-		t.Fatal("Start with absent unit + no startCmd: expected error, got nil")
+	// With a startCmd configured, Start must run it (not the native fallback).
+	marker := filepath.Join(tmpDir, "startcmd-ran")
+	h := &hermesDescriptor{home: t.TempDir(), startCmd: "touch " + marker}
+	if err := h.Start("hermes:analyst-echo"); err != nil {
+		t.Fatalf("Start with absent unit + startCmd: unexpected error: %v", err)
 	}
-	if !strings.Contains(err.Error(), "start command") && !strings.Contains(err.Error(), "startCmd") {
-		t.Errorf("error message should mention start command; got: %v", err)
+
+	// startCmd runs detached (Setsid, not waited on); poll for the marker file.
+	found := false
+	for i := 0; i < 100; i++ {
+		if _, err := os.Stat(marker); err == nil {
+			found = true
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if !found {
+		t.Error("expected the configured startCmd to run when the unit is absent")
 	}
 }

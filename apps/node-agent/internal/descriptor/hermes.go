@@ -257,13 +257,33 @@ func (h *hermesDescriptor) Start(key string) error {
 	if hermesUnitKnown(unit) {
 		return exec.Command("systemctl", "--user", "start", unit).Run()
 	}
-	// Fallback: run the configured start command.
-	if h.startCmd == "" {
-		return fmt.Errorf("no start command configured for hermes (set hermesStartCmd in node config)")
+	// An operator-configured start command takes precedence over the native
+	// fallback (it can encode a site-specific launcher).
+	if h.startCmd != "" {
+		cmd := exec.Command("sh", "-c", h.startCmd)
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+		return cmd.Start()
 	}
-	cmd := exec.Command("sh", "-c", h.startCmd)
+	// Native fallback: launch the profile gateway the way the Hermes supervisor
+	// does — `hermes -p <name> gateway run --replace` — detached so it outlives
+	// the node-agent. This covers process-tree (non-systemd, e.g. root) Hermes
+	// deployments where no unit exists and no startCmd is configured; without it
+	// a restart would Stop the profile and then fail to Start it. The `-p <name>`
+	// form keeps the launched process matchable by hermesPattern(), which
+	// Health/Stop rely on via pgrep.
+	cmd := exec.Command("hermes", hermesNativeStartArgs(key)...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	return cmd.Start()
+}
+
+// hermesNativeStartArgs builds the argv (after the `hermes` binary) to launch a
+// profile gateway natively. For the root key it omits the profile selector.
+func hermesNativeStartArgs(key string) []string {
+	if key == "hermes" {
+		return []string{"gateway", "run", "--replace"}
+	}
+	name := strings.TrimPrefix(key, "hermes:")
+	return []string{"-p", name, "gateway", "run", "--replace"}
 }
 
 // ListDir lists the directory at rel (relative to the station's workspace).
