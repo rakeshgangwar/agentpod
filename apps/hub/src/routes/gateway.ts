@@ -29,6 +29,14 @@ export const gatewayRoutes = new Hono().get(
     const nodeId = colonIdx !== -1 ? token.slice(0, colonIdx) : token;
     const nodeSecret = colonIdx !== -1 ? token.slice(colonIdx + 1) : "";
     let authed: string | null = null;
+    // Resolves true once auth completes, false if the connection is rejected or
+    // closed first. onMessage awaits this so an early frame — notably the
+    // one-shot `hello` the agent sends immediately on connect, which carries the
+    // agent version — is processed after auth instead of being dropped mid-auth.
+    let resolveAuth!: (ok: boolean) => void;
+    const authReady = new Promise<boolean>((r) => {
+      resolveAuth = r;
+    });
 
     return {
       async onOpen(_e, ws) {
@@ -37,12 +45,14 @@ export const gatewayRoutes = new Hono().get(
           !nodeSecret ||
           !(await verifyNodeCredential(nodeId, nodeSecret))
         ) {
+          resolveAuth(false);
           ws.close(1008, "unauthorized");
           return;
         }
         authed = nodeId;
         connectionManager.register(nodeId, (m) => ws.send(JSON.stringify(m)));
         await setNodeStatus(nodeId, "online");
+        resolveAuth(true);
 
         // Auto-adopt provisioned harness station once the node can answer detect.
         // Fire-and-forget with retries — never blocks or throws into the gateway.
@@ -59,7 +69,12 @@ export const gatewayRoutes = new Hono().get(
       },
 
       async onMessage(evt, _ws) {
-        if (!authed) return;
+        // Wait for auth to finish rather than dropping early frames (the agent's
+        // hello can arrive before verifyNodeCredential resolves).
+        if (!authed) {
+          const ok = await authReady;
+          if (!ok || !authed) return;
+        }
         let parsed;
         try {
           parsed = GatewayClientMessage.safeParse(JSON.parse(String(evt.data)));
@@ -82,6 +97,7 @@ export const gatewayRoutes = new Hono().get(
       },
 
       async onClose() {
+        resolveAuth(false); // unblock any onMessage awaiting auth on early close
         if (authed) {
           dropNode(authed);
           connectionManager.unregister(authed);

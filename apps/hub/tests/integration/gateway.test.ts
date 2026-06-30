@@ -222,10 +222,10 @@ test("hello frame version is persisted to agentVersion on the node row", async (
       ws.onerror = () => rej(new Error("WebSocket connection error"));
     });
 
-    // Wait for server onOpen to complete (verifyNodeCredential is async)
-    await new Promise((r) => setTimeout(r, 150));
-
-    // Send hello with version field
+    // Send hello IMMEDIATELY on open (as the real agent does) — it races with
+    // the server's async verifyNodeCredential. The hub must still ingest the
+    // one-shot hello (it carries the version); regression test for the
+    // dropped-hello race that left agent_version null in production.
     ws.send(JSON.stringify({ type: "hello", hostInfo: { hostname: "version-host", os: "linux", arch: "amd64", cpuCount: 2 }, version: "v0.1.1" }));
 
     await new Promise((r) => setTimeout(r, 300));
