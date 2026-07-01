@@ -278,7 +278,31 @@ func (h *hermesDescriptor) Start(key string) error {
 	// a restart would Stop the profile and then fail to Start it. The `-p <name>`
 	// form keeps the launched process matchable by hermesPattern(), which
 	// Health/Stop rely on via pgrep.
-	cmd := exec.Command("hermes", hermesNativeStartArgs(key)...)
+	return startDetached("hermes", hermesNativeStartArgs(key)...)
+}
+
+// startDetached launches a background process that must OUTLIVE a node-agent
+// restart. The node-agent's own systemd unit uses KillMode=control-group, so a
+// plain child we fork lives in our cgroup and is SIGKILLed when the node-agent
+// restarts (e.g. self-update). To escape that cgroup we launch via `systemd-run`,
+// which starts the command as a transient systemd service in its own cgroup,
+// reparented to PID 1. On hosts without systemd-run there is no cgroup-kill
+// concern, so we fall back to a plain detached (Setsid) child.
+//
+// The target binary is resolved to an absolute path first: a systemd-run
+// transient service does not inherit our PATH, so a bare name might not resolve.
+func startDetached(name string, args ...string) error {
+	if runner, err := exec.LookPath("systemd-run"); err == nil {
+		bin := name
+		if abs, lpErr := exec.LookPath(name); lpErr == nil {
+			bin = abs
+		}
+		// --collect reaps the transient unit when it exits; --quiet suppresses the
+		// "Running as unit: …" notice.
+		runArgs := append([]string{"--collect", "--quiet", bin}, args...)
+		return exec.Command(runner, runArgs...).Run()
+	}
+	cmd := exec.Command(name, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	return cmd.Start()
 }
