@@ -150,6 +150,17 @@ func (h *hermesDescriptor) Health(key string) (Health, error) {
 	// Best-effort process check via pgrep.
 	health.Running, _ = hermesProcessRunning(key)
 
+	// Live process metrics: best-effort — when the profile is running, resolve
+	// its PID and gather CPU/memory/uptime. Hermes runs a separate process per
+	// profile, so these are honest PER-AGENT numbers. Any failure leaves the
+	// metric fields nil; Health() never fails on a ps hiccup.
+	if health.Running {
+		if pid, err := hermesPID(key); err == nil {
+			health.PID = &pid
+			health.CpuPct, health.MemBytes, health.UptimeSec = gatherPidMetrics(pid)
+		}
+	}
+
 	return health, nil
 }
 
@@ -178,13 +189,20 @@ func hermesUnitKnown(unit string) bool {
 	return exec.Command("systemctl", "--user", "cat", unit).Run() == nil
 }
 
-// hermesPattern returns the pgrep pattern for a Hermes station key.
+// hermesPattern returns the pgrep -f (ERE) pattern for a Hermes station key.
+// It matches BOTH profile-gateway invocation forms:
+//
+//	hermes -p <name> gateway ...                       (direct binary, short flag)
+//	... hermes_cli.main --profile <name> gateway ...   (supervisor respawn, long flag)
+//
+// The long form is used when the Hermes main gateway restarts a profile;
+// matching only the short form reported such profiles as stopped while running.
 func hermesPattern(key string) string {
 	if key == "hermes" {
 		return "hermes"
 	}
 	name := strings.TrimPrefix(key, "hermes:")
-	return fmt.Sprintf("hermes -p %s gateway", name)
+	return fmt.Sprintf("(-p|--profile)[ =]%s gateway", name)
 }
 
 // hermesPID returns the PID of the running Hermes process for key,
@@ -246,13 +264,66 @@ func (h *hermesDescriptor) Start(key string) error {
 	if hermesUnitKnown(unit) {
 		return exec.Command("systemctl", "--user", "start", unit).Run()
 	}
-	// Fallback: run the configured start command.
-	if h.startCmd == "" {
-		return fmt.Errorf("no start command configured for hermes (set hermesStartCmd in node config)")
+	// An operator-configured start command takes precedence over the native
+	// fallback (it can encode a site-specific launcher).
+	if h.startCmd != "" {
+		cmd := exec.Command("sh", "-c", h.startCmd)
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+		return cmd.Start()
 	}
-	cmd := exec.Command("sh", "-c", h.startCmd)
+	// Native fallback: launch the profile gateway the way the Hermes supervisor
+	// does — `hermes -p <name> gateway run --replace` — detached so it outlives
+	// the node-agent. This covers process-tree (non-systemd, e.g. root) Hermes
+	// deployments where no unit exists and no startCmd is configured; without it
+	// a restart would Stop the profile and then fail to Start it. The `-p <name>`
+	// form keeps the launched process matchable by hermesPattern(), which
+	// Health/Stop rely on via pgrep.
+	return startDetached("hermes", hermesNativeStartArgs(key)...)
+}
+
+// startDetached launches a background process that must OUTLIVE a node-agent
+// restart. The node-agent's own systemd unit uses KillMode=control-group, so a
+// plain child we fork lives in our cgroup and is SIGKILLed when the node-agent
+// restarts (e.g. self-update). To escape that cgroup we launch via `systemd-run`,
+// which starts the command as a transient systemd service in its own cgroup,
+// reparented to PID 1. On hosts without systemd-run there is no cgroup-kill
+// concern, so we fall back to a plain detached (Setsid) child.
+//
+// The target binary is resolved to an absolute path first: a systemd-run
+// transient service does not inherit our PATH, so a bare name might not resolve.
+func startDetached(name string, args ...string) error {
+	if runner, err := exec.LookPath("systemd-run"); err == nil {
+		bin := name
+		if abs, lpErr := exec.LookPath(name); lpErr == nil {
+			bin = abs
+		}
+		// --collect reaps the transient unit when it exits; --quiet suppresses the
+		// "Running as unit: …" notice.
+		runArgs := append([]string{"--collect", "--quiet", bin}, args...)
+		return exec.Command(runner, runArgs...).Run()
+	}
+	cmd := exec.Command(name, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	return cmd.Start()
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	// Reap the child in the background so a short-lived process does not linger
+	// as a defunct (zombie) entry under the node-agent. The launched gateway is
+	// normally long-lived, so Wait simply blocks harmlessly until it exits; if it
+	// exits promptly (or in tests with a fast stub), this prevents a leaked
+	// zombie — one whose comm can otherwise be matched by pgrep.
+	go func() { _ = cmd.Wait() }()
+	return nil
+}
+
+// hermesNativeStartArgs builds the argv (after the `hermes` binary) to launch a
+// profile gateway natively. For the root key it omits the profile selector.
+func hermesNativeStartArgs(key string) []string {
+	if key == "hermes" {
+		return []string{"gateway", "run", "--replace"}
+	}
+	name := strings.TrimPrefix(key, "hermes:")
+	return []string{"-p", name, "gateway", "run", "--replace"}
 }
 
 // ListDir lists the directory at rel (relative to the station's workspace).

@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../db/drizzle";
 import { nodes, provisionedRuntimes } from "../db/schema/nodes";
 import type { NodeSummary } from "@agentpod/contract";
-import { getLatestAgentVersion } from "./agent-version";
+import { getLatestAgentVersion, isNewerVersion } from "./agent-version";
 
 export type NodeWithProvisioning = NodeSummary & {
   provisioned: { runtimeId: string; provider: string } | null;
@@ -26,7 +26,7 @@ export function annotateWithVersion<
     updateAvailable:
       n.agentVersion != null &&
       latestVersion != null &&
-      n.agentVersion !== latestVersion,
+      isNewerVersion(latestVersion, n.agentVersion),
   }));
 }
 

@@ -44,8 +44,13 @@ func TestUpdateHandler_UpdateVerb(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !handled {
-		t.Error("expected handled=true")
+	// update must NOT be streamed: it is a one-shot RPC whose result map is sent
+	// as a `res` frame. The hub issues it via broker.request(), which only
+	// resolves on a `res` frame — a streamed (stream-eof) reply is never matched,
+	// so the request hangs until the node exits to restart and is then reported
+	// as a false "node disconnected" failure even though the update succeeded.
+	if handled {
+		t.Error("update must return streamed=false so the dispatcher emits a res frame the hub can resolve")
 	}
 
 	m, ok := result.(map[string]any)
@@ -71,6 +76,47 @@ func TestUpdateHandler_UpdateVerb(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for exit goroutine")
+	}
+}
+
+// frameRecorder is a Handler that ALSO implements FrameHandler, recording the
+// last HandleFrame call. Used to prove updateHandler forwards inbound terminal
+// input/resize frames to its inner handler instead of erasing the interface.
+type frameRecorder struct {
+	stubInner
+	gotType string
+	gotID   string
+	gotRaw  json.RawMessage
+}
+
+func (f *frameRecorder) HandleFrame(frameType, id string, raw json.RawMessage) error {
+	f.gotType = frameType
+	f.gotID = id
+	f.gotRaw = raw
+	return nil
+}
+
+// TestUpdateHandler_ForwardsFrames guards against the decorator dropping the
+// FrameHandler interface. In run.go updateHandler wraps a terminalHandler, and
+// the dispatcher routes terminal keystrokes via `h.(FrameHandler)` on the
+// OUTERMOST handler. If updateHandler does not forward HandleFrame, that
+// assertion fails and every input/resize frame is silently discarded — the
+// terminal connects but accepts no input.
+func TestUpdateHandler_ForwardsFrames(t *testing.T) {
+	inner := &frameRecorder{}
+	h := NewUpdateHandler(inner, "v0.1.2")
+
+	fh, ok := h.(FrameHandler)
+	if !ok {
+		t.Fatal("updateHandler must implement FrameHandler so wrapping a terminalHandler does not drop terminal input/resize frames")
+	}
+
+	raw := json.RawMessage(`{"type":"input","id":"attach-1","data":"aGk="}`)
+	if err := fh.HandleFrame("input", "attach-1", raw); err != nil {
+		t.Fatalf("HandleFrame: %v", err)
+	}
+	if inner.gotType != "input" || inner.gotID != "attach-1" {
+		t.Errorf("frame not forwarded to inner: gotType=%q gotID=%q", inner.gotType, inner.gotID)
 	}
 }
 

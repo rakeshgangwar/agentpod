@@ -68,3 +68,26 @@ export async function getLatestAgentVersion(
     return _cache.value;
   }
 }
+
+/**
+ * Return true iff `latest` is a STRICTLY newer version than `current`.
+ *
+ * Versions are "vMAJOR.MINOR.PATCH" (leading "v" optional). Anything that does
+ * not parse (e.g. "unknown", null) yields false. Using a real ordering — rather
+ * than plain inequality — means a stale/older cached "latest" never produces a
+ * spurious "update available" (which would read as a downgrade in the UI).
+ */
+export function isNewerVersion(latest: string, current: string): boolean {
+  const parse = (v: string): [number, number, number] | null => {
+    const m = /^v?(\d+)\.(\d+)\.(\d+)/.exec(v.trim());
+    return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+  };
+  const a = parse(latest);
+  const b = parse(current);
+  if (!a || !b) return false;
+  // Compare major, then minor, then patch. Literal tuple indices keep each
+  // element typed as a definite number (no noUncheckedIndexedAccess widening).
+  if (a[0] !== b[0]) return a[0] > b[0];
+  if (a[1] !== b[1]) return a[1] > b[1];
+  return a[2] > b[2];
+}

@@ -18,6 +18,10 @@ jobs:
     name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
     runs-on: ubuntu-latest
     strategy:
+      # Don't let one arch's transient runner failure cancel the others and skip
+      # the dependent SHA256SUMS/static-asset jobs (which produced an incomplete
+      # release on v0.1.7, needing a manual `gh run rerun --failed`).
+      fail-fast: false
       matrix:
         include:
           - goos: linux

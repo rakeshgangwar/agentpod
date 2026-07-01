@@ -184,18 +184,12 @@ func (o *openclawDescriptor) Health(key string) (Health, error) {
 	// swallowed so Health() never crashes.
 	if running {
 		if pid, pidErr := openclawGatewayPID(); pidErr == nil {
-			psOut, psErr := exec.Command(
-				"ps", "-p", strconv.Itoa(pid), "-o", "%cpu=,rss=,etime=",
-			).Output()
-			if psErr == nil {
-				if cpuPct, rssKB, uptimeSec, parseErr := parsePsMetrics(string(psOut)); parseErr == nil {
-					health.PID = &pid
-					health.CpuPct = &cpuPct
-					memBytes := rssKB * 1024
-					health.MemBytes = &memBytes
-					health.UptimeSec = &uptimeSec
-					note = fmt.Sprintf("shared gateway (PID %d)", pid)
-				}
+			if cpuPct, memBytes, uptimeSec := gatherPidMetrics(pid); cpuPct != nil {
+				health.PID = &pid
+				health.CpuPct = cpuPct
+				health.MemBytes = memBytes
+				health.UptimeSec = uptimeSec
+				note = fmt.Sprintf("shared gateway (PID %d)", pid)
 			}
 		}
 	}
