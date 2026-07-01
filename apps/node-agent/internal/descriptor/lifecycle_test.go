@@ -2,6 +2,7 @@ package descriptor
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"syscall"
 	"testing"
@@ -112,7 +113,13 @@ func TestHermesLifecycle_StopNoProcess_ReturnsError(t *testing.T) {
 	// No hermes process is running in CI; Stop must return an error.
 	err := h.Stop("hermes")
 	if err == nil {
-		t.Fatal("expected error when no hermes process is running")
+		// DIAGNOSTIC (temporary): reveal why Stop found a match.
+		unit := hermesUnitName("hermes")
+		pg, _ := exec.Command("pgrep", "-af", hermesPattern("hermes")).Output()
+		selfCmd, _ := os.ReadFile(fmt.Sprintf("/proc/%d/cmdline", os.Getpid()))
+		t.Fatalf("expected error when no hermes process is running.\n"+
+			"hermesUnitKnown(%q)=%v\npattern=%q\npgrep -af:\n%s\ntest cmdline: %q",
+			unit, hermesUnitKnown(unit), hermesPattern("hermes"), pg, string(selfCmd))
 	}
 }
 
