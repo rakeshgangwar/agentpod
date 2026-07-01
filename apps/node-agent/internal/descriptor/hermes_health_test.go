@@ -16,11 +16,15 @@ import (
 func TestHermesProcessRunning_MatchesProfileLongForm(t *testing.T) {
 	name := "tddprof-longform"
 
-	// Stand-in process whose command line carries the long-form marker. The
-	// compound `sleep …; true` keeps the shell alive (no exec-replace) so the
-	// marker stays in argv; Setpgid lets cleanup reap it via the process group.
+	// Stand-in process whose command line carries the long-form marker
+	// (`--profile <name> gateway`). We deliberately OMIT the "hermes"/
+	// "hermes_cli.main" token: the profile pattern does not need it, and
+	// including it would make this fixture match the broad root-key
+	// `pgrep -f "hermes"` used by other lifecycle tests. The compound
+	// `sleep …; true` keeps the shell alive (no exec-replace) so the marker
+	// stays in argv; Setpgid lets cleanup reap it via the process group.
 	proc := exec.Command("/bin/sh", "-c",
-		"sleep 30; true # python -m hermes_cli.main --profile "+name+" gateway run --replace")
+		"sleep 30; true # --profile "+name+" gateway run --replace")
 	proc.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	if err := proc.Start(); err != nil {
 		t.Fatalf("start stand-in process: %v", err)
@@ -55,12 +59,14 @@ func TestHermesHealth_PopulatesMetricsWhenRunning(t *testing.T) {
 	home := testdataHermesHome(t)
 	d := NewHermes(home)
 
-	// The marker "hermes -p coder-kai gateway" lives inside the -c script (argv),
-	// so pgrep -f matches it. The compound command (`sleep …; true`) keeps the
-	// shell from exec-replacing itself, preserving the marker in the command line.
-	// Setpgid lets cleanup reap the shell AND its sleep child without touching the
-	// test's own process group.
-	proc := exec.Command("/bin/sh", "-c", "sleep 30; true # hermes -p coder-kai gateway")
+	// The marker "-p coder-kai gateway" lives inside the -c script (argv), so
+	// pgrep -f matches the profile pattern. We deliberately OMIT the "hermes"
+	// token — it is not needed for the profile pattern, and including it would
+	// make this fixture match the broad root-key `pgrep -f "hermes"` used by
+	// other lifecycle tests (a cross-test collision). The compound command
+	// (`sleep …; true`) keeps the shell from exec-replacing itself, preserving
+	// the marker; Setpgid lets cleanup reap the shell AND its sleep child.
+	proc := exec.Command("/bin/sh", "-c", "sleep 30; true # -p coder-kai gateway run")
 	proc.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	if err := proc.Start(); err != nil {
 		t.Fatalf("start stand-in process: %v", err)
