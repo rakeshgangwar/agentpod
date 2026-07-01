@@ -209,6 +209,11 @@ func hermesPattern(key string) string {
 // or an error if no matching process is found.
 func hermesPID(key string) (int, error) {
 	out, err := exec.Command("pgrep", "-f", hermesPattern(key)).Output()
+	if os.Getenv("APN_DIAG") != "" { // TEMP diagnostic
+		af, _ := exec.Command("pgrep", "-af", hermesPattern(key)).Output()
+		fmt.Fprintf(os.Stderr, "DIAG hermesPID key=%q pattern=%q pgrep-out=%q err=%v pgrep-af=%q\n",
+			key, hermesPattern(key), out, err, af)
+	}
 	if err != nil {
 		return 0, fmt.Errorf("no hermes process for key %q", key)
 	}

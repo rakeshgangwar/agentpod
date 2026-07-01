@@ -108,16 +108,13 @@ func TestLifecycle_Restart_StopThenStart(t *testing.T) {
 // --- hermesDescriptor lifecycle ---
 
 func TestHermesLifecycle_StopNoProcess_ReturnsError(t *testing.T) {
-	// DIAGNOSTIC v3 (temporary): capture the FIRST `systemctl --user` behavior,
-	// which is what hermesUnitKnown/Stop hit on a cold test binary.
-	unit := hermesUnitName("hermes")
-	catOut, catErr := exec.Command("systemctl", "--user", "cat", unit).CombinedOutput()
-	stopOut, stopErr := exec.Command("systemctl", "--user", "stop", unit).CombinedOutput()
-
+	t.Setenv("APN_DIAG", "1") // TEMP: make hermesPID print what its pgrep matches
 	h := &hermesDescriptor{home: t.TempDir()}
+	// No hermes process is running in CI; Stop must return an error.
 	err := h.Stop("hermes")
-	t.Fatalf("Stop err=%v\n`systemctl --user cat %s`: exit-nil=%v err=%v out=%q\n`systemctl --user stop %s`: exit-nil=%v err=%v out=%q",
-		err, unit, catErr == nil, catErr, catOut, unit, stopErr == nil, stopErr, stopOut)
+	if err == nil {
+		t.Fatal("expected error when no hermes process is running")
+	}
 }
 
 func TestHermesLifecycle_StartNoCommand_ReturnsError(t *testing.T) {
