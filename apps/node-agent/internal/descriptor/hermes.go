@@ -209,11 +209,6 @@ func hermesPattern(key string) string {
 // or an error if no matching process is found.
 func hermesPID(key string) (int, error) {
 	out, err := exec.Command("pgrep", "-f", hermesPattern(key)).Output()
-	if os.Getenv("APN_DIAG") != "" { // TEMP diagnostic
-		af, _ := exec.Command("pgrep", "-af", hermesPattern(key)).Output()
-		fmt.Fprintf(os.Stderr, "DIAG hermesPID key=%q pattern=%q pgrep-out=%q err=%v pgrep-af=%q\n",
-			key, hermesPattern(key), out, err, af)
-	}
 	if err != nil {
 		return 0, fmt.Errorf("no hermes process for key %q", key)
 	}
@@ -309,7 +304,16 @@ func startDetached(name string, args ...string) error {
 	}
 	cmd := exec.Command(name, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	return cmd.Start()
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	// Reap the child in the background so a short-lived process does not linger
+	// as a defunct (zombie) entry under the node-agent. The launched gateway is
+	// normally long-lived, so Wait simply blocks harmlessly until it exits; if it
+	// exits promptly (or in tests with a fast stub), this prevents a leaked
+	// zombie — one whose comm can otherwise be matched by pgrep.
+	go func() { _ = cmd.Wait() }()
+	return nil
 }
 
 // hermesNativeStartArgs builds the argv (after the `hermes` binary) to launch a

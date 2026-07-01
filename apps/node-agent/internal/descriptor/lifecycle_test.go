@@ -108,7 +108,6 @@ func TestLifecycle_Restart_StopThenStart(t *testing.T) {
 // --- hermesDescriptor lifecycle ---
 
 func TestHermesLifecycle_StopNoProcess_ReturnsError(t *testing.T) {
-	t.Setenv("APN_DIAG", "1") // TEMP: make hermesPID print what its pgrep matches
 	h := &hermesDescriptor{home: t.TempDir()}
 	// No hermes process is running in CI; Stop must return an error.
 	err := h.Stop("hermes")
