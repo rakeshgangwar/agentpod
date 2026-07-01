@@ -189,13 +189,20 @@ func hermesUnitKnown(unit string) bool {
 	return exec.Command("systemctl", "--user", "cat", unit).Run() == nil
 }
 
-// hermesPattern returns the pgrep pattern for a Hermes station key.
+// hermesPattern returns the pgrep -f (ERE) pattern for a Hermes station key.
+// It matches BOTH profile-gateway invocation forms:
+//
+//	hermes -p <name> gateway ...                       (direct binary, short flag)
+//	... hermes_cli.main --profile <name> gateway ...   (supervisor respawn, long flag)
+//
+// The long form is used when the Hermes main gateway restarts a profile;
+// matching only the short form reported such profiles as stopped while running.
 func hermesPattern(key string) string {
 	if key == "hermes" {
 		return "hermes"
 	}
 	name := strings.TrimPrefix(key, "hermes:")
-	return fmt.Sprintf("hermes -p %s gateway", name)
+	return fmt.Sprintf("(-p|--profile)[ =]%s gateway", name)
 }
 
 // hermesPID returns the PID of the running Hermes process for key,
