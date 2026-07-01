@@ -3,7 +3,6 @@ package descriptor
 import (
 	"fmt"
 	"os/exec"
-	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -109,26 +108,16 @@ func TestLifecycle_Restart_StopThenStart(t *testing.T) {
 // --- hermesDescriptor lifecycle ---
 
 func TestHermesLifecycle_StopNoProcess_ReturnsError(t *testing.T) {
+	// DIAGNOSTIC v3 (temporary): capture the FIRST `systemctl --user` behavior,
+	// which is what hermesUnitKnown/Stop hit on a cold test binary.
+	unit := hermesUnitName("hermes")
+	catOut, catErr := exec.Command("systemctl", "--user", "cat", unit).CombinedOutput()
+	stopOut, stopErr := exec.Command("systemctl", "--user", "stop", unit).CombinedOutput()
+
 	h := &hermesDescriptor{home: t.TempDir()}
-	// No hermes process is running in CI; Stop must return an error.
 	err := h.Stop("hermes")
-	if err == nil {
-		// DIAGNOSTIC (temporary): the match is transient. Re-run Stop while
-		// sampling pgrep to catch which fleeting "hermes" process it hits.
-		seen := map[string]bool{}
-		var caught []string
-		for i := 0; i < 300; i++ {
-			out, _ := exec.Command("pgrep", "-af", "hermes").Output()
-			if s := strings.TrimSpace(string(out)); s != "" && !seen[s] {
-				seen[s] = true
-				caught = append(caught, s)
-			}
-			_ = h.Stop("hermes")
-		}
-		t.Fatalf("expected error when no hermes process is running.\n"+
-			"distinct transient pgrep -af hermes matches: %d\n%s",
-			len(caught), strings.Join(caught, "\n---\n"))
-	}
+	t.Fatalf("Stop err=%v\n`systemctl --user cat %s`: exit-nil=%v err=%v out=%q\n`systemctl --user stop %s`: exit-nil=%v err=%v out=%q",
+		err, unit, catErr == nil, catErr, catOut, unit, stopErr == nil, stopErr, stopOut)
 }
 
 func TestHermesLifecycle_StartNoCommand_ReturnsError(t *testing.T) {
