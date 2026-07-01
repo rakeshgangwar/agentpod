@@ -2,8 +2,8 @@ package descriptor
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -113,13 +113,21 @@ func TestHermesLifecycle_StopNoProcess_ReturnsError(t *testing.T) {
 	// No hermes process is running in CI; Stop must return an error.
 	err := h.Stop("hermes")
 	if err == nil {
-		// DIAGNOSTIC (temporary): reveal why Stop found a match.
-		unit := hermesUnitName("hermes")
-		pg, _ := exec.Command("pgrep", "-af", hermesPattern("hermes")).Output()
-		selfCmd, _ := os.ReadFile(fmt.Sprintf("/proc/%d/cmdline", os.Getpid()))
+		// DIAGNOSTIC (temporary): the match is transient. Re-run Stop while
+		// sampling pgrep to catch which fleeting "hermes" process it hits.
+		seen := map[string]bool{}
+		var caught []string
+		for i := 0; i < 300; i++ {
+			out, _ := exec.Command("pgrep", "-af", "hermes").Output()
+			if s := strings.TrimSpace(string(out)); s != "" && !seen[s] {
+				seen[s] = true
+				caught = append(caught, s)
+			}
+			_ = h.Stop("hermes")
+		}
 		t.Fatalf("expected error when no hermes process is running.\n"+
-			"hermesUnitKnown(%q)=%v\npattern=%q\npgrep -af:\n%s\ntest cmdline: %q",
-			unit, hermesUnitKnown(unit), hermesPattern("hermes"), pg, string(selfCmd))
+			"distinct transient pgrep -af hermes matches: %d\n%s",
+			len(caught), strings.Join(caught, "\n---\n"))
 	}
 }
 
